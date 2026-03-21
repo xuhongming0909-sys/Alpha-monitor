@@ -52,6 +52,9 @@ jobs:
           SERVER_SERVICE_NAME="${SERVER_SERVICE_NAME:-alpha-monitor}"
           ssh -i ~/.ssh/id_rsa -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
             set -euo pipefail
+            sudo chown -R \"$SERVER_USER:$SERVER_USER\" \"$SERVER_APP_DIR\"
             cd \"$SERVER_APP_DIR\"
-            PROJECT_ROOT=\"$SERVER_APP_DIR\" PROJECT_OWNER=\"$SERVER_USER\" SERVICE_NAME=\"$SERVER_SERVICE_NAME\" bash tools/deploy/update_from_github.sh
+            git fetch --all --prune
+            git reset --hard origin/main
+            PROJECT_ROOT=\"$SERVER_APP_DIR\" PROJECT_OWNER=\"$SERVER_USER\" SKIP_GIT_SYNC=1 SERVICE_NAME=\"$SERVER_SERVICE_NAME\" bash tools/deploy/update_from_github.sh
           "
