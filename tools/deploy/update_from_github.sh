@@ -125,6 +125,9 @@ else
   npm install
 fi
 
+log "ensuring Linux entrypoint is executable"
+chmod +x "$PROJECT_ROOT/tools/deploy/start_linux.sh"
+
 if service_exists; then
   log "restarting system service: ${SERVICE_NAME}"
   run_systemctl restart "$SERVICE_NAME"
