@@ -16,6 +16,8 @@ GIT_RETRY_COUNT="${GIT_RETRY_COUNT:-8}"
 GIT_RETRY_DELAY_SECONDS="${GIT_RETRY_DELAY_SECONDS:-8}"
 SERVICE_RETRY_COUNT="${SERVICE_RETRY_COUNT:-8}"
 SERVICE_RETRY_DELAY_SECONDS="${SERVICE_RETRY_DELAY_SECONDS:-2}"
+HEALTHCHECK_RETRY_COUNT="${HEALTHCHECK_RETRY_COUNT:-20}"
+HEALTHCHECK_RETRY_DELAY_SECONDS="${HEALTHCHECK_RETRY_DELAY_SECONDS:-2}"
 VERIFY_CONFIG_YAML="${VERIFY_CONFIG_YAML:-1}"
 FORCE_RELEASE_APP_PORT="${FORCE_RELEASE_APP_PORT:-1}"
 VERIFY_HOMEPAGE_MARKER="${VERIFY_HOMEPAGE_MARKER:-1}"
@@ -301,6 +303,7 @@ release_stale_port_owner() {
 run_health_check() {
   local resolved_port="${1:-}"
   local health_url
+  local attempt=1
 
   if [[ -z "$resolved_port" ]]; then
     resolved_port="$(detect_app_port)"
@@ -308,7 +311,22 @@ run_health_check() {
   health_url="http://127.0.0.1:${resolved_port}${HEALTH_PATH}"
 
   log "checking health: ${health_url}"
-  curl --fail --silent --show-error "$health_url" >/dev/null
+  while (( attempt <= HEALTHCHECK_RETRY_COUNT )); do
+    if curl --fail --silent --show-error "$health_url" >/dev/null; then
+      return 0
+    fi
+
+    if (( attempt == HEALTHCHECK_RETRY_COUNT )); then
+      warn "health check failed after ${HEALTHCHECK_RETRY_COUNT} attempts"
+      run_systemctl --no-pager --full status "$SERVICE_NAME" | sed -n '1,24p' || true
+      sudo -n journalctl -u "${SERVICE_NAME}" -n 80 --no-pager 2>/dev/null || journalctl -u "${SERVICE_NAME}" -n 80 --no-pager || true
+      die "health check failed: ${health_url}"
+    fi
+
+    warn "health check not ready yet (attempt ${attempt}/${HEALTHCHECK_RETRY_COUNT}), retry in ${HEALTHCHECK_RETRY_DELAY_SECONDS}s"
+    sleep "$HEALTHCHECK_RETRY_DELAY_SECONDS"
+    attempt=$((attempt + 1))
+  done
 }
 
 run_homepage_marker_check() {

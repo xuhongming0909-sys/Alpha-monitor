@@ -208,6 +208,7 @@ Planned script hardening in `tools/deploy/update_from_github.sh`:
    - expected marker exists: `dashboard_page.js`
    - forbidden legacy markers absent: `app.js|message-form`
 5. Fail fast with clear deploy-stage logs when marker verification fails.
+6. Convert single-shot health probe into retry-based readiness check with explicit retry logs.
 
 Acceptance:
 - Deployment fails instead of silently serving stale homepage content.

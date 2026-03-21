@@ -362,3 +362,4 @@
   - expected marker present: `dashboard_page.js`
   - forbidden legacy markers absent: `app.js` and `message-form`
 - If marker validation fails, deployment must exit non-zero and report explicit reason in logs.
+- Health check after restart must use a retry window (instead of single-shot probe) to avoid startup race false failures.

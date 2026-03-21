@@ -549,3 +549,4 @@ GitHub 自动部署正式链路固定为：
    - required marker: `dashboard_page.js`
    - forbidden legacy markers: `app.js|message-form`
 5. Marker check failure must terminate deploy with non-zero exit code.
+6. Health check must run with retry attempts and delay window to tolerate post-restart warm-up.
