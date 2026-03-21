@@ -195,3 +195,20 @@
 - 本次是否需要先输出或更新 `plan.md`：`是，已完成`
 - 当前是否已经进入实施阶段：`是，文档更新后进入代码实施`
 
+
+## 9. Phase F: One-shot Recovery Hardening (2026-03-22)
+
+Goal: eliminate the recurring "service is running but homepage is old" deployment drift.
+
+Planned script hardening in `tools/deploy/update_from_github.sh`:
+1. Validate `config.yaml` syntax before install/restart.
+2. Resolve `app.port` and force-release stale process owners on that port before service restart.
+3. Keep systemd unit refresh as the single source of service startup path.
+4. After health check, verify homepage markers:
+   - expected marker exists: `dashboard_page.js`
+   - forbidden legacy markers absent: `app.js|message-form`
+5. Fail fast with clear deploy-stage logs when marker verification fails.
+
+Acceptance:
+- Deployment fails instead of silently serving stale homepage content.
+- Successful deployment guarantees local homepage contract consistency with dashboard entry.

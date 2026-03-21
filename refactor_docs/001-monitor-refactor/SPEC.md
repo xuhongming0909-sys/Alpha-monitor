@@ -538,3 +538,14 @@ GitHub 自动部署正式链路固定为：
 5. 若服务已安装，则服务自动重启
 6. `/api/health` 在部署后返回可用结果，且 `web = ok`
 
+
+#### 8.8.7 Deploy Drift Guardrails (2026-03-22)
+
+`tools/deploy/update_from_github.sh` must enforce:
+1. `config.yaml` syntax validation before dependency install and service restart.
+2. Resolve runtime app port from config, then release stale process owners on that port before restart.
+3. Keep systemd unit refresh as the canonical service startup path.
+4. After `/api/health` passes, run homepage marker verification on `http://127.0.0.1:${app.port}/`:
+   - required marker: `dashboard_page.js`
+   - forbidden legacy markers: `app.js|message-form`
+5. Marker check failure must terminate deploy with non-zero exit code.

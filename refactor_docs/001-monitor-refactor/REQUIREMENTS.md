@@ -353,3 +353,12 @@
 - 部署任务中的服务器业务执行日志来自 `tools/deploy/update_from_github.sh`，而不是散落在 workflow YAML 内。
 - 自动部署完成后，正式网址与 `/api/health` 仍可访问，且 `web` 状态为 `ok`。
 
+
+## 18. Deploy Drift Guardrails (2026-03-22)
+
+- The server deploy script must validate `config.yaml` syntax before service restart.
+- The server deploy script must force-release stale listeners on `app.port` before restarting managed service.
+- Deployment success must include homepage marker verification:
+  - expected marker present: `dashboard_page.js`
+  - forbidden legacy markers absent: `app.js` and `message-form`
+- If marker validation fails, deployment must exit non-zero and report explicit reason in logs.

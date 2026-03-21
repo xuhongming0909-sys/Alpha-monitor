@@ -16,6 +16,11 @@ GIT_RETRY_COUNT="${GIT_RETRY_COUNT:-8}"
 GIT_RETRY_DELAY_SECONDS="${GIT_RETRY_DELAY_SECONDS:-8}"
 SERVICE_RETRY_COUNT="${SERVICE_RETRY_COUNT:-8}"
 SERVICE_RETRY_DELAY_SECONDS="${SERVICE_RETRY_DELAY_SECONDS:-2}"
+VERIFY_CONFIG_YAML="${VERIFY_CONFIG_YAML:-1}"
+FORCE_RELEASE_APP_PORT="${FORCE_RELEASE_APP_PORT:-1}"
+VERIFY_HOMEPAGE_MARKER="${VERIFY_HOMEPAGE_MARKER:-1}"
+EXPECTED_HOME_MARKER="${EXPECTED_HOME_MARKER:-dashboard_page.js}"
+FORBIDDEN_HOME_MARKERS="${FORBIDDEN_HOME_MARKERS:-app.js|message-form}"
 
 log() {
   printf '[deploy] %s\n' "$1"
@@ -232,15 +237,105 @@ try {
 EOF
 }
 
+validate_config_yaml() {
+  if [[ "$VERIFY_CONFIG_YAML" != "1" ]]; then
+    log "skip config.yaml syntax validation because VERIFY_CONFIG_YAML=${VERIFY_CONFIG_YAML}"
+    return 0
+  fi
+
+  if [[ ! -f "$PROJECT_ROOT/config.yaml" ]]; then
+    warn "config.yaml not found, skip syntax validation"
+    return 0
+  fi
+
+  log "validating config.yaml syntax"
+  node <<'EOF'
+const fs = require('fs');
+const path = require('path');
+const yaml = require('yaml');
+
+const configPath = path.join(process.cwd(), 'config.yaml');
+const text = fs.readFileSync(configPath, 'utf8');
+yaml.parse(text);
+EOF
+}
+
+release_stale_port_owner() {
+  local port="$1"
+  [[ "$FORCE_RELEASE_APP_PORT" == "1" ]] || return 0
+  [[ -n "$port" ]] || return 0
+
+  log "releasing stale owner on port ${port} before restart"
+
+  if command -v fuser >/dev/null 2>&1; then
+    if sudo -n fuser -k "${port}/tcp" >/dev/null 2>&1; then
+      return 0
+    fi
+    fuser -k "${port}/tcp" >/dev/null 2>&1 || true
+    return 0
+  fi
+
+  if command -v ss >/dev/null 2>&1; then
+    local pids
+    pids="$(
+      ss -ltnp 2>/dev/null \
+        | awk -v port=":${port}" '
+            index($4, port) {
+              if (match($0, /pid=[0-9]+/)) {
+                pid = substr($0, RSTART + 4, RLENGTH - 4);
+                print pid;
+              }
+            }
+          ' \
+        | sort -u
+    )"
+    if [[ -n "$pids" ]]; then
+      while IFS= read -r pid; do
+        [[ -n "$pid" ]] || continue
+        kill -9 "$pid" >/dev/null 2>&1 || sudo -n kill -9 "$pid" >/dev/null 2>&1 || true
+      done <<< "$pids"
+    fi
+  fi
+}
+
 run_health_check() {
-  local resolved_port
+  local resolved_port="${1:-}"
   local health_url
 
-  resolved_port="$(detect_app_port)"
+  if [[ -z "$resolved_port" ]]; then
+    resolved_port="$(detect_app_port)"
+  fi
   health_url="http://127.0.0.1:${resolved_port}${HEALTH_PATH}"
 
   log "checking health: ${health_url}"
   curl --fail --silent --show-error "$health_url" >/dev/null
+}
+
+run_homepage_marker_check() {
+  local resolved_port="${1:-}"
+  local homepage_url
+  local homepage_html
+
+  if [[ "$VERIFY_HOMEPAGE_MARKER" != "1" ]]; then
+    log "skip homepage marker check because VERIFY_HOMEPAGE_MARKER=${VERIFY_HOMEPAGE_MARKER}"
+    return 0
+  fi
+
+  if [[ -z "$resolved_port" ]]; then
+    resolved_port="$(detect_app_port)"
+  fi
+
+  homepage_url="http://127.0.0.1:${resolved_port}/"
+  log "checking homepage markers: ${homepage_url}"
+  homepage_html="$(curl --fail --silent --show-error "$homepage_url")"
+
+  if [[ -n "$EXPECTED_HOME_MARKER" ]] && ! printf '%s' "$homepage_html" | grep -q "$EXPECTED_HOME_MARKER"; then
+    die "homepage marker check failed: missing expected marker '${EXPECTED_HOME_MARKER}'"
+  fi
+
+  if [[ -n "$FORBIDDEN_HOME_MARKERS" ]] && printf '%s' "$homepage_html" | grep -Eq "$FORBIDDEN_HOME_MARKERS"; then
+    die "homepage marker check failed: found forbidden markers '${FORBIDDEN_HOME_MARKERS}'"
+  fi
 }
 
 cd "$PROJECT_ROOT"
@@ -276,6 +371,9 @@ else
   log "skipping git sync because SKIP_GIT_SYNC=1"
 fi
 
+validate_config_yaml
+RESOLVED_APP_PORT="$(detect_app_port)"
+
 if [[ -f package-lock.json ]]; then
   log "installing Node dependencies with npm ci"
   npm ci
@@ -289,6 +387,9 @@ chmod +x "$PROJECT_ROOT/tools/deploy/start_linux.sh"
 
 if service_exists; then
   refresh_systemd_unit
+  log "stopping system service before restart: ${SERVICE_NAME}"
+  run_systemctl stop "$SERVICE_NAME" || true
+  release_stale_port_owner "$RESOLVED_APP_PORT"
   log "restarting system service: ${SERVICE_NAME}"
   run_systemctl restart "$SERVICE_NAME"
   wait_service_active
@@ -297,5 +398,6 @@ else
   warn "system service ${SERVICE_NAME}.service not found; code was updated but service is not managed yet"
 fi
 
-run_health_check
+run_health_check "$RESOLVED_APP_PORT"
+run_homepage_marker_check "$RESOLVED_APP_PORT"
 log "deployment finished successfully"
