@@ -10,6 +10,8 @@ PROJECT_OWNER="${PROJECT_OWNER:-$(id -un)}"
 APP_PORT="${APP_PORT:-}"
 HEALTH_PATH="${HEALTH_PATH:-/api/health}"
 SKIP_GIT_SYNC="${SKIP_GIT_SYNC:-0}"
+GIT_RETRY_COUNT="${GIT_RETRY_COUNT:-5}"
+GIT_RETRY_DELAY_SECONDS="${GIT_RETRY_DELAY_SECONDS:-8}"
 
 log() {
   printf '[deploy] %s\n' "$1"
@@ -22,6 +24,27 @@ warn() {
 fail() {
   printf '[deploy][error] %s\n' "$1" >&2
   exit 1
+}
+
+retry_command() {
+  local description="$1"
+  shift
+
+  local attempt=1
+  while (( attempt <= GIT_RETRY_COUNT )); do
+    log "${description} (attempt ${attempt}/${GIT_RETRY_COUNT})"
+    if "$@"; then
+      return 0
+    fi
+
+    if (( attempt == GIT_RETRY_COUNT )); then
+      fail "${description} failed after ${GIT_RETRY_COUNT} attempts"
+    fi
+
+    warn "${description} failed, retrying in ${GIT_RETRY_DELAY_SECONDS}s"
+    sleep "$GIT_RETRY_DELAY_SECONDS"
+    attempt=$((attempt + 1))
+  done
 }
 
 run_systemctl() {
@@ -87,11 +110,9 @@ log "project owner: $PROJECT_OWNER"
 repair_project_permissions
 
 if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
-  log "fetching latest code from origin"
-  git fetch --all --prune
+  retry_command "fetching latest code from origin" git fetch --all --prune
 
-  log "resetting worktree to origin/${TARGET_BRANCH}"
-  git reset --hard "origin/${TARGET_BRANCH}"
+  retry_command "resetting worktree to origin/${TARGET_BRANCH}" git reset --hard "origin/${TARGET_BRANCH}"
 else
   log "skipping git sync because SKIP_GIT_SYNC=1"
 fi

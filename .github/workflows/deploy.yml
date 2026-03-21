@@ -54,7 +54,16 @@ jobs:
             set -euo pipefail
             sudo chown -R \"$SERVER_USER:$SERVER_USER\" \"$SERVER_APP_DIR\"
             cd \"$SERVER_APP_DIR\"
-            git fetch --all --prune
-            git reset --hard origin/main
+            for attempt in 1 2 3 4 5; do
+              if git fetch --all --prune && git reset --hard origin/main; then
+                break
+              fi
+              if [ \"\$attempt\" -eq 5 ]; then
+                echo 'git sync failed after 5 attempts' >&2
+                exit 1
+              fi
+              echo \"git sync failed on attempt \$attempt, retrying in 8s\" >&2
+              sleep 8
+            done
             PROJECT_ROOT=\"$SERVER_APP_DIR\" PROJECT_OWNER=\"$SERVER_USER\" SKIP_GIT_SYNC=1 SERVICE_NAME=\"$SERVER_SERVICE_NAME\" bash tools/deploy/update_from_github.sh
           "
