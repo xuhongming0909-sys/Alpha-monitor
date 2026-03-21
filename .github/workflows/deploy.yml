@@ -53,8 +53,5 @@ jobs:
           ssh -i ~/.ssh/id_rsa -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
             set -euo pipefail
             cd \"$SERVER_APP_DIR\"
-            git fetch --all --prune
-            git reset --hard origin/main
-            chmod +x tools/deploy/update_from_github.sh
-            SKIP_GIT_SYNC=1 SERVICE_NAME=\"$SERVER_SERVICE_NAME\" bash tools/deploy/update_from_github.sh
+            PROJECT_ROOT=\"$SERVER_APP_DIR\" PROJECT_OWNER=\"$SERVER_USER\" SERVICE_NAME=\"$SERVER_SERVICE_NAME\" bash tools/deploy/update_from_github.sh
           "

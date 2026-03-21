@@ -6,6 +6,7 @@ set -euo pipefail
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 TARGET_BRANCH="${TARGET_BRANCH:-main}"
 SERVICE_NAME="${SERVICE_NAME:-alpha-monitor}"
+PROJECT_OWNER="${PROJECT_OWNER:-$(id -un)}"
 APP_PORT="${APP_PORT:-}"
 HEALTH_PATH="${HEALTH_PATH:-/api/health}"
 SKIP_GIT_SYNC="${SKIP_GIT_SYNC:-0}"
@@ -36,6 +37,16 @@ service_exists() {
     sudo -n systemctl list-unit-files "${SERVICE_NAME}.service" --no-legend 2>/dev/null | grep -q "${SERVICE_NAME}\.service"
   else
     systemctl list-unit-files "${SERVICE_NAME}.service" --no-legend 2>/dev/null | grep -q "${SERVICE_NAME}\.service"
+  fi
+}
+
+repair_project_permissions() {
+  log "repairing file ownership for deploy user: ${PROJECT_OWNER}"
+
+  if sudo -n true >/dev/null 2>&1; then
+    sudo -n chown -R "${PROJECT_OWNER}:${PROJECT_OWNER}" "$PROJECT_ROOT"
+  else
+    chown -R "${PROJECT_OWNER}:${PROJECT_OWNER}" "$PROJECT_ROOT"
   fi
 }
 
@@ -71,6 +82,9 @@ cd "$PROJECT_ROOT"
 
 log "project root: $PROJECT_ROOT"
 log "target branch: $TARGET_BRANCH"
+log "project owner: $PROJECT_OWNER"
+
+repair_project_permissions
 
 if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
   log "fetching latest code from origin"
