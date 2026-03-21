@@ -51,29 +51,6 @@ retry_hard() {
   done
 }
 
-retry_soft() {
-  local description="$1"
-  shift
-
-  local attempt=1
-  while (( attempt <= GIT_RETRY_COUNT )); do
-    log "${description} (attempt ${attempt}/${GIT_RETRY_COUNT})"
-    if "$@"; then
-      return 0
-    fi
-
-    if (( attempt == GIT_RETRY_COUNT )); then
-      return 1
-    fi
-
-    warn "${description} failed, retrying in ${GIT_RETRY_DELAY_SECONDS}s"
-    sleep "$GIT_RETRY_DELAY_SECONDS"
-    attempt=$((attempt + 1))
-  done
-
-  return 1
-}
-
 require_command() {
   local cmd="$1"
   command -v "$cmd" >/dev/null 2>&1 || die "required command not found: ${cmd}"
@@ -81,10 +58,14 @@ require_command() {
 
 preflight_checks() {
   [[ -d "$PROJECT_ROOT" ]] || die "project root not found: $PROJECT_ROOT"
-  [[ -d "$PROJECT_ROOT/.git" ]] || die "not a git repository: $PROJECT_ROOT"
+  if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
+    [[ -d "$PROJECT_ROOT/.git" ]] || die "not a git repository: $PROJECT_ROOT"
+  fi
   [[ -f "$PROJECT_ROOT/package.json" ]] || die "package.json not found in project root"
 
-  require_command git
+  if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
+    require_command git
+  fi
   require_command npm
   require_command node
   require_command curl
@@ -144,17 +125,22 @@ repair_project_permissions() {
 git_sync() {
   export GIT_TERMINAL_PROMPT=0
 
-  if ! retry_soft "fetching latest code from origin" git fetch --all --prune; then
-    warn "default git fetch failed, trying resilient fetch mode"
-    retry_hard \
-      "fetching target branch with resilient HTTP settings" \
-      git -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
-      fetch --prune origin "$TARGET_BRANCH"
-    retry_hard "resetting worktree to fetched HEAD" git reset --hard FETCH_HEAD
+  retry_hard \
+    "fetching latest code from origin with resilient HTTP settings" \
+    git -c http.version=HTTP/1.1 -c http.maxRequests=2 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
+    fetch --all --prune
+
+  if git show-ref --quiet "refs/remotes/origin/${TARGET_BRANCH}"; then
+    retry_hard "resetting worktree to origin/${TARGET_BRANCH}" git reset --hard "origin/${TARGET_BRANCH}"
     return 0
   fi
 
-  retry_hard "resetting worktree to origin/${TARGET_BRANCH}" git reset --hard "origin/${TARGET_BRANCH}"
+  warn "origin/${TARGET_BRANCH} not found after --all fetch, trying direct branch fetch"
+  retry_hard \
+    "fetching target branch explicitly" \
+    git -c http.version=HTTP/1.1 -c http.maxRequests=2 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
+    fetch --prune origin "$TARGET_BRANCH"
+  retry_hard "resetting worktree to fetched HEAD" git reset --hard FETCH_HEAD
 }
 
 refresh_systemd_unit() {
