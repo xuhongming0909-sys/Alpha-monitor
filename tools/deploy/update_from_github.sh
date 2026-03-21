@@ -12,6 +12,7 @@ HEALTH_PATH="${HEALTH_PATH:-/api/health}"
 SKIP_GIT_SYNC="${SKIP_GIT_SYNC:-0}"
 GIT_RETRY_COUNT="${GIT_RETRY_COUNT:-5}"
 GIT_RETRY_DELAY_SECONDS="${GIT_RETRY_DELAY_SECONDS:-8}"
+DEPLOY_REEXEC="${DEPLOY_REEXEC:-0}"
 
 log() {
   printf '[deploy] %s\n' "$1"
@@ -66,6 +67,7 @@ service_exists() {
 refresh_systemd_unit() {
   local template_path="$PROJECT_ROOT/tools/deploy/alpha-monitor.service"
   local target_path="/etc/systemd/system/${SERVICE_NAME}.service"
+  local rendered_unit
 
   if [[ ! -f "$template_path" ]]; then
     warn "systemd template not found: $template_path"
@@ -73,22 +75,24 @@ refresh_systemd_unit() {
   fi
 
   log "refreshing systemd unit: ${SERVICE_NAME}.service"
+  rendered_unit="$(mktemp)"
+
+  sed \
+    -e "s|__PROJECT_ROOT__|${PROJECT_ROOT}|g" \
+    -e "s|__SERVICE_USER__|${PROJECT_OWNER}|g" \
+    "$template_path" > "$rendered_unit"
 
   if sudo -n true >/dev/null 2>&1; then
-    sudo -n sed \
-      -e "s|__PROJECT_ROOT__|${PROJECT_ROOT}|g" \
-      -e "s|__SERVICE_USER__|${PROJECT_OWNER}|g" \
-      "$template_path" > "$target_path"
+    sudo -n tee "$target_path" < "$rendered_unit" >/dev/null
     sudo -n chmod 644 "$target_path"
     sudo -n systemctl daemon-reload
   else
-    sed \
-      -e "s|__PROJECT_ROOT__|${PROJECT_ROOT}|g" \
-      -e "s|__SERVICE_USER__|${PROJECT_OWNER}|g" \
-      "$template_path" > "$target_path"
+    cat "$rendered_unit" > "$target_path"
     chmod 644 "$target_path"
     systemctl daemon-reload
   fi
+
+  rm -f "$rendered_unit"
 }
 
 repair_project_permissions() {
@@ -141,6 +145,22 @@ if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
   retry_command "fetching latest code from origin" git fetch --all --prune
 
   retry_command "resetting worktree to origin/${TARGET_BRANCH}" git reset --hard "origin/${TARGET_BRANCH}"
+
+  if [[ "$DEPLOY_REEXEC" != "1" ]]; then
+    log "reloading deployment script from latest synced revision"
+    exec env \
+      PROJECT_ROOT="$PROJECT_ROOT" \
+      TARGET_BRANCH="$TARGET_BRANCH" \
+      SERVICE_NAME="$SERVICE_NAME" \
+      PROJECT_OWNER="$PROJECT_OWNER" \
+      APP_PORT="$APP_PORT" \
+      HEALTH_PATH="$HEALTH_PATH" \
+      SKIP_GIT_SYNC=1 \
+      DEPLOY_REEXEC=1 \
+      GIT_RETRY_COUNT="$GIT_RETRY_COUNT" \
+      GIT_RETRY_DELAY_SECONDS="$GIT_RETRY_DELAY_SECONDS" \
+      bash "$PROJECT_ROOT/tools/deploy/update_from_github.sh"
+  fi
 else
   log "skipping git sync because SKIP_GIT_SYNC=1"
 fi
