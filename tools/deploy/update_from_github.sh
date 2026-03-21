@@ -63,6 +63,34 @@ service_exists() {
   fi
 }
 
+refresh_systemd_unit() {
+  local template_path="$PROJECT_ROOT/tools/deploy/alpha-monitor.service"
+  local target_path="/etc/systemd/system/${SERVICE_NAME}.service"
+
+  if [[ ! -f "$template_path" ]]; then
+    warn "systemd template not found: $template_path"
+    return 0
+  fi
+
+  log "refreshing systemd unit: ${SERVICE_NAME}.service"
+
+  if sudo -n true >/dev/null 2>&1; then
+    sudo -n sed \
+      -e "s|__PROJECT_ROOT__|${PROJECT_ROOT}|g" \
+      -e "s|__SERVICE_USER__|${PROJECT_OWNER}|g" \
+      "$template_path" > "$target_path"
+    sudo -n chmod 644 "$target_path"
+    sudo -n systemctl daemon-reload
+  else
+    sed \
+      -e "s|__PROJECT_ROOT__|${PROJECT_ROOT}|g" \
+      -e "s|__SERVICE_USER__|${PROJECT_OWNER}|g" \
+      "$template_path" > "$target_path"
+    chmod 644 "$target_path"
+    systemctl daemon-reload
+  fi
+}
+
 repair_project_permissions() {
   log "repairing file ownership for deploy user: ${PROJECT_OWNER}"
 
@@ -129,6 +157,7 @@ log "ensuring Linux entrypoint is executable"
 chmod +x "$PROJECT_ROOT/tools/deploy/start_linux.sh"
 
 if service_exists; then
+  refresh_systemd_unit
   log "restarting system service: ${SERVICE_NAME}"
   run_systemctl restart "$SERVICE_NAME"
   run_systemctl --no-pager --full status "$SERVICE_NAME" | sed -n '1,12p'
