@@ -13,6 +13,8 @@ SKIP_GIT_SYNC="${SKIP_GIT_SYNC:-0}"
 GIT_RETRY_COUNT="${GIT_RETRY_COUNT:-5}"
 GIT_RETRY_DELAY_SECONDS="${GIT_RETRY_DELAY_SECONDS:-8}"
 DEPLOY_REEXEC="${DEPLOY_REEXEC:-0}"
+SERVICE_RETRY_COUNT="${SERVICE_RETRY_COUNT:-8}"
+SERVICE_RETRY_DELAY_SECONDS="${SERVICE_RETRY_DELAY_SECONDS:-2}"
 
 log() {
   printf '[deploy] %s\n' "$1"
@@ -48,6 +50,47 @@ retry_command() {
   done
 }
 
+retry_soft_command() {
+  local description="$1"
+  shift
+
+  local attempt=1
+  while (( attempt <= GIT_RETRY_COUNT )); do
+    log "${description} (attempt ${attempt}/${GIT_RETRY_COUNT})"
+    if "$@"; then
+      return 0
+    fi
+
+    if (( attempt == GIT_RETRY_COUNT )); then
+      return 1
+    fi
+
+    warn "${description} failed, retrying in ${GIT_RETRY_DELAY_SECONDS}s"
+    sleep "$GIT_RETRY_DELAY_SECONDS"
+    attempt=$((attempt + 1))
+  done
+
+  return 1
+}
+
+require_command() {
+  local cmd="$1"
+  command -v "$cmd" >/dev/null 2>&1 || fail "required command not found: ${cmd}"
+}
+
+preflight_checks() {
+  [[ -d "$PROJECT_ROOT" ]] || fail "project root not found: $PROJECT_ROOT"
+  [[ -d "$PROJECT_ROOT/.git" ]] || fail "not a git repository: $PROJECT_ROOT"
+  [[ -f "$PROJECT_ROOT/package.json" ]] || fail "package.json not found in project root"
+
+  require_command git
+  require_command npm
+  require_command node
+  require_command curl
+  require_command sed
+  require_command mktemp
+}
+
 run_systemctl() {
   if sudo -n true >/dev/null 2>&1; then
     sudo -n systemctl "$@"
@@ -62,6 +105,22 @@ service_exists() {
   else
     systemctl list-unit-files "${SERVICE_NAME}.service" --no-legend 2>/dev/null | grep -q "${SERVICE_NAME}\.service"
   fi
+}
+
+git_sync() {
+  export GIT_TERMINAL_PROMPT=0
+
+  if ! retry_soft_command "fetching latest code from origin" git fetch --all --prune; then
+    warn "default git fetch failed, trying resilient fetch mode"
+    retry_command \
+      "fetching target branch with resilient HTTP settings" \
+      git -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
+      fetch --prune origin "$TARGET_BRANCH"
+    retry_command "resetting worktree to fetched HEAD" git reset --hard FETCH_HEAD
+    return 0
+  fi
+
+  retry_command "resetting worktree to origin/${TARGET_BRANCH}" git reset --hard "origin/${TARGET_BRANCH}"
 }
 
 refresh_systemd_unit() {
@@ -93,6 +152,29 @@ refresh_systemd_unit() {
   fi
 
   rm -f "$rendered_unit"
+}
+
+wait_service_active() {
+  local attempt=1
+  while (( attempt <= SERVICE_RETRY_COUNT )); do
+    if run_systemctl is-active --quiet "$SERVICE_NAME"; then
+      log "service ${SERVICE_NAME} is active"
+      return 0
+    fi
+
+    warn "service ${SERVICE_NAME} not active yet (attempt ${attempt}/${SERVICE_RETRY_COUNT})"
+    sleep "$SERVICE_RETRY_DELAY_SECONDS"
+    attempt=$((attempt + 1))
+  done
+
+  warn "service ${SERVICE_NAME} failed to become active"
+  run_systemctl --no-pager --full status "$SERVICE_NAME" | sed -n '1,20p' || true
+  if sudo -n true >/dev/null 2>&1; then
+    sudo -n journalctl -u "${SERVICE_NAME}" -n 60 --no-pager || true
+  else
+    journalctl -u "${SERVICE_NAME}" -n 60 --no-pager || true
+  fi
+  fail "service restart check failed"
 }
 
 repair_project_permissions() {
@@ -139,12 +221,11 @@ log "project root: $PROJECT_ROOT"
 log "target branch: $TARGET_BRANCH"
 log "project owner: $PROJECT_OWNER"
 
+preflight_checks
 repair_project_permissions
 
 if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
-  retry_command "fetching latest code from origin" git fetch --all --prune
-
-  retry_command "resetting worktree to origin/${TARGET_BRANCH}" git reset --hard "origin/${TARGET_BRANCH}"
+  git_sync
 
   if [[ "$DEPLOY_REEXEC" != "1" ]]; then
     log "reloading deployment script from latest synced revision"
@@ -180,6 +261,7 @@ if service_exists; then
   refresh_systemd_unit
   log "restarting system service: ${SERVICE_NAME}"
   run_systemctl restart "$SERVICE_NAME"
+  wait_service_active
   run_systemctl --no-pager --full status "$SERVICE_NAME" | sed -n '1,12p'
 else
   warn "system service ${SERVICE_NAME}.service not found; code was updated but service is not managed yet"

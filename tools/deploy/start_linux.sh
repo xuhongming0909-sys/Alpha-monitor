@@ -1,13 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 统一的 Linux 启动入口，只负责切换到项目根目录并启动正式 Node 服务。
+# Unified Linux entrypoint for the production Node service.
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
 mkdir -p runtime_logs runtime_data
 
-NODE_BIN="${NODE_BIN:-$(command -v node)}"
+if [[ -n "${NODE_BIN:-}" ]]; then
+  RESOLVED_NODE_BIN="$NODE_BIN"
+else
+  RESOLVED_NODE_BIN="$(command -v node || true)"
+  if [[ -z "$RESOLVED_NODE_BIN" ]] && [[ -x "/usr/bin/node" ]]; then
+    RESOLVED_NODE_BIN="/usr/bin/node"
+  fi
+  if [[ -z "$RESOLVED_NODE_BIN" ]] && [[ -x "/usr/local/bin/node" ]]; then
+    RESOLVED_NODE_BIN="/usr/local/bin/node"
+  fi
+fi
+
+if [[ -z "${RESOLVED_NODE_BIN:-}" ]]; then
+  echo "[start_linux][error] node binary not found in PATH and common locations" >&2
+  exit 1
+fi
+
 export NODE_ENV="${NODE_ENV:-production}"
 
-exec "$NODE_BIN" start_server.js
+exec "$RESOLVED_NODE_BIN" start_server.js
