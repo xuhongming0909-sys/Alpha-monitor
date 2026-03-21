@@ -209,3 +209,58 @@ If `/api/health` is reachable but `web != ok`:
 If `web = ok` but `data_jobs = warn`:
 
 - The homepage is up; investigate Python data jobs separately
+
+## 10. GitHub auto deploy
+
+Official repo-side auto deploy chain:
+
+1. Push code to `main`
+2. GitHub Actions runs `.github/workflows/deploy.yml`
+3. The workflow connects to the server through SSH
+4. The server runs `tools/deploy/update_from_github.sh`
+5. The script updates code, installs dependencies, restarts the service, and checks health
+
+Required GitHub Secrets:
+
+- `SERVER_HOST`
+- `SERVER_USER`
+- `SERVER_PORT`
+- `SERVER_SSH_KEY`
+
+Optional GitHub Secrets:
+
+- `SERVER_APP_DIR`
+- `SERVER_SERVICE_NAME`
+
+Default values used by the workflow if optional secrets are not set:
+
+- `SERVER_APP_DIR=/home/ubuntu/Alpha monitor`
+- `SERVER_SERVICE_NAME=alpha-monitor`
+
+## 11. Server-side manual dry run
+
+Before trusting GitHub auto deploy, run this once on the server:
+
+```bash
+cd "/home/ubuntu/Alpha monitor"
+bash tools/deploy/update_from_github.sh
+```
+
+Expected behavior:
+
+1. Reset to `origin/main`
+2. Install Node dependencies
+3. Restart `alpha-monitor` if it exists
+4. Print local health-check result
+
+## 12. If auto deploy fails
+
+Check in this order:
+
+1. GitHub Actions job log
+2. SSH connectivity and key validity
+3. Server directory path
+4. `git status` and repo permissions on the server
+5. `sudo systemctl status alpha-monitor`
+6. `curl http://127.0.0.1:5000/api/health`
+7. `sudo journalctl -u alpha-monitor -n 100 --no-pager`

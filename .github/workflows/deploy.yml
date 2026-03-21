@@ -1,0 +1,60 @@
+name: Deploy Alpha Monitor
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SERVER_PORT: ${{ secrets.SERVER_PORT }}
+      SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+      SERVER_APP_DIR: ${{ secrets.SERVER_APP_DIR }}
+      SERVER_SERVICE_NAME: ${{ secrets.SERVER_SERVICE_NAME }}
+
+    steps:
+      - name: Validate required secrets
+        run: |
+          set -euo pipefail
+          test -n "$SERVER_HOST" || { echo "Missing secret: SERVER_HOST"; exit 1; }
+          test -n "$SERVER_USER" || { echo "Missing secret: SERVER_USER"; exit 1; }
+          test -n "$SERVER_PORT" || { echo "Missing secret: SERVER_PORT"; exit 1; }
+          test -n "$SERVER_SSH_KEY" || { echo "Missing secret: SERVER_SSH_KEY"; exit 1; }
+
+      - name: Prepare SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Show deployment target
+        run: |
+          SERVER_APP_DIR="${SERVER_APP_DIR:-/home/ubuntu/Alpha monitor}"
+          SERVER_SERVICE_NAME="${SERVER_SERVICE_NAME:-alpha-monitor}"
+          echo "Host: $SERVER_HOST"
+          echo "Port: $SERVER_PORT"
+          echo "User: $SERVER_USER"
+          echo "App dir: $SERVER_APP_DIR"
+          echo "Service: $SERVER_SERVICE_NAME"
+
+      - name: Deploy over SSH
+        run: |
+          set -euo pipefail
+          SERVER_APP_DIR="${SERVER_APP_DIR:-/home/ubuntu/Alpha monitor}"
+          SERVER_SERVICE_NAME="${SERVER_SERVICE_NAME:-alpha-monitor}"
+          ssh -i ~/.ssh/id_rsa -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
+            set -euo pipefail
+            cd \"$SERVER_APP_DIR\"
+            git fetch --all --prune
+            git reset --hard origin/main
+            chmod +x tools/deploy/update_from_github.sh
+            SKIP_GIT_SYNC=1 SERVICE_NAME=\"$SERVER_SERVICE_NAME\" bash tools/deploy/update_from_github.sh
+          "
