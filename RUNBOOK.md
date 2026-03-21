@@ -216,9 +216,11 @@ Official repo-side auto deploy chain:
 
 1. Push code to `main`
 2. GitHub Actions runs `.github/workflows/deploy.yml`
-3. The workflow connects to the server through SSH
-4. The server runs `tools/deploy/update_from_github.sh`
-5. The script updates code, installs dependencies, restarts the service, and checks health
+3. Runner creates a release archive from repository contents
+4. Runner connects to the server through SSH and streams the archive to the server
+5. Server extracts the archive into `SERVER_APP_DIR`
+6. Server runs `tools/deploy/update_from_github.sh` with `SKIP_GIT_SYNC=1`
+7. The script installs dependencies, refreshes/restarts the service, and checks health
 
 Required GitHub Secrets:
 
@@ -237,20 +239,26 @@ Default values used by the workflow if optional secrets are not set:
 - `SERVER_APP_DIR=/home/ubuntu/Alpha monitor`
 - `SERVER_SERVICE_NAME=alpha-monitor`
 
+Important notes:
+
+- Auto deploy no longer depends on the server running `git fetch` from GitHub.
+- This avoids server-side TLS/network instability during repository sync.
+- Archive upload excludes `.codex`, `.git`, `node_modules`, `runtime_logs`, and `runtime_data`.
+
 ## 11. Server-side manual dry run
 
 Before trusting GitHub auto deploy, run this once on the server:
 
 ```bash
 cd "/home/ubuntu/Alpha monitor"
-bash tools/deploy/update_from_github.sh
+SKIP_GIT_SYNC=1 bash tools/deploy/update_from_github.sh
 ```
 
 Expected behavior:
 
-1. Reset to `origin/main`
+1. Keep current code as-is (no git sync)
 2. Install Node dependencies
-3. Restart `alpha-monitor` if it exists
+3. Refresh and restart `alpha-monitor` if it exists
 4. Print local health-check result
 
 ## 12. If auto deploy fails
@@ -260,7 +268,7 @@ Check in this order:
 1. GitHub Actions job log
 2. SSH connectivity and key validity
 3. Server directory path
-4. `git status` and repo permissions on the server
+4. Archive extract permission under `SERVER_APP_DIR`
 5. `sudo systemctl status alpha-monitor`
 6. `curl http://127.0.0.1:5000/api/health`
 7. `sudo journalctl -u alpha-monitor -n 100 --no-pager`
