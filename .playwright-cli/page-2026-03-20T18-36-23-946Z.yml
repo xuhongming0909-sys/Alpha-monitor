@@ -1,0 +1,74 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e5]:
+        - paragraph [ref=e6]: Alpha Monitor / Live Dashboard
+        - heading "Alpha Monitor" [level=1] [ref=e7]
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - generic [ref=e10]:
+            - generic [ref=e11]: HKD/CNY
+            - strong [ref=e12]: "0.8809"
+          - generic [ref=e13]: /
+          - generic [ref=e14]:
+            - generic [ref=e15]: USD/CNY
+            - strong [ref=e16]: "6.9020"
+          - generic [ref=e17]: /
+          - generic [ref=e18]:
+            - generic [ref=e19]: 十年期国债收益率
+            - strong [ref=e20]: 暂未返回
+          - generic [ref=e21]: /
+          - generic [ref=e22]:
+            - generic [ref=e23]: 更新时间
+            - strong [ref=e24]: 2026/03/21 01:50
+        - generic [ref=e25]: 实时数据已连接
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - heading "股债打新" [level=2] [ref=e29]
+          - generic [ref=e30]: 正在聚合今日打新事件
+        - table [ref=e33]:
+          - rowgroup [ref=e34]:
+            - row "当前阶段 类型 名称 / 代码 申购日 抽签日 中签缴款日 上市日 申购上限 发行价 / 转股价" [ref=e35]:
+              - columnheader "当前阶段" [ref=e36]
+              - columnheader "类型" [ref=e37]
+              - columnheader "名称 / 代码" [ref=e38]
+              - columnheader "申购日" [ref=e39]
+              - columnheader "抽签日" [ref=e40]
+              - columnheader "中签缴款日" [ref=e41]
+              - columnheader "上市日" [ref=e42]
+              - columnheader "申购上限" [ref=e43]
+              - columnheader "发行价 / 转股价" [ref=e44]
+          - rowgroup [ref=e45]:
+            - row [ref=e46]:
+              - cell [ref=e47]
+            - row [ref=e49]:
+              - cell [ref=e50]
+            - row [ref=e52]:
+              - cell [ref=e53]
+      - complementary [ref=e55]:
+        - generic [ref=e56]:
+          - heading "推送设置" [level=2] [ref=e57]
+          - generic [ref=e58]: 正在读取推送配置
+        - generic [ref=e59]:
+          - generic [ref=e60]:
+            - generic [ref=e61]: 常规模块主推送 1
+            - textbox "常规模块主推送 1" [ref=e62]
+          - generic [ref=e63]:
+            - generic [ref=e64]: 常规模块主推送 2
+            - textbox "常规模块主推送 2" [ref=e65]
+          - generic [ref=e66]:
+            - generic [ref=e67]: 收购私有专报
+            - textbox "收购私有专报" [ref=e68]
+          - generic [ref=e69]:
+            - button "保存" [disabled] [ref=e70]
+            - button "刷新" [ref=e71] [cursor=pointer]
+    - navigation "主功能切换" [ref=e72]:
+      - button "转债套利" [ref=e73] [cursor=pointer]
+      - button "AH溢价" [ref=e74] [cursor=pointer]
+      - button "AB溢价" [ref=e75] [cursor=pointer]
+      - button "监控套利" [ref=e76] [cursor=pointer]
+      - button "分红提醒" [ref=e77] [cursor=pointer]
+      - button "收购私有" [ref=e78] [cursor=pointer]
+    - generic [ref=e83]: 转债套利正在拉取真实数据
+  - status

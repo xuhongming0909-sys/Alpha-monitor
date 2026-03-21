@@ -1,22 +1,37 @@
-﻿{
-  "name": "alpha-monitor-ios",
-  "version": "0.1.0",
+{
+  "name": "alpha-monitor-refactor",
+  "version": "1.0.0",
   "private": true,
-  "main": "node_modules/expo/AppEntry.js",
+  "description": "Refactored Alpha Monitor with cleaner architecture and improved UI",
   "scripts": {
-    "start": "expo start",
-    "ios": "expo run:ios",
-    "android": "expo run:android",
-    "web": "expo start --web"
+    "dev": "node start_server.js",
+    "start": "node start_server.js",
+    "start:stable": "powershell -ExecutionPolicy Bypass -File ./tools/start_stable.ps1",
+    "stop:stable": "powershell -ExecutionPolicy Bypass -File ./tools/stop_stable.ps1",
+    "check:health": "powershell -ExecutionPolicy Bypass -File ./tools/check_health.ps1",
+    "show:access": "powershell -ExecutionPolicy Bypass -File ./tools/show_access_info.ps1",
+    "install:stable-task": "powershell -ExecutionPolicy Bypass -File ./tools/install_stable_task.ps1",
+    "uninstall:stable-task": "powershell -ExecutionPolicy Bypass -File ./tools/uninstall_stable_task.ps1",
+    "install:firewall": "powershell -ExecutionPolicy Bypass -File ./tools/install_firewall_rule.ps1",
+    "uninstall:firewall": "powershell -ExecutionPolicy Bypass -File ./tools/uninstall_firewall_rule.ps1",
+    "check": "node smoke_check.js",
+    "check:boundaries": "python tools/check_plugin_boundaries.py",
+    "sync:pairs": "python tools/export_pair_pool.py --refresh",
+    "sync:subscriptions": "python data_dispatch.py ipo && python data_dispatch.py bonds",
+    "sync:cb-stock-history": "python data_dispatch.py sync-cb-stock-history",
+    "sync:cb-stock-history:full": "python data_dispatch.py sync-cb-stock-history --force-full",
+    "sync:premium:update": "python tools/rebuild_premium_db.py --mode update",
+    "sync:premium:missing": "python tools/rebuild_premium_db.py --mode update --only-missing",
+    "sync:premium:rebuild": "python tools/rebuild_premium_db.py --mode rebuild"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
-    "expo": "~54.0.13",
-    "expo-status-bar": "~3.0.8",
-    "react": "19.1.0",
-    "react-native": "0.81.4"
-  },
-  "devDependencies": {
-    "@types/react": "~19.1.10",
-    "typescript": "~5.9.2"
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "yaml": "^2.8.2"
   }
 }
+
+

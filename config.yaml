@@ -1,0 +1,279 @@
+# Alpha Monitor config contract
+# This file is the single source of truth for long-lived business config.
+# UI-edited runtime data should stay in runtime JSON state files, not here.
+
+app:
+  # App runtime defaults
+  name: "Alpha Monitor"
+  environment: "development"
+  host: "0.0.0.0"
+  port: 5000
+  scheduler_tick_interval_ms: 60000
+  shutdown_grace_timeout_ms: 5000
+  python_exec_timeout_ms: 60000
+  python_exec_max_buffer_mb: 50
+  trust_proxy: false
+  server_base_url: "http://127.0.0.1:5000"
+  healthcheck_path: "/api/health"
+  timezone: "Asia/Shanghai"
+  env_file: ".env"
+  python_bin: "python"
+  python_bin_candidates:
+    - "python"
+
+deployment:
+  # Public deployment contract for cloud-server runtime
+  public_base_url: "${PUBLIC_BASE_URL}"
+  reverse_proxy:
+    enabled: false
+    type: "none"
+  systemd:
+    service_name: "alpha-monitor"
+  healthcheck:
+    public_path: "/api/health"
+
+storage:
+  # Shared storage and profile rules
+  data_root_dir: "./runtime_data"
+  shared_data_dir: "./runtime_data/shared"
+  runtime_profile_dir: "./runtime_data/profiles"
+  db_profile: "shared"
+  history_incremental_update: true
+  replace_full_database: false
+  runtime_files:
+    market_refresh_state: "market_refresh_state.json"
+    arbitrage_monitors: "custom_monitors.json"
+    dividend_portfolio: "dividend_portfolio.json"
+    merger_company_reports: "merger_company_reports.json"
+    push_config: "push_config.json"
+    push_runtime_state: "push_runtime_state.json"
+
+logging:
+  # Minimal logging defaults
+  level: "info"
+  console_enabled: true
+
+bus:
+  # The Bus = normalized payload contract between fetch plugins and strategy plugins
+  schema_version: "v1"
+  timezone: "Asia/Shanghai"
+  require_normalized_payload: true
+  allow_raw_source_snapshot: true
+  normalized_record_required_fields:
+    - "plugin"
+    - "market"
+    - "symbol"
+    - "name"
+    - "event_type"
+    - "quote_time"
+    - "metrics"
+    - "raw"
+    - "status"
+
+plugins:
+  # Plugin isolation rules
+  enforce_isolation: true
+  only_allow_shared_and_bus_imports: true
+  zero_side_effect_notification_style: true
+  data_fetch:
+    ah_premium:
+      enabled: true
+      folder: "data_fetch/ah_premium"
+    ab_premium:
+      enabled: true
+      folder: "data_fetch/ab_premium"
+    exchange_rate:
+      enabled: true
+      folder: "data_fetch/exchange_rate"
+    convertible_bond:
+      enabled: true
+      folder: "data_fetch/convertible_bond"
+    merger:
+      enabled: true
+      folder: "data_fetch/merger"
+    subscription:
+      enabled: true
+      folder: "data_fetch/subscription"
+    dividend:
+      enabled: true
+      folder: "data_fetch/dividend"
+    custom_monitor:
+      enabled: true
+      folder: "data_fetch/custom_monitor"
+  strategy:
+    ah_premium:
+      enabled: true
+      folder: "strategy/ah_premium"
+    ab_premium:
+      enabled: true
+      folder: "strategy/ab_premium"
+    convertible_bond:
+      enabled: true
+      folder: "strategy/convertible_bond"
+    merger:
+      enabled: true
+      folder: "strategy/merger"
+    subscription:
+      enabled: true
+      folder: "strategy/subscription"
+    dividend:
+      enabled: true
+      folder: "strategy/dividend"
+    custom_monitor:
+      enabled: true
+      folder: "strategy/custom_monitor"
+
+data_fetch:
+  # Fetch layer config only controls upstream access and normalization cadence
+  realtime:
+    price_refresh_interval_ms: 300000
+    exchange_rate_refresh_interval_ms: 300000
+  daily_sync:
+    cutoff_time: "16:10"
+  plugins:
+    ah_premium:
+      intraday: true
+      refresh_interval_ms: 300000
+      daily_incremental_sync: true
+      force_pair_sync_on_daily_job: true
+    ab_premium:
+      intraday: true
+      refresh_interval_ms: 300000
+      daily_incremental_sync: true
+      force_pair_sync_on_daily_job: true
+    exchange_rate:
+      intraday: true
+      refresh_interval_ms: 300000
+      daily_incremental_sync: false
+      source: "tencent"
+    subscription:
+      intraday: true
+      refresh_interval_ms: 900000
+      daily_incremental_sync: true
+      supported_kinds:
+        - "ipo"
+        - "bond"
+    dividend:
+      intraday: false
+      refresh_interval_ms: 900000
+      daily_incremental_sync: true
+    merger:
+      intraday: false
+      refresh_time: "00:00"
+      daily_incremental_sync: false
+      announcement_lookback_days: 90
+      keyword_sets:
+        search:
+          - "tender_offer"
+          - "absorption_merger"
+          - "agreement_acquisition"
+          - "major_asset_restructuring"
+          - "privatization"
+        core:
+          - "tender_offer_report"
+          - "tender_offer_notice"
+          - "acquisition_report"
+          - "merger_report"
+          - "restructuring_report"
+    convertible_bond:
+      intraday: true
+      refresh_interval_ms: 300000
+      daily_incremental_sync: true
+      sync_stock_history_before_strategy: true
+      trading_days_per_year: 252
+      volatility_windows:
+        - 20
+        - 60
+        - 120
+      primary_vol_window: 60
+      history_lookback_days: 420
+      max_vol_sync_workers: 8
+      max_financial_workers: 10
+      inline_history_hydrate_limit: 24
+      jisilu_cookie: "${JISILU_COOKIE}"
+    custom_monitor:
+      intraday: true
+      refresh_interval_ms: 300000
+      data_source: "runtime_state"
+
+strategy:
+  # Strategy layer reads only normalized records plus config
+  ah_premium:
+    ranking_metric: "premium_rate"
+    push_top_n: 3
+  ab_premium:
+    ranking_metric: "premium_rate"
+    push_top_n: 3
+  convertible_bond:
+    push_categories:
+      - "double_low"
+      - "theoretical_yield"
+      - "putback_arbitrage"
+      - "limit_up_arbitrage"
+      - "conversion_arbitrage"
+      - "delisting_game"
+  merger:
+    same_day_only: true
+    ai_provider: "deepseek"
+    prompt_template_code: "MERGER_DEAL_OVERVIEW_V1"
+    report_max_chars: 500
+    deepseek_api_key: "${DEEPSEEK_API_KEY}"
+    deepseek_base_url: "https://api.deepseek.com"
+  dividend:
+    trigger_rule: "record_date_same_day"
+  subscription:
+    scope:
+      - "a_share_ipo"
+      - "convertible_bond"
+    push_events:
+      - "subscribe"
+      - "lottery_check"
+      - "payment"
+      - "listing"
+  custom_monitor:
+    support_stock_plus_cash: true
+    support_pure_cash_mode: true
+
+presentation:
+  # Presentation layer controls API shaping and dashboard visibility
+  api_prefix: "/api"
+  dashboard_entry: "./presentation/templates/dashboard_template.html"
+  show_empty_modules: true
+  show_failure_state: true
+  stock_search:
+    default_limit: 10
+    max_limit: 100
+    timeout_ms: 30000
+  dividend:
+    default_upcoming_days: 7
+    max_upcoming_days: 365
+  historical_premium:
+    default_days: 1825
+    max_days: 10000
+    timeout_ms: 100000
+
+notification:
+  # Long-lived notification defaults; user-edited times remain runtime overrides
+  channel: "wecom"
+  default_full_push_time: "08:00"
+  ui_runtime_overrides_enabled: true
+  enabled_modules:
+    ahab: true
+    subscription: true
+    cb_arb: true
+    custom_monitor: true
+    dividend: true
+    merger: true
+  scheduler:
+    enabled: true
+    default_times:
+      - "08:00"
+    merger_schedule:
+      enabled: true
+      default_time: "08:00"
+  wecom:
+    webhook_url: "${WECOM_WEBHOOK_URL}"
+    push_html_url: "${PUSH_HTML_URL}"
+    max_markdown_length: 3900
+
+

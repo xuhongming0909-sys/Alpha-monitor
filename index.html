@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Alpha Monitor</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4efe7;
+        --card: #fffdf8;
+        --line: #d8c9b3;
+        --text: #2e241a;
+        --muted: #6a5742;
+        --primary: #b55c2c;
+        --primary-dark: #8f461f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top right, rgba(181, 92, 44, 0.14), transparent 30%),
+          linear-gradient(180deg, #f8f4ed 0%, var(--bg) 48%, #efe7da 100%);
+      }
+
+      .shell {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        box-shadow: 0 18px 42px rgba(92, 63, 36, 0.08);
+      }
+
+      .hero {
+        padding: 28px;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 34px;
+        line-height: 1.2;
+      }
+
+      h2 {
+        font-size: 20px;
+        margin-bottom: 12px;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        line-height: 1.75;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 14px 0 6px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: #fff4ea;
+        border: 1px solid #edcfb8;
+        color: var(--primary-dark);
+        font-weight: 700;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 46px;
+        padding: 0 18px;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        text-decoration: none;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .btn-primary {
+        background: var(--primary);
+        color: #fff;
+      }
+
+      .btn-primary:hover {
+        background: var(--primary-dark);
+      }
+
+      .btn-secondary {
+        background: #fff5eb;
+        color: var(--primary-dark);
+        border-color: var(--line);
+      }
+
+      .panel {
+        margin-top: 18px;
+        padding: 20px;
+      }
+
+      .panel ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      iframe {
+        width: 100%;
+        min-height: 900px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: #fff;
+      }
+
+      .muted-code {
+        font-family: Consolas, "Courier New", monospace;
+        background: #f7efe5;
+        border: 1px solid #ead8c4;
+        border-radius: 10px;
+        padding: 2px 8px;
+      }
+
+      @media (max-width: 760px) {
+        .hero,
+        .panel {
+          padding: 18px;
+        }
+
+        h1 {
+          font-size: 28px;
+        }
+
+        iframe {
+          min-height: 680px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="card hero">
+        <h1>Alpha Monitor 页面入口</h1>
+        <div class="status" id="service-status">正在检查本地服务状态...</div>
+        <p>
+          这个入口页支持两种打开方式：如果本地服务已经启动，就直接进入
+          <span class="muted-code">http://127.0.0.1:5000/</span>；
+          如果你只是双击打开 HTML 文件，也能先看到本地预览页。
+        </p>
+        <p>
+          如果服务没有启动，请先执行
+          <span class="muted-code">npm run start</span>
+          或
+          <span class="muted-code">npm run start:stable</span>。
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="http://127.0.0.1:5000/" target="_blank" rel="noreferrer">打开服务版页面</a>
+          <a class="btn btn-secondary" href="./presentation/templates/dashboard_template.html" target="_blank" rel="noreferrer">打开本地预览页</a>
+        </div>
+      </section>
+
+      <section class="card panel">
+        <h2>使用说明</h2>
+        <ul>
+          <li>正式访问地址：<span class="muted-code">http://127.0.0.1:5000/</span></li>
+          <li>本地模板文件：<span class="muted-code">presentation/templates/dashboard_template.html</span></li>
+          <li>如果模板能打开但没有数据，通常说明前端文件没问题，只是后端服务还没启动。</li>
+        </ul>
+      </section>
+
+      <section class="card panel">
+        <h2>本地预览</h2>
+        <iframe src="./presentation/templates/dashboard_template.html" title="Alpha Monitor 本地预览"></iframe>
+      </section>
+    </div>
+
+    <script>
+      const statusNode = document.getElementById('service-status');
+      const healthUrl = 'http://127.0.0.1:5000/api/health';
+
+      async function updateServiceStatus() {
+        try {
+          const response = await fetch(healthUrl, { cache: 'no-store' });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          statusNode.textContent = '本地服务已启动，可以直接打开服务版页面。';
+        } catch (error) {
+          statusNode.textContent = '本地服务未启动，当前可先使用本地预览页。';
+        }
+      }
+
+      updateServiceStatus();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,43 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - paragraph [ref=e4]: Alpha Monitor / Live Dashboard
+      - heading "Alpha Monitor" [level=1] [ref=e5]
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - heading "市场状态" [level=2] [ref=e9]
+        - generic [ref=e10]: 正在连接市场接口
+      - complementary [ref=e16]:
+        - generic [ref=e17]:
+          - heading "推送设置" [level=2] [ref=e18]
+          - generic [ref=e19]: 推送时间可编辑 / 收购私有专报已启用
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - generic [ref=e22]: 常规模块主推送 1
+            - textbox "常规模块主推送 1" [ref=e23]
+          - generic [ref=e24]:
+            - generic [ref=e25]: 常规模块主推送 2
+            - textbox "常规模块主推送 2" [ref=e26]
+          - generic [ref=e27]:
+            - generic [ref=e28]: 收购私有专报时间
+            - textbox "收购私有专报时间" [ref=e29]
+          - generic [ref=e30]:
+            - button "保存推送时间" [ref=e31] [cursor=pointer]
+            - button "刷新页面数据" [ref=e32] [cursor=pointer]
+    - generic [ref=e33]:
+      - generic [ref=e34]:
+        - heading "股债打新" [level=2] [ref=e35]
+        - generic [ref=e36]: 正在聚合今日打新事件
+      - generic [ref=e37]:
+        - article [ref=e38]
+        - article [ref=e42]
+        - article [ref=e46]
+    - navigation "主功能切换" [ref=e50]:
+      - button "转债套利" [ref=e51] [cursor=pointer]
+      - button "AH溢价" [ref=e52] [cursor=pointer]
+      - button "AB溢价" [ref=e53] [cursor=pointer]
+      - button "监控套利" [ref=e54] [cursor=pointer]
+      - button "分红提醒" [ref=e55] [cursor=pointer]
+      - button "收购私有" [ref=e56] [cursor=pointer]
+    - generic [ref=e61]: 转债套利正在拉取真实数据
+  - status

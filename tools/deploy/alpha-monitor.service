@@ -1,0 +1,17 @@
+[Unit]
+Description=Alpha Monitor Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+WorkingDirectory=__PROJECT_ROOT__
+Environment=NODE_ENV=production
+ExecStart=__PROJECT_ROOT__/tools/deploy/start_linux.sh
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

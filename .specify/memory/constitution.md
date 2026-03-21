@@ -1,0 +1,83 @@
+# Alpha Monitor Constitution
+
+## 核心原则
+
+1. 必须使用真实数据，严禁使用假数据、演示数据或静态空壳冒充真实结果。
+2. 代码必须按职责拆分，禁止把抓取、计算、展示、推送混在同一个文件。
+3. 所有可变参数必须进入 `config.yaml`，不得继续散落硬编码。
+4. 修改路径要尽量单一清晰，简单需求不应牵动多个职责域一起改。
+5. 核心逻辑必须保留中文注释，说明职责、输入输出、边界和设计原因。
+
+## 项目结构原则
+
+- `data_fetch/` 只负责抓取与标准化。
+- `strategy/` 只负责业务计算与规则判断。
+- `presentation/` 只负责页面、接口整形和展示逻辑。
+- `notification/` 只负责推送配置、推送格式和推送调度。
+- `shared/` 只负责配置、路径、时间、运行态和通用能力。
+
+跨域公共逻辑只能下沉到 `shared/`，禁止插件之间直接乱连。
+
+## 配置原则
+
+- `config.yaml` 是唯一正式配置合同。
+- 新增参数时，必须先写入 `config.yaml`，再写代码。
+- 敏感值可以来自环境变量，但字段名、用途和回退规则仍必须写在 `config.yaml` 中。
+
+## 开发流程原则
+
+以后统一采用下面这套更简化的流程：
+
+### 第一步：任务开始前先读宪法
+
+每次开始任何任务前，必须先读取并遵守：
+
+1. `CONSTITUTION.md`
+
+### 第二步：先形成 plan
+
+- 每次有项目变更需求，先输出或更新 `refactor_docs/001-monitor-refactor/plan.md`
+- 可以直接使用 Codex 的 Plan mode 形成方案
+- 在 `plan.md` 未确认前，不进入代码实施阶段
+
+### 第三步：实施前再写 REQUIREMENTS 和 SPEC
+
+如果本轮 `plan.md` 会影响以下任一内容：
+
+- 需求范围
+- 页面行为
+- 计算口径
+- 接口含义
+- 配置项
+- 部署方式
+
+则必须在改代码前按下面顺序更新：
+
+1. `refactor_docs/001-monitor-refactor/REQUIREMENTS.md`
+2. `refactor_docs/001-monitor-refactor/SPEC.md`
+
+完成上述更新后，才能进入实施阶段。
+
+## 实施与验收原则
+
+- 实施后必须做最小验证。
+- 至少优先使用现有校验命令，例如：
+  - `npm run check`
+  - `npm run check:boundaries`
+  - `python data_dispatch.py exchange-rate`
+  - `python data_dispatch.py ah`
+  - `python data_dispatch.py ab`
+- 如果修改了计算逻辑，还必须核对是否与 `SPEC.md` 的“业务逻辑与计算字典”一致。
+
+## 治理规则
+
+- 本文件高于临时口头约定。
+- 如需修改宪法，必须同时更新：
+  - `CONSTITUTION.md`
+  - `.specify/memory/constitution.md`
+- 宪法例外必须在对应 `plan.md` 中说明原因、影响范围和回收方案。
+
+**Version**: 1.2.0  
+**Ratified**: 2026-03-20  
+**Last Amended**: 2026-03-21  
+**Amendment Summary**: 进一步简化工作流，固定为“先读宪法，先形成 plan，实施前再写 REQUIREMENTS 和 SPEC”。
