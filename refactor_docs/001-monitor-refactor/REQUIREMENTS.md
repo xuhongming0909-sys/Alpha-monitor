@@ -323,6 +323,9 @@
   - 自动部署只更新代码和依赖，不改变当前业务数据库、运行数据目录和 `/api/*` 数据来源。
 - 业务规则（核心）：
   - 自动部署正式链路固定为：`GitHub Actions -> SSH -> 服务器更新脚本 -> 服务重启 -> 健康检查`
+  - GitHub Actions 工作流不得在 YAML 内直接执行 `git fetch/reset`、`npm ci/install`、`systemctl restart` 等服务器业务步骤
+  - 代码同步、依赖同步、服务重启、健康检查统一由 `tools/deploy/update_from_github.sh` 承担
+  - 工作流日志必须明确标记至少 4 个阶段：`Validate secrets`、`Prepare SSH`、`Trigger remote script`、`Deployment done`
   - 正式自动部署目标分支固定为 `main`
   - 服务器项目目录默认是 `/home/ubuntu/Alpha monitor`
   - 自动部署完成后，若 `alpha-monitor` 服务存在，必须自动重启该服务
@@ -347,4 +350,6 @@
 - 服务器端统一更新脚本能完成 `git fetch --all`、`git reset --hard origin/main`、依赖同步和健康检查。
 - 若服务器已安装 `alpha-monitor` 服务，自动部署后服务会自动重启并恢复提供网页访问。
 - GitHub Actions 日志中能看出失败发生在 SSH、代码同步、依赖安装、服务重启还是健康检查阶段。
+- 部署任务中的服务器业务执行日志来自 `tools/deploy/update_from_github.sh`，而不是散落在 workflow YAML 内。
 - 自动部署完成后，正式网址与 `/api/health` 仍可访问，且 `web` 状态为 `ok`。
+

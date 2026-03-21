@@ -17,11 +17,13 @@ jobs:
       SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
       SERVER_APP_DIR: ${{ secrets.SERVER_APP_DIR }}
       SERVER_SERVICE_NAME: ${{ secrets.SERVER_SERVICE_NAME }}
+      TARGET_BRANCH: main
 
     steps:
       - name: Validate required secrets
         run: |
           set -euo pipefail
+          echo "[stage] Validate secrets"
           test -n "$SERVER_HOST" || { echo "Missing secret: SERVER_HOST"; exit 1; }
           test -n "$SERVER_USER" || { echo "Missing secret: SERVER_USER"; exit 1; }
           test -n "$SERVER_PORT" || { echo "Missing secret: SERVER_PORT"; exit 1; }
@@ -30,6 +32,7 @@ jobs:
       - name: Prepare SSH
         run: |
           set -euo pipefail
+          echo "[stage] Prepare SSH"
           mkdir -p ~/.ssh
           printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
@@ -50,20 +53,13 @@ jobs:
           set -euo pipefail
           SERVER_APP_DIR="${SERVER_APP_DIR:-/home/ubuntu/Alpha monitor}"
           SERVER_SERVICE_NAME="${SERVER_SERVICE_NAME:-alpha-monitor}"
-          ssh -i ~/.ssh/id_rsa -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
+          echo "[stage] Trigger remote script"
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
             set -euo pipefail
-            sudo chown -R \"$SERVER_USER:$SERVER_USER\" \"$SERVER_APP_DIR\"
-            cd \"$SERVER_APP_DIR\"
-            for attempt in 1 2 3 4 5; do
-              if git fetch --all --prune && git reset --hard origin/main; then
-                break
-              fi
-              if [ \"\$attempt\" -eq 5 ]; then
-                echo 'git sync failed after 5 attempts' >&2
-                exit 1
-              fi
-              echo \"git sync failed on attempt \$attempt, retrying in 8s\" >&2
-              sleep 8
-            done
-            PROJECT_ROOT=\"$SERVER_APP_DIR\" PROJECT_OWNER=\"$SERVER_USER\" SKIP_GIT_SYNC=1 SERVICE_NAME=\"$SERVER_SERVICE_NAME\" bash tools/deploy/update_from_github.sh
+            if [ ! -f \"$SERVER_APP_DIR/tools/deploy/update_from_github.sh\" ]; then
+              echo \"update script not found: $SERVER_APP_DIR/tools/deploy/update_from_github.sh\" >&2
+              exit 1
+            fi
+            PROJECT_ROOT=\"$SERVER_APP_DIR\" PROJECT_OWNER=\"$SERVER_USER\" SERVICE_NAME=\"$SERVER_SERVICE_NAME\" TARGET_BRANCH=\"$TARGET_BRANCH\" GIT_RETRY_COUNT=5 GIT_RETRY_DELAY_SECONDS=8 bash \"$SERVER_APP_DIR/tools/deploy/update_from_github.sh\"
           "
+          echo "[stage] Deployment done"

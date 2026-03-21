@@ -480,7 +480,10 @@ GitHub 自动部署正式链路固定为：
 职责约束：
 
 - `deploy.yml` 只负责触发远程部署，不内嵌大量服务器业务逻辑
+- `deploy.yml` 仅允许执行以下职责：校验 Secrets、准备 SSH、触发远程脚本、输出阶段日志
+- `deploy.yml` 禁止直接执行 `git fetch/reset`、`npm ci/install`、`systemctl restart` 等服务器业务步骤
 - `update_from_github.sh` 作为服务器统一更新入口，供 GitHub Actions 和人工排障共用
+- 工作流中的服务器业务输出应由该脚本统一产生，便于定位“脚本外失败”与“脚本内失败”
 
 #### 8.8.3 服务器更新脚本合同
 `tools/deploy/update_from_github.sh` 至少必须执行以下步骤：
@@ -530,6 +533,8 @@ GitHub 自动部署正式链路固定为：
 
 1. 向 `main` 推送提交后，GitHub Actions 自动触发
 2. 工作流能通过 SSH 进入目标服务器并执行更新脚本
-3. 更新脚本完成代码同步与依赖同步
-4. 若服务已安装，则服务自动重启
-5. `/api/health` 在部署后返回可用结果，且 `web = ok`
+3. 工作流 YAML 不重复实现服务器业务逻辑（如 git 同步、依赖安装、服务重启）
+4. 更新脚本完成代码同步与依赖同步
+5. 若服务已安装，则服务自动重启
+6. `/api/health` 在部署后返回可用结果，且 `web = ok`
+

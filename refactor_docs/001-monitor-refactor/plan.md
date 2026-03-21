@@ -1,6 +1,6 @@
 # Alpha Monitor 云服务器 GitHub 自动部署计划
 
-**Date**: `2026-03-21`
+**Date**: `2026-03-22`
 **Feature**: `001-monitor-refactor`
 **Related Docs**:
 - [REQUIREMENTS.md](C:/Users/93724/Desktop/Alpha%20monitor/refactor_docs/001-monitor-refactor/REQUIREMENTS.md)
@@ -41,7 +41,7 @@
 
 1. 云服务器目录已连接 GitHub 仓库，主目录为 `/home/ubuntu/Alpha monitor`。
 2. 仓库内已经有 Linux 启动、`systemd`、Nginx/Caddy 辅助脚本。
-3. 仓库根目录还没有 `.github/workflows/`，因此 GitHub 推送后不会自动触发部署。
+3. 仓库中已经存在 `.github/workflows/deploy.yml`，但当前实现仍包含部分服务器侧同步逻辑，和“工作流只负责触发、服务器脚本负责执行”的目标有偏差。
 4. 服务器上是否已经安装 `alpha-monitor.service` 仍可能因机器状态不同而不一致，因此自动部署脚本必须兼容“服务已安装”和“服务未安装”两种情况。
 
 ## 4. 实施假设
@@ -137,6 +137,25 @@
 
 - 用户只看文档也能完成剩余少量手工配置。
 
+
+### Phase E: 工作流职责收口与一致性修正
+
+目标：把 GitHub Actions 职责收口为“准备 SSH + 触发服务器统一更新脚本”，避免与脚本逻辑重复。
+
+计划修改：
+
+- `.github/workflows/deploy.yml`
+
+要修正的内容：
+
+1. 去除工作流中的 `git fetch/reset`、服务重启等服务器业务逻辑。
+2. 远程只执行 `tools/deploy/update_from_github.sh`，并通过环境变量传入目录、服务名和分支。
+3. 日志中明确打印部署阶段，便于区分 SSH 连接失败与脚本内部失败。
+
+完成标准：
+
+- 工作流实现与 `REQUIREMENTS.md`、`SPEC.md` 的自动部署合同完全一致。
+
 ## 6. 风险与处理
 
 ### 风险 1：服务器没有安装正式服务
@@ -175,3 +194,4 @@
 - 本次是否需要先更新 `REQUIREMENTS.md` 和 `SPEC.md`：`是`
 - 本次是否需要先输出或更新 `plan.md`：`是，已完成`
 - 当前是否已经进入实施阶段：`是，文档更新后进入代码实施`
+
