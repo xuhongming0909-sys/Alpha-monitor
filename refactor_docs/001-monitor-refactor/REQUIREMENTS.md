@@ -363,3 +363,30 @@
   - forbidden legacy markers absent: `app.js` and `message-form`
 - If marker validation fails, deployment must exit non-zero and report explicit reason in logs.
 - Health check after restart must use a retry window (instead of single-shot probe) to avoid startup race false failures.
+
+## 19. Compact List Contract (2026-03-22)
+- Desktop hard constraint (1920x1080): key list information must be readable without module-internal horizontal/vertical scrolling.
+- List strategy is fixed to:
+  - key columns by default
+  - strong pagination
+  - inline row detail expansion for secondary fields
+- Global page scroll remains allowed; nested table container scroll must be avoided as the primary reading path.
+- Strong pagination default page size is `20`.
+
+## 20. Push Config and Scheduling Contract (2026-03-22)
+- `GET /api/push/config` and `POST /api/push/config` must always return parseable JSON.
+- Unknown `/api/*` paths must return JSON 404 payload, not HTML fallback.
+- After push config save:
+  - UI must apply POST response immediately
+  - UI must perform one follow-up GET sync
+  - page refresh must show the same persisted runtime values
+- Scheduler calendar mode for this round is fixed to daily execution (Mon-Sun).
+
+## 21. Monitor Arbitrage Runtime Contract (2026-03-22)
+- Monitor arbitrage must not depend on a single hardcoded Python binary.
+- Production deploy must install Python dependencies from `requirements.txt`.
+- Deploy must verify Python import readiness for at least:
+  - `akshare`
+  - `pandas`
+  - `requests`
+- If dependency verification fails, deployment must fail fast and block release.

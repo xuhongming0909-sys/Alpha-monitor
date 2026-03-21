@@ -17,8 +17,9 @@ app:
   healthcheck_path: "/api/health"
   timezone: "Asia/Shanghai"
   env_file: ".env"
-  python_bin: "python"
+  python_bin: "python3"
   python_bin_candidates:
+    - "python3"
     - "python"
 
 deployment:
@@ -266,6 +267,7 @@ notification:
     merger: true
   scheduler:
     enabled: true
+    calendar_mode: "daily"
     default_times:
       - "08:00"
     merger_schedule:

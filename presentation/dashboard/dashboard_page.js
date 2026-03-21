@@ -1,7 +1,7 @@
 ﻿'use strict';
 
 const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000' : '';
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 20;
 
 const ENDPOINTS = {
   exchangeRate: '/api/market/exchange-rate',
@@ -49,6 +49,13 @@ const state = {
   activeTab: 'cb-arb',
   eventsBound: false,
   savingPush: false,
+  expandedRows: {
+    cbArb: {},
+    ah: {},
+    ab: {},
+    monitor: {},
+    merger: {},
+  },
   tables: {
     cbArb: createTableState('cbArb'),
     ah: createTableState('ah'),
@@ -102,6 +109,19 @@ function resourceState() {
     data: null,
     error: null,
   };
+}
+
+function readExpandedState(tableKey, rowId) {
+  if (!tableKey || !rowId) return false;
+  return Boolean(state.expandedRows?.[tableKey]?.[rowId]);
+}
+
+function toggleExpandedState(tableKey, rowId) {
+  if (!tableKey || !rowId) return;
+  if (!state.expandedRows[tableKey]) {
+    state.expandedRows[tableKey] = {};
+  }
+  state.expandedRows[tableKey][rowId] = !state.expandedRows[tableKey][rowId];
 }
 
 function escapeHtml(value) {
@@ -268,9 +288,14 @@ async function fetchJson(url, options = {}) {
     ...options,
   });
 
-  const payload = await response.json().catch(() => {
-    throw new Error(`接口返回了无法解析的响应：${url}`);
-  });
+  const rawText = await response.text();
+  let payload = null;
+  try {
+    payload = rawText ? JSON.parse(rawText) : null;
+  } catch {
+    const preview = String(rawText || '').replace(/\s+/g, ' ').slice(0, 160);
+    throw new Error(`接口返回了无法解析的响应：${url} (HTTP ${response.status}) ${preview}`);
+  }
 
   if (!response.ok || payload?.success === false) {
     throw new Error(payload?.error || `请求失败：${response.status}`);
@@ -329,6 +354,19 @@ function bindEvents() {
     const pageTarget = event.target.closest('.pagination-button[data-table-key][data-page-action]');
     if (pageTarget) {
       handlePageClick(pageTarget.dataset.tableKey, pageTarget.dataset.pageAction);
+      return;
+    }
+
+    const expandTarget = event.target.closest('.expand-button[data-table-key][data-row-id]');
+    if (expandTarget) {
+      const tableKey = expandTarget.dataset.tableKey;
+      const rowId = expandTarget.dataset.rowId;
+      toggleExpandedState(tableKey, rowId);
+      if (tableKey === 'cbArb') return renderConvertibleBondPanel();
+      if (tableKey === 'ah') return renderPremiumPanel('ah');
+      if (tableKey === 'ab') return renderPremiumPanel('ab');
+      if (tableKey === 'monitor') return renderMonitorPanel();
+      if (tableKey === 'merger') return renderMergerPanel();
     }
   });
 
@@ -720,6 +758,10 @@ async function savePushConfig() {
     state.resources.pushConfig.status = "ready";
     state.resources.pushConfig.data = payload;
     state.resources.pushConfig.error = null;
+    const syncedPayload = await fetchJson(ENDPOINTS.pushConfig, { method: "GET" });
+    state.resources.pushConfig.status = "ready";
+    state.resources.pushConfig.data = syncedPayload;
+    state.resources.pushConfig.error = null;
     showToast("推送设置已保存并同步到当前页面");
   } catch (error) {
     state.resources.pushConfig.status = "error";
@@ -874,8 +916,9 @@ function getProcessedTableRows(tableKey, rows, columns) {
   };
 }
 
-function renderTableHeader(columns, tableKey) {
+function renderTableHeader(columns, tableKey, options = {}) {
   const tableState = state.tables[tableKey];
+  const includeDetails = Boolean(options.includeDetails);
   const cells = columns
     .map((column) => {
       if (column.key === 'index') return '<th>序号</th>';
@@ -906,7 +949,8 @@ function renderTableHeader(columns, tableKey) {
     })
     .join('');
 
-  return `<tr>${cells}</tr>`;
+  const detailHead = includeDetails ? '<th>详情</th>' : '';
+  return `<tr>${cells}${detailHead}</tr>`;
 }
 
 function renderTableCell(column, row, rowNumber) {
@@ -917,6 +961,29 @@ function renderTableCell(column, row, rowNumber) {
   const value = typeof column.render === 'function' ? column.render(row, rowNumber) : escapeHtml(row[column.key] || '--');
   const cellClass = typeof column.className === 'function' ? column.className(row, rowNumber) : column.className || '';
   return `<td${cellClass ? ` class="${escapeHtml(cellClass)}"` : ''}>${value}</td>`;
+}
+
+function resolveRowId(tableKey, row, fallbackIndex) {
+  if (tableKey === 'cbArb') return String(row.code || row.bondName || fallbackIndex);
+  if (tableKey === 'ah') return `${row.aCode || ''}-${row.hCode || ''}-${fallbackIndex}`;
+  if (tableKey === 'ab') return `${row.aCode || ''}-${row.bCode || ''}-${fallbackIndex}`;
+  if (tableKey === 'monitor') return String(row.id || row.name || fallbackIndex);
+  if (tableKey === 'merger') return String(row.announcementId || `${row.secCode || ''}-${row.announcementTime || ''}-${fallbackIndex}`);
+  return String(fallbackIndex);
+}
+
+function renderDetailGrid(items) {
+  if (!Array.isArray(items) || !items.length) return '<div class="muted">无补充字段</div>';
+  return `
+    <div class="detail-grid">
+      ${items.map((item) => `
+        <div class="detail-item">
+          <div class="detail-label">${escapeHtml(item.label || '--')}</div>
+          <div class="detail-value">${escapeHtml(item.value || '--')}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
 }
 
 function renderPagination(tableKey, model) {
@@ -937,7 +1004,7 @@ function renderPagination(tableKey, model) {
 }
 
 function renderPaginatedTable(options) {
-  const { tableKey, tableKind, columns, rows, emptyMessage, rowClassName } = options;
+  const { tableKey, tableKind, columns, rows, emptyMessage, rowClassName, detailRenderer } = options;
   if (!rows.length) {
     return `
       <div class="empty-state">
@@ -947,19 +1014,27 @@ function renderPaginatedTable(options) {
   }
 
   const model = getProcessedTableRows(tableKey, rows, columns);
+  const hasDetails = typeof detailRenderer === 'function';
   const body = model.rows
     .map((row, index) => {
       const rowNumber = model.startIndex + index + 1;
+      const rowId = resolveRowId(tableKey, row, rowNumber);
       const className = typeof rowClassName === 'function' ? rowClassName(row) : '';
       const cells = columns.map((column) => renderTableCell(column, row, rowNumber)).join('');
-      return `<tr${className ? ` class="${escapeHtml(className)}"` : ''}>${cells}</tr>`;
+      const detailsCell = hasDetails
+        ? `<td><button type="button" class="expand-button" data-table-key="${escapeHtml(tableKey)}" data-row-id="${escapeHtml(rowId)}">${readExpandedState(tableKey, rowId) ? '收起' : '展开'}</button></td>`
+        : '';
+      const mainRow = `<tr${className ? ` class="${escapeHtml(className)}"` : ''}>${cells}${detailsCell}</tr>`;
+      if (!hasDetails || !readExpandedState(tableKey, rowId)) return mainRow;
+      const detailHtml = detailRenderer(row, rowNumber);
+      return `${mainRow}<tr class="detail-row"><td colspan="${columns.length + 1}">${detailHtml}</td></tr>`;
     })
     .join('');
 
   return `
     <div class="table-wrap">
       <table data-table-kind="${escapeHtml(tableKind)}">
-        <thead>${renderTableHeader(columns, tableKey)}</thead>
+        <thead>${renderTableHeader(columns, tableKey, { includeDetails: hasDetails })}</thead>
         <tbody>${body}</tbody>
       </table>
     </div>
@@ -968,7 +1043,7 @@ function renderPaginatedTable(options) {
 }
 
 function renderSimpleTable(options) {
-  const { tableKind, columns, rows, emptyMessage, rowClassName } = options;
+  const { tableKind, tableKey, columns, rows, emptyMessage, rowClassName, detailRenderer } = options;
   if (!rows.length) {
     return `
       <div class="empty-state">
@@ -977,16 +1052,18 @@ function renderSimpleTable(options) {
     `;
   }
 
+  const hasDetails = Boolean(tableKey) && typeof detailRenderer === 'function';
   return `
     <div class="table-wrap">
       <table data-table-kind="${escapeHtml(tableKind)}">
         <thead>
-          <tr>${columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')}</tr>
+          <tr>${columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')}${hasDetails ? '<th>详情</th>' : ''}</tr>
         </thead>
         <tbody>
           ${rows
             .map((row, index) => {
               const rowNumber = index + 1;
+              const rowId = resolveRowId(tableKey, row, rowNumber);
               const className = typeof rowClassName === 'function' ? rowClassName(row, rowNumber) : '';
               const cells = columns
                 .map((column) => {
@@ -995,7 +1072,13 @@ function renderSimpleTable(options) {
                   return `<td${cellClass ? ` class="${escapeHtml(cellClass)}"` : ''}>${value}</td>`;
                 })
                 .join('');
-              return `<tr${className ? ` class="${escapeHtml(className)}"` : ''}>${cells}</tr>`;
+              const detailsCell = hasDetails
+                ? `<td><button type="button" class="expand-button" data-table-key="${escapeHtml(tableKey)}" data-row-id="${escapeHtml(rowId)}">${readExpandedState(tableKey, rowId) ? '收起' : '展开'}</button></td>`
+                : '';
+              const mainRow = `<tr${className ? ` class="${escapeHtml(className)}"` : ''}>${cells}${detailsCell}</tr>`;
+              if (!hasDetails || !readExpandedState(tableKey, rowId)) return mainRow;
+              const detailHtml = detailRenderer(row, rowNumber);
+              return `${mainRow}<tr class="detail-row"><td colspan="${columns.length + 1}">${detailHtml}</td></tr>`;
             })
             .join('')}
         </tbody>
@@ -1019,26 +1102,35 @@ function renderSummaryCard(title, rows, extraClass = "") {
 function buildConvertibleColumns() {
   return [
     { key: 'index', label: '序号' },
-    { key: 'code', label: '转债代码', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => row.code, render: (row) => `<span class="mono-text">${escapeHtml(row.code || '--')}</span>` },
-    { key: 'bondName', label: '转债名称', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => row.bondName, render: (row) => escapeHtml(row.bondName || '--') },
-    { key: 'stockCode', label: '正股代码', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => row.stockCode, render: (row) => `<span class="mono-text">${escapeHtml(row.stockCode || '--')}</span>` },
-    { key: 'stockName', label: '正股名称', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => row.stockName, render: (row) => escapeHtml(row.stockName || '--') },
-    { key: 'price', label: '转债现价', sortable: true, sortType: 'number', defaultDir: 'desc', group: '价格', sortValue: (row) => toNumber(row.price), render: (row) => formatNumber(row.price, 2) },
-    { key: 'changePercent', label: '转债涨跌幅', sortable: true, sortType: 'number', defaultDir: 'desc', group: '价格', sortValue: (row) => toNumber(row.changePercent), className: (row) => statusClass(row.changePercent), render: (row) => formatPercent(row.changePercent, 2) },
-    { key: 'stockPrice', label: '正股现价', sortable: true, sortType: 'number', defaultDir: 'desc', group: '价格', sortValue: (row) => toNumber(row.stockPrice), render: (row) => formatNumber(row.stockPrice, 2) },
-    { key: 'stockChangePercent', label: '正股涨跌幅', sortable: true, sortType: 'number', defaultDir: 'desc', group: '价格', sortValue: (row) => toNumber(row.stockChangePercent), className: (row) => statusClass(row.stockChangePercent), render: (row) => formatPercent(row.stockChangePercent, 2) },
-    { key: 'convertPrice', label: '转股价', sortable: true, sortType: 'number', defaultDir: 'desc', group: '套利', sortValue: (row) => toNumber(row.convertPrice), render: (row) => formatNumber(row.convertPrice, 2) },
-    { key: 'convertValue', label: '转股价值', sortable: true, sortType: 'number', defaultDir: 'desc', group: '套利', sortValue: (row) => toNumber(row.convertValue), render: (row) => formatNumber(row.convertValue, 2) },
-    { key: 'premiumRate', label: '转股溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', group: '套利', sortValue: (row) => toNumber(row.premiumRate), className: (row) => statusClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate, 2) },
-    { key: 'doubleLow', label: '双低', sortable: true, sortType: 'number', defaultDir: 'asc', group: '套利', sortValue: (row) => toNumber(row.doubleLow), render: (row) => formatNumber(row.doubleLow, 2) },
-    { key: 'theoreticalPremiumRate', label: '理论溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', group: '套利', sortValue: (row) => toNumber(row.theoreticalPremiumRate), className: (row) => statusClass(row.theoreticalPremiumRate), render: (row) => formatPercent(row.theoreticalPremiumRate, 2) },
-    { key: 'rating', label: '评级', sortable: true, sortType: 'text', defaultDir: 'asc', group: '风险', sortValue: (row) => row.rating, render: (row) => escapeHtml(row.rating || '--') },
-    { key: 'remainingYears', label: '剩余年限', sortable: true, sortType: 'number', defaultDir: 'asc', group: '风险', sortValue: (row) => toNumber(row.remainingYears), render: (row) => formatNumber(row.remainingYears, 2) },
-    { key: 'remainingSizeYi', label: '剩余规模(亿)', sortable: true, sortType: 'number', defaultDir: 'asc', group: '风险', sortValue: (row) => toNumber(row.remainingSizeYi), render: (row) => formatNumber(row.remainingSizeYi, 2) },
-    { key: 'turnoverAmountYi', label: '成交额(亿)', sortable: true, sortType: 'number', defaultDir: 'desc', group: '风险', sortValue: (row) => toNumber(row.turnoverAmountYi), render: (row) => formatNumber(row.turnoverAmountYi, 2) },
-    { key: 'yieldToMaturityPretax', label: '到期税前收益率', sortable: true, sortType: 'number', defaultDir: 'desc', group: '风险', sortValue: (row) => toNumber(row.yieldToMaturityPretax), className: (row) => statusClass(row.yieldToMaturityPretax), render: (row) => formatPercent(row.yieldToMaturityPretax, 2) },
-    { key: 'listingDate', label: '上市日', sortable: true, sortType: 'date', defaultDir: 'desc', group: '时间', sortValue: (row) => normalizeDateKey(row.listingDate), render: (row) => escapeHtml(formatDateOnly(row.listingDate)) },
-    { key: 'convertStartDate', label: '转股起始日', sortable: true, sortType: 'date', defaultDir: 'desc', group: '时间', sortValue: (row) => normalizeDateKey(row.convertStartDate), render: (row) => escapeHtml(formatDateOnly(row.convertStartDate)) },
+    {
+      key: 'bondInfo',
+      label: '转债',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'asc',
+      sortValue: (row) => `${row.bondName || ''}-${row.code || ''}`,
+      render: (row) => `
+        <div>${escapeHtml(row.bondName || '--')}</div>
+        <div class="muted mono-text">${escapeHtml(row.code || '--')}</div>
+      `,
+    },
+    {
+      key: 'stockInfo',
+      label: '正股',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'asc',
+      sortValue: (row) => `${row.stockName || ''}-${row.stockCode || ''}`,
+      render: (row) => `
+        <div>${escapeHtml(row.stockName || '--')}</div>
+        <div class="muted mono-text">${escapeHtml(row.stockCode || '--')}</div>
+      `,
+    },
+    { key: 'price', label: '转债现价', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.price), render: (row) => formatNumber(row.price, 2) },
+    { key: 'stockPrice', label: '正股现价', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.stockPrice), render: (row) => formatNumber(row.stockPrice, 2) },
+    { key: 'premiumRate', label: '转股溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premiumRate), className: (row) => statusClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate, 2) },
+    { key: 'doubleLow', label: '双低', sortable: true, sortType: 'number', defaultDir: 'asc', sortValue: (row) => toNumber(row.doubleLow), render: (row) => formatNumber(row.doubleLow, 2) },
+    { key: 'theoreticalPremiumRate', label: '理论溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.theoreticalPremiumRate), className: (row) => statusClass(row.theoreticalPremiumRate), render: (row) => formatPercent(row.theoreticalPremiumRate, 2) },
   ];
 }
 
@@ -1046,16 +1138,34 @@ function buildPremiumColumns(type) {
   const config = getPremiumConfig(type);
   return [
     { key: 'index', label: '序号' },
-    { key: 'aCode', label: 'A股代码', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => row.aCode, render: (row) => `<span class="mono-text">${escapeHtml(row.aCode || '--')}</span>` },
-    { key: 'aName', label: 'A股名称', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => row.aName, render: (row) => escapeHtml(row.aName || '--') },
-    { key: config.peerCodeKey, label: config.peerCodeLabel, sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => row[config.peerCodeKey], render: (row) => `<span class="mono-text">${escapeHtml(row[config.peerCodeKey] || '--')}</span>` },
-    { key: config.peerNameKey, label: config.peerNameLabel, sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => row[config.peerNameKey], render: (row) => escapeHtml(row[config.peerNameKey] || '--') },
-    { key: 'aPrice', label: 'A股价', sortable: true, sortType: 'number', defaultDir: 'desc', group: '价格', sortValue: (row) => toNumber(row.aPrice), render: (row) => formatNumber(row.aPrice, 2) },
-    { key: config.peerMarketPriceKey, label: config.peerMarketPriceLabel, sortable: true, sortType: 'number', defaultDir: 'desc', group: '价格', sortValue: (row) => toNumber(row[config.peerMarketPriceKey]), render: (row) => formatNumber(row[config.peerMarketPriceKey], 2) },
-    { key: config.peerPriceKey, label: '对手人民币价', sortable: true, sortType: 'number', defaultDir: 'desc', group: '价格', sortValue: (row) => toNumber(row[config.peerPriceKey]), render: (row) => formatNumber(row[config.peerPriceKey], 2) },
-    { key: 'priceGap', label: '价差', sortable: true, sortType: 'number', defaultDir: 'desc', group: '比较', sortValue: (row) => computePremiumGap(row, config.peerPriceKey), className: (row) => statusClass(computePremiumGap(row, config.peerPriceKey)), render: (row) => formatSignedNumber(computePremiumGap(row, config.peerPriceKey), 2) },
-    { key: 'premium', label: '溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', group: '比较', sortValue: (row) => toNumber(row.premium), className: (row) => statusClass(row.premium), render: (row) => formatPercent(row.premium, 2) },
-    { key: 'percentile', label: '近三年百分位', sortable: true, sortType: 'number', defaultDir: 'desc', group: '样本', sortValue: (row) => toNumber(row.percentile), render: (row) => formatPercent(row.percentile, 2) },
+    {
+      key: 'aInfo',
+      label: 'A股',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'asc',
+      sortValue: (row) => `${row.aName || ''}-${row.aCode || ''}`,
+      render: (row) => `
+        <div>${escapeHtml(row.aName || '--')}</div>
+        <div class="muted mono-text">${escapeHtml(row.aCode || '--')}</div>
+      `,
+    },
+    {
+      key: 'peerInfo',
+      label: config.peerNameLabel,
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'asc',
+      sortValue: (row) => `${row[config.peerNameKey] || ''}-${row[config.peerCodeKey] || ''}`,
+      render: (row) => `
+        <div>${escapeHtml(row[config.peerNameKey] || '--')}</div>
+        <div class="muted mono-text">${escapeHtml(row[config.peerCodeKey] || '--')}</div>
+      `,
+    },
+    { key: 'aPrice', label: 'A股价', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.aPrice), render: (row) => formatNumber(row.aPrice, 2) },
+    { key: config.peerPriceKey, label: '对手人民币价', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row[config.peerPriceKey]), render: (row) => formatNumber(row[config.peerPriceKey], 2) },
+    { key: 'premium', label: '溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premium), className: (row) => statusClass(row.premium), render: (row) => formatPercent(row.premium, 2) },
+    { key: 'percentile', label: '近三年分位', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.percentile), render: (row) => formatPercent(row.percentile, 2) },
     { key: 'sampleRange', label: '样本区间', sortable: false, render: (row) => escapeHtml(formatHistoryRange(row)) },
   ];
 }
@@ -1138,7 +1248,7 @@ function renderConvertibleBondPanel() {
       <div class="module-toolbar">
         <div>
           <div class="tab-title">转债套利</div>
-          <div class="section-note">摘要区参考 AH 的分栏秩序压缩为紧凑小栏目，主表更早进入视野，并继续保留排序、分页与横向滚动。</div>
+          <div class="section-note">主表默认仅展示关键列；补充字段统一放到行内展开，桌面端不依赖横向滚动查看核心信息。</div>
         </div>
         <div class="panel-meta">
           <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
@@ -1155,6 +1265,7 @@ function renderConvertibleBondPanel() {
           columns: buildConvertibleColumns(),
           rows,
           emptyMessage: "转债套利暂时没有返回数据",
+          detailRenderer: (row) => renderDetailGrid(buildConvertibleDetailItems(row)),
         })}
       </div>
     </div>
@@ -1196,7 +1307,7 @@ function renderPremiumPanel(type) {
       <div class="premium-toolbar">
         <div>
           <div class="tab-title">${config.title}</div>
-          <div class="section-note">顶部摘要跟随当前主表排序字段联动；主表保留全量列表并按 50 条分页。</div>
+          <div class="section-note">主表按关键列紧凑展示，默认 20 条分页；补充字段通过“展开”查看，不再依赖模块内滚动。</div>
         </div>
         <div class="panel-meta">
           <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
@@ -1223,6 +1334,7 @@ function renderPremiumPanel(type) {
           columns,
           rows,
           emptyMessage: `${config.title} 暂无数据`,
+          detailRenderer: (row) => renderDetailGrid(buildPremiumDetailItems(type, row)),
         })}
         <div class="slim-note">${buildPremiumExplainText(type, rows)}</div>
       </div>
@@ -1284,75 +1396,75 @@ function renderMonitorPanel() {
   }
 
   if (resource.status === 'error') {
-    panel.innerHTML = moduleError('监控套利加载失败', resource.error?.message);
+    panel.innerHTML = moduleError('监控套利加载失败', summarizeMonitorError(resource.error?.message));
     return;
   }
 
+  const payload = readResourceObject('monitor');
   const rows = [...readResourceArray('monitor')].sort((a, b) => (bestMonitorYield(b) ?? -Infinity) - (bestMonitorYield(a) ?? -Infinity));
+  if (!rows.length && payload?.error) {
+    panel.innerHTML = moduleError('监控套利加载失败', summarizeMonitorError(payload.error));
+    return;
+  }
   if (!rows.length) {
     panel.innerHTML = moduleEmpty('当前没有监控套利项目');
     return;
   }
 
-  const tableRows = rows.map((row) => `
-    <tr>
-      <td>
+  const columns = [
+    {
+      key: 'name',
+      label: '监控项',
+      render: (row) => `
         <div>${escapeHtml(row.name || '--')}</div>
         <div class="muted">${escapeHtml(row.acquirerName || '--')} → ${escapeHtml(row.targetName || '--')}</div>
-      </td>
-      <td>
-        <div>收购方 ¥${formatNumber(row.acquirerPrice, 2)}</div>
-        <div class="muted">目标方 ¥${formatNumber(row.targetPrice, 2)}</div>
-      </td>
-      <td>${formatNumber(row.stockRatio, 4)}</td>
-      <td>${formatNumber(row.safetyFactor, 4)}</td>
-      <td class="mono-text">${escapeHtml(buildStockFormulaText(row))}</td>
-      <td>¥${formatNumber(row.stockPayout, 2)}</td>
-      <td class="${statusClass(row.stockSpread)}">${formatSignedNumber(row.stockSpread, 2)}</td>
-      <td class="${statusClass(row.stockYieldRate)}">${formatPercent(row.stockYieldRate, 2)}</td>
-      <td>¥${formatNumber(row.cashPayout, 2)}</td>
-      <td class="${statusClass(row.cashSpread)}">${formatSignedNumber(row.cashSpread, 2)}</td>
-      <td class="${statusClass(row.cashYieldRate)}">${formatPercent(row.cashYieldRate, 2)}</td>
-    </tr>
-  `).join('');
+      `,
+    },
+    {
+      key: 'targetPrice',
+      label: '目标现价',
+      render: (row) => `¥${formatNumber(readMonitorTargetPrice(row), 2)}`,
+    },
+    {
+      key: 'stockYieldRate',
+      label: '股票腿收益率',
+      className: (row) => statusClass(row.stockYieldRate),
+      render: (row) => formatPercent(row.stockYieldRate, 2),
+    },
+    {
+      key: 'cashYieldRate',
+      label: '现金腿收益率',
+      className: (row) => statusClass(row.cashYieldRate),
+      render: (row) => formatPercent(row.cashYieldRate, 2),
+    },
+    {
+      key: 'bestYield',
+      label: '最优收益率',
+      className: (row) => statusClass(bestMonitorYield(row)),
+      render: (row) => formatPercent(bestMonitorYield(row), 2),
+    },
+  ];
 
   panel.innerHTML = `
     <div class="module-shell">
       <div class="module-toolbar">
         <div>
           <div class="tab-title">监控套利</div>
-          <div class="section-note">默认使用最新股价重算；继续保留换股 + 现金与纯现金两种模式</div>
+          <div class="section-note">主表仅保留收益决策关键字段；换股比例、安全系数、公式等放在“展开”里查看。</div>
         </div>
-        <div class="section-note">最近更新 ${escapeHtml(formatDate(readUpdateTime('monitor')))}</div>
-      </div>
-      <div class="formula-box">
-        <h3>计算公式</h3>
-        <div class="formula-lines">
-          <div class="formula-line">股票腿理论对价 = 收购方股价 × 换股比例 × 安全系数 + 现金分派</div>
-          <div class="formula-line">股票腿收益率 = (股票腿理论对价 - 目标现价) / 目标现价 × 100</div>
-          <div class="formula-line">现金腿收益率 = (现金对价 - 目标现价) / 目标现价 × 100</div>
+        <div class="panel-meta">
+          <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
+          <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('monitor')))}</span>
         </div>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>监控名称</th>
-              <th>实时股价</th>
-              <th>换股比例</th>
-              <th>安全系数</th>
-              <th>股票腿公式</th>
-              <th>股票腿理论对价</th>
-              <th>股票腿价差</th>
-              <th>股票腿收益率</th>
-              <th>现金腿对价</th>
-              <th>现金腿价差</th>
-              <th>现金腿收益率</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </div>
+      ${renderSimpleTable({
+        tableKind: 'monitor',
+        tableKey: 'monitor',
+        columns,
+        rows,
+        emptyMessage: '当前没有监控套利项目',
+        detailRenderer: (row) => renderDetailGrid(buildMonitorDetailItems(row)),
+      })}
     </div>
   `;
 }
@@ -1461,7 +1573,6 @@ function renderMergerPanel() {
 
   const todayRows = rows.filter((row) => isTodayAnnouncement(row));
   const columns = [
-    { key: 'index', label: '序号', render: (_row, index) => `<span class="mono-text">${escapeHtml(String(index))}</span>` },
     {
       key: 'announcementTime',
       label: '公告时间',
@@ -1486,17 +1597,8 @@ function renderMergerPanel() {
         <div class="muted">${row.isCore ? '<span class="core-badge">核心</span>' : ''}</div>
       `,
     },
-    { key: 'searchKeyword', label: '关键词', render: (row) => escapeHtml(row.searchKeyword || '--') },
-    {
-      key: 'title',
-      label: '公告标题',
-      render: (row) => `
-        <div>${escapeHtml(row.title || '--')}</div>
-        <div class="muted mono-text">ID ${escapeHtml(row.announcementId || '--')}</div>
-      `,
-    },
-    { key: 'latestPrice', label: '目标现价', className: (row) => statusClass(readMergerLatestPrice(row)), render: (row) => formatNumber(readMergerLatestPrice(row), 2) },
     { key: 'offerPrice', label: '报价', render: (row) => formatNumber(row.offerPrice, 2) },
+    { key: 'latestPrice', label: '目标现价', className: (row) => statusClass(readMergerLatestPrice(row)), render: (row) => formatNumber(readMergerLatestPrice(row), 2) },
     { key: 'premiumRate', label: '报价溢价', className: (row) => statusClass(readMergerPremiumRate(row)), render: (row) => formatPercent(readMergerPremiumRate(row), 2) },
     { key: 'links', label: '链接', render: (row) => buildMergerLinks(row) },
   ];
@@ -1516,10 +1618,12 @@ function renderMergerPanel() {
       </div>
       ${renderSimpleTable({
         tableKind: 'merger',
+        tableKey: 'merger',
         columns,
         rows,
         rowClassName: (row) => (isTodayAnnouncement(row) ? 'merger-row-today' : ''),
         emptyMessage: '当前没有收购私有 / 并购公告',
+        detailRenderer: (row) => renderDetailGrid(buildMergerDetailItems(row)),
       })}
     </div>
   `;
@@ -1642,6 +1746,38 @@ function bestMonitorYield(row) {
   return Math.max(toNumber(row?.stockYieldRate) ?? -Infinity, toNumber(row?.cashYieldRate) ?? -Infinity);
 }
 
+function buildConvertibleDetailItems(row) {
+  return [
+    { label: '转债涨跌幅', value: formatPercent(row.changePercent, 2) },
+    { label: '正股涨跌幅', value: formatPercent(row.stockChangePercent, 2) },
+    { label: '转股价', value: formatNumber(row.convertPrice, 2) },
+    { label: '转股价值', value: formatNumber(row.convertValue, 2) },
+    { label: '成交额(亿)', value: formatNumber(row.turnoverAmountYi, 2) },
+    { label: '剩余规模(亿)', value: formatNumber(row.remainingSizeYi, 2) },
+    { label: '评级', value: row.rating || '--' },
+    { label: '剩余年限', value: formatNumber(row.remainingYears, 2) },
+    { label: '到期税前收益率', value: formatPercent(row.yieldToMaturityPretax, 2) },
+    { label: '上市日', value: formatDateOnly(row.listingDate) },
+    { label: '转股起始日', value: formatDateOnly(row.convertStartDate) },
+  ];
+}
+
+function buildPremiumDetailItems(type, row) {
+  const config = getPremiumConfig(type);
+  return [
+    { label: 'A股代码', value: row.aCode || '--' },
+    { label: 'A股名称', value: row.aName || '--' },
+    { label: config.peerCodeLabel, value: row[config.peerCodeKey] || '--' },
+    { label: config.peerNameLabel, value: row[config.peerNameKey] || '--' },
+    { label: config.peerMarketPriceLabel, value: formatNumber(row[config.peerMarketPriceKey], 2) },
+    { label: '对手人民币价', value: formatNumber(row[config.peerPriceKey], 2) },
+    { label: '价差', value: formatSignedNumber(computePremiumGap(row, config.peerPriceKey), 2) },
+    { label: '可用样本数', value: formatInt(row.historyCount) },
+    { label: '样本起始', value: formatDateOnly(row.historyStartDate) },
+    { label: '样本结束', value: formatDateOnly(row.historyEndDate) },
+  ];
+}
+
 function buildStockFormulaText(row) {
   return [
     formatNumber(row.acquirerPrice, 2),
@@ -1654,6 +1790,40 @@ function buildStockFormulaText(row) {
   ].join(' ');
 }
 
+function summarizeMonitorError(message) {
+  const text = String(message || '').trim();
+  if (!text) return '请稍后重试，或点击“刷新”重新拉取。';
+
+  if (text.includes('python: not found') || text.includes('python3: not found')) {
+    return '服务器缺少 Python 运行时，请使用部署链路自动安装并重启服务。';
+  }
+
+  if (text.includes("No module named 'akshare'") || text.includes('No module named akshare') || text.includes('missing python modules')) {
+    return '服务器缺少 Python 依赖（akshare / pandas / requests），请执行部署脚本安装 requirements 后重试。';
+  }
+
+  return text.replace(/\s+/g, ' ').slice(0, 180);
+}
+
+function readMonitorTargetPrice(row) {
+  return toNumber(row?.targetPrice ?? row?.targetLastPrice ?? row?.targetNowPrice);
+}
+
+function buildMonitorDetailItems(row) {
+  return [
+    { label: '收购方现价', value: `¥${formatNumber(row.acquirerPrice, 2)}` },
+    { label: '目标方现价', value: `¥${formatNumber(readMonitorTargetPrice(row), 2)}` },
+    { label: '换股比例', value: formatNumber(row.stockRatio, 4) },
+    { label: '安全系数', value: formatNumber(row.safetyFactor, 4) },
+    { label: '现金分派', value: `¥${formatNumber(row.cashDistributionCny, 2)}` },
+    { label: '股票腿公式', value: buildStockFormulaText(row) },
+    { label: '股票腿理论对价', value: `¥${formatNumber(row.stockPayout, 2)}` },
+    { label: '股票腿价差', value: formatSignedNumber(row.stockSpread, 2) },
+    { label: '现金腿对价', value: `¥${formatNumber(row.cashPayout, 2)}` },
+    { label: '现金腿价差', value: formatSignedNumber(row.cashSpread, 2) },
+  ];
+}
+
 function readMergerLatestPrice(row) {
   return toNumber(row?.latestPrice ?? row?.stockPrice ?? row?.price);
 }
@@ -1663,6 +1833,17 @@ function readMergerPremiumRate(row) {
   const offerPrice = toNumber(row?.offerPrice ?? row?.bidPrice);
   if (latestPrice === null || offerPrice === null || latestPrice === 0) return null;
   return ((offerPrice - latestPrice) / latestPrice) * 100;
+}
+
+function buildMergerDetailItems(row) {
+  return [
+    { label: '公告标题', value: row.title || '--' },
+    { label: '关键词', value: row.searchKeyword || '--' },
+    { label: '公告ID', value: row.announcementId || '--' },
+    { label: '公告日期', value: formatDateOnly(row.announcementDate) },
+    { label: '公告链接', value: row.announcementUrl || '--' },
+    { label: 'PDF链接', value: row.pdfUrl || '--' },
+  ];
 }
 
 if (document.readyState === 'loading') {

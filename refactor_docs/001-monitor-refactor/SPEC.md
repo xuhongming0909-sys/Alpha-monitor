@@ -550,3 +550,52 @@ GitHub 自动部署正式链路固定为：
    - forbidden legacy markers: `app.js|message-form`
 5. Marker check failure must terminate deploy with non-zero exit code.
 6. Health check must run with retry attempts and delay window to tolerate post-restart warm-up.
+
+## 9. Compact List Rendering Spec (2026-03-22)
+
+### 9.1 Rendering mode
+- Desktop-first list rendering mode is fixed to:
+  - key columns only in the default row
+  - inline detail row expansion for non-key fields
+  - strong pagination with default `pageSize = 20`
+- Module-internal max-height scroll containers must be removed from primary list rendering.
+
+### 9.2 Expansion interaction
+- Each row provides a deterministic expand/collapse action.
+- Expanded details render in-place directly below the row and must not navigate away.
+- Expansion state is table-scoped and does not alter sorting or pagination behavior.
+
+### 9.3 Error presentation
+- Long backend traceback text must not be rendered directly in list panels.
+- UI displays a concise error summary with actionable hint text.
+
+## 10. Push API and Scheduler Spec (2026-03-22)
+
+### 10.1 API parsing behavior
+- Frontend API client must parse response from raw text and then JSON decode.
+- On decode failure, client error message must include endpoint + HTTP status + short body preview.
+
+### 10.2 Route fallback behavior
+- Server must return JSON 404 for unmatched `/api/*` routes.
+- Non-API paths continue to use dashboard HTML fallback.
+
+### 10.3 Save consistency behavior
+- Push save flow is:
+  1. POST config
+  2. apply POST response in-memory
+  3. immediately GET config for calibration
+  4. re-render inputs and state text from latest GET payload
+
+### 10.4 Scheduler calendar behavior
+- `notification.scheduler.calendar_mode` is introduced.
+- Supported values:
+  - `daily`
+  - `workdays`
+  - `trading_days`
+- This round default is `daily`.
+
+## 11. Deploy Python Readiness Spec (2026-03-22)
+- Deploy script must resolve an available Python executable with fallback candidates.
+- Deploy script must install `requirements.txt` dependencies before service restart.
+- Deploy script must verify import readiness for `akshare`, `pandas`, `requests`.
+- Import verification failure is fatal and must terminate deploy with non-zero exit code.

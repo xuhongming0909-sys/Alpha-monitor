@@ -232,7 +232,7 @@
 
       .subscription-table-wrap,
       .table-wrap {
-        overflow: auto;
+        overflow: visible;
         border-radius: var(--radius-md);
         border: 1px solid rgba(255, 255, 255, 0.08);
         background:
@@ -240,19 +240,11 @@
           rgba(255, 255, 255, 0.02);
       }
 
-      .table-wrap {
-        max-height: min(74vh, 860px);
-      }
-
-      .subscription-table-wrap {
-        max-height: min(42vh, 420px);
-      }
-
       .push-strip {
         display: grid;
         gap: 12px;
-        margin-top: 18px;
-        padding: 14px 8px 4px;
+        margin-top: 14px;
+        padding: 10px 8px 4px;
       }
 
       .push-strip-head {
@@ -548,39 +540,41 @@
       table {
         width: 100%;
         border-collapse: collapse;
+        table-layout: fixed;
       }
 
       table[data-table-kind="subscription"] {
-        min-width: 1120px;
+        min-width: 0;
       }
 
       table[data-table-kind="convertible"] {
-        min-width: 1820px;
+        min-width: 0;
       }
 
       table[data-table-kind="premium"] {
-        min-width: 1500px;
+        min-width: 0;
       }
 
       table[data-table-kind="monitor"] {
-        min-width: 1600px;
+        min-width: 0;
       }
 
       table[data-table-kind="dividend"] {
-        min-width: 940px;
+        min-width: 0;
       }
 
       table[data-table-kind="merger"] {
-        min-width: 1760px;
+        min-width: 0;
       }
 
       th,
       td {
-        padding: 13px 12px;
+        padding: 9px 10px;
         text-align: left;
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         vertical-align: top;
-        font-size: 14px;
+        font-size: 13px;
+        word-break: break-word;
       }
 
       th {
@@ -590,7 +584,7 @@
         background: rgba(18, 18, 22, 0.98);
         color: var(--text-soft);
         font-weight: 600;
-        white-space: nowrap;
+        white-space: normal;
       }
 
       tbody tr {
@@ -668,6 +662,46 @@
 
       .mono-text {
         font-family: "Consolas", "SFMono-Regular", "Courier New", monospace;
+      }
+
+      .expand-button {
+        min-height: 28px;
+        padding: 5px 10px;
+        font-size: 12px;
+        border-radius: 10px;
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .expand-button:hover {
+        background: rgba(255, 85, 102, 0.1);
+      }
+
+      .detail-row td {
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px 12px;
+      }
+
+      .detail-item {
+        min-width: 0;
+      }
+
+      .detail-label {
+        color: var(--text-faint);
+        font-size: 12px;
+      }
+
+      .detail-value {
+        margin-top: 2px;
+        color: var(--text);
+        font-size: 13px;
+        line-height: 1.45;
       }
 
       .muted {
@@ -857,6 +891,10 @@
 
         .pagination-button {
           flex: 1 1 calc(50% - 6px);
+        }
+
+        .detail-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
     </style>

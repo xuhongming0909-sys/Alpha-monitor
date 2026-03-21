@@ -23,6 +23,9 @@ FORCE_RELEASE_APP_PORT="${FORCE_RELEASE_APP_PORT:-1}"
 VERIFY_HOMEPAGE_MARKER="${VERIFY_HOMEPAGE_MARKER:-1}"
 EXPECTED_HOME_MARKER="${EXPECTED_HOME_MARKER:-dashboard_page.js}"
 FORBIDDEN_HOME_MARKERS="${FORBIDDEN_HOME_MARKERS:-app.js|message-form}"
+INSTALL_PYTHON_REQUIREMENTS="${INSTALL_PYTHON_REQUIREMENTS:-1}"
+VERIFY_PYTHON_IMPORTS="${VERIFY_PYTHON_IMPORTS:-1}"
+PYTHON_BIN_CANDIDATES="${PYTHON_BIN_CANDIDATES:-python3 python}"
 
 log() {
   printf '[deploy] %s\n' "$1"
@@ -78,6 +81,60 @@ preflight_checks() {
   require_command curl
   require_command systemctl
   require_command sed
+}
+
+detect_python_bin() {
+  local candidate
+  for candidate in $PYTHON_BIN_CANDIDATES; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+install_python_requirements() {
+  local python_bin="${1:-}"
+  [[ "$INSTALL_PYTHON_REQUIREMENTS" == "1" ]] || {
+    log "skip Python dependency install because INSTALL_PYTHON_REQUIREMENTS=${INSTALL_PYTHON_REQUIREMENTS}"
+    return 0
+  }
+
+  if [[ ! -f "$PROJECT_ROOT/requirements.txt" ]]; then
+    warn "requirements.txt not found, skip Python dependency install"
+    return 0
+  fi
+
+  [[ -n "$python_bin" ]] || die "python runtime not found; cannot install requirements"
+  log "installing Python dependencies with ${python_bin} -m pip install -r requirements.txt"
+  "$python_bin" -m pip install -r "$PROJECT_ROOT/requirements.txt"
+}
+
+verify_python_imports() {
+  local python_bin="${1:-}"
+  [[ "$VERIFY_PYTHON_IMPORTS" == "1" ]] || {
+    log "skip Python import verification because VERIFY_PYTHON_IMPORTS=${VERIFY_PYTHON_IMPORTS}"
+    return 0
+  }
+
+  [[ -n "$python_bin" ]] || die "python runtime not found; cannot verify imports"
+  log "verifying Python imports: akshare, pandas, requests"
+  "$python_bin" - <<'EOF'
+import importlib
+
+required = ["akshare", "pandas", "requests"]
+missing = []
+
+for name in required:
+    try:
+        importlib.import_module(name)
+    except Exception:
+        missing.append(name)
+
+if missing:
+    raise SystemExit("missing python modules: " + ", ".join(missing))
+EOF
 }
 
 # 尝试 sudo systemctl；若 sudo 不可用则回退普通 systemctl。
@@ -383,6 +440,9 @@ if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
       GIT_RETRY_DELAY_SECONDS="$GIT_RETRY_DELAY_SECONDS" \
       SERVICE_RETRY_COUNT="$SERVICE_RETRY_COUNT" \
       SERVICE_RETRY_DELAY_SECONDS="$SERVICE_RETRY_DELAY_SECONDS" \
+      INSTALL_PYTHON_REQUIREMENTS="$INSTALL_PYTHON_REQUIREMENTS" \
+      VERIFY_PYTHON_IMPORTS="$VERIFY_PYTHON_IMPORTS" \
+      PYTHON_BIN_CANDIDATES="$PYTHON_BIN_CANDIDATES" \
       bash "$PROJECT_ROOT/tools/deploy/update_from_github.sh"
   fi
 else
@@ -391,6 +451,12 @@ fi
 
 validate_config_yaml
 RESOLVED_APP_PORT="$(detect_app_port)"
+PYTHON_BIN="$(detect_python_bin || true)"
+if [[ -n "$PYTHON_BIN" ]]; then
+  log "detected python runtime: ${PYTHON_BIN}"
+else
+  warn "python runtime not found in candidates: ${PYTHON_BIN_CANDIDATES}"
+fi
 
 if [[ -f package-lock.json ]]; then
   log "installing Node dependencies with npm ci"
@@ -399,6 +465,9 @@ else
   log "package-lock.json not found, using npm install"
   npm install
 fi
+
+install_python_requirements "$PYTHON_BIN"
+verify_python_imports "$PYTHON_BIN"
 
 log "ensuring Linux entrypoint is executable"
 chmod +x "$PROJECT_ROOT/tools/deploy/start_linux.sh"

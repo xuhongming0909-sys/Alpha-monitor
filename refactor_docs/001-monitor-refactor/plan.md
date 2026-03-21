@@ -213,3 +213,25 @@ Planned script hardening in `tools/deploy/update_from_github.sh`:
 Acceptance:
 - Deployment fails instead of silently serving stale homepage content.
 - Successful deployment guarantees local homepage contract consistency with dashboard entry.
+
+## 10. Phase G: Compact UX + Push Reliability + Monitor Recoverability (2026-03-22)
+
+Goal: complete one-shot refactor for three production pain points:
+1. Compact list presentation on desktop without module-internal horizontal/vertical scrolling.
+2. Push config read/write reliability and effective scheduled delivery.
+3. Monitor arbitrage recoverability in cloud deploy (Python runtime + dependencies).
+
+Plan:
+1. Update `REQUIREMENTS.md` and `SPEC.md` contracts first.
+2. Refactor dashboard tables to "key columns + inline detail expansion + strong pagination".
+3. Remove module-internal max-height scrolling and tighten spacing.
+4. Harden API client JSON parsing and add uniform `/api/*` JSON 404 fallback.
+5. Make push scheduler calendar mode explicit and set to daily execution.
+6. Add deploy-stage Python dependency install and import verification.
+
+Acceptance:
+- Desktop 1920x1080 can read key list information without module-internal scrolling.
+- `GET/POST /api/push/config` is stable, parseable, and UI state remains consistent after save + reload.
+- Scheduler can execute on all weekdays and weekends when times match.
+- `GET /api/monitors` no longer fails with `python not found` / `No module named akshare`.
+- GitHub Actions deploy remains the single sync path to cloud server and finishes with health + marker checks.

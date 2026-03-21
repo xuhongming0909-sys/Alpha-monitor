@@ -174,6 +174,9 @@ const DEFAULT_MAIN_PUSH_TIMES = normalizeTimeListConfig(
   NOTIFICATION_CONFIG?.scheduler?.default_times,
   DEFAULT_MAIN_PUSH_TIME
 );
+const PUSH_CALENDAR_MODE = String(
+  NOTIFICATION_CONFIG?.scheduler?.calendar_mode || 'daily'
+).trim().toLowerCase() || 'daily';
 const DEFAULT_NOTIFICATION_MODULES = buildNotificationModuleDefaults();
 const DEFAULT_MERGER_PUSH_TIME = normalizeTimeConfig(
   NOTIFICATION_CONFIG?.scheduler?.merger_schedule?.default_time,
@@ -667,6 +670,8 @@ const weComScheduler = createWeComScheduler({
   pushMergerReportToWeCom,
   getShanghaiParts,
   parsePushMinutes: (value) => pushConfigDomain.parsePushMinutes(value),
+  calendarMode: PUSH_CALENDAR_MODE,
+  isTradingSession,
   defaultMergerSchedule: DEFAULT_PUSH_CONFIG.mergerSchedule,
   logError: (scope, error) => console.error(scope, error?.message || error),
 });
@@ -1655,6 +1660,15 @@ registerDashboardRoutes({
   stockSearchDefaultLimit: toIntConfig(PRESENTATION_STOCK_SEARCH_CONFIG.default_limit, 10),
   stockSearchMaxLimit: toIntConfig(PRESENTATION_STOCK_SEARCH_CONFIG.max_limit, 100),
   stockSearchTimeoutMs: toIntConfig(PRESENTATION_STOCK_SEARCH_CONFIG.timeout_ms, 30000),
+});
+
+app.use('/api', (req, res) => {
+  return sendError(
+    res,
+    `API not found: ${req.method} ${req.path}`,
+    404,
+    null
+  );
 });
 
 app.get('*', (_req, res) => res.sendFile(INDEX_FILE));
