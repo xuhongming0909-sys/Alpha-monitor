@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from copy import deepcopy
 from typing import Any
 
@@ -52,6 +53,9 @@ def _cache_fallback() -> dict[str, Any]:
                 "status": "empty",
                 "sourceUrl": SOURCE_URL_TEMPLATE.format(bucket_code=bucket),
                 "source": "jisilu_qdii",
+                "cookieConfigured": False,
+                "authMode": "public",
+                "usedLoginEnhancedRows": False,
             }
             for key, bucket in DEFAULT_CATEGORIES.items()
         },
@@ -67,10 +71,12 @@ def _write_cache(payload: dict[str, Any]) -> dict[str, Any]:
     return _state_registry()["write"]("lof_arbitrage_cache", "lof_arbitrage_cache.json", payload)
 
 
-def _create_session() -> requests.Session:
+def _create_session(cookie_text: str = "") -> requests.Session:
     session = requests.Session()
     session.trust_env = False
     session.headers.update(REQUEST_HEADERS)
+    if cookie_text:
+        session.headers["Cookie"] = cookie_text
     retry = Retry(
         total=2,
         connect=2,
@@ -118,53 +124,124 @@ def _read_source_config(source_name: str, plugin_config: dict[str, Any]) -> tupl
     return enabled, bucket_code
 
 
+def _read_cookie(plugin_config: dict[str, Any]) -> str:
+    configured = str(plugin_config.get("jisilu_cookie") or "").strip()
+    if configured:
+        return configured
+    return str(os.getenv("JISILU_COOKIE", "")).strip()
+
+
+def _build_status(
+    *,
+    item_count: int,
+    update_time: str,
+    source_url: str,
+    bucket_code: str,
+    cookie_configured: bool,
+    auth_mode: str,
+    used_login_enhanced_rows: bool,
+    served_from_cache: bool,
+    status: str,
+    error: str = "",
+) -> dict[str, Any]:
+    payload = {
+        "enabled": True,
+        "status": status,
+        "itemCount": item_count,
+        "updateTime": update_time,
+        "source": "jisilu_qdii",
+        "sourceUrl": source_url,
+        "servedFromCache": served_from_cache,
+        "bucketCode": bucket_code,
+        "cookieConfigured": cookie_configured,
+        "authMode": auth_mode,
+        "usedLoginEnhancedRows": used_login_enhanced_rows,
+    }
+    if error:
+        payload["error"] = error
+    return payload
+
+
+def _fetch_source_once(
+    session: requests.Session,
+    source_url: str,
+    timeout_seconds: float,
+) -> list[dict[str, Any]]:
+    payload = _fetch_json(session, source_url, timeout_seconds)
+    return _extract_rows(payload)
+
+
 def _fetch_source(
     source_name: str,
     bucket_code: str,
-    session: requests.Session,
+    public_session: requests.Session,
+    auth_session: requests.Session | None,
+    cookie_configured: bool,
     timeout_seconds: float,
     cache_snapshot: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     source_url = SOURCE_URL_TEMPLATE.format(bucket_code=bucket_code)
     cache_entry = cache_snapshot.get("sources", {}).get(source_name, {}) if isinstance(cache_snapshot, dict) else {}
+    auth_error = ""
     try:
-        payload = _fetch_json(session, source_url, timeout_seconds)
-        rows = _extract_rows(payload)
-        return rows, {
-            "enabled": True,
-            "status": "ok" if rows else "empty",
-            "itemCount": len(rows),
-            "updateTime": now_iso(),
-            "source": "jisilu_qdii",
-            "sourceUrl": source_url,
-            "servedFromCache": False,
-            "bucketCode": bucket_code,
-        }
+        if auth_session is not None:
+            try:
+                auth_rows = _fetch_source_once(auth_session, source_url, timeout_seconds)
+                if auth_rows:
+                    return auth_rows, _build_status(
+                        item_count=len(auth_rows),
+                        update_time=now_iso(),
+                        source_url=source_url,
+                        bucket_code=bucket_code,
+                        cookie_configured=cookie_configured,
+                        auth_mode="authenticated",
+                        used_login_enhanced_rows=True,
+                        served_from_cache=False,
+                        status="ok",
+                    )
+            except Exception as exc:
+                auth_error = str(exc)
+
+        public_rows = _fetch_source_once(public_session, source_url, timeout_seconds)
+        return public_rows, _build_status(
+            item_count=len(public_rows),
+            update_time=now_iso(),
+            source_url=source_url,
+            bucket_code=bucket_code,
+            cookie_configured=cookie_configured,
+            auth_mode="authenticated_fallback_public" if cookie_configured else "public",
+            used_login_enhanced_rows=False,
+            served_from_cache=False,
+            status="ok" if public_rows else "empty",
+            error=auth_error,
+        )
     except Exception as exc:
         cached_rows = deepcopy(cache_entry.get("rows", [])) if isinstance(cache_entry, dict) else []
         if cached_rows:
-            return cached_rows, {
-                "enabled": True,
-                "status": "stale_cache",
-                "itemCount": len(cached_rows),
-                "updateTime": str(cache_entry.get("updateTime") or now_iso()),
-                "source": "jisilu_qdii",
-                "sourceUrl": source_url,
-                "servedFromCache": True,
-                "bucketCode": bucket_code,
-                "error": str(exc),
-            }
-        return [], {
-            "enabled": True,
-            "status": "error",
-            "itemCount": 0,
-            "updateTime": now_iso(),
-            "source": "jisilu_qdii",
-            "sourceUrl": source_url,
-            "servedFromCache": False,
-            "bucketCode": bucket_code,
-            "error": str(exc),
-        }
+            return cached_rows, _build_status(
+                item_count=len(cached_rows),
+                update_time=str(cache_entry.get("updateTime") or now_iso()),
+                source_url=source_url,
+                bucket_code=bucket_code,
+                cookie_configured=bool(cache_entry.get("cookieConfigured", cookie_configured)),
+                auth_mode=str(cache_entry.get("authMode") or ("authenticated_fallback_public" if cookie_configured else "public")),
+                used_login_enhanced_rows=bool(cache_entry.get("usedLoginEnhancedRows")),
+                served_from_cache=True,
+                status="stale_cache",
+                error=auth_error or str(exc),
+            )
+        return [], _build_status(
+            item_count=0,
+            update_time=now_iso(),
+            source_url=source_url,
+            bucket_code=bucket_code,
+            cookie_configured=cookie_configured,
+            auth_mode="authenticated_fallback_public" if cookie_configured else "public",
+            used_login_enhanced_rows=False,
+            served_from_cache=False,
+            status="error",
+            error=auth_error or str(exc),
+        )
 
 
 def fetch_lof_arbitrage_snapshot() -> dict[str, Any]:
@@ -172,13 +249,16 @@ def fetch_lof_arbitrage_snapshot() -> dict[str, Any]:
 
     plugin_config = _plugin_config()
     timeout_seconds = max(float(plugin_config.get("timeout_ms", 30000)) / 1000.0, 3.0)
+    cookie_text = _read_cookie(plugin_config)
+    cookie_configured = bool(cookie_text)
     cache_snapshot = _read_cache()
     categories = {key: [] for key in DEFAULT_CATEGORIES}
     source_status = {}
     next_cache = _cache_fallback()
     next_cache["updatedAt"] = now_iso()
 
-    with _create_session() as session:
+    with _create_session() as public_session:
+        auth_session = _create_session(cookie_text) if cookie_configured else None
         for source_name in DEFAULT_CATEGORIES:
             enabled, bucket_code = _read_source_config(source_name, plugin_config)
             source_url = SOURCE_URL_TEMPLATE.format(bucket_code=bucket_code)
@@ -193,6 +273,9 @@ def fetch_lof_arbitrage_snapshot() -> dict[str, Any]:
                     "sourceUrl": source_url,
                     "servedFromCache": False,
                     "bucketCode": bucket_code,
+                    "cookieConfigured": cookie_configured,
+                    "authMode": "public",
+                    "usedLoginEnhancedRows": False,
                 }
                 next_cache["sources"][source_name] = {
                     "rows": [],
@@ -200,10 +283,21 @@ def fetch_lof_arbitrage_snapshot() -> dict[str, Any]:
                     "status": "disabled",
                     "sourceUrl": source_url,
                     "source": "jisilu_qdii",
+                    "cookieConfigured": cookie_configured,
+                    "authMode": "public",
+                    "usedLoginEnhancedRows": False,
                 }
                 continue
 
-            rows, status = _fetch_source(source_name, bucket_code, session, timeout_seconds, cache_snapshot)
+            rows, status = _fetch_source(
+                source_name,
+                bucket_code,
+                public_session,
+                auth_session,
+                cookie_configured,
+                timeout_seconds,
+                cache_snapshot,
+            )
             categories[source_name] = rows
             source_status[source_name] = status
             next_cache["sources"][source_name] = {
@@ -212,7 +306,12 @@ def fetch_lof_arbitrage_snapshot() -> dict[str, Any]:
                 "status": status.get("status") or "empty",
                 "sourceUrl": source_url,
                 "source": "jisilu_qdii",
+                "cookieConfigured": bool(status.get("cookieConfigured")),
+                "authMode": str(status.get("authMode") or "public"),
+                "usedLoginEnhancedRows": bool(status.get("usedLoginEnhancedRows")),
             }
+        if auth_session is not None:
+            auth_session.close()
 
     cache_snapshot = _write_cache(next_cache)
     served_from_cache = any(bool((source_status.get(key) or {}).get("servedFromCache")) for key in source_status)
@@ -226,4 +325,3 @@ def fetch_lof_arbitrage_snapshot() -> dict[str, Any]:
         cacheTime=cache_snapshot.get("updatedAt") or now_iso(),
         servedFromCache=served_from_cache,
     )
-

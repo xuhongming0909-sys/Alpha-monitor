@@ -2,7 +2,7 @@
 
 const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000' : '';
 const PAGE_SIZE = 50;
-const FORCE_REFRESH_RESOURCE_KEYS = ['exchangeRate', 'ipo', 'bonds', 'cbArb', 'ah', 'ab', 'merger', 'lofArb'];
+const FORCE_REFRESH_RESOURCE_KEYS = ['exchangeRate', 'ipo', 'bonds', 'cbArb', 'ah', 'ab', 'merger'];
 const CRITICAL_CACHE_REVALIDATION_KEYS = ['exchangeRate', 'cbArb', 'ah', 'ab'];
 
 const ENDPOINTS = {
@@ -16,12 +16,12 @@ const ENDPOINTS = {
   stockSearch: '/api/stock/search',
   dividend: '/api/dividend?action=refresh',
   merger: '/api/market/event-arbitrage',
-  lofArb: '/api/market/lof-arbitrage',
   pushConfig: '/api/push/config',
 };
 
-const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'monitor', 'dividend', 'merger', 'lof-arb'];
+const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'monitor', 'dividend', 'merger'];
 const EVENT_ARB_SUBTAB_SEQUENCE = ['a_event', 'hk_private', 'cn_private', 'rights_issue', 'announcement_pool'];
+const LOF_SUBTAB_SEQUENCE = ['europe_us', 'asia', 'commodity'];
 const MONITOR_MARKET_OPTIONS = ['A', 'H', 'B'];
 const MONITOR_CURRENCY_OPTIONS = ['CNY', 'HKD', 'USD'];
 const PUSH_MODULE_LABELS = {
@@ -61,7 +61,9 @@ const TABLE_DEFAULTS = {
   monitor: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   dividend: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   merger: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  lofArb: { sortKey: 'premiumRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
+  lofArbEurope: { sortKey: 'premiumRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
+  lofArbAsia: { sortKey: 'premiumRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
+  lofArbCommodity: { sortKey: 'premiumRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   eventArbHk: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   eventArbCn: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   eventArbA: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
@@ -82,7 +84,6 @@ const state = {
     ab: {},
     monitor: {},
     merger: {},
-    lofArb: {},
     eventArbHk: {},
     eventArbCn: {},
     eventArbA: {},
@@ -95,7 +96,6 @@ const state = {
     monitor: createTableState('monitor'),
     dividend: createTableState('dividend'),
     merger: createTableState('merger'),
-    lofArb: createTableState('lofArb'),
     eventArbHk: createTableState('eventArbHk'),
     eventArbCn: createTableState('eventArbCn'),
     eventArbA: createTableState('eventArbA'),
@@ -111,7 +111,6 @@ const state = {
     monitor: resourceState(),
     dividend: resourceState(),
     merger: resourceState(),
-    lofArb: resourceState(),
     pushConfig: resourceState(),
   },
 };
@@ -125,7 +124,6 @@ const dom = {
     monitor: document.getElementById('panel-monitor'),
     dividend: document.getElementById('panel-dividend'),
     merger: document.getElementById('panel-merger'),
-    'lof-arb': document.getElementById('panel-lof-arb'),
   },
   statusLine: document.getElementById('status-line'),
   statusUpdateText: document.getElementById('status-update-text'),
@@ -575,6 +573,15 @@ function bindEvents() {
       if (!EVENT_ARB_SUBTAB_SEQUENCE.includes(subtab)) return;
       state.mergerSubview = subtab;
       renderMergerPanel();
+      return;
+    }
+
+    const lofSubtab = event.target.closest('[data-lof-subtab]');
+    if (lofSubtab) {
+      const subtab = String(lofSubtab.dataset.lofSubtab || '').trim();
+      if (!LOF_SUBTAB_SEQUENCE.includes(subtab)) return;
+      state.lofSubview = subtab;
+      renderLofArbitragePanel();
     }
   });
 
@@ -661,6 +668,7 @@ function renderTabs() {
   });
 
   Object.entries(dom.tabPanels).forEach(([key, panel]) => {
+    if (!panel) return;
     panel.classList.toggle('active', key === state.activeTab);
   });
 }
@@ -1460,7 +1468,7 @@ function handleSortClick(tableKey, sortKey) {
   if (tableKey === 'cbArb') renderConvertibleBondPanel();
   if (tableKey === 'ah') renderPremiumPanel('ah');
   if (tableKey === 'ab') renderPremiumPanel('ab');
-  if (tableKey === 'lofArb') renderLofArbitragePanel();
+  if (tableKey.startsWith('lofArb')) renderLofArbitragePanel();
 }
 
 function handlePageClick(tableKey, action) {
@@ -1480,7 +1488,7 @@ function handlePageClick(tableKey, action) {
   if (tableKey === 'ab') renderPremiumPanel('ab');
   if (tableKey === 'monitor') renderMonitorPanel();
   if (tableKey === 'dividend') renderDividendPanel();
-  if (tableKey === 'lofArb') renderLofArbitragePanel();
+  if (tableKey.startsWith('lofArb')) renderLofArbitragePanel();
   if (tableKey === 'merger' || tableKey.startsWith('eventArb')) renderMergerPanel();
 }
 
@@ -1490,7 +1498,9 @@ function readTableSourceRows(tableKey) {
   if (tableKey === 'ab') return readResourceArray('ab');
   if (tableKey === 'monitor') return readResourceArray('monitor');
   if (tableKey === 'dividend') return readResourceArray('dividend');
-  if (tableKey === 'lofArb') return readLofArbitrageRows();
+  if (tableKey === 'lofArbEurope') return readLofArbitrageGroupRows('europe_us');
+  if (tableKey === 'lofArbAsia') return readLofArbitrageGroupRows('asia');
+  if (tableKey === 'lofArbCommodity') return readLofArbitrageGroupRows('commodity');
   if (tableKey === 'merger' || tableKey === 'eventArbAnnouncement') return readEventArbitrageCategoryRows('announcement_pool');
   if (tableKey === 'eventArbHk') return readEventArbitrageCategoryRows('hk_private');
   if (tableKey === 'eventArbCn') return readEventArbitrageCategoryRows('cn_private');
@@ -1502,7 +1512,7 @@ function getTableColumns(tableKey) {
   if (tableKey === 'cbArb') return buildConvertibleColumns();
   if (tableKey === 'ah') return buildPremiumColumns('ah');
   if (tableKey === 'ab') return buildPremiumColumns('ab');
-  if (tableKey === 'lofArb') return buildLofArbitrageColumns();
+  if (tableKey.startsWith('lofArb')) return buildLofArbitrageColumns();
   return [];
 }
 
@@ -1648,7 +1658,7 @@ function resolveRowId(tableKey, row, fallbackIndex) {
   if (tableKey === 'ah') return `${row.aCode || ''}-${row.hCode || ''}-${fallbackIndex}`;
   if (tableKey === 'ab') return `${row.aCode || ''}-${row.bCode || ''}-${fallbackIndex}`;
   if (tableKey === 'monitor') return String(row.id || row.name || fallbackIndex);
-  if (tableKey === 'lofArb') return String(row.id || `${row.symbol || ''}-${fallbackIndex}`);
+  if (tableKey.startsWith('lofArb')) return String(row.id || `${row.symbol || ''}-${fallbackIndex}`);
   if (tableKey === 'merger') return String(row.announcementId || `${row.secCode || ''}-${row.announcementTime || ''}-${fallbackIndex}`);
   if (tableKey === 'eventArbAnnouncement') return String(row.announcementId || `${row.secCode || ''}-${row.announcementTime || ''}-${fallbackIndex}`);
   if (tableKey === 'eventArbHk' || tableKey === 'eventArbCn' || tableKey === 'eventArbA') {
@@ -1871,6 +1881,15 @@ function buildConvertibleColumns() {
     },
     { key: 'premiumRate', label: '转股溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premiumRate), className: (row) => statusClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate, 2) },
     {
+      key: 'pureBondValue',
+      label: '纯债价值',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => readPureBondBase(row),
+      render: (row) => formatNumber(readPureBondBase(row), 2),
+    },
+    {
       key: 'pureBondPremiumRate',
       label: '纯债溢价率',
       sortable: true,
@@ -1901,7 +1920,7 @@ function buildConvertibleColumns() {
     },
     {
       key: 'volatility60',
-      label: '60日波动率',
+      label: '60日波动率(历史)',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -1910,7 +1929,7 @@ function buildConvertibleColumns() {
     },
     {
       key: 'optionTheoreticalValue',
-      label: '期权理论价值',
+      label: '期权理论价值(参考)',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -1919,17 +1938,15 @@ function buildConvertibleColumns() {
       render: (row) => formatNumber(computeOptionTheoreticalValue(row), 2),
     },
     {
-      key: 'theoreticalMetrics',
-      label: '理论价值 / 理论溢价率',
+      key: 'theoreticalPrice',
+      label: '理论价值(参考)',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
       sortValue: (row) => toNumber(row.theoreticalPrice),
-      render: (row) => `
-        <div>理论价 ${escapeHtml(formatNumber(row.theoreticalPrice, 2))}</div>
-        <div class="muted ${escapeHtml(statusClass(row.theoreticalPremiumRate))}">理论溢价 ${escapeHtml(formatPercent(row.theoreticalPremiumRate, 2))}</div>
-      `,
+      render: (row) => formatNumber(row.theoreticalPrice, 2),
     },
+    { key: 'theoreticalPremiumRate', label: '理论溢价率(参考)', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.theoreticalPremiumRate), className: (row) => statusClass(row.theoreticalPremiumRate), render: (row) => formatPercent(row.theoreticalPremiumRate, 2) },
     {
       key: 'listingDate',
       label: '上市日',
@@ -1965,16 +1982,6 @@ function buildConvertibleColumns() {
       defaultDir: 'desc',
       sortValue: (row) => String(row.rating || ''),
       render: (row) => escapeHtml(row.rating || '--'),
-    },
-    {
-      key: 'yieldToMaturityPretax',
-      label: '到期税前收益率',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.yieldToMaturityPretax),
-      className: (row) => statusClass(row.yieldToMaturityPretax),
-      render: (row) => formatPercent(row.yieldToMaturityPretax, 2),
     },
   ];
 }
@@ -2046,10 +2053,10 @@ function renderActivePanel() {
   if (state.activeTab === 'cb-arb') return renderConvertibleBondPanel();
   if (state.activeTab === 'ah') return renderPremiumPanel('ah');
   if (state.activeTab === 'ab') return renderPremiumPanel('ab');
+  if (state.activeTab === 'lof-arb') return renderLofArbitragePanel();
   if (state.activeTab === 'monitor') return renderMonitorPanel();
   if (state.activeTab === 'dividend') return renderDividendPanel();
   if (state.activeTab === 'merger') return renderMergerPanel();
-  if (state.activeTab === 'lof-arb') return renderLofArbitragePanel();
 }
 
 function renderConvertibleBondPanel() {
@@ -2132,7 +2139,7 @@ function renderConvertibleBondPanel() {
       <div class="summary-grid summary-grid-three">${summaryCards}</div>
       <div class="list-card">
         <h3>转债套利主表</h3>
-        <div class="section-note">保持现有计算口径不变，只把你关心的核心参数前移到主表，提高桌面端信息密度。</div>
+        <div class="section-note">理论价值 = 纯债价值 + 期权理论价值；期权理论价值 = 看涨期权价值 - 看跌期权价值。当前 60 日波动率是基于正股近期收盘收益率年化得到的历史口径，期权/理论价值仅作参考，不建议当成高置信主指标。</div>
         ${renderPaginatedTable({
           tableKey: "cbArb",
           tableKind: "convertible",
@@ -2525,6 +2532,14 @@ function readLofArbitrageRows() {
   return readArray(readLofArbitrageData().rows);
 }
 
+function readLofArbitrageGroups() {
+  return readObject(readLofArbitrageData().groups);
+}
+
+function readLofArbitrageGroupRows(category) {
+  return readArray(readLofArbitrageGroups()[category]);
+}
+
 function readLofArbitrageOverview() {
   return readObject(readLofArbitrageData().overview);
 }
@@ -2535,11 +2550,25 @@ function readLofArbitrageSourceStatus() {
 
 function lofCategoryLabel(category) {
   const map = {
-    europe_us: '欧美',
-    asia: '亚洲',
+    europe_us: '欧美市场',
+    asia: '亚洲市场',
     commodity: '商品',
   };
   return map[String(category || '').trim()] || '--';
+}
+
+function readLofSubview() {
+  return LOF_SUBTAB_SEQUENCE.includes(state.lofSubview) ? state.lofSubview : 'europe_us';
+}
+
+function lofTableKey(category) {
+  if (category === 'asia') return 'lofArbAsia';
+  if (category === 'commodity') return 'lofArbCommodity';
+  return 'lofArbEurope';
+}
+
+function readLofSourceStatus(category) {
+  return readObject(readLofArbitrageSourceStatus()[category]);
 }
 
 function lofActionClass(status) {
@@ -2557,9 +2586,57 @@ function lofPremiumBasisLabel(basis) {
   return map[String(basis || '').trim()] || '--';
 }
 
+function lofAuthModeLabel(mode) {
+  const map = {
+    public: '公开结果',
+    authenticated: '已登录增强',
+    authenticated_fallback_public: '登录失败后回退公开结果',
+  };
+  return map[String(mode || '').trim()] || '--';
+}
+
+function lofEstimateSourceLabel(source) {
+  const map = {
+    direct_source: '源直接返回',
+    derived_from_est_val_increase_rt: 'Jisilu估值涨幅推导',
+  };
+  return map[String(source || '').trim()] || '当前源未返回';
+}
+
 function renderRiskFlags(flags) {
   const items = Array.isArray(flags) ? flags.filter(Boolean) : [];
   return items.length ? items.join('；') : '--';
+}
+
+function renderLofValue(value, digits = 4, fallbackText = '') {
+  const parsed = toNumber(value);
+  if (parsed !== null) return formatNumber(parsed, digits);
+  const text = String(fallbackText || '').trim();
+  return text || '当前源未返回';
+}
+
+function renderLofPercent(value, digits = 2, fallbackText = '') {
+  const parsed = toNumber(value);
+  if (parsed !== null) return formatPercent(parsed, digits);
+  const text = String(fallbackText || '').trim();
+  return text || '当前源未返回';
+}
+
+function renderLofSubtabs() {
+  const active = readLofSubview();
+  return `
+    <div class="subtab-nav">
+      ${LOF_SUBTAB_SEQUENCE.map((key) => `
+        <button
+          type="button"
+          class="subtab-button ${key === active ? 'active' : ''}"
+          data-lof-subtab="${escapeHtml(key)}"
+        >
+          ${escapeHtml(lofCategoryLabel(key))}
+        </button>
+      `).join('')}
+    </div>
+  `;
 }
 
 function buildLofArbitrageColumns() {
@@ -2575,62 +2652,20 @@ function buildLofArbitrageColumns() {
     },
     {
       key: 'name',
-      label: '基金 / 分区',
+      label: '名称',
       sortable: true,
       sortType: 'text',
       defaultDir: 'asc',
-      render: (row) => `
-        <div>${escapeHtml(row.name || '--')}</div>
-        <div class="muted">${escapeHtml(lofCategoryLabel(row.category))} / ${escapeHtml(row.issuer || '--')}</div>
-      `,
+      render: (row) => escapeHtml(row.name || '--'),
     },
     {
-      key: 'currentPrice',
-      label: '现价 / 涨幅',
+      key: 'actionStatus',
+      label: '结论',
       sortable: true,
-      sortType: 'number',
+      sortType: 'text',
       defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.currentPrice),
-      render: (row) => `
-        <div>${formatNumber(row.currentPrice, 3)}</div>
-        <div class="${escapeHtml(statusClass(row.changeRate))}">${formatPercent(row.changeRate, 2)}</div>
-      `,
-    },
-    {
-      key: 'navPremiumRate',
-      label: '净值 / 溢价',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.navPremiumRate),
-      render: (row) => `
-        <div>${formatNumber(row.navValue, 4)}</div>
-        <div class="${escapeHtml(statusClass(row.navPremiumRate))}">${formatPercent(row.navPremiumRate, 2)}</div>
-      `,
-    },
-    {
-      key: 'iopvPremiumRate',
-      label: 'IOPV / 溢价',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.iopvPremiumRate),
-      render: (row) => `
-        <div>${formatNumber(row.iopv, 4)}</div>
-        <div class="${escapeHtml(statusClass(row.iopvPremiumRate))}">${formatPercent(row.iopvPremiumRate, 2)}</div>
-      `,
-    },
-    {
-      key: 'estimatedPremiumRate',
-      label: '估值 / 溢价',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.estimatedPremiumRate),
-      render: (row) => `
-        <div>${formatNumber(row.estimatedValue, 4)}</div>
-        <div class="${escapeHtml(statusClass(row.estimatedPremiumRate))}">${formatPercent(row.estimatedPremiumRate, 2)}</div>
-      `,
+      className: (row) => lofActionClass(row.actionStatus),
+      render: (row) => escapeHtml(row.actionStatus || '--'),
     },
     {
       key: 'premiumRate',
@@ -2639,20 +2674,123 @@ function buildLofArbitrageColumns() {
       sortType: 'number',
       defaultDir: 'desc',
       sortValue: (row) => toNumber(row.premiumRate),
-      render: (row) => `
-        <div class="${escapeHtml(statusClass(row.premiumRate))}">${formatPercent(row.premiumRate, 2)}</div>
-        <div class="muted">${escapeHtml(lofPremiumBasisLabel(row.premiumBasis))} / ${escapeHtml(row.confidence || '--')}</div>
-      `,
+      className: (row) => statusClass(row.premiumRate),
+      render: (row) => formatPercent(row.premiumRate, 2),
     },
     {
-      key: 'netPremiumRate',
-      label: '扣费后溢价',
+      key: 'currentPrice',
+      label: '现价',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.netPremiumRate),
-      className: (row) => statusClass(row.netPremiumRate),
-      render: (row) => formatPercent(row.netPremiumRate, 2),
+      sortValue: (row) => toNumber(row.currentPrice),
+      render: (row) => formatNumber(row.currentPrice, 3),
+    },
+    {
+      key: 'changeRate',
+      label: '涨跌幅',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.changeRate),
+      className: (row) => statusClass(row.changeRate),
+      render: (row) => formatPercent(row.changeRate, 2),
+    },
+    {
+      key: 'volumeWan',
+      label: '成交额(万元)',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.volumeWan),
+      render: (row) => formatNumber(row.volumeWan, 2),
+    },
+    {
+      key: 'amountWanShares',
+      label: '场内份额(万份)',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.amountWanShares),
+      render: (row) => formatNumber(row.amountWanShares, 0),
+    },
+    {
+      key: 'amountIncreaseWanShares',
+      label: '场内新增(万份)',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.amountIncreaseWanShares),
+      render: (row) => formatSignedNumber(row.amountIncreaseWanShares, 0),
+    },
+    {
+      key: 'iopv',
+      label: 'IOPV',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.iopv),
+      render: (row) => escapeHtml(renderLofValue(row.iopv, 4, row.iopvText)),
+    },
+    {
+      key: 'iopvPremiumRate',
+      label: 'IOPV溢价率',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.iopvPremiumRate),
+      className: (row) => statusClass(row.iopvPremiumRate),
+      render: (row) => escapeHtml(renderLofPercent(row.iopvPremiumRate, 2, row.iopvPremiumRateText)),
+    },
+    {
+      key: 'navValue',
+      label: 'T-2净值',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.navValue),
+      render: (row) => escapeHtml(renderLofValue(row.navValue, 4, row.navValueText)),
+    },
+    {
+      key: 'navDate',
+      label: '净值日期',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'desc',
+      render: (row) => formatDateOnly(row.navDate),
+    },
+    {
+      key: 'navPremiumRate',
+      label: 'T-2净值溢价',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.navPremiumRate),
+      className: (row) => statusClass(row.navPremiumRate),
+      render: (row) => escapeHtml(renderLofPercent(row.navPremiumRate, 2, row.navPremiumRateText)),
+    },
+    {
+      key: 'referenceIndexChangeRate',
+      label: 'T-1指数涨幅',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.referenceIndexChangeRate),
+      className: (row) => statusClass(row.referenceIndexChangeRate),
+      render: (row) => formatPercent(row.referenceIndexChangeRate, 2),
+    },
+    {
+      key: 'referenceIndex',
+      label: '相关指数',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'asc',
+      render: (row) => escapeHtml(row.referenceIndex || '--'),
+    },
+    {
+      key: 'applyFeeText',
+      label: '申购费',
+      render: (row) => escapeHtml(row.applyFeeText || '--'),
     },
     {
       key: 'applyStatus',
@@ -2663,44 +2801,66 @@ function buildLofArbitrageColumns() {
       render: (row) => escapeHtml(row.applyStatus || '--'),
     },
     {
-      key: 'volumeWan',
-      label: '成交额(万)',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.volumeWan),
-      render: (row) => formatNumber(row.volumeWan, 2),
+      key: 'redeemFeeText',
+      label: '赎回费',
+      render: (row) => escapeHtml(row.redeemFeeText || '--'),
     },
     {
-      key: 'actionStatus',
-      label: '结论',
+      key: 'redeemStatus',
+      label: '赎回状态',
       sortable: true,
       sortType: 'text',
       defaultDir: 'asc',
-      className: (row) => lofActionClass(row.actionStatus),
-      render: (row) => escapeHtml(row.actionStatus || '--'),
+      render: (row) => escapeHtml(row.redeemStatus || '--'),
     },
     {
-      key: 'detailUrl',
-      label: '详情',
-      render: (row) => buildAnchor(row.detailUrl, '详情页') || '--',
+      key: 'managementFeeText',
+      label: '管托费',
+      render: (row) => escapeHtml(row.managementFeeText || '--'),
+    },
+    {
+      key: 'issuer',
+      label: '基金公司',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'asc',
+      render: (row) => escapeHtml(row.issuer || '--'),
+    },
+    {
+      key: 'officialUrl',
+      label: '官方链接',
+      render: (row) => buildAnchor(row.officialUrl, '基金官网') || '--',
+    },
+    {
+      key: 'sourceDetailUrl',
+      label: '集思录详情',
+      render: (row) => buildAnchor(row.sourceDetailUrl || row.detailUrl, '详情页') || '--',
     },
   ];
 }
 
 function renderLofArbitrageDetail(row) {
   const items = [
-    { label: '基金公司', value: row.issuer || '--' },
-    { label: '净值日期', value: formatDateOnly(row.navDate) },
-    { label: 'IOPV时间', value: row.iopvTime || '--' },
-    { label: '估值时间', value: row.estimatedTime || '--' },
-    { label: '申购费', value: formatPercent(row.applyFeeRate, 2) },
-    { label: '场内交易费', value: formatPercent(row.tradeFeeRate, 2) },
-    { label: '赎回费', value: formatPercent(row.redeemFeeRate, 2) },
-    { label: '管托费', value: formatPercent(row.managementFeeRate, 2) },
+    { label: '结论', value: row.actionStatus || '--' },
+    { label: '信号来源', value: `${lofPremiumBasisLabel(row.premiumBasis)} / ${row.confidence || '--'}` },
+    { label: '信号溢价', value: formatPercent(row.premiumRate, 2) },
+    { label: '扣费后溢价', value: formatPercent(row.netPremiumRate, 2) },
+    { label: '估值', value: renderLofValue(row.estimatedValue, 4, row.estimatedValueText) },
+    { label: '估值来源', value: lofEstimateSourceLabel(row.estimatedSource) },
+    { label: '估值溢价', value: renderLofPercent(row.estimatedPremiumRate, 2, row.estimatedPremiumRateText) },
+    { label: '估值涨幅', value: renderLofPercent(row.estimatedIncreaseRate, 2, row.estimatedIncreaseRateText) },
+    { label: 'IOPV时间', value: row.iopvTime || '当前源未返回' },
+    { label: '估值时间', value: row.estimatedTime || '当前源未返回' },
+    { label: '场内新增比例', value: formatPercent(row.amountIncreaseRate, 2) },
     { label: '币种 / T+0', value: `${row.currency || '--'} / ${formatBooleanLabel(row.t0)}` },
-    { label: '参考指数', value: row.referenceIndex || '--' },
-    { label: '指数涨幅', value: formatPercent(row.referenceIndexChangeRate, 2) },
+    { label: '参考价', value: row.referencePriceText || '--' },
+    { label: '报价时间', value: row.quoteTimeText || '--' },
+    { label: '报价日期', value: formatDateOnly(row.priceDate) },
+    { label: '换手率', value: formatPercent(row.turnoverRate, 2) },
+    { label: '基金类型', value: row.fundType || '--' },
+    { label: '场内交易费', value: formatPercent(row.tradeFeeRate, 2) },
+    { label: '管托费说明', value: row.managementFeeTips || row.managementFeeText || '--' },
+    { label: '估值说明', value: row.calculationTips || '--' },
     { label: '风险提示', value: renderRiskFlags(row.riskFlags) },
   ];
   return renderDetailGrid(items);
@@ -2723,69 +2883,63 @@ function renderLofArbitragePanel() {
 
   const rows = readLofArbitrageRows();
   const overview = readLofArbitrageOverview();
-  const sourceStatus = readLofArbitrageSourceStatus();
+  const iopvSearch = readObject(readLofArbitrageData().iopvSearch);
+  const activeCategory = readLofSubview();
+  const activeRows = readLofArbitrageGroupRows(activeCategory);
+  const activeStatus = readLofSourceStatus(activeCategory);
   if (!rows.length) {
-    panel.innerHTML = moduleEmpty('当前公开零登录链路暂未返回 LOF 套利数据');
+    panel.innerHTML = moduleEmpty('当前公开链路暂未返回 LOF 套利数据');
     return;
   }
 
-  const candidateRows = rows.filter((row) => row.actionStatus === '套利候选').slice(0, 3);
-  const watchRows = rows.filter((row) => row.actionStatus === '仅观察').slice(0, 3);
-  const sourceRows = ['europe_us', 'asia', 'commodity'].map((key) => {
-    const status = readObject(sourceStatus[key]);
-    return {
-      title: lofCategoryLabel(key),
-      subtitle: `${eventArbStatusLabel(status.status)} / ${formatDate(status.updateTime)}`,
-      value: formatInt(status.itemCount),
-    };
-  });
+  const authText = overview.authenticatedGroupCount
+    ? `已登录增强 ${formatInt(overview.authenticatedGroupCount)} 个子市场`
+    : (overview.cookieConfigured ? '已配置登录增强，当前未生效' : '未配置登录增强');
+  const iopvStatusText = iopvSearch.loginEnhancementUsed ? '已启用登录增强' : '当前未用登录增强';
+  const estimateStatusText = iopvSearch.estimateComputationMode === 'derived_from_est_val_increase_rt'
+    ? '估值涨幅推导'
+    : (iopvSearch.publicSourceStatus || '--');
 
   panel.innerHTML = `
     <div class="module-shell">
       <div class="module-toolbar">
         <div>
           <div class="tab-title">LOF套利</div>
-          <div class="section-note">第一版先走零登录公开链路：直接读取 Jisilu QDII 列表。IOPV 或盘中估值缺失时，系统只保留观察结论，不误报为可执行套利。</div>
+          <div class="section-note">这一版继续按市场长表展示。估值优先使用源直接返回；如果源没给估值但给了估值涨幅，就按 Jisilu 的净值和估值涨幅推导当前估值。IOPV 仍然只认源直出，缺失时明确显示“当前源未返回”。</div>
         </div>
         <div class="panel-meta">
           <span>总样本 ${escapeHtml(formatInt(overview.totalCount))}</span>
-          <span>IOPV公开可用 ${escapeHtml(formatInt(overview.iopvAvailableCount))}</span>
+          <span>${escapeHtml(authText)}</span>
+          <span>估值可用 ${escapeHtml(formatInt(overview.estimateAvailableCount))}</span>
+          <span>估值推导 ${escapeHtml(formatInt(overview.estimateDerivedCount))}</span>
+          <span>IOPV可用 ${escapeHtml(formatInt(overview.iopvAvailableCount))}</span>
           <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('lofArb')))}</span>
           <span>${escapeHtml(readFreshnessText('lofArb'))}</span>
         </div>
       </div>
-      <div class="summary-grid summary-grid-three">
-        ${renderSummaryCard(
-          '套利候选',
-          candidateRows.map((row) => ({
-            title: `${row.name || '--'} ${row.symbol || ''}`.trim(),
-            subtitle: `${lofPremiumBasisLabel(row.premiumBasis)} / 申购 ${row.applyStatus || '--'}`,
-            value: formatPercent(row.netPremiumRate, 2),
-            valueClass: statusClass(row.netPremiumRate),
-          })),
-          'compact-card'
-        )}
-        ${renderSummaryCard(
-          '仅观察',
-          watchRows.map((row) => ({
-            title: `${row.name || '--'} ${row.symbol || ''}`.trim(),
-            subtitle: renderRiskFlags(row.riskFlags),
-            value: formatPercent(row.premiumRate, 2),
-            valueClass: statusClass(row.premiumRate),
-          })),
-          'compact-card'
-        )}
-        ${renderSummaryCard('来源状态', sourceRows, 'compact-card')}
-      </div>
+      ${renderLofSubtabs()}
       <div class="list-card">
-        <h3>LOF套利主表</h3>
-        <div class="section-note">主表同时展示净值溢价、IOPV溢价、估值溢价和申购状态。当前零登录链路下，很多标的的 IOPV 仍为空，因此一期结论优先保证“真实可解释”，不追求伪精确。</div>
+        <div class="module-toolbar">
+          <div>
+            <h3>${escapeHtml(lofCategoryLabel(activeCategory))}</h3>
+            <div class="section-note">主表按套利阅读路径展示结论和信号溢价；下方次级信息继续直接展示估值来源、估值说明和风险提示，不再额外保留顶部摘要栏目。</div>
+          </div>
+          <div class="panel-meta">
+            <span>当前子市场 ${escapeHtml(formatInt(activeRows.length))} 条</span>
+            <span>来源状态 ${escapeHtml(eventArbStatusLabel(activeStatus.status))}</span>
+            <span>模式 ${escapeHtml(lofAuthModeLabel(activeStatus.authMode))}</span>
+            <span>IOPV状态 ${escapeHtml(iopvSearch.currentIopvAvailability === 'available' ? '已返回' : '未返回')}</span>
+            <span>IOPV链路 ${escapeHtml(iopvStatusText)}</span>
+            <span>估值状态 ${escapeHtml(iopvSearch.currentEstimateAvailability === 'available' ? '已返回' : '未返回')}</span>
+            <span>估值链路 ${escapeHtml(estimateStatusText)}</span>
+          </div>
+        </div>
         ${renderPaginatedTable({
-          tableKey: 'lofArb',
+          tableKey: lofTableKey(activeCategory),
           tableKind: 'merger',
           columns: buildLofArbitrageColumns(),
-          rows,
-          emptyMessage: '当前没有 LOF 套利数据',
+          rows: activeRows,
+          emptyMessage: `当前没有${lofCategoryLabel(activeCategory)}数据`,
           detailRenderer: renderLofArbitrageDetail,
           detailMode: 'always',
         })}
@@ -3049,8 +3203,8 @@ function buildEventArbAnnouncementColumns() {
 
 function renderEventArbitrageSummaryDetail(row) {
   return `
-    <div class="detail-grid">
-      <div class="detail-item">
+    <div class="detail-grid single-column">
+      <div class="detail-item full-span">
         <div class="detail-label">摘要</div>
         <div class="detail-value">${escapeHtml(row?.summary || '--')}</div>
       </div>
@@ -3060,8 +3214,8 @@ function renderEventArbitrageSummaryDetail(row) {
 
 function renderEventArbitrageRemarkDetail(row, value) {
   return `
-    <div class="detail-grid">
-      <div class="detail-item">
+    <div class="detail-grid single-column">
+      <div class="detail-item full-span">
         <div class="detail-label">备注</div>
         <div class="detail-value">${escapeHtml(value || '--')}</div>
       </div>
@@ -3349,7 +3503,6 @@ function buildConvertibleDetailItems(row) {
     { label: '剩余规模(亿)', value: formatNumber(row.remainingSizeYi, 2) },
     { label: '评级', value: row.rating || '--' },
     { label: '剩余年限', value: formatNumber(row.remainingYears, 2) },
-    { label: '到期税前收益率', value: formatPercent(row.yieldToMaturityPretax, 2) },
     { label: '上市日', value: formatDateOnly(row.listingDate) },
     { label: '转股起始日', value: formatDateOnly(row.convertStartDate) },
   ];

@@ -47,8 +47,8 @@ def _parse_apply_status(status_text: str) -> dict[str, Any]:
     lowered = text.lower()
     is_open = bool(text) and ("开放" in text or "限" in text)
     is_limited = "限" in text
-    is_paused = "暂停" in text or "关闭" in text or "不可" in text or "停止" in text
-    limit_match = re.search(r"限\s*([0-9]+(?:\.[0-9]+)?)\s*([千万元亿万]?)", text)
+    is_paused = any(keyword in text for keyword in ("暂停", "关闭", "不可", "停止"))
+    limit_match = re.search(r"限\s*([0-9]+(?:\.[0-9]+)?)\s*([千万元亿元万]?)", text)
     limit_value = None
     if limit_match:
         limit_value = limit_match.group(1) + (limit_match.group(2) or "")
@@ -61,10 +61,17 @@ def _parse_apply_status(status_text: str) -> dict[str, Any]:
     }
 
 
-def _build_risk_flags(row: dict[str, Any], apply_meta: dict[str, Any], confidence: str, low_liquidity_volume_wan: float | None) -> list[str]:
-    flags = []
+def _build_risk_flags(
+    row: dict[str, Any],
+    apply_meta: dict[str, Any],
+    confidence: str,
+    low_liquidity_volume_wan: float | None,
+) -> list[str]:
+    flags: list[str] = []
     if confidence == "low":
-        flags.append("仅有净值溢价，缺少零登录 IOPV/盘中估值")
+        flags.append("仅有净值溢价，缺少可执行级 IOPV/盘中估值")
+    if row.get("estimatedSource") == "derived_from_est_val_increase_rt":
+        flags.append("估值由 Jisilu 估值涨幅字段推导，需结合申赎限制复核")
     if apply_meta.get("isLimited"):
         flags.append(f"申购受限：{apply_meta.get('raw') or '限购'}")
     if apply_meta.get("isPaused"):
@@ -73,8 +80,17 @@ def _build_risk_flags(row: dict[str, Any], apply_meta: dict[str, Any], confidenc
     if low_liquidity_volume_wan is not None and volume is not None and volume < low_liquidity_volume_wan:
         flags.append("场内成交额偏低，卖出冲击需谨慎")
     if _clean_text(row.get("notes")):
-        flags.append(row["notes"])
+        flags.append(str(row["notes"]))
     return flags
+
+
+def _sort_row_key(item: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        -(item.get("actionRank") or 0),
+        -(_to_float(item.get("premiumRate")) or -9999),
+        -(_to_float(item.get("volumeWan")) or -9999),
+        str(item.get("symbol") or ""),
+    )
 
 
 def _enrich_row(row: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
@@ -85,9 +101,10 @@ def _enrich_row(row: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
     low_liquidity_volume_wan = _to_float(config.get("low_liquidity_volume_wan"))
 
     signal_basis, premium_rate, confidence = _pick_signal_basis(row)
-    apply_meta = _parse_apply_status(row.get("applyStatus"))
+    apply_meta = _parse_apply_status(str(row.get("applyStatus") or ""))
     cost_rate = sum(
-        value for value in (
+        value
+        for value in (
             _to_float(row.get("applyFeeRate")),
             _to_float(row.get("tradeFeeRate")),
         )
@@ -95,7 +112,7 @@ def _enrich_row(row: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
     )
     net_premium_rate = premium_rate - cost_rate if premium_rate is not None else None
 
-    # 这里把“抓到的溢价”与“能否真正执行”拆开，避免把净值观察信号误报成可套利结论。
+    # 把“观察到的溢价”与“是否可执行”分开，避免把 NAV-only 误判成套利结论。
     if apply_meta.get("isPaused"):
         action_status = "不可参与"
         action_rank = 0
@@ -108,7 +125,12 @@ def _enrich_row(row: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
     elif treat_limited_apply_as_watch_only and apply_meta.get("isLimited"):
         action_status = "仅观察"
         action_rank = 2
-    elif net_premium_rate is not None and premium_rate >= premium_threshold_pct and net_premium_rate >= min_net_premium_pct and apply_meta.get("isOpen"):
+    elif (
+        net_premium_rate is not None
+        and premium_rate >= premium_threshold_pct
+        and net_premium_rate >= min_net_premium_pct
+        and apply_meta.get("isOpen")
+    ):
         action_status = "套利候选"
         action_rank = 3
     else:
@@ -130,9 +152,11 @@ def _enrich_row(row: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _build_overview(rows: list[dict], groups: dict[str, list[dict]]) -> dict[str, Any]:
+def _build_overview(rows: list[dict], groups: dict[str, list[dict]], source_status: dict[str, Any]) -> dict[str, Any]:
     actionable = [row for row in rows if row.get("actionStatus") == "套利候选"]
     watch_rows = [row for row in rows if row.get("actionStatus") == "仅观察"]
+    estimate_direct_rows = [row for row in rows if row.get("estimatedSource") == "direct_source"]
+    estimate_derived_rows = [row for row in rows if row.get("estimatedSource") == "derived_from_est_val_increase_rt"]
     return {
         "totalCount": len(rows),
         "candidateCount": len(actionable),
@@ -140,10 +164,33 @@ def _build_overview(rows: list[dict], groups: dict[str, list[dict]]) -> dict[str
         "applyOpenCount": sum(1 for row in rows if row.get("applyOpen")),
         "iopvAvailableCount": sum(1 for row in rows if row.get("iopv") is not None),
         "estimateAvailableCount": sum(1 for row in rows if row.get("estimatedValue") is not None),
+        "estimateDirectCount": len(estimate_direct_rows),
+        "estimateDerivedCount": len(estimate_derived_rows),
         "navOnlyCount": sum(1 for row in rows if row.get("premiumBasis") == "nav"),
         "europeUsCount": len(groups.get("europe_us") or []),
         "asiaCount": len(groups.get("asia") or []),
         "commodityCount": len(groups.get("commodity") or []),
+        "cookieConfigured": any(bool((source_status.get(key) or {}).get("cookieConfigured")) for key in LOF_CATEGORY_KEYS),
+        "authenticatedGroupCount": sum(
+            1 for key in LOF_CATEGORY_KEYS if bool((source_status.get(key) or {}).get("usedLoginEnhancedRows"))
+        ),
+    }
+
+
+def _build_iopv_search(rows: list[dict], source_status: dict[str, Any]) -> dict[str, Any]:
+    cookie_configured = any(bool((source_status.get(key) or {}).get("cookieConfigured")) for key in LOF_CATEGORY_KEYS)
+    login_enhanced_used = any(bool((source_status.get(key) or {}).get("usedLoginEnhancedRows")) for key in LOF_CATEGORY_KEYS)
+    iopv_available = any(row.get("iopv") is not None for row in rows)
+    estimate_available = any(row.get("estimatedValue") is not None for row in rows)
+    derived_estimate_available = any(row.get("estimatedSource") == "derived_from_est_val_increase_rt" for row in rows)
+    return {
+        "publicSourceStatus": "searching",
+        "currentZeroLoginAvailability": "partial_schema_but_not_publicly_filled",
+        "loginEnhancementConfigured": cookie_configured,
+        "loginEnhancementUsed": login_enhanced_used,
+        "currentIopvAvailability": "available" if iopv_available else "not_returned_by_current_source_chain",
+        "currentEstimateAvailability": "available" if estimate_available else "not_returned_by_current_source_chain",
+        "estimateComputationMode": "derived_from_est_val_increase_rt" if derived_estimate_available else "direct_or_unavailable",
     }
 
 
@@ -155,7 +202,8 @@ def build_lof_arbitrage_response(fetch_payload: dict, bus_records: list[dict]) -
 
     config = _strategy_config()
     groups = _empty_groups()
-    rows = []
+    rows: list[dict[str, Any]] = []
+    source_status = (fetch_payload.get("data") or {}).get("sourceStatus", {})
 
     for record in bus_records:
         if record.get("status") != "ok":
@@ -166,27 +214,19 @@ def build_lof_arbitrage_response(fetch_payload: dict, bus_records: list[dict]) -
             groups[category].append(row)
         rows.append(row)
 
-    rows.sort(
-        key=lambda item: (
-            -(item.get("actionRank") or 0),
-            -(_to_float(item.get("premiumRate")) or -9999),
-            -(_to_float(item.get("volumeWan")) or -9999),
-            str(item.get("symbol") or ""),
-        )
-    )
+    rows.sort(key=_sort_row_key)
+    for category in groups:
+        groups[category].sort(key=_sort_row_key)
 
     payload = {
-        "overview": _build_overview(rows, groups),
+        "overview": _build_overview(rows, groups, source_status),
         "rows": rows,
         "groups": groups,
-        "sourceStatus": (fetch_payload.get("data") or {}).get("sourceStatus", {}),
+        "sourceStatus": source_status,
         "updateTime": fetch_payload.get("updateTime"),
         "cacheTime": fetch_payload.get("cacheTime"),
         "servedFromCache": bool(fetch_payload.get("servedFromCache")),
-        "iopvSearch": {
-            "publicSourceStatus": "searching",
-            "currentZeroLoginAvailability": "partial_schema_but_not_publicly_filled",
-        },
+        "iopvSearch": _build_iopv_search(rows, source_status),
     }
     return build_success(
         payload,
