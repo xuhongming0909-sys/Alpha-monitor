@@ -27,8 +27,7 @@ from data_fetch.convertible_bond.source import _build_cov_quote_map, _build_cov_
 import stock_price_history_db as db
 
 MAX_WORKERS = 8
-MAX_ROWS_PER_SYMBOL = 120
-LOOKBACK_DAYS = 360
+LOOKBACK_DAYS = 420
 
 
 def _load_jisilu_cookie() -> str:
@@ -212,8 +211,6 @@ def sync_cb_stock_history(force_full: bool = False) -> Dict[str, Any]:
                     "error": str(exc),
                 })
 
-    pruned = db.prune_to_recent_rows(MAX_ROWS_PER_SYMBOL)
-
     ok = [item for item in results if item.get("success") and not item.get("skipped")]
     skipped = [item for item in results if item.get("skipped")]
     failed = [item for item in results if not item.get("success")]
@@ -225,7 +222,8 @@ def sync_cb_stock_history(force_full: bool = False) -> Dict[str, Any]:
         "skippedSymbols": len(skipped),
         "failedSymbols": len(failed),
         "writtenRows": sum(int(item.get("rows") or 0) for item in ok),
-        "prunedRows": int(pruned),
+        # 历史 K 线库作为波动率权威来源，不再在同步后把每个股票裁成短滚动窗口。
+        "prunedRows": 0,
         "removedStaleSymbols": int(cleanup.get("removedSymbols") or 0),
         "removedStalePriceRows": int(cleanup.get("removedPriceRows") or 0),
         "failed": failed[:30],

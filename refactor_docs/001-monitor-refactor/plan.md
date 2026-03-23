@@ -1218,3 +1218,33 @@ Acceptance:
 - Note content is driven from `config.yaml` through `GET /api/dashboard/ui-config`.
 - Empty note sections auto-hide.
 - Existing tables, summary cards, sorting, pagination, and calculation results remain unchanged.
+
+## 37. Phase AI: DB-authoritative Convertible Volatility Fix (2026-03-24)
+
+Goal: correct the convertible-bond volatility calculation so the visible `60日波动率` is truly computed from the local historical K-line database with the right sample window, without letting the sync path silently trim away the needed price history.
+
+Plan:
+1. Keep this round narrow and calculation-focused:
+   - no dashboard layout change
+   - no route semantic change
+   - no unrelated refactor
+2. Fix the realized-volatility sample window:
+   - `20/60/120日波动率` must use the most recent `20/60/120` close-to-close log-return observations
+   - this requires at least `window + 1` closes from the local price-history database
+   - the current off-by-one return window must be removed
+3. Fix the historical-price sync trust boundary:
+   - the local `stock_price_history.db` remains the authoritative source for volatility reads
+   - sync may append or backfill missing rows, but must not prune each symbol back down to a tiny rolling slice that destroys the established history library
+4. Align missing-data hydration with the corrected window:
+   - inline fallback hydration only fills when the database lacks the minimum close count required for volatility calculation
+   - once the database already has enough rows, volatility calculation reads directly from the database result
+5. After implementation, verify one or more live symbols by:
+   - reading the closes from `stock_price_history.db`
+   - recomputing the latest `60日波动率`
+   - confirming the API payload matches the database-derived result
+
+Acceptance:
+- `60日波动率` uses `60` recent log-return samples rather than `59`.
+- The volatility read path requires `window + 1` closes from `stock_price_history.db`.
+- Convertible-bond history sync no longer prunes the established stock K-line library down to `120` rows per symbol.
+- Manual database recomputation for a sample symbol matches the API payload.

@@ -26,6 +26,7 @@ TRADING_DAYS_PER_YEAR = 252
 PRIMARY_VOL_WINDOW = 60
 HISTORY_LOOKBACK_DAYS = 420
 MAX_VOL_SYNC_WORKERS = 8
+REQUIRED_CLOSE_ROWS = max(VOL_WINDOWS) + 1
 MAX_FINANCIAL_WORKERS = 10
 INLINE_HISTORY_HYDRATE_LIMIT = 24
 ROOT = Path(__file__).resolve().parents[2]
@@ -192,8 +193,8 @@ def _sync_stock_history_if_needed(symbol: str) -> Dict[str, Any]:
     if not code:
         return {"symbol": code, "synced": False, "rows": 0}
 
-    existing = price_db.load_recent_closes(code, max(VOL_WINDOWS))
-    if len(existing) >= max(VOL_WINDOWS):
+    existing = price_db.load_recent_closes(code, REQUIRED_CLOSE_ROWS)
+    if len(existing) >= REQUIRED_CLOSE_ROWS:
         return {"symbol": code, "synced": False, "rows": 0}
 
     end_date = datetime.now().strftime("%Y%m%d")
@@ -883,7 +884,8 @@ def _calc_volatility_metrics(stock_code: str) -> Dict[str, Optional[float]]:
     if not symbol:
         return {"volatility20": None, "volatility60": None, "volatility120": None}
 
-    close_series = pd.Series(price_db.load_recent_closes(symbol, max(VOL_WINDOWS)), dtype="float64")
+    # 波动率严格按历史库最近 N 个收益率样本计算，因此至少需要 N+1 个收盘价。
+    close_series = pd.Series(price_db.load_recent_closes(symbol, REQUIRED_CLOSE_ROWS), dtype="float64")
 
     if len(close_series) < 2:
         return {"volatility20": None, "volatility60": None, "volatility120": None}
@@ -892,7 +894,7 @@ def _calc_volatility_metrics(stock_code: str) -> Dict[str, Optional[float]]:
     metrics: Dict[str, Optional[float]] = {}
     for window in VOL_WINDOWS:
         key = f"volatility{window}"
-        required_returns = max(2, window - 1)
+        required_returns = max(2, window)
         if len(returns) < required_returns:
             metrics[key] = None
             continue

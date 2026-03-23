@@ -2276,3 +2276,19 @@ GitHub 自动部署正式链路固定为：
   - section titles
   - line lists
 - Existing summary cards, tables, detail rows, and pagination layout must remain intact.
+
+## 33. DB-authoritative Convertible Volatility Spec (2026-03-24)
+
+### 33.1 Volatility sample rule
+- `volatility20` uses the latest `20` close-to-close log returns.
+- `volatility60` uses the latest `60` close-to-close log returns.
+- `volatility120` uses the latest `120` close-to-close log returns.
+- Therefore the read path must load at least `121` closes for the largest current window.
+
+### 33.2 Database authority rule
+- The visible convertible-bond volatility fields are calculated from `runtime_data/shared/stock_price_history.db`.
+- Backfill logic may append missing local rows, but the final volatility read still comes from the local database rows after hydration.
+
+### 33.3 History sync preservation rule
+- `data_fetch/convertible_bond/history_source.py` and its script mirror must not prune each symbol to `120` rows after sync.
+- The historical K-line library is preserved as the authority for later volatility recomputation and verification.

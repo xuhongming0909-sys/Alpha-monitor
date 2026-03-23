@@ -1237,3 +1237,11 @@
 - 如果某个模块某一类说明为空：
   - 该小节自动隐藏
   - 不影响其他小节显示
+
+## 41. DB-authoritative Convertible Volatility Contract (2026-03-24)
+- `20/60/120鏃ユ尝鍔ㄧ巼` must be computed from the local `stock_price_history.db` using the most recent `20/60/120` close-to-close log-return observations.
+- The calculation must require at least `window + 1` closes from the local history database.
+- The current off-by-one sample bug (`window - 1` returns) is not allowed.
+- Inline missing-data hydration may backfill the local history database only when the local database does not yet contain enough closes for volatility calculation.
+- Once enough closes already exist locally, volatility calculation must read from the database result directly.
+- The convertible-bond stock-history sync path must not prune each symbol back down to a short rolling slice that destroys the established historical K-line library.
