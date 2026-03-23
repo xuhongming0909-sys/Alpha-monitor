@@ -11,13 +11,15 @@ npm install
 
 3. Copy `.env.example` to `.env` when local secrets are required.
 
-## Start the dashboard
+## Development-only local start
 
 ```powershell
 npm run dev
 ```
 
-Open `http://127.0.0.1:5000`.
+Open `http://127.0.0.1:5000` only for development verification.
+
+Official runtime access must use the cloud public URL configured in `config.yaml > deployment.public_base_url`.
 
 ## Required verification commands
 
@@ -82,3 +84,8 @@ bash tools/deploy/server_doctor.sh
 ```
 
 5. Verify public homepage and public `/api/health`.
+6. If webhook/public URL class parameters changed, sync the server `.env` directly:
+
+```powershell
+npm run sync:server:env
+```

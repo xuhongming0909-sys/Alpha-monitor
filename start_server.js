@@ -70,6 +70,7 @@ const PRESENTATION_STOCK_SEARCH_CONFIG = PRESENTATION_CONFIG?.stock_search || {}
 const PRESENTATION_DIVIDEND_CONFIG = PRESENTATION_CONFIG?.dividend || {};
 const PRESENTATION_HISTORICAL_PREMIUM_CONFIG = PRESENTATION_CONFIG?.historical_premium || {};
 const PRESENTATION_DASHBOARD_TABLE_UI_CONFIG = PRESENTATION_CONFIG?.dashboard_table_ui || {};
+const PRESENTATION_DASHBOARD_MODULE_NOTES_CONFIG = PRESENTATION_CONFIG?.dashboard_module_notes || {};
 const EVENT_ARB_STRATEGY_CONFIG = STRATEGY_CONFIG?.event_arbitrage || {};
 const INDEX_FILE = path.resolve(ROOT, PRESENTATION_CONFIG.dashboard_entry || './index.html');
 const STATIC_DATA_DIR = PATH_POLICY.dataRootDir;
@@ -255,7 +256,36 @@ function buildDashboardTableUiConfig(config = {}) {
   };
 }
 
+function normalizeStringListConfig(values) {
+  return (Array.isArray(values) ? values : [])
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+}
+
+// 展示注释只做配置归一化，不在这里混入业务计算，保证解释文本和页面渲染解耦。
+function buildDashboardModuleNotesConfig(config = {}) {
+  const buildModuleNote = (moduleKey) => {
+    const item = config && typeof config[moduleKey] === 'object' ? config[moduleKey] : {};
+    return {
+      dataSources: normalizeStringListConfig(item.data_sources),
+      formulas: normalizeStringListConfig(item.formulas),
+      strategyNotes: normalizeStringListConfig(item.strategy_notes),
+    };
+  };
+
+  return {
+    subscription: buildModuleNote('subscription'),
+    cbArb: buildModuleNote('cbArb'),
+    ah: buildModuleNote('ah'),
+    ab: buildModuleNote('ab'),
+    monitor: buildModuleNote('monitor'),
+    dividend: buildModuleNote('dividend'),
+    merger: buildModuleNote('merger'),
+  };
+}
+
 const DASHBOARD_TABLE_UI = buildDashboardTableUiConfig(PRESENTATION_DASHBOARD_TABLE_UI_CONFIG);
+const DASHBOARD_MODULE_NOTES = buildDashboardModuleNotesConfig(PRESENTATION_DASHBOARD_MODULE_NOTES_CONFIG);
 const PROCESS_STARTED_AT = sharedNowIso();
 const APP_PACKAGE_VERSION = (() => {
   try {
@@ -2224,6 +2254,7 @@ registerDashboardRoutes({
       tabletFontPx: DASHBOARD_TABLE_UI.tabletFontPx,
       minWidthByKind: { ...DASHBOARD_TABLE_UI.minWidthByKind },
     },
+    moduleNotes: { ...DASHBOARD_MODULE_NOTES },
   }),
   getAccessInfo: () => ({
     serverBaseUrl: SERVER_BASE_URL,

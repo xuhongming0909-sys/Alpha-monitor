@@ -224,6 +224,55 @@ function applyTableUiConfigFromState() {
   applyTableUiConfig(payload);
 }
 
+function readDashboardModuleNotes() {
+  const payload = state.resources.uiConfig?.data?.data || {};
+  const notes = payload?.moduleNotes && typeof payload.moduleNotes === 'object' ? payload.moduleNotes : {};
+  return notes;
+}
+
+function readModuleNote(moduleKey) {
+  const item = readDashboardModuleNotes()[moduleKey];
+  return item && typeof item === 'object'
+    ? {
+      dataSources: Array.isArray(item.dataSources) ? item.dataSources.filter(Boolean) : [],
+      formulas: Array.isArray(item.formulas) ? item.formulas.filter(Boolean) : [],
+      strategyNotes: Array.isArray(item.strategyNotes) ? item.strategyNotes.filter(Boolean) : [],
+    }
+    : { dataSources: [], formulas: [], strategyNotes: [] };
+}
+
+function renderModuleFootnote(moduleKey) {
+  const note = readModuleNote(moduleKey);
+  const sections = [
+    { title: '数据来源', items: note.dataSources },
+    { title: '计算公式', items: note.formulas },
+    { title: '策略说明', items: note.strategyNotes },
+  ].filter((section) => section.items.length);
+
+  if (!sections.length) return '';
+
+  return `
+    <div class="module-footnote-card">
+      <h3>页面注释</h3>
+      <div class="module-footnote-grid">
+        ${sections.map((section) => `
+          <div class="module-footnote-section">
+            <div class="module-footnote-title">${escapeHtml(section.title)}</div>
+            <div class="module-footnote-lines">
+              ${section.items.map((item) => `<div class="module-footnote-line">${escapeHtml(item)}</div>`).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderDashboardUiState() {
+  applyTableUiConfigFromState();
+  renderEverything();
+}
+
 function createTableState(key) {
   return { ...TABLE_DEFAULTS[key] };
 }
@@ -722,7 +771,7 @@ async function bootstrap(options = {}) {
   const skipCacheRevalidation = Boolean(options.skipCacheRevalidation);
 
   const tasks = [
-    loadResource('uiConfig', ENDPOINTS.uiConfig, applyTableUiConfigFromState),
+    loadResource('uiConfig', ENDPOINTS.uiConfig, renderDashboardUiState),
     loadResource('health', ENDPOINTS.health, renderHeaderOnly),
     loadResource('exchangeRate', ENDPOINTS.exchangeRate, renderHeaderOnly, { force: forceMarket }),
     loadResource('ipo', ENDPOINTS.ipo, renderHeaderOnly, { force: forceMarket }),
@@ -897,7 +946,7 @@ function renderSubscriptionSummary() {
   }
 
   const rows = buildTodaySubscriptionRows(readResourceArray('ipo'), readResourceArray('bonds'));
-  dom.subscriptionSummary.innerHTML = renderSubscriptionTable(rows);
+  dom.subscriptionSummary.innerHTML = `${renderSubscriptionTable(rows)}${renderModuleFootnote('subscription')}`;
 
   const updateTime = maxUpdateTime(['ipo', 'bonds']);
   dom.lastRefreshText.textContent = updateTime ? `最近更新时间：${formatDate(updateTime)}` : '等待打新接口返回';
@@ -2332,6 +2381,7 @@ function renderConvertibleBondPanel() {
         })}
         <div class="slim-note">60日波动率基于历史K线库真实收盘价年化计算；理论价值相关字段继续作为参考指标。</div>
       </div>
+      ${renderModuleFootnote('cbArb')}
     </div>
   `;
 }
@@ -2400,6 +2450,7 @@ function renderPremiumPanel(type) {
         })}
         <div class="slim-note">${buildPremiumExplainText(type, rows)}</div>
       </div>
+      ${renderModuleFootnote(type)}
     </div>
   `;
 }
@@ -2535,6 +2586,7 @@ function renderMonitorPanel() {
         detailRenderer: (row) => renderDetailGrid(buildMonitorDetailItems(row)),
         detailMode: 'always',
       })}
+      ${renderModuleFootnote('monitor')}
     </div>
   `;
 }
@@ -2705,6 +2757,7 @@ function renderDividendPanel() {
           emptyMessage: '当前没有分红观察名单',
         })}
       </div>
+      ${renderModuleFootnote('dividend')}
     </div>
   `;
 }
@@ -3114,6 +3167,7 @@ function renderMergerPanel() {
       </div>
       ${renderEventArbitrageSubtabs()}
       ${renderEventArbitrageSubview()}
+      ${renderModuleFootnote('merger')}
     </div>
   `;
 }

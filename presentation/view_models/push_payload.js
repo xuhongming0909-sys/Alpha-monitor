@@ -15,6 +15,7 @@ function buildPushConfigResponse(config, runtimeState = {}, deliveryStatus = {})
       webhookConfigured: Boolean(deliveryStatus?.webhookConfigured),
       pushHtmlUrlConfigured: Boolean(deliveryStatus?.pushHtmlUrlConfigured),
       schedulerEnabled: deliveryStatus?.schedulerEnabled !== false,
+      schedulerDisabledReason: deliveryStatus?.schedulerDisabledReason || null,
       calendarMode: deliveryStatus?.calendarMode || null,
       selectedModules,
       lastMainPushAttemptAt: runtimeState?.lastMainPushAttemptAt || null,

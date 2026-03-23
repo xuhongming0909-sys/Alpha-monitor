@@ -1,19 +1,20 @@
 # Alpha Monitor Runbook
 
-## 1. Local development
+## 1. Runtime model
+
+- Official runtime mode: cloud only
+- Official user access: configured public URL
+- Official process hosting: cloud `systemd` + reverse proxy
+- Local `npm run dev` is development validation only and is not an operator-facing access path
+
+## 2. Development-only local checks
 
 - Start: `npm run dev`
 - Health check: `npm run check:health`
 - Smoke check: `npm run check`
 - Boundary check: `npm run check:boundaries`
-- Access info: `npm run show:access`
 
-Windows local helper entrypoints remain:
-
-- Start: double-click `start_dashboard.bat`
-- Stop: double-click `stop_dashboard.bat`
-
-## 2. Health check meaning
+## 3. Health check meaning
 
 `/api/health` returns layered status:
 
@@ -26,7 +27,7 @@ Rule:
 - If `web = ok`, the site should still be considered reachable.
 - `data_jobs = warn` or `push_scheduler = warn` means background work degraded, not that the homepage is down.
 
-## 3. Official cloud-server target
+## 4. Official cloud-server target
 
 Formal public deployment target:
 
@@ -47,7 +48,7 @@ App internal port:
 - Node app still listens on the configured app port, default `5000`
 - Reverse proxy forwards public traffic to that internal port
 
-## 4. Required config before public deployment
+## 4A. Required config before public deployment
 
 Update `config.yaml` before server rollout:
 
@@ -130,6 +131,27 @@ The following files are runtime state, not source-of-truth code artifacts:
 - `runtime_data/shared/*.json`
 
 Deployment must preserve these files on the server. They should stay local to the runtime environment and must not be relied on as Git-tracked release content.
+
+## 5.3 Core env sync
+
+Official core cloud-env sync entry:
+
+```powershell
+npm run sync:server:env
+```
+
+What it does:
+
+1. Reads `ops/server_profile.local.yaml`
+2. Syncs core remote `.env` keys such as `WECOM_WEBHOOK_URL`, `PUBLIC_BASE_URL`, `PUSH_HTML_URL`
+3. Restarts the managed service only when values changed
+4. Checks the configured health endpoint
+
+Safe inspection mode:
+
+```powershell
+python tools/deploy/sync_remote_env_from_profile.py --dry-run
+```
 
 ## 6. systemd operations
 

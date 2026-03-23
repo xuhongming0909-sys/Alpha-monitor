@@ -3,17 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Alpha Monitor</title>
+    <title>Alpha Monitor Cloud Access</title>
     <style>
       :root {
         color-scheme: light;
-        --bg: #f4efe7;
-        --card: #fffdf8;
-        --line: #d8c9b3;
-        --text: #2e241a;
-        --muted: #6a5742;
-        --primary: #b55c2c;
-        --primary-dark: #8f461f;
+        --bg: #f3efe7;
+        --card: #fffdfa;
+        --line: #d8ccb9;
+        --text: #2c241c;
+        --muted: #65584a;
+        --accent: #a34d23;
+        --accent-dark: #7e3818;
       }
 
       * {
@@ -26,21 +26,21 @@
         font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
         color: var(--text);
         background:
-          radial-gradient(circle at top right, rgba(181, 92, 44, 0.14), transparent 30%),
-          linear-gradient(180deg, #f8f4ed 0%, var(--bg) 48%, #efe7da 100%);
+          radial-gradient(circle at top right, rgba(163, 77, 35, 0.12), transparent 28%),
+          linear-gradient(180deg, #f9f6f0 0%, var(--bg) 52%, #ece3d5 100%);
       }
 
       .shell {
-        max-width: 1180px;
+        max-width: 980px;
         margin: 0 auto;
-        padding: 24px 16px 40px;
+        padding: 28px 16px 48px;
       }
 
       .card {
         background: var(--card);
         border: 1px solid var(--line);
         border-radius: 22px;
-        box-shadow: 0 18px 42px rgba(92, 63, 36, 0.08);
+        box-shadow: 0 18px 42px rgba(84, 58, 34, 0.08);
       }
 
       .hero {
@@ -48,13 +48,14 @@
       }
 
       h1,
-      h2 {
+      h2,
+      p {
         margin: 0;
       }
 
       h1 {
         font-size: 34px;
-        line-height: 1.2;
+        line-height: 1.18;
       }
 
       h2 {
@@ -62,22 +63,22 @@
         margin-bottom: 12px;
       }
 
-      p,
-      li {
+      .lead {
+        margin-top: 14px;
         color: var(--muted);
-        line-height: 1.75;
+        line-height: 1.8;
       }
 
       .status {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        margin: 14px 0 6px;
+        margin-top: 16px;
         padding: 8px 12px;
         border-radius: 999px;
-        background: #fff4ea;
-        border: 1px solid #edcfb8;
-        color: var(--primary-dark);
+        background: #fff3e8;
+        border: 1px solid #efd6c2;
+        color: var(--accent-dark);
         font-weight: 700;
       }
 
@@ -85,7 +86,7 @@
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
-        margin-top: 18px;
+        margin-top: 20px;
       }
 
       .btn {
@@ -102,17 +103,17 @@
       }
 
       .btn-primary {
-        background: var(--primary);
+        background: var(--accent);
         color: #fff;
       }
 
       .btn-primary:hover {
-        background: var(--primary-dark);
+        background: var(--accent-dark);
       }
 
       .btn-secondary {
-        background: #fff5eb;
-        color: var(--primary-dark);
+        background: #fff7ef;
+        color: var(--accent-dark);
         border-color: var(--line);
       }
 
@@ -123,23 +124,17 @@
 
       .panel {
         margin-top: 18px;
-        padding: 20px;
+        padding: 22px;
       }
 
-      .panel ul {
+      ul {
         margin: 0;
         padding-left: 20px;
+        color: var(--muted);
+        line-height: 1.8;
       }
 
-      iframe {
-        width: 100%;
-        min-height: 900px;
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        background: #fff;
-      }
-
-      .muted-code {
+      .mono {
         font-family: Consolas, "Courier New", monospace;
         background: #f7efe5;
         border: 1px solid #ead8c4;
@@ -156,149 +151,117 @@
         h1 {
           font-size: 28px;
         }
-
-        iframe {
-          min-height: 680px;
-        }
       }
     </style>
   </head>
   <body>
     <div class="shell">
       <section class="card hero">
-        <h1>Alpha Monitor 页面入口</h1>
-        <div class="status" id="service-status">正在检查本地服务状态...</div>
-        <p>
-          这个入口页支持两种打开方式：如果本地服务已经启动，就直接进入
-          <span class="muted-code" data-service-url>待检测</span>；
-          如果你只是双击打开 HTML 文件，也能先看到本地预览页。
-        </p>
-        <p>
-          如果服务没有启动，请先执行
-          <span class="muted-code">npm run start</span>
-          或
-          <span class="muted-code">npm run start:stable</span>。
+        <h1>Alpha Monitor 云端访问入口</h1>
+        <div class="status" id="status-text">正在读取云端访问配置...</div>
+        <p class="lead">
+          该项目现在只保留云端正式运行形态，不再提供本地预览页、本地常驻守护或本地接入入口。
+          正式访问请使用部署后的公网首页与公网健康检查地址。
         </p>
         <div class="actions">
-          <a class="btn btn-primary" id="service-link" href="#" target="_blank" rel="noreferrer" aria-disabled="true">打开服务版页面</a>
-          <a class="btn btn-secondary" id="preview-link" href="./presentation/templates/dashboard_template.html" target="_blank" rel="noreferrer">打开本地预览页</a>
+          <a class="btn btn-primary" id="home-link" href="#" target="_blank" rel="noreferrer" aria-disabled="true">打开云端首页</a>
+          <a class="btn btn-secondary" id="health-link" href="#" target="_blank" rel="noreferrer" aria-disabled="true">打开云端健康检查</a>
         </div>
       </section>
 
       <section class="card panel">
-        <h2>使用说明</h2>
+        <h2>当前访问信息</h2>
         <ul>
-          <li>正式访问地址：<span class="muted-code" data-service-url>待检测</span></li>
-          <li>本地模板文件：<span class="muted-code">presentation/templates/dashboard_template.html</span></li>
-          <li id="service-hint">如果模板能打开但没有数据，通常说明前端文件没问题，只是后端服务还没启动。</li>
+          <li>正式首页：<span class="mono" id="public-home-text">待返回</span></li>
+          <li>健康检查：<span class="mono" id="public-health-text">待返回</span></li>
+          <li>运行环境：<span class="mono" id="environment-text">待返回</span></li>
         </ul>
       </section>
 
       <section class="card panel">
-        <h2>本地预览</h2>
-        <iframe id="preview-frame" src="./presentation/templates/dashboard_template.html" title="Alpha Monitor 本地预览"></iframe>
+        <h2>使用规则</h2>
+        <ul>
+          <li>正式访问只认云端 `deployment.public_base_url`。</li>
+          <li>本地 `npm run dev` 只用于开发验证，不再作为交付入口。</li>
+          <li>如果公网地址尚未配置，请先查看 `RUNBOOK.md` 完成云端部署。</li>
+        </ul>
       </section>
     </div>
 
     <script>
-      const statusNode = document.getElementById('service-status');
-      const serviceLinkNode = document.getElementById('service-link');
-      const previewLinkNode = document.getElementById('preview-link');
-      const previewFrameNode = document.getElementById('preview-frame');
-      const serviceHintNode = document.getElementById('service-hint');
-      const serviceUrlNodes = Array.from(document.querySelectorAll('[data-service-url]'));
-      const previewTemplatePath = './presentation/templates/dashboard_template.html';
+      const statusNode = document.getElementById('status-text');
+      const homeLinkNode = document.getElementById('home-link');
+      const healthLinkNode = document.getElementById('health-link');
+      const homeTextNode = document.getElementById('public-home-text');
+      const healthTextNode = document.getElementById('public-health-text');
+      const environmentTextNode = document.getElementById('environment-text');
 
       function normalizeBaseUrl(value) {
         const text = String(value || '').trim();
         return text ? text.replace(/\/+$/, '') : '';
       }
 
-      function buildPreviewUrl(serviceBaseUrl) {
-        const baseUrl = normalizeBaseUrl(serviceBaseUrl);
-        if (!baseUrl) return previewTemplatePath;
-        return `${previewTemplatePath}?apiBase=${encodeURIComponent(baseUrl)}`;
-      }
-
-      function setServiceLink(serviceBaseUrl) {
-        if (!serviceLinkNode) return;
-        if (!serviceBaseUrl) {
-          serviceLinkNode.setAttribute('aria-disabled', 'true');
-          serviceLinkNode.setAttribute('href', '#');
+      function setLink(node, href) {
+        if (!node) return;
+        if (!href) {
+          node.href = '#';
+          node.setAttribute('aria-disabled', 'true');
           return;
         }
-        serviceLinkNode.setAttribute('aria-disabled', 'false');
-        serviceLinkNode.setAttribute('href', serviceBaseUrl);
-      }
-
-      function applyAccessInfo(accessInfo) {
-        const serviceBaseUrl = normalizeBaseUrl(
-          accessInfo?.publicBaseUrl || accessInfo?.serverBaseUrl
-        );
-        const previewUrl = buildPreviewUrl(serviceBaseUrl);
-        const visibleServiceUrl = serviceBaseUrl || '以 config.yaml > app.server_base_url 为准';
-        serviceUrlNodes.forEach((node) => {
-          node.textContent = visibleServiceUrl;
-        });
-        setServiceLink(serviceBaseUrl);
-        if (previewLinkNode) previewLinkNode.href = previewUrl;
-        if (previewFrameNode) previewFrameNode.src = previewUrl;
-        if (serviceHintNode && !serviceBaseUrl) {
-          serviceHintNode.textContent = '当前是本地静态预览，服务地址以 config.yaml > app.server_base_url 和实际启动结果为准。';
-        }
-        return {
-          serviceBaseUrl,
-          publicHealthUrl: normalizeBaseUrl(accessInfo?.publicHealthUrl),
-        };
+        node.href = href;
+        node.setAttribute('aria-disabled', 'false');
       }
 
       async function loadAccessInfo() {
         if (window.location.protocol === 'file:') {
           return {
-            serverBaseUrl: '',
             publicBaseUrl: '',
             publicHealthUrl: '',
-            environment: 'file-preview',
+            environment: 'file',
           };
         }
+
+        const response = await fetch('./api/dashboard/access-info', { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const payload = await response.json();
+        return payload?.data || {};
+      }
+
+      async function renderAccessInfo() {
         try {
-          const response = await fetch('./api/dashboard/access-info', { cache: 'no-store' });
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+          const info = await loadAccessInfo();
+          const publicBaseUrl = normalizeBaseUrl(info.publicBaseUrl);
+          const publicHealthUrl = normalizeBaseUrl(info.publicHealthUrl);
+          const environment = String(info.environment || (window.location.protocol === 'file:' ? 'file' : 'unknown'));
+
+          homeTextNode.textContent = publicBaseUrl || '请查看 config.yaml > deployment.public_base_url';
+          healthTextNode.textContent = publicHealthUrl || '请先完成云端部署后再访问 /api/health';
+          environmentTextNode.textContent = environment;
+          setLink(homeLinkNode, publicBaseUrl);
+          setLink(healthLinkNode, publicHealthUrl);
+
+          if (publicBaseUrl && publicHealthUrl) {
+            statusNode.textContent = '云端访问配置已就绪';
+            return;
           }
-          const payload = await response.json();
-          return payload?.data || {};
+
+          if (window.location.protocol === 'file:') {
+            statusNode.textContent = '当前是本地文件模式，请改用云端公网地址访问';
+            return;
+          }
+
+          statusNode.textContent = '云端访问配置未完整返回，请先检查部署配置';
         } catch (_error) {
-          const origin = normalizeBaseUrl(window.location.origin);
-          return {
-            serverBaseUrl: origin,
-            publicBaseUrl: origin,
-            publicHealthUrl: origin ? `${origin}/api/health` : '',
-            environment: 'fallback',
-          };
+          homeTextNode.textContent = '请查看 RUNBOOK.md 完成云端部署';
+          healthTextNode.textContent = '请在部署完成后访问公网 /api/health';
+          environmentTextNode.textContent = window.location.protocol === 'file:' ? 'file' : 'unknown';
+          statusNode.textContent = '无法读取访问配置，请先检查云端服务';
         }
       }
 
-      async function updateServiceStatus() {
-        const accessInfo = await loadAccessInfo();
-        const applied = applyAccessInfo(accessInfo);
-        const healthUrl = applied.publicHealthUrl || (applied.serviceBaseUrl ? `${applied.serviceBaseUrl}/api/health` : '');
-        if (!healthUrl) {
-          statusNode.textContent = '当前未锁定服务地址，已切换为本地静态预览模式。';
-          return;
-        }
-        try {
-          const response = await fetch(healthUrl, { cache: 'no-store' });
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
-          statusNode.textContent = '本地服务已启动，可以直接打开服务版页面。';
-        } catch (_error) {
-          statusNode.textContent = '服务暂不可达，当前可先使用本地预览页。';
-        }
-      }
-
-      updateServiceStatus();
+      renderAccessInfo();
     </script>
   </body>
 </html>

@@ -541,6 +541,51 @@
         border: 1px solid rgba(255, 255, 255, 0.08);
       }
 
+      .module-footnote-card {
+        margin-top: 10px;
+        padding: 11px 12px;
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
+          rgba(255, 255, 255, 0.018);
+      }
+
+      .module-footnote-card h3 {
+        margin: 0 0 8px;
+        font-size: 14px;
+      }
+
+      .module-footnote-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px 12px;
+      }
+
+      .module-footnote-section {
+        min-width: 0;
+      }
+
+      .module-footnote-title {
+        margin-bottom: 6px;
+        color: #ffe1e4;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .module-footnote-lines {
+        display: grid;
+        gap: 6px;
+      }
+
+      .module-footnote-line {
+        color: var(--text-soft);
+        font-size: 13px;
+        line-height: 1.55;
+        white-space: normal;
+        word-break: break-word;
+      }
+
       .summary-card {
         background:
           linear-gradient(180deg, rgba(255, 85, 102, 0.08), rgba(18, 18, 22, 0.92)),
@@ -1227,7 +1272,8 @@
 
       @media (max-width: 1380px) {
         .module-grid,
-        .summary-grid.summary-grid-three {
+        .summary-grid.summary-grid-three,
+        .module-footnote-grid {
           grid-template-columns: 1fr;
         }
 
