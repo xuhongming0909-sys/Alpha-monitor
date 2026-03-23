@@ -1773,17 +1773,19 @@ function renderMonitorPanel() {
     panel.innerHTML = moduleError('监控套利加载失败', summarizeMonitorError(payload.error));
     return;
   }
-  if (!rows.length) {
-    panel.innerHTML = moduleEmpty('当前没有监控套利项目');
-    return;
-  }
 
   const columns = [
     {
       key: 'name',
       label: '监控项',
       render: (row) => `
-        <div>${escapeHtml(row.name || '--')}</div>
+        <div class="monitor-item-head">
+          <span>${escapeHtml(row.name || '--')}</span>
+          <span class="monitor-item-actions">
+            <button type="button" class="mini-action" data-monitor-action="edit" data-monitor-id="${escapeHtml(String(row.id || ''))}">编辑</button>
+            <button type="button" class="mini-action danger" data-monitor-action="delete" data-monitor-id="${escapeHtml(String(row.id || ''))}" ${state.savingMonitor ? 'disabled' : ''}>删除</button>
+          </span>
+        </div>
         <div class="muted">${escapeHtml(row.acquirerName || '--')} → ${escapeHtml(row.targetName || '--')}</div>
       `,
     },
@@ -1817,22 +1819,14 @@ function renderMonitorPanel() {
       <div class="module-toolbar">
         <div>
           <div class="tab-title">监控套利</div>
-          <div class="section-note">主表仅保留收益决策关键字段；换股比例、安全系数、公式等放在“展开”里查看。</div>
+          <div class="section-note">每个项目直接在主行下方展示参数与计算说明；支持原地新增和编辑已有监控。</div>
         </div>
         <div class="panel-meta">
           <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
           <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('monitor')))}</span>
         </div>
       </div>
-      <div class="formula-box">
-        <h3>公式说明</h3>
-        <div class="formula-lines">
-          <div class="formula-line">股票腿理论对价 = 收购方股价 × 换股比例 × 安全系数 + 现金分派</div>
-          <div class="formula-line">股票腿收益率 = (股票腿理论对价 - 目标现价) / 目标现价 × 100</div>
-          <div class="formula-line">现金腿收益率 = (现金对价 - 目标现价) / 目标现价 × 100</div>
-          <div class="formula-line">纯现金模式继续保留；主表展示关键收益字段，详细参数可通过“展开”查看。</div>
-        </div>
-      </div>
+      ${renderMonitorEditor()}
       ${renderPaginatedTable({
         tableKind: 'monitor',
         tableKey: 'monitor',
@@ -1840,9 +1834,117 @@ function renderMonitorPanel() {
         rows,
         emptyMessage: '当前没有监控套利项目',
         detailRenderer: (row) => renderDetailGrid(buildMonitorDetailItems(row)),
+        detailMode: 'always',
       })}
     </div>
   `;
+}
+
+function renderMonitorEditor() {
+  const draft = readMonitorEditorDraft();
+  const isEditMode = state.monitorEditor?.mode === 'edit' && draft.id;
+  const submitLabel = isEditMode ? '保存修改' : '新增监控';
+
+  return `
+    <div class="list-card monitor-editor-card">
+      <div class="monitor-editor-head">
+        <div>
+          <h3>${isEditMode ? '编辑监控项目' : '新增监控项目'}</h3>
+          <div class="section-note">收购方 / 目标方代码、市场、币种、换股比例、现金对价等参数都可直接维护；保存后按最新行情重算。</div>
+        </div>
+        <div class="button-row">
+          <button type="button" class="btn-secondary" data-monitor-action="reset" ${state.savingMonitor ? 'disabled' : ''}>新增空白</button>
+        </div>
+      </div>
+      <div class="formula-box formula-box-compact">
+        <h3>公式说明</h3>
+        <div class="formula-lines">
+          <div class="formula-line">股票腿理论对价 = 收购方股价 × 换股比例 × 安全系数 + 现金分派</div>
+          <div class="formula-line">股票腿收益率 = (股票腿理论对价 - 目标现价) / 目标现价 × 100</div>
+          <div class="formula-line">现金腿收益率 = (现金对价 - 目标现价) / 目标现价 × 100</div>
+        </div>
+      </div>
+      <form id="monitor-editor-form" class="monitor-editor-form">
+        <input type="hidden" name="id" value="${escapeHtml(draft.id)}" />
+        <div class="monitor-form-grid">
+          <div class="input-group">
+            <label for="monitor-name">监控名称</label>
+            <input id="monitor-name" name="name" type="text" value="${escapeHtml(draft.name)}" placeholder="可选，不填则自动生成" />
+          </div>
+          <div class="input-group">
+            <label for="monitor-acquirer-name">收购方名称</label>
+            <input id="monitor-acquirer-name" name="acquirerName" type="text" value="${escapeHtml(draft.acquirerName)}" placeholder="例如 中金公司" />
+          </div>
+          <div class="input-group">
+            <label for="monitor-acquirer-code">收购方代码</label>
+            <input id="monitor-acquirer-code" name="acquirerCode" type="text" value="${escapeHtml(draft.acquirerCode)}" placeholder="例如 601995" />
+          </div>
+          <div class="input-group">
+            <label for="monitor-acquirer-market">收购方市场</label>
+            <select id="monitor-acquirer-market" name="acquirerMarket">${renderSelectOptions(MONITOR_MARKET_OPTIONS, draft.acquirerMarket)}</select>
+          </div>
+          <div class="input-group">
+            <label for="monitor-acquirer-currency">收购方币种</label>
+            <select id="monitor-acquirer-currency" name="acquirerCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.acquirerCurrency)}</select>
+          </div>
+          <div class="input-group">
+            <label for="monitor-target-name">目标方名称</label>
+            <input id="monitor-target-name" name="targetName" type="text" value="${escapeHtml(draft.targetName)}" placeholder="例如 东兴证券" />
+          </div>
+          <div class="input-group">
+            <label for="monitor-target-code">目标方代码</label>
+            <input id="monitor-target-code" name="targetCode" type="text" value="${escapeHtml(draft.targetCode)}" placeholder="例如 601198 / 02688" />
+          </div>
+          <div class="input-group">
+            <label for="monitor-target-market">目标方市场</label>
+            <select id="monitor-target-market" name="targetMarket">${renderSelectOptions(MONITOR_MARKET_OPTIONS, draft.targetMarket)}</select>
+          </div>
+          <div class="input-group">
+            <label for="monitor-target-currency">目标方币种</label>
+            <select id="monitor-target-currency" name="targetCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.targetCurrency)}</select>
+          </div>
+          <div class="input-group">
+            <label for="monitor-stock-ratio">换股比例</label>
+            <input id="monitor-stock-ratio" name="stockRatio" type="number" step="0.0001" value="${escapeHtml(String(draft.stockRatio ?? ''))}" />
+          </div>
+          <div class="input-group">
+            <label for="monitor-safety-factor">安全系数</label>
+            <input id="monitor-safety-factor" name="safetyFactor" type="number" min="0" max="1" step="0.0001" value="${escapeHtml(String(draft.safetyFactor ?? 1))}" />
+          </div>
+          <div class="input-group">
+            <label for="monitor-cash-distribution">现金分派</label>
+            <input id="monitor-cash-distribution" name="cashDistribution" type="number" step="0.0001" value="${escapeHtml(String(draft.cashDistribution ?? ''))}" />
+          </div>
+          <div class="input-group">
+            <label for="monitor-cash-distribution-currency">现金分派币种</label>
+            <select id="monitor-cash-distribution-currency" name="cashDistributionCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.cashDistributionCurrency)}</select>
+          </div>
+          <div class="input-group">
+            <label for="monitor-cash-option-price">现金对价</label>
+            <input id="monitor-cash-option-price" name="cashOptionPrice" type="number" step="0.0001" value="${escapeHtml(String(draft.cashOptionPrice ?? ''))}" />
+          </div>
+          <div class="input-group">
+            <label for="monitor-cash-option-currency">现金对价币种</label>
+            <select id="monitor-cash-option-currency" name="cashOptionCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.cashOptionCurrency)}</select>
+          </div>
+          <div class="input-group monitor-form-note">
+            <label for="monitor-note">备注</label>
+            <textarea id="monitor-note" name="note" rows="3" placeholder="可选">${escapeHtml(draft.note)}</textarea>
+          </div>
+        </div>
+        <div class="button-row">
+          <button type="submit" class="btn-primary" ${state.savingMonitor ? 'disabled' : ''}>${submitLabel}</button>
+          <button type="button" class="btn-secondary" data-monitor-action="reset" ${state.savingMonitor ? 'disabled' : ''}>清空表单</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+function renderSelectOptions(options, selectedValue) {
+  return options
+    .map((item) => `<option value="${escapeHtml(item)}" ${item === selectedValue ? 'selected' : ''}>${escapeHtml(item)}</option>`)
+    .join('');
 }
 
 function renderDividendPanel() {
@@ -2147,7 +2249,16 @@ function buildPremiumDetailItems(type, row) {
   ];
 }
 
-function buildStockFormulaText(row) {
+function hasMonitorStockLeg(row) {
+  return (toNumber(row?.stockRatio) ?? 0) !== 0 || (toNumber(row?.cashDistributionCny ?? row?.cashDistribution) ?? 0) !== 0;
+}
+
+function hasMonitorCashLeg(row) {
+  return (toNumber(row?.cashPayout ?? row?.cashOptionPrice) ?? 0) !== 0;
+}
+
+function buildMonitorPricingText(row) {
+  if (!hasMonitorStockLeg(row)) return '未配置股票腿';
   return [
     formatNumber(row.acquirerPrice, 2),
     '×',
@@ -2179,17 +2290,20 @@ function readMonitorTargetPrice(row) {
 }
 
 function buildMonitorDetailItems(row) {
+  const stockLegEnabled = hasMonitorStockLeg(row);
+  const cashLegEnabled = hasMonitorCashLeg(row);
   return [
-    { label: '收购方现价', value: `¥${formatNumber(row.acquirerPrice, 2)}` },
-    { label: '目标方现价', value: `¥${formatNumber(readMonitorTargetPrice(row), 2)}` },
+    { label: '收购方股价', value: `¥${formatNumber(row.acquirerPrice, 2)}` },
+    { label: '目标方股价', value: `¥${formatNumber(readMonitorTargetPrice(row), 2)}` },
     { label: '换股比例', value: formatNumber(row.stockRatio, 4) },
     { label: '安全系数', value: formatNumber(row.safetyFactor, 4) },
     { label: '现金分派', value: `¥${formatNumber(row.cashDistributionCny, 2)}` },
-    { label: '股票腿公式', value: buildStockFormulaText(row) },
-    { label: '股票腿理论对价', value: `¥${formatNumber(row.stockPayout, 2)}` },
-    { label: '股票腿价差', value: formatSignedNumber(row.stockSpread, 2) },
-    { label: '现金腿对价', value: `¥${formatNumber(row.cashPayout, 2)}` },
-    { label: '现金腿价差', value: formatSignedNumber(row.cashSpread, 2) },
+    { label: '理论对价计算说明', value: buildMonitorPricingText(row) },
+    { label: '股票腿理论对价', value: stockLegEnabled ? `¥${formatNumber(row.stockPayout, 2)}` : '未配置股票腿' },
+    { label: '股票腿价差', value: stockLegEnabled ? formatSignedNumber(row.stockSpread, 2) : '未配置股票腿' },
+    { label: '现金对价', value: cashLegEnabled ? `¥${formatNumber(row.cashPayout, 2)}` : '未配置现金腿' },
+    { label: '现金腿价差', value: cashLegEnabled ? formatSignedNumber(row.cashSpread, 2) : '未配置现金腿' },
+    { label: '备注', value: row.note || '无' },
   ];
 }
 

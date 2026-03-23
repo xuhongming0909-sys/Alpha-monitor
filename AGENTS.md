@@ -48,4 +48,12 @@ This repository follows the constitution-first workflow below:
 4. Only implement after the constitution, plan, requirements, and spec are aligned.
 
 If the constitution is amended, update both `CONSTITUTION.md` and `.specify/memory/constitution.md` together.
+
+## Server Profile
+
+For any server login, deployment, environment-variable, or service-restart task:
+
+1. Read `ops/server_profile.local.yaml` first if it exists.
+2. Reuse the stored connection and service parameters instead of asking again.
+3. If required fields are still blank, ask only for the missing items.
 <!-- MANUAL ADDITIONS END -->

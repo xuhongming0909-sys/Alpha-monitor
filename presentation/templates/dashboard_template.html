@@ -283,7 +283,11 @@
         font-size: 13px;
       }
 
-      input[type="time"] {
+      input[type="time"],
+      input[type="text"],
+      input[type="number"],
+      select,
+      textarea {
         width: 100%;
         min-height: 44px;
         padding: 10px 14px;
@@ -292,6 +296,11 @@
         background: rgba(255, 255, 255, 0.04);
         color: var(--text);
         font: inherit;
+      }
+
+      textarea {
+        min-height: 92px;
+        resize: vertical;
       }
 
       .push-form .input-group {
@@ -459,6 +468,63 @@
       .summary-card.compact-card h3 {
         margin-bottom: 10px;
         font-size: 15px;
+      }
+
+      .monitor-editor-card {
+        margin-bottom: 14px;
+      }
+
+      .monitor-editor-head,
+      .monitor-item-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px 14px;
+        flex-wrap: wrap;
+      }
+
+      .monitor-editor-form {
+        display: grid;
+        gap: 12px;
+      }
+
+      .monitor-form-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px 12px;
+      }
+
+      .monitor-form-note {
+        grid-column: 1 / -1;
+      }
+
+      .monitor-item-actions {
+        display: inline-flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .mini-action {
+        min-height: 30px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-soft);
+      }
+
+      .mini-action:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .mini-action.danger {
+        border-color: rgba(255, 117, 131, 0.22);
+        color: #ffb8c1;
+      }
+
+      .formula-box.formula-box-compact {
+        margin-bottom: 12px;
       }
 
       .stack-list {
@@ -834,6 +900,10 @@
           grid-template-columns: repeat(3, minmax(0, 1fr));
         }
 
+        .monitor-form-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
         .button-row.inline {
           margin-left: 0;
         }
@@ -882,6 +952,10 @@
           min-width: 100%;
         }
 
+        .monitor-form-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
         .pagination-bar {
           align-items: flex-start;
         }
@@ -896,6 +970,12 @@
 
         .detail-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 560px) {
+        .monitor-form-grid {
+          grid-template-columns: 1fr;
         }
       }
     </style>

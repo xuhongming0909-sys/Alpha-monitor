@@ -22,4 +22,5 @@ runtime_data/shared/dividend组合.json
 runtime_data/shared/并购公司报告.json
 runtime_data/shared/推送配置.json
 runtime_data/shared/推送运行状态.json
+ops/server_profile.local.yaml
 
