@@ -1,5 +1,7 @@
 "use strict";
 
+const { getShanghaiParts, normalizeDateText } = require("../../shared/time/shanghai_time");
+
 function topN(rows, count, compareFn) {
   return [...rows].sort(compareFn).slice(0, count);
 }
@@ -54,9 +56,33 @@ function isValidCbArbRow(row) {
   );
 }
 
+function todayShanghaiDate() {
+  return getShanghaiParts().date;
+}
+
+function normalizeComparableDate(value) {
+  const text = normalizeDateText(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+}
+
+function isCbArbRowDelistedOrExpired(row, today = todayShanghaiDate()) {
+  if (!row || typeof row !== "object") return true;
+  if (row.isDelistedOrExpired === true) return true;
+
+  for (const key of ["delistDate", "ceaseDate"]) {
+    const dateText = normalizeComparableDate(row[key]);
+    if (dateText && dateText <= today) return true;
+  }
+
+  const maturityDate = normalizeComparableDate(row.maturityDate);
+  return Boolean(maturityDate && maturityDate < today);
+}
+
 function sanitizeCbArbRows(rows) {
+  const today = todayShanghaiDate();
   const map = new Map();
   for (const row of Array.isArray(rows) ? rows : []) {
+    if (isCbArbRowDelistedOrExpired(row, today)) continue;
     if (!isValidCbArbRow(row)) continue;
     const key = String(row.code || "").trim();
     const existing = map.get(key);
@@ -68,6 +94,7 @@ function sanitizeCbArbRows(rows) {
 }
 
 function cbArbOpportunitySets(rows) {
+  const cleanRows = sanitizeCbArbRows(rows);
   const toNum = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
   const formatDate = (value) => String(value || "").trim();
   const hasPassedConvertStart = (row) => {
@@ -92,7 +119,7 @@ function cbArbOpportunitySets(rows) {
 
   return {
     doubleLow: topN(
-      rows.filter((row) => toNum(row.doubleLow) !== null),
+      cleanRows.filter((row) => toNum(row.doubleLow) !== null),
       3,
       (a, b) => (toNum(a.doubleLow) ?? Number.POSITIVE_INFINITY) - (toNum(b.doubleLow) ?? Number.POSITIVE_INFINITY)
     ).map((row) => ({
@@ -101,7 +128,7 @@ function cbArbOpportunitySets(rows) {
       reason: `双低最低：${(toNum(row.doubleLow) ?? 0).toFixed(2)}`,
     })),
     theoPremium: topN(
-      rows.filter((row) => toNum(row.theoreticalPremiumRate) !== null),
+      cleanRows.filter((row) => toNum(row.theoreticalPremiumRate) !== null),
       3,
       (a, b) => (toNum(b.theoreticalPremiumRate) ?? Number.NEGATIVE_INFINITY) - (toNum(a.theoreticalPremiumRate) ?? Number.NEGATIVE_INFINITY)
     ).map((row) => ({
@@ -110,7 +137,7 @@ function cbArbOpportunitySets(rows) {
       reason: `理论溢价率最高：${pctText(row.theoreticalPremiumRate)}`,
     })),
     redeem: topN(
-      rows.filter((row) => {
+      cleanRows.filter((row) => {
         const price = toNum(row.price);
         const stockPrice = toNum(row.stockPrice);
         const redeemValue = putbackValue(row);
@@ -126,7 +153,7 @@ function cbArbOpportunitySets(rows) {
       reason: `回售执行价高于现价，差额 ${((putbackValue(row) ?? 0) - (toNum(row.price) ?? 0)).toFixed(2)}`,
     })),
     limitUp: topN(
-      rows.filter((row) => (toNum(row.stockChangePercent) ?? -999) >= 9.5),
+      cleanRows.filter((row) => (toNum(row.stockChangePercent) ?? -999) >= 9.5),
       3,
       (a, b) => (toNum(b.stockChangePercent) ?? Number.NEGATIVE_INFINITY) - (toNum(a.stockChangePercent) ?? Number.NEGATIVE_INFINITY)
     ).map((row) => ({
@@ -135,7 +162,7 @@ function cbArbOpportunitySets(rows) {
       reason: `正股接近/触及涨停：${pctText(row.stockChangePercent)}`,
     })),
     convert: topN(
-      rows.filter((row) => {
+      cleanRows.filter((row) => {
         const spread = convertSpreadRate(row);
         return spread !== null && spread > 2 && hasPassedConvertStart(row);
       }),
@@ -147,7 +174,7 @@ function cbArbOpportunitySets(rows) {
       reason: `转股套利空间 ${pctText(convertSpreadRate(row))}`,
     })),
     delist: topN(
-      rows.filter((row) => (toNum(row.price) ?? 9999) < 100),
+      cleanRows.filter((row) => (toNum(row.price) ?? 9999) < 100),
       3,
       (a, b) => (toNum(a.price) ?? Number.POSITIVE_INFINITY) - (toNum(b.price) ?? Number.POSITIVE_INFINITY)
     ).map((row) => ({
