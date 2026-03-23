@@ -6,11 +6,15 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=__SERVICE_USER__
+WorkingDirectory=__PROJECT_ROOT__
+EnvironmentFile=-__PROJECT_ROOT__/.env
 Environment=NODE_ENV=production
+ExecStartPre=/usr/bin/env bash -lc 'mkdir -p "__PROJECT_ROOT__/runtime_logs" "__PROJECT_ROOT__/runtime_data"'
 ExecStart=/usr/bin/env bash "__PROJECT_ROOT__/tools/deploy/start_linux.sh"
 Restart=always
 RestartSec=5
 KillSignal=SIGINT
+TimeoutStopSec=30
 
 [Install]
 WantedBy=multi-user.target

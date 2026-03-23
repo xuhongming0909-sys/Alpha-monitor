@@ -20,9 +20,6 @@ jobs:
       TARGET_BRANCH: main
 
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-
       - name: Validate required secrets
         run: |
           set -euo pipefail
@@ -57,23 +54,12 @@ jobs:
           SERVER_APP_DIR="${SERVER_APP_DIR:-/home/ubuntu/Alpha monitor}"
           SERVER_SERVICE_NAME="${SERVER_SERVICE_NAME:-alpha-monitor}"
           echo "[stage] Trigger remote script"
-
-          echo "[stage] Build release archive"
-          tar \
-            --exclude-vcs \
-            --exclude='.codex' \
-            --exclude='node_modules' \
-            --exclude='runtime_logs' \
-            --exclude='runtime_data' \
-            -czf /tmp/alpha-monitor-release.tgz .
-
-          echo "[stage] Upload archive and deploy"
-          cat /tmp/alpha-monitor-release.tgz | ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
             set -euo pipefail
-            if [ ! -f \"$SERVER_APP_DIR/tools/deploy/update_from_github.sh\" ]; then
-              mkdir -p \"$SERVER_APP_DIR\"
-            fi
-            tar -xzf - -C \"$SERVER_APP_DIR\"
-            PROJECT_ROOT=\"$SERVER_APP_DIR\" PROJECT_OWNER=\"$SERVER_USER\" SERVICE_NAME=\"$SERVER_SERVICE_NAME\" TARGET_BRANCH=\"$TARGET_BRANCH\" SKIP_GIT_SYNC=1 GIT_RETRY_COUNT=10 GIT_RETRY_DELAY_SECONDS=10 SERVICE_RETRY_COUNT=10 SERVICE_RETRY_DELAY_SECONDS=2 bash \"$SERVER_APP_DIR/tools/deploy/update_from_github.sh\"
+            test -f \"$SERVER_APP_DIR/tools/deploy/update_from_github.sh\" || {
+              echo \"Missing remote deploy script: $SERVER_APP_DIR/tools/deploy/update_from_github.sh\" >&2
+              exit 1
+            }
+            PROJECT_ROOT=\"$SERVER_APP_DIR\" PROJECT_OWNER=\"$SERVER_USER\" SERVICE_NAME=\"$SERVER_SERVICE_NAME\" TARGET_BRANCH=\"$TARGET_BRANCH\" GIT_RETRY_COUNT=10 GIT_RETRY_DELAY_SECONDS=10 SERVICE_RETRY_COUNT=10 SERVICE_RETRY_DELAY_SECONDS=2 bash \"$SERVER_APP_DIR/tools/deploy/update_from_github.sh\"
           "
           echo "[stage] Deployment done"

@@ -35,6 +35,7 @@ Formal public deployment target:
 3. `systemd` keeps the service alive
 4. `Nginx` or `Caddy` exposes `80/443`
 5. Public users open the homepage through the public URL, not `:5000`
+6. Runtime JSON state stays on the server and is not treated as source code
 
 Recommended public entry:
 
@@ -85,18 +86,13 @@ sudo bash tools/deploy/install_systemd.sh
 For Nginx:
 
 ```bash
-sudo cp tools/deploy/nginx-alpha-monitor.conf /etc/nginx/sites-available/alpha-monitor
-sudo ln -sf /etc/nginx/sites-available/alpha-monitor /etc/nginx/sites-enabled/alpha-monitor
-sudo nginx -t
-sudo systemctl reload nginx
+sudo bash tools/deploy/install_nginx_site.sh alpha-monitor YOUR_DOMAIN_OR_IP 5000
 ```
 
 For Caddy:
 
 ```bash
-sudo cp tools/deploy/Caddyfile /etc/caddy/Caddyfile
-sudo caddy validate --config /etc/caddy/Caddyfile
-sudo systemctl reload caddy
+sudo bash tools/deploy/install_caddy_site.sh YOUR_DOMAIN_OR_IP 5000
 ```
 
 7. Verify:
@@ -126,6 +122,14 @@ Meaning:
 4. Run the doctor script to check local health, public health, service state, and listening ports
 
 If you already use a domain and HTTPS, you can keep nginx for HTTP forwarding first, then add certificate management after the app is confirmed reachable.
+
+## 5.2 Runtime state rule
+
+The following files are runtime state, not source-of-truth code artifacts:
+
+- `runtime_data/shared/*.json`
+
+Deployment must preserve these files on the server. They should stay local to the runtime environment and must not be relied on as Git-tracked release content.
 
 ## 6. systemd operations
 
@@ -216,11 +220,9 @@ Official repo-side auto deploy chain:
 
 1. Push code to `main`
 2. GitHub Actions runs `.github/workflows/deploy.yml`
-3. Runner creates a release archive from repository contents
-4. Runner connects to the server through SSH and streams the archive to the server
-5. Server extracts the archive into `SERVER_APP_DIR`
-6. Server runs `tools/deploy/update_from_github.sh` with `SKIP_GIT_SYNC=1`
-7. The script installs dependencies, refreshes/restarts the service, and checks health
+3. Runner connects to the server through SSH
+4. Runner triggers `tools/deploy/update_from_github.sh` inside `SERVER_APP_DIR`
+5. The server-side script performs code sync, dependency install, service refresh/restart, and health checks
 
 Required GitHub Secrets:
 
@@ -241,9 +243,9 @@ Default values used by the workflow if optional secrets are not set:
 
 Important notes:
 
-- Auto deploy no longer depends on the server running `git fetch` from GitHub.
-- This avoids server-side TLS/network instability during repository sync.
-- Archive upload excludes `.codex`, `.git`, `node_modules`, `runtime_logs`, and `runtime_data`.
+- GitHub Actions only validates secrets, prepares SSH, and triggers the remote script.
+- All server-side business steps stay inside `tools/deploy/update_from_github.sh`.
+- The remote directory must already contain the repository and the deploy script.
 
 ## 11. Server-side manual dry run
 
@@ -251,15 +253,15 @@ Before trusting GitHub auto deploy, run this once on the server:
 
 ```bash
 cd "/home/ubuntu/Alpha monitor"
-SKIP_GIT_SYNC=1 bash tools/deploy/update_from_github.sh
+bash tools/deploy/update_from_github.sh
 ```
 
 Expected behavior:
 
-1. Keep current code as-is (no git sync)
-2. Install Node dependencies
+1. Fetch and reset to the configured target branch
+2. Install Node and Python dependencies
 3. Refresh and restart `alpha-monitor` if it exists
-4. Print local health-check result
+4. Print health-check and homepage marker verification results
 
 ## 12. If auto deploy fails
 
@@ -268,7 +270,7 @@ Check in this order:
 1. GitHub Actions job log
 2. SSH connectivity and key validity
 3. Server directory path
-4. Archive extract permission under `SERVER_APP_DIR`
+4. Whether `tools/deploy/update_from_github.sh` exists under `SERVER_APP_DIR`
 5. `sudo systemctl status alpha-monitor`
 6. `curl http://127.0.0.1:5000/api/health`
 7. `sudo journalctl -u alpha-monitor -n 100 --no-pager`

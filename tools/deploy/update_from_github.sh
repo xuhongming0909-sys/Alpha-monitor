@@ -26,6 +26,7 @@ FORBIDDEN_HOME_MARKERS="${FORBIDDEN_HOME_MARKERS:-app.js|message-form}"
 INSTALL_PYTHON_REQUIREMENTS="${INSTALL_PYTHON_REQUIREMENTS:-1}"
 VERIFY_PYTHON_IMPORTS="${VERIFY_PYTHON_IMPORTS:-1}"
 PYTHON_BIN_CANDIDATES="${PYTHON_BIN_CANDIDATES:-python3 python}"
+RUNTIME_PRESERVE_DIR="${RUNTIME_PRESERVE_DIR:-}"
 
 log() {
   printf '[deploy] %s\n' "$1"
@@ -201,6 +202,53 @@ repair_project_permissions() {
   if ! chown -R "${PROJECT_OWNER}:${PROJECT_OWNER}" "$PROJECT_ROOT" >/dev/null 2>&1; then
     warn "unable to change ownership for ${PROJECT_ROOT}; continuing with existing permissions"
   fi
+}
+
+preserve_tracked_runtime_files() {
+  local backup_dir
+  local tracked_count=0
+  local rel_path
+
+  [[ -d "$PROJECT_ROOT/.git" ]] || return 0
+
+  backup_dir="$(mktemp -d)"
+  while IFS= read -r -d '' rel_path; do
+    tracked_count=$((tracked_count + 1))
+    [[ -f "$PROJECT_ROOT/$rel_path" ]] || continue
+    mkdir -p "$backup_dir/$(dirname "$rel_path")"
+    cp -p "$PROJECT_ROOT/$rel_path" "$backup_dir/$rel_path"
+  done < <(git -C "$PROJECT_ROOT" ls-files -z -- runtime_data)
+
+  if (( tracked_count == 0 )); then
+    rm -rf "$backup_dir"
+    return 0
+  fi
+
+  log "preserved ${tracked_count} tracked runtime_data file(s) before git sync"
+  printf '%s' "$backup_dir"
+}
+
+restore_preserved_runtime_files() {
+  local backup_dir="${1:-}"
+  local preserved_path
+  local rel_path
+
+  [[ -n "$backup_dir" ]] || return 0
+  [[ -d "$backup_dir" ]] || return 0
+
+  log "restoring preserved runtime_data files after code sync"
+  while IFS= read -r -d '' preserved_path; do
+    rel_path="${preserved_path#${backup_dir}/}"
+    mkdir -p "$PROJECT_ROOT/$(dirname "$rel_path")"
+    cp -p "$preserved_path" "$PROJECT_ROOT/$rel_path"
+  done < <(find "$backup_dir" -type f -print0)
+}
+
+cleanup_preserved_runtime_files() {
+  local backup_dir="${1:-}"
+  [[ -n "$backup_dir" ]] || return 0
+  [[ -d "$backup_dir" ]] || return 0
+  rm -rf "$backup_dir"
 }
 
 git_sync() {
@@ -452,6 +500,9 @@ preflight_checks
 repair_project_permissions
 
 if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
+  if [[ -z "$RUNTIME_PRESERVE_DIR" ]]; then
+    RUNTIME_PRESERVE_DIR="$(preserve_tracked_runtime_files || true)"
+  fi
   git_sync
 
   # 代码同步后重新执行新版本脚本，避免“旧脚本跑后半程”。
@@ -473,11 +524,16 @@ if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
       INSTALL_PYTHON_REQUIREMENTS="$INSTALL_PYTHON_REQUIREMENTS" \
       VERIFY_PYTHON_IMPORTS="$VERIFY_PYTHON_IMPORTS" \
       PYTHON_BIN_CANDIDATES="$PYTHON_BIN_CANDIDATES" \
+      RUNTIME_PRESERVE_DIR="$RUNTIME_PRESERVE_DIR" \
       bash "$PROJECT_ROOT/tools/deploy/update_from_github.sh"
   fi
 else
   log "skipping git sync because SKIP_GIT_SYNC=1"
 fi
+
+restore_preserved_runtime_files "$RUNTIME_PRESERVE_DIR"
+cleanup_preserved_runtime_files "$RUNTIME_PRESERVE_DIR"
+RUNTIME_PRESERVE_DIR=""
 
 validate_config_yaml
 RESOLVED_APP_PORT="$(detect_app_port)"

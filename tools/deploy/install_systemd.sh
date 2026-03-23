@@ -29,3 +29,4 @@ systemctl restart "$SERVICE_NAME"
 
 echo "Installed systemd service: $SERVICE_NAME"
 echo "Check status with: sudo systemctl status $SERVICE_NAME"
+echo "If you use a public domain, also review .env and config.yaml before exposing 80/443."

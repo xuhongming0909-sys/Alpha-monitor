@@ -470,3 +470,12 @@
   - `转债套利`
   - `监控套利`
   - `分红提醒`
+## 26. Cloud Runtime Preservation And First-Install Closure (2026-03-23)
+- Auto deploy must preserve server-local runtime JSON state under `runtime_data/shared/*.json`.
+- These runtime JSON files are environment-local state, not release-source artifacts.
+- A deploy triggered from GitHub must not overwrite existing server monitor lists, push config, push runtime state, merger reports, or cached market snapshots with repository copies.
+- The managed Linux service template must load from the project root and support `.env` overrides consistently after reboot.
+- First public rollout must support both:
+  - `tools/deploy/install_nginx_site.sh`
+  - `tools/deploy/install_caddy_site.sh`
+- Public homepage and public `/api/health` must still resolve to the same dashboard service after either proxy installer is used.

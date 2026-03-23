@@ -1,6 +1,6 @@
 ﻿# Alpha monitor Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-21
+Auto-generated from all feature plans. Last updated: 2026-03-23
 
 ## Active Technologies
 
@@ -9,14 +9,23 @@ Auto-generated from all feature plans. Last updated: 2026-03-21
 ## Project Structure
 
 ```text
-backend/
-frontend/
-tests/
+data_fetch/
+strategy/
+presentation/
+notification/
+shared/
+tools/
+runtime_data/
+refactor_docs/
 ```
 
 ## Commands
 
-cd src; pytest; ruff check .
+npm run check
+npm run check:boundaries
+python data_dispatch.py exchange-rate
+python data_dispatch.py ah
+python data_dispatch.py ab
 
 ## Code Style
 

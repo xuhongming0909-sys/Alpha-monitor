@@ -775,3 +775,32 @@ GitHub 自动部署正式链路固定为：
   - FX history failures
   - batch-wide provider failures that prevent useful progress
   - any failure path outside the per-symbol upstream price-fetch anomaly classification
+## 16. Cloud Runtime Preservation And Proxy Install Spec (2026-03-23)
+
+### 16.1 Runtime-state boundary
+- `runtime_data/shared/*.json` is runtime state, not release-source truth.
+- Repository sync may update code and static assets, but must not replace the server's current runtime JSON content with repository copies.
+
+### 16.2 Deploy-script preservation behavior
+- `tools/deploy/update_from_github.sh` must preserve tracked runtime JSON files before `git reset --hard` and restore them immediately after code sync completes.
+- Preservation scope must cover at least:
+  - monitor list
+  - dividend portfolio
+  - push config
+  - push runtime state
+  - merger company reports
+  - market cache snapshots
+  - market refresh state
+
+### 16.3 Managed service template
+- `tools/deploy/alpha-monitor.service` must declare:
+  - project-root working directory
+  - optional `.env` loading through `EnvironmentFile`
+  - pre-start runtime directory creation
+  - automatic restart on failure
+
+### 16.4 Reverse-proxy install scripts
+- Repo must provide one-command installer scripts for both bundled proxy options:
+  - `tools/deploy/install_nginx_site.sh`
+  - `tools/deploy/install_caddy_site.sh`
+- Both scripts must template the public host and upstream app port, validate config, and reload the managed proxy service.

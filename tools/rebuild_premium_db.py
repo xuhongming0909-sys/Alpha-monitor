@@ -27,6 +27,21 @@ from fetch_historical_premium import (
 from market_pairs import load_dynamic_pairs
 
 
+def _is_tolerated_update_error(message: object) -> bool:
+    text = str(message or "").strip()
+    if not text:
+        return False
+
+    # Incremental sync should stay available when only a few symbols hit
+    # upstream provider edge cases and existing local cache can still serve.
+    tolerated_patterns = (
+        "AkShare daily request failed",
+        "AkShare daily has no usable rows",
+        "No price rows in range",
+    )
+    return any(pattern in text for pattern in tolerated_patterns)
+
+
 def _select_pairs(pair_data: dict, stock_type: str, resume_from: str, limit: int | None) -> list[tuple[str, dict]]:
     selected: list[tuple[str, dict]] = []
     normalized_type = str(stock_type or "ALL").upper()
@@ -71,6 +86,7 @@ def run(mode: str, stock_type: str = "ALL", limit: int | None = None, resume_fro
     ok = 0
     skipped = 0
     failed = []
+    warnings = []
     summary_cache = {
         "AH": premium_history_summaries("AH", [str(item.get("aCode") or "").strip() for _, item in selected_pairs if _ == "AH"]),
         "AB": premium_history_summaries("AB", [str(item.get("aCode") or "").strip() for _, item in selected_pairs if _ == "AB"]),
@@ -109,6 +125,8 @@ def run(mode: str, stock_type: str = "ALL", limit: int | None = None, resume_fro
         done += 1
         if result.get("success"):
             ok += 1
+        elif mode == "update" and _is_tolerated_update_error(result.get("error")):
+            warnings.append({"type": current_type, "code": a_code, "error": result.get("error")})
         else:
             failed.append({"type": current_type, "code": a_code, "error": result.get("error")})
 
@@ -120,7 +138,9 @@ def run(mode: str, stock_type: str = "ALL", limit: int | None = None, resume_fro
         "processed": done,
         "skipped": skipped,
         "successCount": ok,
+        "warningCount": len(warnings),
         "failedCount": len(failed),
+        "warnings": warnings[:30],
         "failed": failed[:30],
         "marketDates": market_dates,
         "updateTime": datetime.now().isoformat(),

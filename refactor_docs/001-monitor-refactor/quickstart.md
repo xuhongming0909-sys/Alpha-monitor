@@ -53,3 +53,32 @@ npm run check:boundaries
    items.
 7. Mobile viewport keeps one-page semantics and allows horizontal scrolling for
    long tables instead of rendering a second UI.
+
+## Cloud rollout checklist
+
+1. Update `config.yaml` for the real server URL and reverse proxy mode.
+2. Install the managed service:
+
+```bash
+sudo bash tools/deploy/install_systemd.sh
+```
+
+3. Expose the public entry with one reverse proxy:
+
+```bash
+sudo bash tools/deploy/install_nginx_site.sh alpha-monitor YOUR_DOMAIN_OR_IP 5000
+```
+
+or
+
+```bash
+sudo bash tools/deploy/install_caddy_site.sh YOUR_DOMAIN_OR_IP 5000
+```
+
+4. Run the server doctor:
+
+```bash
+bash tools/deploy/server_doctor.sh
+```
+
+5. Verify public homepage and public `/api/health`.

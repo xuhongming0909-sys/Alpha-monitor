@@ -338,3 +338,17 @@ Acceptance:
 - `python tools/rebuild_premium_db.py --mode update` can return success while exposing warning details for a small number of provider-outlier symbols.
 - `/api/health` can recover from `data_jobs = warn` to healthy on the next scheduler cycle when only non-fatal provider-outlier errors remain.
 - The homepage remains reachable throughout the repair and verification process.
+## 14. Phase K: Cloud Runtime Preservation + First-Install Proxy Closure (2026-03-23)
+
+Goal: make the cloud deploy path safe for long-term unattended operation by preserving runtime state and reducing first-install proxy drift.
+
+Plan:
+1. Remove runtime JSON state files from release-source expectations and document them as server-local state.
+2. Keep deploy-script preservation in front of `git reset --hard` so automatic updates do not wipe monitor lists, push config, or runtime caches.
+3. Strengthen the `systemd` service template with explicit working directory and `.env` loading.
+4. Provide both nginx and Caddy installation scripts so first public rollout does not depend on manual copy-paste edits.
+
+Acceptance:
+- Automatic deployment no longer overwrites server-local `runtime_data/shared/*.json`.
+- A fresh Ubuntu server can install either nginx or Caddy with a single repo script and expose the same homepage and `/api/health`.
+- The managed service keeps loading from the project root after reboot and picks up `.env` overrides consistently.
