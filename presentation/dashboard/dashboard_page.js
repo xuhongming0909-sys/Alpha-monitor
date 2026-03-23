@@ -2379,11 +2379,50 @@ function renderConvertibleBondPanel() {
           rows,
           emptyMessage: "转债套利暂时没有返回数据",
         })}
-        <div class="slim-note">60日波动率基于历史K线库真实收盘价年化计算；理论价值相关字段继续作为参考指标。</div>
+        <div class="slim-note">${buildConvertibleExplainText(rows)}</div>
       </div>
       ${renderModuleFootnote('cbArb')}
     </div>
   `;
+}
+
+function buildConvertibleExplainText(rows) {
+  const baseText = '60日波动率基于历史K线库真实收盘价、按最近60个对数收益率样本年化计算；理论价值相关字段继续作为参考指标。';
+  const exampleRow = Array.isArray(rows)
+    ? rows.find((row) => {
+      const bondBase = readPureBondBase(row);
+      return (
+        toNumber(row?.theoreticalPrice) !== null &&
+        toNumber(row?.callOptionValue) !== null &&
+        bondBase !== null &&
+        toNumber(row?.volatility60 ?? row?.annualizedVolatility) !== null
+      );
+    })
+    : null;
+
+  if (!exampleRow) return escapeHtml(baseText);
+
+  const bondBase = readPureBondBase(exampleRow);
+  const callValue = toNumber(exampleRow.callOptionValue);
+  const putValue = toNumber(exampleRow.putOptionValue);
+  const theoreticalPrice = toNumber(exampleRow.theoreticalPrice);
+  const pricingFormula = String(exampleRow.pricingFormula || '').trim();
+  const formulaText = pricingFormula === 'bond+call-put'
+    ? `${formatNumber(bondBase, 2)} + ${formatNumber(callValue, 2)} - ${formatNumber(putValue ?? 0, 2)} = ${formatNumber(theoreticalPrice, 2)}`
+    : `${formatNumber(bondBase, 2)} + ${formatNumber(callValue, 2)} = ${formatNumber(theoreticalPrice, 2)}`;
+  const detailText = [
+    `例：${exampleRow.bondName || '--'} ${exampleRow.code || ''}`.trim(),
+    `正股 ${exampleRow.stockName || '--'} ${exampleRow.stockCode || ''}`.trim(),
+    `现价 ${formatNumber(exampleRow.stockPrice, 2)}`,
+    `转股价 ${formatNumber(exampleRow.convertPrice, 2)}`,
+    `60日波动率 ${formatPercent(exampleRow.volatility60 ?? exampleRow.annualizedVolatility, 2)}`,
+    `债底 ${formatNumber(bondBase, 2)}`,
+    pricingFormula === 'bond+call-put'
+      ? `理论价按“债底 + 看涨期权 - 看跌期权”口径参考计算：${formulaText}`
+      : `理论价按“债底 + 看涨期权”口径参考计算：${formulaText}`,
+  ].join('；');
+
+  return escapeHtml(`${baseText} ${detailText}。`);
 }
 
 function renderPremiumPanel(type) {

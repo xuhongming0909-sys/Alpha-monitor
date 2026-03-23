@@ -1245,3 +1245,9 @@
 - Inline missing-data hydration may backfill the local history database only when the local database does not yet contain enough closes for volatility calculation.
 - Once enough closes already exist locally, volatility calculation must read from the database result directly.
 - The convertible-bond stock-history sync path must not prune each symbol back down to a short rolling slice that destroys the established historical K-line library.
+
+## 42. Full CB History Sync + Real Example Note Contract (2026-03-24)
+- When the underlying-stock HFQ history library is fully synced, convertible-bond theoretical metrics must be recalculated from the refreshed volatility inputs in the same release cycle.
+- The convertible-bond page note must include one real current example drawn from the live dataset.
+- The example must show the actual bond code/name and the actual numeric formula branch used for the displayed theoretical-price reference field.
+- The example must not use fabricated placeholder values.

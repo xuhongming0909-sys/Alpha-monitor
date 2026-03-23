@@ -1248,3 +1248,23 @@ Acceptance:
 - The volatility read path requires `window + 1` closes from `stock_price_history.db`.
 - Convertible-bond history sync no longer prunes the established stock K-line library down to `120` rows per symbol.
 - Manual database recomputation for a sample symbol matches the API payload.
+
+## 38. Phase AJ: Full CB History Sync + Real Example Note (2026-03-24)
+
+Goal: after the full underlying-stock history sync is completed, refresh convertible-bond theoretical metrics together and show one real on-page example explaining how a theoretical price is formed.
+
+Plan:
+1. Keep this round narrow:
+   - no route change
+   - no unrelated UI refactor
+2. Run full underlying-stock HFQ history sync for convertible-bond symbols so the local history database is complete enough for all current volatility windows.
+3. Rebuild the convertible-bond dataset after history sync so option-theoretical metrics and theoretical-price fields are refreshed from the updated volatility inputs.
+4. Replace the generic convertible note text with a real example row from the current dataset:
+   - use one actual bond / stock pair from live data
+   - show the actual formula branch and actual numbers used in the displayed theoretical-price reference field
+5. Verify cloud output after deploy by checking one sample row through the public API.
+
+Acceptance:
+- Full HFQ stock-history sync is executed for convertible-bond underlyings.
+- Convertible theoretical metrics are refreshed after the history sync.
+- The page note shows one real current example instead of only abstract wording.

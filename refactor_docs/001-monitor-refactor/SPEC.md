@@ -2292,3 +2292,18 @@ GitHub 自动部署正式链路固定为：
 ### 33.3 History sync preservation rule
 - `data_fetch/convertible_bond/history_source.py` and its script mirror must not prune each symbol to `120` rows after sync.
 - The historical K-line library is preserved as the authority for later volatility recomputation and verification.
+
+## 34. Full CB History Sync + Real Example Note Spec (2026-03-24)
+
+### 34.1 Refresh sequencing rule
+- Full convertible-underlying HFQ history sync runs before the refreshed convertible-bond theoretical metrics are trusted.
+- After the history sync, the convertible-bond dataset must be rebuilt so `callOptionValue*`, `putOptionValue*`, `theoreticalPrice*`, and `theoreticalPremiumRate*` reflect the latest volatility inputs.
+
+### 34.2 On-page real example rule
+- `renderConvertibleBondPanel()` must render a note that includes:
+  - the database-based volatility explanation
+  - one real current row example from the active dataset when such a row is available
+- The example may use either:
+  - `债底 + 看涨期权`
+  - or `债底 + 看涨期权 - 看跌期权`
+- The displayed numbers must come from the same row payload already shown in the table.
