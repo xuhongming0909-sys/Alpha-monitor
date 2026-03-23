@@ -24,7 +24,10 @@ function createPushConfigStore(options = {}) {
 
   function normalizePushConfig(input = {}) {
     const fallbackModules = { ...(defaultConfig.modules || {}) };
-    const rawModules = (input.modules && typeof input.modules === "object") ? input.modules : fallbackModules;
+    const rawModules = {
+      ...fallbackModules,
+      ...((input.modules && typeof input.modules === "object") ? input.modules : {}),
+    };
     const modules = Object.fromEntries(
       Object.keys(fallbackModules).map((key) => [key, Boolean(rawModules[key])])
     );
