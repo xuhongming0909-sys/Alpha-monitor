@@ -995,20 +995,31 @@ GitHub 自动部署正式链路固定为：
 - The editor is closed by default and must open only when:
   - user clicks `新增监控`
   - user clicks row-level `编辑`
-- Create and edit share one popup/modal implementation.
+- Create and edit share one inline implementation rendered above the monitor list.
 
 ### 19.2 Visible form fields
-- Popup visible fields are fixed to:
+- Visible fields are fixed to:
   - `收购方`
   - `目标方`
+  - `换股比例`
   - `安全系数`
   - `现金对价`
   - `现金对价币种`
   - `现金选择权`
   - `现金选择权币种`
-- The old direct-input fields for code / market / share-currency / note / generated name / stock ratio must not render as normal visible inputs in this round.
+- The old direct-input fields for code / market / share-currency / note / generated name must not render as normal visible inputs in this round.
 
-### 19.3 Hidden-field preservation
+### 19.3 Search confirmation behavior
+- `收购方` and `目标方` inputs must support lightweight live lookup using the existing stock-search API.
+- The editor must render a visible resolved-security hint when hidden metadata is already known, including at least:
+  - resolved name
+  - code
+  - market type
+  - currency
+- When the search API returns multiple candidates, the editor may render a compact candidate list for explicit user confirmation.
+- Selecting a candidate updates the hidden fields immediately.
+
+### 19.4 Hidden-field preservation
 - When editing an existing monitor row, hidden fields from stored runtime data must be carried forward unless the corresponding visible entity input changes.
 - At minimum, preserved hidden fields include:
   - `id`
@@ -1019,17 +1030,8 @@ GitHub 自动部署正式链路固定为：
   - `targetCode`
   - `targetMarket`
   - `targetCurrency`
-  - `stockRatio`
   - `note`
-
-### 19.4 Entity auto-resolution
-- On save, frontend may call the existing stock-search API to resolve security metadata from the visible `收购方` / `目标方` text.
-- Resolution output must populate hidden values for:
-  - code
-  - market type
-  - currency
-- If a visible entity input has not changed during edit mode, the existing hidden values should win over re-search.
-- If auto-resolution fails for a new entity and no stored hidden values exist, save must stop with a concise error telling the user to provide a more precise company name or code.
+- `stockRatio` is no longer hidden in this round; it must follow the visible form value.
 ## 20. Startup Responsiveness And Premium History Recovery Spec (2026-03-23)
 
 ### 20.1 Dashboard latency model
@@ -1067,3 +1069,48 @@ GitHub 自动部署正式链路固定为：
   - `source`
   - `warning`
 - This fallback must not throw an API-level error or produce an HTTP 500 by itself.
+
+## 21. Event Arbitrage UI Simplification Spec (2026-03-23)
+
+### 21.1 Visible navigation
+- The frontend event-arbitrage sub-tab sequence is fixed to:
+  - `a_event`
+  - `hk_private`
+  - `cn_private`
+  - `rights_issue`
+  - `announcement_pool`
+- `overview` remains an API field only; it is not part of the visible sub-tab sequence.
+- Frontend default event-arbitrage sub-tab becomes `a_event`.
+
+### 21.2 A-share rendering rule
+- `A股套利` uses the standardized `a_event` rows directly.
+- Table-visible A-share fields remain limited to the scraped core fields, including:
+  - code
+  - name
+  - current price
+  - change rate
+  - safety price
+  - safety discount
+  - choose price
+  - choose discount
+  - currency
+  - event type
+  - official announcement link
+- `forumUrl` may stay in raw payload storage, but frontend must not render it in this round.
+
+### 21.3 HK/CN rendering rule
+- `港股套利` main table displays only fetched core fields and a direct raw-announcement link from the scraped source row.
+- That announcement link must point to the source-side original/core announcement URL carried by the normalized row.
+- `中概私有` keeps the same non-expand secondary-row presentation pattern for textual notes.
+
+### 21.4 Summary placement
+- A-share `summary` is removed from the main table columns.
+- Instead, each A-share row renders a second always-visible detail row directly below the main row.
+- That detail row must not depend on expand/collapse interaction.
+- The rendered label is fixed to `摘要`.
+- HK/CN text notes follow the same always-visible detail-row pattern, but the rendered label is fixed to `备注`.
+
+### 21.5 Event-arbitrage detail interaction
+- `事件套利` tables no longer use row-level expand buttons in this round.
+- `announcement_pool` renders without detail toggles.
+- `hk_private`, `cn_private`, and `a_event` keep the secondary detail-row visual style, but it is always visible and not interactive.

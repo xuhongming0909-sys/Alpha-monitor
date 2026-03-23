@@ -277,7 +277,7 @@ presentation:
     default_upcoming_days: 7
     max_upcoming_days: 365
   event_arbitrage:
-    default_subtab: "overview"
+    default_subtab: "a_event"
     show_disabled_categories: true
     module_name: "事件套利"
   historical_premium:

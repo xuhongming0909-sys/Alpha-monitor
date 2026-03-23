@@ -424,13 +424,11 @@ Goal: simplify `监控套利` editing so the user only fills the smallest necess
 Plan:
 1. Update `REQUIREMENTS.md` and `SPEC.md` first.
 2. Keep existing monitor runtime data and calculation output unchanged unless the user edits a value.
-3. Change the editor interaction from always-expanded inline form to:
-   - default collapsed state
-   - explicit `新增监控` trigger
-   - popup/modal editor for both create and edit
+3. Keep the editor closed by default; clicking `新增监控` or `编辑` opens the editor.
 4. Reduce the visible input set to:
    - `收购方`
    - `目标方`
+   - `换股比例`
    - `安全系数`
    - `现金对价` + `币种`
    - `现金选择权` + `币种`
@@ -439,13 +437,14 @@ Plan:
    - market
    - share currency
    - optional generated monitor name
-6. On save, auto-resolve the hidden security metadata from the visible entity input where possible; for existing monitor edits, preserve previously stored hidden fields unless the visible entity changes.
+6. Add lightweight stock search confirmation under `收购方` and `目标方` so the user can see which security has been identified before saving.
 
 Acceptance:
 - `监控套利` editor is not expanded by default when the panel opens.
-- Clicking `新增监控` opens a popup editor.
-- Clicking `编辑` on an existing row opens the same popup editor with the current values filled in.
-- The popup form no longer shows code / market / share-currency fields as normal inputs.
+- Clicking `新增监控` expands the editor inline within the current panel instead of opening popup-style overlay UI.
+- Clicking `编辑` on an existing row opens the same inline editor with the current values filled in.
+- The visible form includes `换股比例`.
+- `收购方` / `目标方` inputs show resolved security info and candidate matches when auto-search runs.
 - Existing monitor items can still be edited and saved without losing their stored hidden metadata.
 ## 18. Phase O: Startup Responsiveness + Premium History Self-Healing (2026-03-23)
 
@@ -468,3 +467,30 @@ Acceptance:
 - Incremental premium-history update can detect a degraded cache and trigger full backfill for only the affected symbols.
 - `/api/market/ipo` returns a parseable success payload with empty arrays when no IPO history is available yet.
 - The homepage no longer looks "stuck loading" just because one optional data source currently has no stored history.
+
+## 19. Phase P: Event Arbitrage UI Simplification (2026-03-23)
+
+Goal: simplify the `事件套利` reading path so the user lands directly on real category data, and A-share rows display only the core scraped content without forum links or expandable detail toggles.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first so the simplified event-arbitrage UI contract is explicit before frontend changes.
+2. Remove the `总览` sub-tab from the phase-1 `事件套利` page, but keep the backend `overview` field in the API contract for internal aggregation and future use.
+3. Change the default `事件套利` sub-tab from `overview` to `a_event`.
+4. Keep the existing visible sub-tabs as:
+   - `A股套利`
+   - `港股套利`
+   - `中概私有`
+   - `港供套利`
+   - `最新公告`
+5. Remove the forum-link presentation from the `A股套利` page even if the raw payload still contains a forum URL.
+6. Rename the A-share official announcement link label from `公告链接` to `官方公告`.
+7. Remove expandable detail toggles from the `事件套利` tables in this round.
+8. Render A-share `摘要` directly below each row as an always-visible secondary detail block instead of an expandable detail area or a dedicated summary column.
+
+Acceptance:
+- The `事件套利` page no longer exposes a `总览` sub-tab.
+- Opening `事件套利` lands directly on `A股套利`.
+- `A股套利` no longer renders `论坛链接`.
+- The A-share announcement link label is `官方公告`.
+- Event-arbitrage tables no longer show `展开 / 收起` controls.
+- A-share rows show `摘要` directly below the main row using the existing detail-row visual style.

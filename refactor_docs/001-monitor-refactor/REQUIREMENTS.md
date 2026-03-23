@@ -492,15 +492,19 @@
 
 ## 28. Minimal Monitor Editor Contract (2026-03-23)
 - `监控套利` 页面中的新增/编辑表单必须默认收起，不能再长期占据列表顶部。
-- 用户点击 `新增监控` 或某一行的 `编辑` 后，才显示监控编辑弹窗。
+- 用户点击 `新增监控` 或某一行的 `编辑` 后，才显示监控编辑区。
 - 用户可见输入项只保留：
   - `收购方`
   - `目标方`
+  - `换股比例`
   - `安全系数`
   - `现金对价`
   - `现金对价币种`
   - `现金选择权`
   - `现金选择权币种`
+- 编辑区必须在当前页面中向下展开，不再使用遮罩弹窗或新标签页。
+- 保存成功后，编辑区必须自动收起。
+- `收购方` 与 `目标方` 输入必须支持自动检索，并明确展示当前识别到的股票名称/代码/市场/币种，让用户确认系统理解正确。
 - 用户可见表单不再直接暴露以下实现细节字段：
   - 收购方代码
   - 目标方代码
@@ -510,7 +514,6 @@
   - 目标方币种
   - 监控名称
   - 备注
-  - 换股比例
 - 对于隐藏字段，系统应优先自动判断；编辑已有项目时，如用户未改动主体对象，必须保留原有隐藏字段，不能因表单简化把老数据清空。
 ## 28. Event Arbitrage Unified Module Contract (2026-03-23)
 - Dashboard top-level module `鏀惰喘绉佹湁` is upgraded to `浜嬩欢濂楀埄`.
@@ -606,3 +609,23 @@
   - `upcoming = []`
   - optional warning text is allowed
 - The homepage must not appear broken or permanently loading just because IPO history is currently empty on the server.
+
+## 30. Event Arbitrage UI Simplification Contract (2026-03-23)
+- The phase-1 `事件套利` page must no longer render a visible `总览` sub-tab.
+- The backend `overview` payload may remain in `/api/market/event-arbitrage`, but it is no longer part of the required first-screen navigation contract.
+- `事件套利` default visible sub-tab must be `A股套利`.
+- Visible sub-tabs are fixed to:
+  - `A股套利`
+  - `港股套利`
+  - `中概私有`
+  - `港供套利`
+  - `最新公告`
+- `A股套利` page must not render a `论坛链接` entry in the table or detail area.
+- A-share official announcement entry must be labeled `官方公告`.
+- `事件套利` tables in this round must not expose `展开 / 收起` controls.
+- `港股套利` page main table must keep only the fetched core fields plus原始核心公告链接，不再叠加公告池补充字段。
+- `港股套利` / `中概私有` remarks must render as always-visible secondary rows below the main row, using the same non-expand style as the A-share summary row.
+- `A股套利` main-row fields stay aligned with the scraped payload fields, and `摘要` must render as an always-visible secondary block under the row instead of:
+  - a dedicated summary column
+  - an expandable detail area
+  - an additional nested tab

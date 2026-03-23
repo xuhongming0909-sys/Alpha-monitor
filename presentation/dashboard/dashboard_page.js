@@ -20,7 +20,7 @@ const ENDPOINTS = {
 };
 
 const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'monitor', 'dividend', 'merger'];
-const EVENT_ARB_SUBTAB_SEQUENCE = ['overview', 'hk_private', 'cn_private', 'a_event', 'announcement_pool', 'rights_issue'];
+const EVENT_ARB_SUBTAB_SEQUENCE = ['a_event', 'hk_private', 'cn_private', 'rights_issue', 'announcement_pool'];
 const MONITOR_MARKET_OPTIONS = ['A', 'H', 'B'];
 const MONITOR_CURRENCY_OPTIONS = ['CNY', 'HKD', 'USD'];
 const PUSH_MODULE_LABELS = {
@@ -67,7 +67,7 @@ const TABLE_DEFAULTS = {
 
 const state = {
   activeTab: 'cb-arb',
-  mergerSubview: 'overview',
+  mergerSubview: 'a_event',
   eventsBound: false,
   savingPush: false,
   savingMonitor: false,
@@ -2159,7 +2159,7 @@ function readEventArbitrageStatus(category) {
 }
 
 function readEventArbitrageSubview() {
-  return EVENT_ARB_SUBTAB_SEQUENCE.includes(state.mergerSubview) ? state.mergerSubview : 'overview';
+  return EVENT_ARB_SUBTAB_SEQUENCE.includes(state.mergerSubview) ? state.mergerSubview : 'a_event';
 }
 
 function eventArbStatusLabel(status) {
@@ -2177,12 +2177,11 @@ function eventArbStatusLabel(status) {
 
 function eventArbCategoryLabel(category) {
   const map = {
-    overview: '总览',
-    hk_private: '港股私有化',
-    cn_private: '中概股私有化',
     a_event: 'A股套利',
-    announcement_pool: '公告池',
-    rights_issue: '港股供股权(待接入)',
+    hk_private: '港股套利',
+    cn_private: '中概私有',
+    rights_issue: '港供套利',
+    announcement_pool: '最新公告',
   };
   return map[category] || category;
 }
@@ -2202,8 +2201,7 @@ function buildAnchor(url, label) {
 function renderEventArbitrageLinks(row) {
   const links = [
     buildAnchor(row?.detailUrl, '详情链接'),
-    buildAnchor(row?.announcementUrl, '公告链接'),
-    buildAnchor(row?.forumUrl, '论坛链接'),
+    buildAnchor(row?.announcementUrl, row?.category === 'a_event' ? '官方公告' : '公告链接'),
     buildAnchor(row?.officialMatch?.pdfUrl, '匹配PDF'),
   ].filter(Boolean);
   return links.length ? links.join(' / ') : '--';
@@ -2315,8 +2313,7 @@ function buildEventArbHkColumns() {
     { key: 'dealMethod', label: '收购方式', render: (row) => escapeHtml(row.dealMethod || '--') },
     { key: 'canCounter', label: '是否可反套', render: (row) => escapeHtml(formatBooleanLabel(row.canCounter)) },
     { key: 'canShort', label: '是否可卖空', render: (row) => escapeHtml(formatBooleanLabel(row.canShort)) },
-    { key: 'summary', label: '备注', render: (row) => escapeHtml(row.summary || '--') },
-    { key: 'links', label: '详情链接', render: (row) => renderEventArbitrageLinks(row) },
+    { key: 'detailUrl', label: '核心公告', render: (row) => buildAnchor(row.detailUrl, '核心公告') || '--' },
   ];
 }
 
@@ -2332,8 +2329,7 @@ function buildEventArbCnColumns() {
     { key: 'eventStage', label: '进程', render: (row) => escapeHtml(row.eventStage || '--') },
     { key: 'offeror', label: '要约方', render: (row) => escapeHtml(row.offeror || '--') },
     { key: 'dealMethod', label: '收购方式', render: (row) => escapeHtml(row.dealMethod || '--') },
-    { key: 'feesHint', label: '费用提示', render: (row) => escapeHtml(row.feesHint || row.summary || '--') },
-    { key: 'links', label: '详情链接', render: (row) => renderEventArbitrageLinks(row) },
+    { key: 'detailUrl', label: '详情链接', render: (row) => buildAnchor(row.detailUrl, '详情链接') || '--' },
   ];
 }
 
@@ -2349,9 +2345,7 @@ function buildEventArbAColumns() {
     { key: 'chooseDiscountRate', label: '现金选择权折价', className: (row) => statusClass(row.chooseDiscountRate), render: (row) => formatPercent(row.chooseDiscountRate, 2) },
     { key: 'currency', label: '币种', render: (row) => escapeHtml(row.currency || '--') },
     { key: 'eventType', label: '事件类型', render: (row) => escapeHtml(row.eventType || '--') },
-    { key: 'summary', label: '摘要', render: (row) => escapeHtml(row.summary || '--') },
-    { key: 'announcementUrl', label: '公告链接', render: (row) => buildAnchor(row.announcementUrl || row.detailUrl, '公告链接') || '--' },
-    { key: 'forumUrl', label: '论坛链接', render: (row) => buildAnchor(row.forumUrl, '论坛链接') || '--' },
+    { key: 'announcementUrl', label: '官方公告', render: (row) => buildAnchor(row.announcementUrl || row.detailUrl, '官方公告') || '--' },
   ];
 }
 
@@ -2388,8 +2382,30 @@ function buildEventArbAnnouncementColumns() {
   ];
 }
 
+function renderEventArbitrageSummaryDetail(row) {
+  return `
+    <div class="detail-grid">
+      <div class="detail-item">
+        <div class="detail-label">摘要</div>
+        <div class="detail-value">${escapeHtml(row?.summary || '--')}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderEventArbitrageRemarkDetail(row, value) {
+  return `
+    <div class="detail-grid">
+      <div class="detail-item">
+        <div class="detail-label">备注</div>
+        <div class="detail-value">${escapeHtml(value || '--')}</div>
+      </div>
+    </div>
+  `;
+}
+
 function renderEventArbitrageTableView(options) {
-  const { title, note, tableKey, tableKind, rows, columns, emptyMessage, rowClassName, detailRenderer } = options;
+  const { title, note, tableKey, tableKind, rows, columns, emptyMessage, rowClassName, detailRenderer, detailMode } = options;
   const status = readEventArbitrageStatus(options.categoryKey || '');
   return `
     <div class="list-card">
@@ -2411,6 +2427,7 @@ function renderEventArbitrageTableView(options) {
         emptyMessage,
         rowClassName,
         detailRenderer,
+        detailMode,
       })}
     </div>
   `;
@@ -2418,23 +2435,23 @@ function renderEventArbitrageTableView(options) {
 
 function renderEventArbitrageSubview() {
   const subtab = readEventArbitrageSubview();
-  if (subtab === 'overview') return renderEventArbitrageOverviewView();
   if (subtab === 'hk_private') {
     return renderEventArbitrageTableView({
-      title: '港股私有化',
-      note: '零登录公开源主表，公告池只做精确代码匹配补充。',
+      title: '港股套利',
+      note: '只展示抓取到的核心字段，并补充源侧原始核心公告链接。',
       categoryKey: 'hk_private',
       tableKey: 'eventArbHk',
       tableKind: 'merger',
       rows: readEventArbitrageCategoryRows('hk_private'),
       columns: buildEventArbHkColumns(),
-      emptyMessage: '当前没有港股私有化数据',
-      detailRenderer: (row) => renderEventArbitrageDetail(row),
+      emptyMessage: '当前没有港股套利数据',
+      detailRenderer: (row) => renderEventArbitrageRemarkDetail(row, row?.summary),
+      detailMode: 'always',
     });
   }
   if (subtab === 'cn_private') {
     return renderEventArbitrageTableView({
-      title: '中概股私有化',
+      title: '中概私有',
       note: '当前公开接口返回为空时保持空表，不使用假数据填充。',
       categoryKey: 'cn_private',
       tableKey: 'eventArbCn',
@@ -2442,7 +2459,8 @@ function renderEventArbitrageSubview() {
       rows: readEventArbitrageCategoryRows('cn_private'),
       columns: buildEventArbCnColumns(),
       emptyMessage: '当前公开源没有中概股私有化数据',
-      detailRenderer: (row) => renderEventArbitrageDetail(row),
+      detailRenderer: (row) => renderEventArbitrageRemarkDetail(row, row?.feesHint || row?.summary),
+      detailMode: 'always',
     });
   }
   if (subtab === 'a_event') {
@@ -2455,13 +2473,14 @@ function renderEventArbitrageSubview() {
       rows: readEventArbitrageCategoryRows('a_event'),
       columns: buildEventArbAColumns(),
       emptyMessage: '当前没有 A 股事件套利数据',
-      detailRenderer: (row) => renderEventArbitrageDetail(row),
+      detailRenderer: (row) => renderEventArbitrageSummaryDetail(row),
+      detailMode: 'always',
     });
   }
   if (subtab === 'announcement_pool') {
     const rows = [...readEventArbitrageCategoryRows('announcement_pool')].sort((a, b) => readAnnouncementSortValue(b) - readAnnouncementSortValue(a));
     return renderEventArbitrageTableView({
-      title: '公告池',
+      title: '最新公告',
       note: '保留并购公告与 AI 报告能力，用于辅助校验和深挖，不再作为默认主列表。',
       categoryKey: 'announcement_pool',
       tableKey: 'eventArbAnnouncement',
@@ -2470,13 +2489,12 @@ function renderEventArbitrageSubview() {
       columns: buildEventArbAnnouncementColumns(),
       emptyMessage: '当前没有公告池数据',
       rowClassName: (row) => (isTodayAnnouncement(row) ? 'merger-row-today' : ''),
-      detailRenderer: (row) => renderDetailGrid(buildMergerDetailItems(row)),
     });
   }
   const status = readEventArbitrageStatus('rights_issue');
   return `
     <div class="list-card disabled-card">
-      <h3>港股供股权套利</h3>
+      <h3>港供套利</h3>
       <div class="section-note">当前按“零登录”约束不接入该页。现有公开源需要登录或权限校验，第一阶段只保留信息架构和禁用态说明。</div>
       <div class="slim-note" style="margin-top: 12px;">状态：${escapeHtml(eventArbStatusLabel(status.status))} / 最近更新 ${escapeHtml(formatDate(status.updateTime || readUpdateTime('merger')))}</div>
     </div>
