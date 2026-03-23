@@ -1,7 +1,7 @@
 ﻿'use strict';
 
 const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000' : '';
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 const ENDPOINTS = {
   exchangeRate: '/api/market/exchange-rate',
@@ -43,6 +43,9 @@ const TABLE_DEFAULTS = {
   cbArb: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   ah: { sortKey: 'premium', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   ab: { sortKey: 'premium', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
+  monitor: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
+  dividend: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
+  merger: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
 };
 
 const state = {
@@ -60,6 +63,9 @@ const state = {
     cbArb: createTableState('cbArb'),
     ah: createTableState('ah'),
     ab: createTableState('ab'),
+    monitor: createTableState('monitor'),
+    dividend: createTableState('dividend'),
+    merger: createTableState('merger'),
   },
   resources: {
     exchangeRate: resourceState(),
@@ -532,8 +538,7 @@ function buildTodaySubscriptionRows(ipoRows, bondRows) {
           name: row.name || row.bondName || row.stockName || '--',
           code: row.code || row.bondCode || row.stockCode || '--',
           subscribeDate: row.subscribeDate,
-          lotteryDate: row.lotteryDate,
-          paymentDate: row.paymentDate,
+          paymentDisplayDate: row.lotteryDate || row.paymentDate,
           listingDate: row.listingDate,
           subscribeLimit: row.subscribeLimit,
           issueOrConvertLabel: recordType === 'ipo' ? '发行价' : '转股价',
@@ -569,8 +574,7 @@ function renderSubscriptionTable(rows) {
         <div class="muted mono-text">${escapeHtml(row.code)}</div>
       </td>
       <td>${escapeHtml(formatDateOnly(row.subscribeDate))}</td>
-      <td>${escapeHtml(formatDateOnly(row.lotteryDate))}</td>
-      <td>${escapeHtml(formatDateOnly(row.paymentDate))}</td>
+      <td>${escapeHtml(formatDateOnly(row.paymentDisplayDate))}</td>
       <td>${escapeHtml(formatDateOnly(row.listingDate))}</td>
       <td>${escapeHtml(formatSubscribeLimit(row.subscribeLimit))}</td>
       <td>${escapeHtml(`${row.issueOrConvertLabel} ${formatNumber(row.issueOrConvertValue, 2)}`)}</td>
@@ -578,7 +582,7 @@ function renderSubscriptionTable(rows) {
   `).join('')
     : `
       <tr>
-        <td colspan="9">
+        <td colspan="8">
           <div class="empty-state" style="min-height: 120px; padding: 20px;">今日无数据</div>
         </td>
       </tr>
@@ -593,7 +597,6 @@ function renderSubscriptionTable(rows) {
             <th>类型</th>
             <th>名称 / 代码</th>
             <th>申购日</th>
-            <th>抽签日</th>
             <th>中签缴款日</th>
             <th>上市日</th>
             <th>申购上限</th>
@@ -630,7 +633,6 @@ function loadingSubscriptionTable() {
             <th>类型</th>
             <th>名称 / 代码</th>
             <th>申购日</th>
-            <th>抽签日</th>
             <th>中签缴款日</th>
             <th>上市日</th>
             <th>申购上限</th>
@@ -810,12 +812,18 @@ function handlePageClick(tableKey, action) {
   if (tableKey === 'cbArb') renderConvertibleBondPanel();
   if (tableKey === 'ah') renderPremiumPanel('ah');
   if (tableKey === 'ab') renderPremiumPanel('ab');
+  if (tableKey === 'monitor') renderMonitorPanel();
+  if (tableKey === 'dividend') renderDividendPanel();
+  if (tableKey === 'merger') renderMergerPanel();
 }
 
 function readTableSourceRows(tableKey) {
   if (tableKey === 'cbArb') return readResourceArray('cbArb');
   if (tableKey === 'ah') return readResourceArray('ah');
   if (tableKey === 'ab') return readResourceArray('ab');
+  if (tableKey === 'monitor') return readResourceArray('monitor');
+  if (tableKey === 'dividend') return readResourceArray('dividend');
+  if (tableKey === 'merger') return readResourceArray('merger');
   return [];
 }
 
@@ -1307,7 +1315,7 @@ function renderPremiumPanel(type) {
       <div class="premium-toolbar">
         <div>
           <div class="tab-title">${config.title}</div>
-          <div class="section-note">主表按关键列紧凑展示，默认 20 条分页；补充字段通过“展开”查看，不再依赖模块内滚动。</div>
+          <div class="section-note">主表按关键列紧凑展示，默认 50 条分页；补充字段通过“展开”查看，不再依赖模块内滚动。</div>
         </div>
         <div class="panel-meta">
           <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
@@ -1457,7 +1465,7 @@ function renderMonitorPanel() {
           <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('monitor')))}</span>
         </div>
       </div>
-      ${renderSimpleTable({
+      ${renderPaginatedTable({
         tableKind: 'monitor',
         tableKey: 'monitor',
         columns,
@@ -1495,24 +1503,26 @@ function renderDividendPanel() {
   const sortedByYield = [...rows].sort(
     (a, b) => (toNumber(b?.dividendData?.dividendYield) ?? -Infinity) - (toNumber(a?.dividendData?.dividendYield) ?? -Infinity)
   );
+  const tableColumns = [
+    { key: 'code', label: '代码', render: (row) => escapeHtml(row.code || '--') },
+    { key: 'name', label: '名称', render: (row) => escapeHtml(row.name || '--') },
+    { key: 'recordDate', label: '登记日', render: (row) => formatDateOnly(row?.dividendData?.recordDate) },
+    { key: 'exDividendDate', label: '除权日', render: (row) => formatDateOnly(row?.dividendData?.exDividendDate) },
+    { key: 'payDate', label: '派息日', render: (row) => formatDateOnly(row?.dividendData?.payDate) },
+    { key: 'dividendPerShare', label: '每股分红', render: (row) => formatNumber(row?.dividendData?.dividendPerShare, 3) },
+    {
+      key: 'dividendYield',
+      label: '股息率',
+      className: (row) => statusClass(row?.dividendData?.dividendYield),
+      render: (row) => formatPercent(row?.dividendData?.dividendYield, 2),
+    },
+  ];
 
   const todayList = todayRows.map((row) => ({
     title: `${row.name || '--'} ${row.code || ''}`.trim(),
     subtitle: `除权 ${formatDateOnly(row?.dividendData?.exDividendDate)} / 派息 ${formatDateOnly(row?.dividendData?.payDate)}`,
     value: formatPercent(row?.dividendData?.dividendYield, 2),
   }));
-
-  const tableRows = sortedByYield.slice(0, 20).map((row) => `
-    <tr>
-      <td>${escapeHtml(row.code || '--')}</td>
-      <td>${escapeHtml(row.name || '--')}</td>
-      <td>${formatDateOnly(row?.dividendData?.recordDate)}</td>
-      <td>${formatDateOnly(row?.dividendData?.exDividendDate)}</td>
-      <td>${formatDateOnly(row?.dividendData?.payDate)}</td>
-      <td>${formatNumber(row?.dividendData?.dividendPerShare, 3)}</td>
-      <td>${formatPercent(row?.dividendData?.dividendYield, 2)}</td>
-    </tr>
-  `).join('');
 
   panel.innerHTML = `
     <div class="module-shell">
@@ -1529,22 +1539,13 @@ function renderDividendPanel() {
       </div>
       <div class="list-card">
         <h3>分红观察名单</h3>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>代码</th>
-                <th>名称</th>
-                <th>登记日</th>
-                <th>除权日</th>
-                <th>派息日</th>
-                <th>每股分红</th>
-                <th>股息率</th>
-              </tr>
-            </thead>
-            <tbody>${tableRows}</tbody>
-          </table>
-        </div>
+        ${renderPaginatedTable({
+          tableKind: 'dividend',
+          tableKey: 'dividend',
+          columns: tableColumns,
+          rows: sortedByYield,
+          emptyMessage: '当前没有分红观察名单',
+        })}
       </div>
     </div>
   `;
@@ -1616,7 +1617,7 @@ function renderMergerPanel() {
           <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('merger')))}</span>
         </div>
       </div>
-      ${renderSimpleTable({
+      ${renderPaginatedTable({
         tableKind: 'merger',
         tableKey: 'merger',
         columns,

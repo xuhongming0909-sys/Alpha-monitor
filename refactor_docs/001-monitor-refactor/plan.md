@@ -235,3 +235,28 @@ Acceptance:
 - Scheduler can execute on all weekdays and weekends when times match.
 - `GET /api/monitors` no longer fails with `python not found` / `No module named akshare`.
 - GitHub Actions deploy remains the single sync path to cloud server and finishes with health + marker checks.
+
+## 11. Phase H: Subscription Date Simplification + Monitor UI Recovery + Global 50-row Pagination (2026-03-23)
+
+Goal: finish one-shot correction for three current production regressions:
+1. In the subscription table, remove the standalone `抽签日` column and reuse `lotteryDate` as the displayed value for `中签缴款日`.
+2. Restore `监控套利` to a stable, readable panel with the same table/pagination interaction as other modules.
+3. Unify dashboard module tables to `50` rows per page instead of mixed `20` / unpaginated behavior.
+
+Plan:
+1. Update `REQUIREMENTS.md` and `SPEC.md` first so page behavior and field semantics are explicit before coding.
+2. Adjust the top subscription table contract:
+   - keep today-stage judgment unchanged
+   - remove the visible `抽签日` header
+   - `中签缴款日` column displays `lotteryDate`
+3. Refactor monitor rendering to use the shared paginated table path, not a special simple table path.
+4. Extend the shared table state so `监控套利` / `分红提醒` / `收购私有` also paginate at `50` rows per page.
+5. Keep existing formulas unchanged and verify monitor calculations still match `SPEC.md`.
+6. After implementation, run local checks, then push to GitHub and trigger the cloud-server auto-deploy path.
+
+Acceptance:
+- The subscription table no longer shows a `抽签日` column.
+- The visible `中签缴款日` column uses `lotteryDate` values consistently for IPO and bond rows.
+- `监控套利` renders successfully when `/api/monitors` returns data and supports 50-row pagination.
+- `转债套利` / `AH溢价` / `AB溢价` / `监控套利` / `分红提醒` / `收购私有` all use 50-row pagination.
+- GitHub main branch and cloud deployment are updated to the latest implementation, and the latest webpage can be opened for verification.
