@@ -352,3 +352,119 @@ Acceptance:
 - Automatic deployment no longer overwrites server-local `runtime_data/shared/*.json`.
 - A fresh Ubuntu server can install either nginx or Caddy with a single repo script and expose the same homepage and `/api/health`.
 - The managed service keeps loading from the project root after reboot and picks up `.env` overrides consistently.
+
+## 15. Phase L: Daily Delisted Convertible Bond Exclusion (2026-03-23)
+
+Goal: ensure the convertible-bond arbitrage page automatically removes bonds that are already delisted, ceased, or expired as of the current trading day, even when the page is still reading a previous cache snapshot.
+
+Plan:
+1. Update `REQUIREMENTS.md` and `SPEC.md` first so the daily exclusion rule is explicit before code changes.
+2. Keep the existing fetch-layer exclusion flag, but do not rely on it as the only truth source for dashboard output.
+3. Add a strategy-layer daily filter for `/api/market/convertible-bond-arbitrage` that re-evaluates each row against the current Shanghai date on every response.
+4. Exclude a row from the outward-facing list when:
+   - `delistDate <= today`
+   - or `ceaseDate <= today`
+   - or `maturityDate < today`
+5. Keep the existing API route and page structure unchanged; this round only corrects the daily visibility rule.
+
+Acceptance:
+- On any given day, the dashboard `转债套利` page no longer shows bonds whose `delistDate` or `ceaseDate` is already that day or earlier.
+- Matured bonds whose `maturityDate` is earlier than today are also removed from the visible list.
+- The exclusion still works when the API response originated from an older cache payload, because the Node/service layer re-checks dates at response time.
+## 16. Phase M: Event Arbitrage Unified Integration (2026-03-23)
+
+Goal: replace the narrow `鏀惰喘绉佹湁` dashboard tab with a broader `浜嬩欢濂楀埄` module that uses external event-arbitrage data as the primary reading path while preserving the existing merger-announcement routes as auxiliary evidence.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first so the renamed module, sub-tabs, API contract, and zero-login first-phase scope are explicit before implementation.
+2. Keep the top-level dashboard tab count fixed at 6, but rename the old `鏀惰喘绉佹湁` tab to `浜嬩欢濂楀埄`.
+3. Introduce a new aggregated API `GET /api/market/event-arbitrage` that returns:
+   - overview cards
+   - normalized category groups for `hk_private`, `cn_private`, `a_event`, `rights_issue`, and `announcement_pool`
+   - per-source status metadata
+4. Implement the fetch layer with direct public JSON requests to Jisilu for:
+   - `hk_arbitrage_list`
+   - `cn_arbitrage_list`
+   - `astock_arbitrage_list`
+5. Do not make Firecrawl part of the production hot path in phase 1; only document it as a future fallback if the public JSON interfaces disappear.
+6. Keep `rights_issue` inside the API/model contract, but return it as disabled with empty rows in phase 1 because the current zero-login constraint disallows using the login-gated source.
+7. Keep existing routes compatible:
+   - `/api/market/merger`
+   - `/api/merger/report`
+   - `/api/merger/reports/today`
+8. In the strategy layer, enrich external event rows with a lightweight exact-code match against the existing merger announcement pool, exposing:
+   - latest matched announcement title
+   - announcement date
+   - PDF link
+   - whether an AI report is already available
+9. In the presentation layer, render `浜嬩欢濂楀埄` with internal sub-tabs:
+   - `鎬昏`
+   - `娓偂绉佹湁鍖?`
+   - `涓鑲＄鏈夊寲`
+   - `A鑲″鍒?`
+   - `鍏憡姹?`
+   - `娓偂渚涜偂鏉?寰呮帴鍏?`
+10. Keep the new module webpage-only in phase 1:
+   - no push integration
+   - no new AI summary generation for Jisilu rows
+   - no changes to the existing merger push chain
+
+Acceptance:
+- The dashboard top tab label changes from `鏀惰喘绉佹湁` to `浜嬩欢濂楀埄`.
+- `GET /api/market/event-arbitrage` returns normalized real data for `hk_private`, `cn_private`, and `a_event`, plus `announcement_pool`, while `rights_issue` is present but explicitly disabled.
+- The `浜嬩欢濂楀埄` page defaults to `鎬昏`, not `鍏憡姹?`.
+- External event rows can show matched announcement/PDF/report metadata without breaking when no match exists.
+- Legacy merger endpoints stay compatible for existing callers and AI-report flows.
+- A source failure in one external category degrades only that category and does not blank the whole page or the rest of the dashboard.
+
+## 17. Phase N: Minimal Monitor Editor + Popup Entry (2026-03-23)
+
+Goal: simplify `监控套利` editing so the user only fills the smallest necessary business inputs, while the system auto-resolves the rest and keeps the editor hidden until explicitly opened.
+
+Plan:
+1. Update `REQUIREMENTS.md` and `SPEC.md` first.
+2. Keep existing monitor runtime data and calculation output unchanged unless the user edits a value.
+3. Change the editor interaction from always-expanded inline form to:
+   - default collapsed state
+   - explicit `新增监控` trigger
+   - popup/modal editor for both create and edit
+4. Reduce the visible input set to:
+   - `收购方`
+   - `目标方`
+   - `安全系数`
+   - `现金对价` + `币种`
+   - `现金选择权` + `币种`
+5. Hide implementation-oriented fields from the user-facing form, including:
+   - code
+   - market
+   - share currency
+   - optional generated monitor name
+6. On save, auto-resolve the hidden security metadata from the visible entity input where possible; for existing monitor edits, preserve previously stored hidden fields unless the visible entity changes.
+
+Acceptance:
+- `监控套利` editor is not expanded by default when the panel opens.
+- Clicking `新增监控` opens a popup editor.
+- Clicking `编辑` on an existing row opens the same popup editor with the current values filled in.
+- The popup form no longer shows code / market / share-currency fields as normal inputs.
+- Existing monitor items can still be edited and saved without losing their stored hidden metadata.
+## 18. Phase O: Startup Responsiveness + Premium History Self-Healing (2026-03-23)
+
+Goal: remove the current "page waits too long" perception by fixing the broken data paths behind it, and make AH / AB premium history recover automatically when the SQLite cache degrades to a one-day snapshot.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first so the degraded-history recovery rule and IPO empty-state fallback are explicit before code changes.
+2. Keep the existing cache-first dashboard strategy because cached quote endpoints are already fast enough for first paint.
+3. Treat the following as production regressions that must self-heal instead of being silently skipped in incremental sync:
+   - `premium_summary.sampleCount3Y <= 1`
+   - missing `startDate3Y` / `endDate3Y` while samples exist
+   - obviously collapsed short-range summaries that indicate the DB only retained a recent snapshot
+4. In premium-history update mode, when the summary is degraded, force a full backfill for that symbol instead of doing the normal short incremental update window.
+5. Change IPO data loading so "no stored history yet" returns a successful empty payload rather than HTTP 500 / `success: false`, because the dashboard should degrade to an empty table instead of looking broken.
+6. After implementation, run server-side premium-history repair and verify `AH / AB` rows recover real multi-day sample ranges and non-null percentile values.
+
+Acceptance:
+- Normal cached dashboard quote endpoints remain fast for first paint.
+- AH / AB no longer stay stuck at `sample 1 / same-day range` after the next repair cycle.
+- Incremental premium-history update can detect a degraded cache and trigger full backfill for only the affected symbols.
+- `/api/market/ipo` returns a parseable success payload with empty arrays when no IPO history is available yet.
+- The homepage no longer looks "stuck loading" just because one optional data source currently has no stored history.

@@ -422,6 +422,36 @@
         animation: fadeUp 0.22s ease;
       }
 
+      .subtab-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .subtab-button {
+        min-height: 38px;
+        padding: 9px 14px;
+        border-radius: 999px;
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .subtab-button.active {
+        color: #fff8f8;
+        background: linear-gradient(135deg, #8f1226, #ff5566);
+        box-shadow: 0 12px 24px rgba(168, 20, 42, 0.18);
+      }
+
+      .subtab-button.disabled {
+        opacity: 0.72;
+      }
+
+      .disabled-card {
+        border-style: dashed;
+      }
+
       .summary-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -474,6 +504,25 @@
         margin-bottom: 14px;
       }
 
+      .monitor-editor-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        background: rgba(8, 8, 12, 0.72);
+        backdrop-filter: blur(8px);
+      }
+
+      .monitor-editor-dialog {
+        width: min(1120px, calc(100vw - 28px));
+        max-height: calc(100vh - 36px);
+        overflow: auto;
+        margin-bottom: 0;
+      }
+
       .monitor-editor-head,
       .monitor-item-head {
         display: flex;
@@ -492,6 +541,10 @@
         display: grid;
         grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: 10px 12px;
+      }
+
+      .monitor-form-grid.monitor-form-grid-simple {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
 
       .monitor-form-note {
@@ -521,6 +574,18 @@
       .mini-action.danger {
         border-color: rgba(255, 117, 131, 0.22);
         color: #ffb8c1;
+      }
+
+      .meta-chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 40px;
+        padding: 0 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-soft);
+        font-size: 13px;
       }
 
       .formula-box.formula-box-compact {
@@ -904,6 +969,10 @@
           grid-template-columns: repeat(3, minmax(0, 1fr));
         }
 
+        .monitor-form-grid.monitor-form-grid-simple {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
         .button-row.inline {
           margin-left: 0;
         }
@@ -956,6 +1025,10 @@
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
+        .monitor-form-grid.monitor-form-grid-simple {
+          grid-template-columns: 1fr;
+        }
+
         .pagination-bar {
           align-items: flex-start;
         }
@@ -976,6 +1049,16 @@
       @media (max-width: 560px) {
         .monitor-form-grid {
           grid-template-columns: 1fr;
+        }
+
+        .monitor-editor-modal {
+          padding: 10px;
+          align-items: flex-end;
+        }
+
+        .monitor-editor-dialog {
+          width: 100%;
+          max-height: calc(100vh - 20px);
         }
       }
     </style>
@@ -1012,7 +1095,7 @@
         <button class="tab-button" data-tab="ab" type="button">AB溢价</button>
         <button class="tab-button" data-tab="monitor" type="button">监控套利</button>
         <button class="tab-button" data-tab="dividend" type="button">分红提醒</button>
-        <button class="tab-button" data-tab="merger" type="button">收购私有</button>
+        <button class="tab-button" data-tab="merger" type="button">事件套利</button>
       </nav>
 
       <section id="tab-panels">
@@ -1052,6 +1135,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <script src="/presentation/dashboard/dashboard_page.js?v=20260323-2"></script>
+    <script src="/presentation/dashboard/dashboard_page.js?v=20260323-3"></script>
   </body>
 </html>

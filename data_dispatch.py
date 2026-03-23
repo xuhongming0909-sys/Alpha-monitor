@@ -11,6 +11,8 @@ from data_fetch.convertible_bond.fetcher import fetch_convertible_bond_snapshot
 from data_fetch.convertible_bond.history_sync import sync_convertible_bond_stock_history
 from data_fetch.convertible_bond.normalizer import normalize_convertible_bond_snapshot
 from data_fetch.dividend.fetcher import fetch_dividend_snapshot, fetch_upcoming_dividend_snapshot
+from data_fetch.event_arbitrage.fetcher import fetch_event_arbitrage_snapshot
+from data_fetch.event_arbitrage.normalizer import normalize_event_arbitrage_snapshot
 from data_fetch.exchange_rate.fetcher import fetch_exchange_rate_snapshot
 from data_fetch.exchange_rate.normalizer import normalize_exchange_rate_snapshot
 from data_fetch.merger.fetcher import fetch_merger_snapshot
@@ -24,6 +26,7 @@ from strategy.ab_premium.service import build_ab_response
 from strategy.ah_premium.service import build_ah_response
 from strategy.convertible_bond.service import build_convertible_bond_response
 from strategy.dividend.service import build_dividend_response
+from strategy.event_arbitrage.service import build_event_arbitrage_response
 from strategy.merger.service import build_merger_response
 from strategy.subscription.service import build_subscription_response
 
@@ -113,6 +116,14 @@ def action_merger() -> dict:
     return build_merger_response(payload, records)
 
 
+def action_event_arbitrage() -> dict:
+    """event_arbitrage快照。"""
+
+    payload = fetch_event_arbitrage_snapshot()
+    records = normalize_event_arbitrage_snapshot(payload)
+    return build_event_arbitrage_response(payload, records)
+
+
 def action_dividend(code: str) -> dict:
     """单只股票dividend查询。"""
 
@@ -162,6 +173,8 @@ def main() -> None:
             dump(action_sync_cb_stock_history(force_full="--force-full" in args[1:]))
         elif action == "merger":
             dump(action_merger())
+        elif action == "event-arbitrage":
+            dump(action_event_arbitrage())
         elif action == "historical-premium":
             dump(
                 ensure_history_for_code(

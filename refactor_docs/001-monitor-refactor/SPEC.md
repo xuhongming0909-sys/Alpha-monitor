@@ -804,3 +804,266 @@ GitHub 自动部署正式链路固定为：
   - `tools/deploy/install_nginx_site.sh`
   - `tools/deploy/install_caddy_site.sh`
 - Both scripts must template the public host and upstream app port, validate config, and reload the managed proxy service.
+
+## 17. Convertible Bond Daily Delist Filter Spec (2026-03-23)
+
+### 17.1 Scope
+- This rule applies to the outward-facing row list used by:
+  - `/api/market/convertible-bond-arbitrage`
+  - dashboard `转债套利` panel
+- The existing Python fetch layer may continue computing `isDelistedOrExpired`, but the final visible list must be re-checked again in Node strategy/service shaping.
+
+### 17.2 Daily date source
+- “Today” is fixed to the Shanghai calendar date.
+- Node-side date comparison must use `shared/time/shanghai_time.js` so cloud/runtime timezone drift does not change the business result.
+
+### 17.3 Exclusion decision
+- Each row must be excluded from the final list when any of the following hold after date normalization:
+  - `delistDate <= today`
+  - `ceaseDate <= today`
+  - `maturityDate < today`
+- `delistDate` / `ceaseDate` are inclusive same-day cutoffs.
+- `maturityDate` remains exclusive for same-day removal, matching the existing fetch-layer rule.
+
+### 17.4 Cache tolerance behavior
+- The Node-side sanitizer must recompute the rule on every response instead of trusting a stale cached `isDelistedOrExpired = false`.
+- If a row already carries `isDelistedOrExpired = true`, it may be excluded immediately without further contradiction handling.
+
+### 17.5 Output behavior
+- Excluded rows must be removed before duplicate-row resolution and before any opportunity-set summary calculation.
+- No new API field or route is required for this round; the correction is purely on visible row inclusion.
+## 18. Event Arbitrage Unified Spec (2026-03-23)
+
+### 18.1 Top-level dashboard contract
+- The old dashboard tab label `鏀惰喘绉佹湁` is replaced by `浜嬩欢濂楀埄`.
+- The root dashboard tab key count remains 6.
+- The existing merger-related backend routes remain valid and unchanged for backward compatibility, but the main dashboard reading path switches to the new event-arbitrage aggregate payload.
+
+### 18.2 Page structure
+- `浜嬩欢濂楀埄` page structure is fixed to:
+  1. module title and update time
+  2. internal sub-tab strip
+  3. sub-view content area
+- Internal sub-tabs are fixed to:
+  - `鎬昏`
+  - `娓偂绉佹湁鍖?`
+  - `涓鑲＄鏈夊寲`
+  - `A鑲″鍒?`
+  - `鍏憡姹?`
+  - `娓偂渚涜偂鏉?寰呮帴鍏?`
+- Default internal sub-tab is `鎬昏`.
+
+### 18.3 API contract
+- New route: `GET /api/market/event-arbitrage`
+- Response shape is fixed to:
+  - `success`
+  - `data.overview`
+  - `data.categories`
+  - `data.sourceStatus`
+  - `error`
+  - `updateTime`
+  - `cacheTime`
+  - `servedFromCache`
+- `data.categories` fixed keys:
+  - `hk_private`
+  - `cn_private`
+  - `a_event`
+  - `rights_issue`
+  - `announcement_pool`
+- `data.sourceStatus` fixed keys:
+  - `hk_private`
+  - `cn_private`
+  - `a_event`
+  - `rights_issue`
+  - `announcement_pool`
+
+### 18.4 Standardized row schema
+- Every external event row must expose:
+  - `id`
+  - `source`
+  - `category`
+  - `market`
+  - `symbol`
+  - `name`
+  - `currentPrice`
+  - `changeRate`
+  - `marketValue`
+  - `offerPrice`
+  - `spreadRate`
+  - `eventType`
+  - `eventStage`
+  - `offeror`
+  - `offerorHolding`
+  - `registryPlace`
+  - `dealMethod`
+  - `canShort`
+  - `canCounter`
+  - `summary`
+  - `detailUrl`
+  - `officialMatch`
+  - `raw`
+- `officialMatch` is either `null` or:
+  - `matched`
+  - `announcementId`
+  - `title`
+  - `announcementDate`
+  - `pdfUrl`
+  - `reportAvailable`
+
+### 18.5 Source and adapter rules
+- Phase-1 primary source is direct public JSON fetching from Jisilu:
+  - `/data/taoligu/hk_arbitrage_list/`
+  - `/data/taoligu/cn_arbitrage_list/`
+  - `/data/taoligu/astock_arbitrage_list/`
+- `rights_issue` stays in the outward-facing model but is disabled in phase 1:
+  - rows = `[]`
+  - status = `disabled_no_public_source`
+- Firecrawl is not part of the production hot path in this round.
+- If one source fails, only that category status may degrade; the whole aggregate endpoint must still return the remaining healthy categories when possible.
+
+### 18.6 Matching rules
+- External rows may be enriched from the existing merger announcement pool.
+- Phase-1 matching rule is fixed to exact code matching only:
+  - Jisilu `symbol`
+  - matches merger `secCode`
+- No fuzzy company-name matching is allowed in this round.
+- If multiple merger rows share the same code, the newest announcement row wins.
+
+### 18.7 Sub-view rendering contract
+- `鎬昏` shows:
+  - per-category row counts
+  - positive-spread row counts
+  - latest update time
+  - matched announcement count
+- `娓偂绉佹湁鍖?` main table columns:
+  - `浠ｇ爜`
+  - `鍚嶇О`
+  - `鐜颁环`
+  - `娑ㄨ穼骞?`
+  - `甯傚€?`
+  - `绉佹湁鍖栦环鏍?`
+  - `濂楀埄绌洪棿`
+  - `绉佹湁鍖栬繘绋?`
+  - `瑕佺害鏂?`
+  - `瑕佺害鏂规寔鑲?`
+  - `鍏徃娉ㄥ唽鍦?`
+  - `鏀惰喘鏂瑰紡`
+  - `鍙嶅`
+  - `鍙崠绌?`
+  - `澶囨敞`
+  - `璇︽儏閾炬帴`
+- `涓鑲＄鏈夊寲` main table columns:
+  - `浠ｇ爜`
+  - `鍚嶇О`
+  - `鐜颁环`
+  - `娑ㄨ穼骞?`
+  - `甯傚€?`
+  - `绉佹湁鍖栦环鏍?`
+  - `濂楀埄绌洪棿`
+  - `杩涚▼`
+  - `瑕佺害鏂?`
+  - `鏀惰喘鏂瑰紡`
+  - `璐圭敤鎻愮ず`
+  - `璇︽儏閾炬帴`
+- `A鑲″鍒?` main table columns:
+  - `浠ｇ爜`
+  - `鍚嶇О`
+  - `鐜颁环`
+  - `娑ㄨ穼骞?`
+  - `瀹夊叏杈归檯浠?`
+  - `瀹夊叏杈归檯鎶樹环`
+  - `鐜伴噾閫夋嫨鏉冧环鏍?`
+  - `鐜伴噾閫夋嫨鏉冩姌浠?`
+  - `甯佺`
+  - `浜嬩欢绫诲瀷`
+  - `鎽樿`
+  - `鍏憡閾炬帴`
+  - `璁哄潧閾炬帴`
+- `鍏憡姹?` continues to show the existing merger-announcement table and AI-report affordances.
+- `娓偂渚涜偂鏉?寰呮帴鍏?` must render a real disabled-state panel with a reason message, not an empty fake table.
+
+### 18.8 Runtime/cache rules
+- New runtime cache file may be used for normalized aggregate payload:
+  - `runtime_data/shared/event_arbitrage_cache.json`
+- Cache payload must not replace the existing merger cache or merger APIs.
+- Cached aggregate payload may be served for fast first paint, but source-level failure text must stay visible in `sourceStatus`.
+
+## 19. Minimal Monitor Popup Editor Spec (2026-03-23)
+
+### 19.1 Interaction mode
+- `监控套利` panel keeps the monitor list visible by default.
+- The editor is closed by default and must open only when:
+  - user clicks `新增监控`
+  - user clicks row-level `编辑`
+- Create and edit share one popup/modal implementation.
+
+### 19.2 Visible form fields
+- Popup visible fields are fixed to:
+  - `收购方`
+  - `目标方`
+  - `安全系数`
+  - `现金对价`
+  - `现金对价币种`
+  - `现金选择权`
+  - `现金选择权币种`
+- The old direct-input fields for code / market / share-currency / note / generated name / stock ratio must not render as normal visible inputs in this round.
+
+### 19.3 Hidden-field preservation
+- When editing an existing monitor row, hidden fields from stored runtime data must be carried forward unless the corresponding visible entity input changes.
+- At minimum, preserved hidden fields include:
+  - `id`
+  - `name`
+  - `acquirerCode`
+  - `acquirerMarket`
+  - `acquirerCurrency`
+  - `targetCode`
+  - `targetMarket`
+  - `targetCurrency`
+  - `stockRatio`
+  - `note`
+
+### 19.4 Entity auto-resolution
+- On save, frontend may call the existing stock-search API to resolve security metadata from the visible `收购方` / `目标方` text.
+- Resolution output must populate hidden values for:
+  - code
+  - market type
+  - currency
+- If a visible entity input has not changed during edit mode, the existing hidden values should win over re-search.
+- If auto-resolution fails for a new entity and no stored hidden values exist, save must stop with a concise error telling the user to provide a more precise company name or code.
+## 20. Startup Responsiveness And Premium History Recovery Spec (2026-03-23)
+
+### 20.1 Dashboard latency model
+- Cached dataset responses remain the default first-paint path.
+- Force-refresh requests are still allowed to be slower than cached reads and must not redefine the normal latency baseline.
+- Diagnosis for this round treats the following separately:
+  - cached endpoint latency
+  - force-refresh latency
+  - broken-source fallback behavior
+
+### 20.2 Degraded premium-summary detection
+- A premium-history summary must be treated as degraded when any of the following hold:
+  - `sampleCount <= 1`
+  - `sampleCount3Y <= 1`
+  - positive sample count exists but required date boundaries are missing
+  - a very small 3Y sample count is paired with a same-day or near-same-day sample range, indicating the DB only kept a recent fragment
+- Degraded summary means "not safe to skip sync", even if `endDate` already matches the latest market date.
+
+### 20.3 Full-backfill escalation rule
+- `tools/rebuild_premium_db.py --mode update` must escalate degraded symbols to a full backfill path instead of the normal short incremental fetch window.
+- The same escalation rule must be available to the on-demand premium-history ensure path used by APIs/tools.
+- Non-degraded symbols may continue using the existing incremental logic.
+
+### 20.4 IPO empty-history fallback
+- `data_fetch/subscription/ipo_source.py` must return a successful empty payload when:
+  - latest upstream fetch failed or returned nothing
+  - and SQLite currently has no stored IPO rows
+- Required payload shape:
+  - `success: true`
+  - `data: []`
+  - `upcoming: []`
+  - `historyCount: 0`
+  - `updateTime`
+- Optional fields:
+  - `source`
+  - `warning`
+- This fallback must not throw an API-level error or produce an HTTP 500 by itself.

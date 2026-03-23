@@ -46,6 +46,7 @@ function registerMarketRoutes(options = {}) {
   registerDatasetRoute("/api/market/convertible-bonds", "bonds", [], (_req, force) => ({ force }));
   registerDatasetRoute("/api/market/convertible-bond-arbitrage", "cbArb", [], (_req, force) => ({ force, syncUniverse: force }));
   registerDatasetRoute("/api/market/merger", "merger", [], (_req, force) => ({ force }));
+  registerDatasetRoute("/api/market/event-arbitrage", "eventArb", {}, (_req, force) => ({ force }));
 
   app.get("/api/market/subscriptions", async (req, res) => {
     try {

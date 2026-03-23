@@ -63,6 +63,7 @@ const NOTIFICATION_CONFIG = APP_CONFIG?.notification || {};
 const PRESENTATION_STOCK_SEARCH_CONFIG = PRESENTATION_CONFIG?.stock_search || {};
 const PRESENTATION_DIVIDEND_CONFIG = PRESENTATION_CONFIG?.dividend || {};
 const PRESENTATION_HISTORICAL_PREMIUM_CONFIG = PRESENTATION_CONFIG?.historical_premium || {};
+const EVENT_ARB_STRATEGY_CONFIG = STRATEGY_CONFIG?.event_arbitrage || {};
 const INDEX_FILE = path.resolve(ROOT, PRESENTATION_CONFIG.dashboard_entry || './index.html');
 const STATIC_DATA_DIR = PATH_POLICY.dataRootDir;
 const SHARED_DATA_DIR = PATH_POLICY.sharedDataDir;
@@ -160,6 +161,8 @@ const MERGER_REPORT_MAX_CHARS = toIntConfig(STRATEGY_CONFIG?.merger?.report_max_
 const MERGER_PROMPT_TEMPLATE_CODE = String(
   STRATEGY_CONFIG?.merger?.prompt_template_code || 'MERGER_DEAL_OVERVIEW_V1'
 ).trim() || 'MERGER_DEAL_OVERVIEW_V1';
+const EVENT_ARB_MATCH_MODE = String(EVENT_ARB_STRATEGY_CONFIG?.match_by || 'sec_code_only').trim().toLowerCase() || 'sec_code_only';
+const EVENT_ARB_MATCH_LOOKBACK_DAYS = toIntConfig(EVENT_ARB_STRATEGY_CONFIG?.match_lookback_days, 365);
 const PYTHON_CANDIDATES = Array.from(new Set(
   [
     ...(Array.isArray(APP_CONFIG?.app?.python_bin_candidates) ? APP_CONFIG.app.python_bin_candidates : []),
@@ -394,6 +397,12 @@ const DATASETS = {
     intraday: Boolean(pluginFetchConfig('merger').intraday),
     dbDailySync: Boolean(pluginFetchConfig('merger').daily_incremental_sync),
     fetch: () => callDataCore(['merger'], { timeout: 120000, maxBuffer: 1024 * 1024 * 100 }),
+  },
+  eventArb: {
+    intraday: pluginFetchConfig('event_arbitrage').intraday !== false,
+    refreshIntervalMs: toIntConfig(pluginFetchConfig('event_arbitrage').refresh_interval_ms, 5 * 60 * 1000),
+    dbDailySync: Boolean(pluginFetchConfig('event_arbitrage').daily_incremental_sync),
+    fetch: (options = {}) => buildEventArbitrageDataset(options),
   },
 };
 const stateStore = STATE_REGISTRY.read('market_refresh_state', 'market_refresh_state.json', {
@@ -1018,7 +1027,7 @@ async function runDataJobsCycle(context = 'tick', options = {}) {
 
   try {
     if (options.preloadDatasets) {
-      const preloadKeys = ['exchangeRate', 'ah', 'ab', 'cbArb', 'merger', 'ipo', 'bonds'];
+      const preloadKeys = ['exchangeRate', 'ah', 'ab', 'cbArb', 'merger', 'eventArb', 'ipo', 'bonds'];
       await Promise.allSettled(preloadKeys.map((key) => getDataset(key)));
       details.preloadedDatasets = preloadKeys;
     }
@@ -1252,6 +1261,288 @@ function getMergerReportsMap() {
 function getMergerReportByCompany({ date, code, name }) {
   const key = mergerCompanyKey({ date, code, name });
   return getMergerReportsMap()[key] || null;
+}
+
+function createEmptyEventArbitrageCategories() {
+  return {
+    hk_private: [],
+    cn_private: [],
+    a_event: [],
+    rights_issue: [],
+    announcement_pool: [],
+  };
+}
+
+function normalizeSecurityCode(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^0-9A-Z]/g, '');
+}
+
+function buildEventArbitrageSourceStatusEntry(sourceName, patch = {}) {
+  const defaults = {
+    hk_private: {
+      enabled: true,
+      status: 'empty',
+      itemCount: 0,
+      source: 'jisilu',
+      sourceUrl: 'https://www.jisilu.cn/data/taoligu/hk_arbitrage_list/',
+      servedFromCache: false,
+      updateTime: nowIso(),
+    },
+    cn_private: {
+      enabled: true,
+      status: 'empty',
+      itemCount: 0,
+      source: 'jisilu',
+      sourceUrl: 'https://www.jisilu.cn/data/taoligu/cn_arbitrage_list/',
+      servedFromCache: false,
+      updateTime: nowIso(),
+    },
+    a_event: {
+      enabled: true,
+      status: 'empty',
+      itemCount: 0,
+      source: 'jisilu',
+      sourceUrl: 'https://www.jisilu.cn/data/taoligu/astock_arbitrage_list/',
+      servedFromCache: false,
+      updateTime: nowIso(),
+    },
+    rights_issue: {
+      enabled: false,
+      status: 'disabled_no_public_source',
+      itemCount: 0,
+      source: 'jisilu',
+      sourceUrl: '',
+      servedFromCache: false,
+      updateTime: nowIso(),
+    },
+    announcement_pool: {
+      enabled: true,
+      status: 'empty',
+      itemCount: 0,
+      source: 'cninfo',
+      sourceUrl: '/api/market/merger',
+      servedFromCache: false,
+      updateTime: nowIso(),
+    },
+  };
+  return { ...(defaults[sourceName] || {}), ...cloneJsonSafe(patch, {}) };
+}
+
+function buildExternalEventArbitrageFallback(error) {
+  const message = normalizeError(error || 'event_arbitrage fetch failed');
+  const categories = createEmptyEventArbitrageCategories();
+  return {
+    success: true,
+    data: {
+      overview: {
+        totalCount: 0,
+        positiveCount: 0,
+        hkPrivateCount: 0,
+        cnPrivateCount: 0,
+        aEventCount: 0,
+        announcementPoolCount: 0,
+      },
+      categories,
+      sourceStatus: {
+        hk_private: buildEventArbitrageSourceStatusEntry('hk_private', { status: 'error', error: message }),
+        cn_private: buildEventArbitrageSourceStatusEntry('cn_private', { status: 'error', error: message }),
+        a_event: buildEventArbitrageSourceStatusEntry('a_event', { status: 'error', error: message }),
+        rights_issue: buildEventArbitrageSourceStatusEntry('rights_issue'),
+        announcement_pool: buildEventArbitrageSourceStatusEntry('announcement_pool', { status: 'pending' }),
+      },
+      updateTime: nowIso(),
+      cacheTime: null,
+      servedFromCache: false,
+    },
+    error: null,
+    updateTime: nowIso(),
+    source: 'jisilu',
+  };
+}
+
+function readEventArbitrageCategories(payload) {
+  const categories = payload?.data?.categories;
+  return categories && typeof categories === 'object' ? categories : createEmptyEventArbitrageCategories();
+}
+
+function readEventArbitrageSourceStatus(payload) {
+  const sourceStatus = payload?.data?.sourceStatus;
+  return sourceStatus && typeof sourceStatus === 'object' ? sourceStatus : {};
+}
+
+function eventArbitrageLatestTime(...values) {
+  return values
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+    .sort()
+    .pop() || nowIso();
+}
+
+function isAnnouncementWithinLookback(row, lookbackDays = EVENT_ARB_MATCH_LOOKBACK_DAYS) {
+  if (!lookbackDays || lookbackDays < 0) return true;
+  const normalizedDate = normalizeDateText(mergerAnnouncementDate(row));
+  if (!normalizedDate) return false;
+  const timestamp = Date.parse(`${normalizedDate}T00:00:00+08:00`);
+  if (!Number.isFinite(timestamp)) return false;
+  return (Date.now() - timestamp) <= (lookbackDays * 24 * 60 * 60 * 1000);
+}
+
+function buildAnnouncementPoolSourceStatus(mergerPayload, rows) {
+  if (mergerPayload?.success === false) {
+    return buildEventArbitrageSourceStatusEntry('announcement_pool', {
+      status: 'error',
+      error: normalizeError(mergerPayload?.error || 'announcement pool fetch failed'),
+      itemCount: Array.isArray(rows) ? rows.length : 0,
+      servedFromCache: false,
+      updateTime: mergerPayload?.updateTime || nowIso(),
+    });
+  }
+  return buildEventArbitrageSourceStatusEntry('announcement_pool', {
+    status: mergerPayload?.servedFromCache ? 'stale_cache' : (Array.isArray(rows) && rows.length ? 'ok' : 'empty'),
+    itemCount: Array.isArray(rows) ? rows.length : 0,
+    servedFromCache: Boolean(mergerPayload?.servedFromCache),
+    updateTime: mergerPayload?.updateTime || nowIso(),
+  });
+}
+
+function buildMergerAnnouncementIndex(rows, lookbackDays = EVENT_ARB_MATCH_LOOKBACK_DAYS) {
+  const index = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const code = normalizeSecurityCode(mergerCompanyCode(row));
+    if (!code || !isAnnouncementWithinLookback(row, lookbackDays)) continue;
+    const current = index.get(code);
+    const nextTime = Number(row?.announcementTime || 0);
+    const currentTime = Number(current?.announcementTime || 0);
+    if (!current || nextTime >= currentTime) {
+      index.set(code, row);
+    }
+  }
+  return index;
+}
+
+function buildOfficialMatch(row) {
+  const date = mergerAnnouncementDate(row);
+  const code = mergerCompanyCode(row);
+  const name = mergerCompanyName(row);
+  const report = getMergerReportByCompany({ date, code, name });
+  return {
+    matched: true,
+    announcementId: row?.announcementId || null,
+    title: pickText(row?.title, ''),
+    announcementDate: date || '',
+    pdfUrl: pickText(row?.pdfUrl, ''),
+    reportAvailable: Boolean(report?.reportMarkdown),
+  };
+}
+
+function enrichEventArbitrageRows(rows, announcementIndex) {
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    if (!row || typeof row !== 'object') return row;
+    const symbol = normalizeSecurityCode(row?.symbol || row?.raw?.stock_code || row?.raw?.stock_id);
+    const matchedRow = EVENT_ARB_MATCH_MODE === 'sec_code_only' ? announcementIndex.get(symbol) : null;
+    return {
+      ...row,
+      officialMatch: matchedRow ? buildOfficialMatch(matchedRow) : null,
+    };
+  });
+}
+
+function buildEventArbitrageOverview(categories, sourceStatus) {
+  const hkRows = Array.isArray(categories?.hk_private) ? categories.hk_private : [];
+  const cnRows = Array.isArray(categories?.cn_private) ? categories.cn_private : [];
+  const aRows = Array.isArray(categories?.a_event) ? categories.a_event : [];
+  const rightsRows = Array.isArray(categories?.rights_issue) ? categories.rights_issue : [];
+  const announcementRows = Array.isArray(categories?.announcement_pool) ? categories.announcement_pool : [];
+  const eventRows = [...hkRows, ...cnRows, ...aRows];
+  const matchedRows = eventRows.filter((row) => row?.officialMatch?.matched);
+  const latestUpdateTime = eventArbitrageLatestTime(
+    ...Object.values(sourceStatus || {}).map((item) => item?.updateTime)
+  );
+  return {
+    totalCount: eventRows.length,
+    positiveCount: eventRows.filter((row) => Number(row?.spreadRate) > 0).length,
+    hkPrivateCount: hkRows.length,
+    cnPrivateCount: cnRows.length,
+    aEventCount: aRows.length,
+    rightsIssueCount: rightsRows.length,
+    announcementPoolCount: announcementRows.length,
+    matchedCount: matchedRows.length,
+    todayMatchedCount: matchedRows.filter((row) => normalizeDateText(row?.officialMatch?.announcementDate) === getShanghaiParts().date).length,
+    latestUpdateTime,
+  };
+}
+
+function buildEventArbitrageDatasetPayload(externalPayload, mergerPayload) {
+  const basePayload = externalPayload?.success === false ? buildExternalEventArbitrageFallback(externalPayload?.error) : externalPayload;
+  const categories = createEmptyEventArbitrageCategories();
+  const externalCategories = readEventArbitrageCategories(basePayload);
+  const announcementPoolRows = Array.isArray(mergerPayload?.data) ? mergerPayload.data : [];
+  const announcementIndex = buildMergerAnnouncementIndex(announcementPoolRows, EVENT_ARB_MATCH_LOOKBACK_DAYS);
+
+  categories.hk_private = enrichEventArbitrageRows(externalCategories.hk_private, announcementIndex);
+  categories.cn_private = enrichEventArbitrageRows(externalCategories.cn_private, announcementIndex);
+  categories.a_event = enrichEventArbitrageRows(externalCategories.a_event, announcementIndex);
+  categories.rights_issue = Array.isArray(externalCategories.rights_issue) ? externalCategories.rights_issue : [];
+  categories.announcement_pool = announcementPoolRows;
+
+  const sourceStatus = {
+    hk_private: buildEventArbitrageSourceStatusEntry('hk_private', readEventArbitrageSourceStatus(basePayload).hk_private),
+    cn_private: buildEventArbitrageSourceStatusEntry('cn_private', readEventArbitrageSourceStatus(basePayload).cn_private),
+    a_event: buildEventArbitrageSourceStatusEntry('a_event', readEventArbitrageSourceStatus(basePayload).a_event),
+    rights_issue: buildEventArbitrageSourceStatusEntry('rights_issue', readEventArbitrageSourceStatus(basePayload).rights_issue),
+    announcement_pool: buildAnnouncementPoolSourceStatus(mergerPayload, announcementPoolRows),
+  };
+
+  const updateTime = eventArbitrageLatestTime(
+    basePayload?.data?.updateTime,
+    basePayload?.updateTime,
+    mergerPayload?.updateTime
+  );
+  const cacheTime = eventArbitrageLatestTime(
+    basePayload?.data?.cacheTime,
+    basePayload?.cacheTime,
+    mergerPayload?.cacheTime
+  );
+  const servedFromCache = Boolean(basePayload?.servedFromCache || mergerPayload?.servedFromCache);
+  const overview = buildEventArbitrageOverview(categories, sourceStatus);
+
+  return {
+    success: true,
+    data: {
+      overview,
+      categories,
+      sourceStatus,
+      updateTime,
+      cacheTime,
+      servedFromCache,
+    },
+    error: null,
+    updateTime,
+    cacheTime,
+    servedFromCache,
+  };
+}
+
+async function buildEventArbitrageDataset(options = {}) {
+  const externalPayload = await callDataCore(['event-arbitrage'], {
+    timeout: 120000,
+    maxBuffer: 1024 * 1024 * 50,
+  });
+  let mergerPayload = null;
+  try {
+    mergerPayload = await getDataset('merger', options.force ? { force: true } : {});
+  } catch (error) {
+    mergerPayload = {
+      success: false,
+      data: [],
+      error: normalizeError(error),
+      updateTime: nowIso(),
+    };
+  }
+  return buildEventArbitrageDatasetPayload(externalPayload, mergerPayload);
 }
 
 function upsertMergerReportByCompany(report) {

@@ -48,6 +48,7 @@ storage:
     merger_company_reports: "merger_company_reports.json"
     push_config: "push_config.json"
     push_runtime_state: "push_runtime_state.json"
+    event_arbitrage_cache: "event_arbitrage_cache.json"
 
 logging:
   # Minimal logging defaults
@@ -92,6 +93,9 @@ plugins:
     merger:
       enabled: true
       folder: "data_fetch/merger"
+    event_arbitrage:
+      enabled: true
+      folder: "data_fetch/event_arbitrage"
     subscription:
       enabled: true
       folder: "data_fetch/subscription"
@@ -114,6 +118,9 @@ plugins:
     merger:
       enabled: true
       folder: "strategy/merger"
+    event_arbitrage:
+      enabled: true
+      folder: "strategy/event_arbitrage"
     subscription:
       enabled: true
       folder: "strategy/subscription"
@@ -176,6 +183,21 @@ data_fetch:
           - "acquisition_report"
           - "merger_report"
           - "restructuring_report"
+    event_arbitrage:
+      intraday: true
+      refresh_interval_ms: 300000
+      daily_incremental_sync: false
+      timeout_ms: 30000
+      cache_ttl_ms: 300000
+      sources:
+        hk_private:
+          enabled: true
+        cn_private:
+          enabled: true
+        a_event:
+          enabled: true
+        rights_issue:
+          enabled: false
     convertible_bond:
       intraday: true
       refresh_interval_ms: 300000
@@ -220,6 +242,12 @@ strategy:
     report_max_chars: 500
     deepseek_api_key: "${DEEPSEEK_API_KEY}"
     deepseek_base_url: "https://api.deepseek.com"
+  event_arbitrage:
+    primary_source: "jisilu"
+    announcement_role: "auxiliary"
+    match_by: "sec_code_only"
+    match_lookback_days: 365
+    enable_push: false
   dividend:
     trigger_rule: "record_date_same_day"
   subscription:
@@ -248,6 +276,10 @@ presentation:
   dividend:
     default_upcoming_days: 7
     max_upcoming_days: 365
+  event_arbitrage:
+    default_subtab: "overview"
+    show_disabled_categories: true
+    module_name: "事件套利"
   historical_premium:
     default_days: 1825
     max_days: 10000

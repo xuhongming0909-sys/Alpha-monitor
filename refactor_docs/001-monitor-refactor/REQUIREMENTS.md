@@ -479,3 +479,130 @@
   - `tools/deploy/install_nginx_site.sh`
   - `tools/deploy/install_caddy_site.sh`
 - Public homepage and public `/api/health` must still resolve to the same dashboard service after either proxy installer is used.
+
+## 27. Convertible Bond Daily Delist Filtering (2026-03-23)
+- `转债套利` 页面与 `/api/market/convertible-bond-arbitrage` 返回列表必须按“当天”动态剔除已经退市、终止上市或已到期的可转债。
+- 这个判定必须每天重新执行，不能只依赖缓存生成当时写入的 `isDelistedOrExpired` 结果。
+- 当满足以下任一条件时，条目不能继续出现在页面可见列表中：
+  - `delistDate <= 今天`
+  - `ceaseDate <= 今天`
+  - `maturityDate < 今天`
+- “今天”的口径固定为上海日期。
+- 本轮不新增页面入口、不新增专用接口，只修正现有转债套利数据出口的可见性规则。
+
+## 28. Minimal Monitor Editor Contract (2026-03-23)
+- `监控套利` 页面中的新增/编辑表单必须默认收起，不能再长期占据列表顶部。
+- 用户点击 `新增监控` 或某一行的 `编辑` 后，才显示监控编辑弹窗。
+- 用户可见输入项只保留：
+  - `收购方`
+  - `目标方`
+  - `安全系数`
+  - `现金对价`
+  - `现金对价币种`
+  - `现金选择权`
+  - `现金选择权币种`
+- 用户可见表单不再直接暴露以下实现细节字段：
+  - 收购方代码
+  - 目标方代码
+  - 收购方市场
+  - 目标方市场
+  - 收购方币种
+  - 目标方币种
+  - 监控名称
+  - 备注
+  - 换股比例
+- 对于隐藏字段，系统应优先自动判断；编辑已有项目时，如用户未改动主体对象，必须保留原有隐藏字段，不能因表单简化把老数据清空。
+## 28. Event Arbitrage Unified Module Contract (2026-03-23)
+- Dashboard top-level module `鏀惰喘绉佹湁` is upgraded to `浜嬩欢濂楀埄`.
+- The top-level dashboard still has exactly 6 tabs; `浜嬩欢濂楀埄` replaces the old merger/private tab and does not add a seventh root entry.
+- `浜嬩欢濂楀埄` must become a unified entry for:
+  - `娓偂绉佹湁鍖?`
+  - `涓鑲＄鏈夊寲`
+  - `A鑲″鍒?`
+  - `娓偂渚涜偂鏉?`
+  - `鍏憡姹?`
+- Phase-1 formal online scope is fixed to:
+  - `娓偂绉佹湁鍖?`
+  - `涓鑲＄鏈夊寲`
+  - `A鑲″鍒?`
+  - `鍏憡姹?杈呭姪`
+- `娓偂渚涜偂鏉?` must be represented in the information architecture, but phase 1 must show it as `寰呮帴鍏?` because the current source is not allowed under the zero-login constraint.
+- Phase 1 must stay webpage-only:
+  - no new push integration
+  - no new Jisilu-row AI summaries
+  - existing merger push/report chain remains unchanged
+- External event data becomes the primary reading path; the existing merger announcement list becomes auxiliary evidence and deep-dive support.
+- Existing routes remain backward-compatible:
+  - `/api/market/merger`
+  - `/api/merger/report`
+  - `/api/merger/reports/today`
+- New unified data contract is provided by `GET /api/market/event-arbitrage`.
+- `GET /api/market/event-arbitrage` must return:
+  - `overview`
+  - `categories`
+  - `sourceStatus`
+  - `updateTime`
+  - `cacheTime`
+  - `servedFromCache`
+- `categories` must contain:
+  - `hk_private`
+  - `cn_private`
+  - `a_event`
+  - `rights_issue`
+  - `announcement_pool`
+- In phase 1:
+  - `rights_issue` must return an empty list
+  - `sourceStatus.rights_issue` must explicitly indicate `disabled_no_public_source`
+- Each standardized event row must expose at least:
+  - `id`
+  - `source`
+  - `category`
+  - `market`
+  - `symbol`
+  - `name`
+  - `currentPrice`
+  - `changeRate`
+  - `marketValue`
+  - `offerPrice`
+  - `spreadRate`
+  - `eventType`
+  - `eventStage`
+  - `offeror`
+  - `offerorHolding`
+  - `registryPlace`
+  - `dealMethod`
+  - `canShort`
+  - `canCounter`
+  - `summary`
+  - `detailUrl`
+  - `officialMatch`
+  - `raw`
+- `officialMatch` must be object-or-null. When present, it must at least include:
+  - `matched`
+  - `announcementId`
+  - `title`
+  - `announcementDate`
+  - `pdfUrl`
+  - `reportAvailable`
+- Phase-1 matching rule is fixed to exact security-code matching only; fuzzy matching is forbidden in this round.
+- A single-source failure must only degrade the corresponding category, and must not blank the whole `浜嬩欢濂楀埄` page or the rest of the dashboard.
+## 29. Startup Responsiveness And Premium History Recovery (2026-03-23)
+- Cached dashboard first-load quote endpoints remain the primary fast path; this round does not replace them with synchronous full real-time refresh.
+- The product must distinguish between:
+  - fast cached first paint
+  - slow force-refresh paths used for manual refresh or background revalidation
+- AH / AB premium history must self-heal when the local SQLite cache is obviously degraded, including:
+  - `sampleCount3Y <= 1`
+  - missing `startDate3Y` or `endDate3Y` while summary samples exist
+  - collapsed same-day or near-same-day ranges that indicate only a recent snapshot survived
+- When the local premium-history summary is degraded, incremental update mode must not skip that symbol as "already synced"; it must trigger a full historical backfill for the affected symbol.
+- This self-healing rule applies to both:
+  - scheduled premium-history maintenance
+  - on-demand history ensure/load flows that rely on the same summary decision
+- `/api/market/ipo` must degrade gracefully when no IPO history exists yet:
+  - response stays parseable JSON
+  - `success = true`
+  - `data = []`
+  - `upcoming = []`
+  - optional warning text is allowed
+- The homepage must not appear broken or permanently loading just because IPO history is currently empty on the server.

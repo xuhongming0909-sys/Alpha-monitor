@@ -13,12 +13,14 @@ const ENDPOINTS = {
   ah: '/api/market/ah',
   ab: '/api/market/ab',
   monitor: '/api/monitors',
+  stockSearch: '/api/stock/search',
   dividend: '/api/dividend?action=refresh',
-  merger: '/api/market/merger',
+  merger: '/api/market/event-arbitrage',
   pushConfig: '/api/push/config',
 };
 
 const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'monitor', 'dividend', 'merger'];
+const EVENT_ARB_SUBTAB_SEQUENCE = ['overview', 'hk_private', 'cn_private', 'a_event', 'announcement_pool', 'rights_issue'];
 const MONITOR_MARKET_OPTIONS = ['A', 'H', 'B'];
 const MONITOR_CURRENCY_OPTIONS = ['CNY', 'HKD', 'USD'];
 const PUSH_MODULE_LABELS = {
@@ -57,16 +59,22 @@ const TABLE_DEFAULTS = {
   monitor: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   dividend: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   merger: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
+  eventArbHk: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
+  eventArbCn: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
+  eventArbA: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
+  eventArbAnnouncement: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
 };
 
 const state = {
   activeTab: 'cb-arb',
+  mergerSubview: 'overview',
   eventsBound: false,
   savingPush: false,
   savingMonitor: false,
   cacheRevalidated: {},
   monitorEditor: {
     mode: 'create',
+    open: false,
     draft: createMonitorDraft(),
   },
   expandedRows: {
@@ -75,6 +83,10 @@ const state = {
     ab: {},
     monitor: {},
     merger: {},
+    eventArbHk: {},
+    eventArbCn: {},
+    eventArbA: {},
+    eventArbAnnouncement: {},
   },
   tables: {
     cbArb: createTableState('cbArb'),
@@ -83,6 +95,10 @@ const state = {
     monitor: createTableState('monitor'),
     dividend: createTableState('dividend'),
     merger: createTableState('merger'),
+    eventArbHk: createTableState('eventArbHk'),
+    eventArbCn: createTableState('eventArbCn'),
+    eventArbA: createTableState('eventArbA'),
+    eventArbAnnouncement: createTableState('eventArbAnnouncement'),
   },
   resources: {
     exchangeRate: resourceState(),
@@ -433,12 +449,23 @@ function bindEvents() {
   });
 
   document.addEventListener('click', (event) => {
+    if (event.target.matches('[data-monitor-overlay="1"]')) {
+      closeMonitorEditor();
+      renderMonitorPanel();
+      return;
+    }
+
     const monitorAction = event.target.closest('[data-monitor-action]');
     if (monitorAction) {
       const action = monitorAction.dataset.monitorAction;
       const monitorId = monitorAction.dataset.monitorId || '';
-      if (action === 'reset') {
-        resetMonitorEditor();
+      if (action === 'open-create') {
+        openMonitorCreateMode();
+        renderMonitorPanel();
+        return;
+      }
+      if (action === 'close-editor') {
+        closeMonitorEditor();
         renderMonitorPanel();
         return;
       }
@@ -474,7 +501,15 @@ function bindEvents() {
       if (tableKey === 'ah') return renderPremiumPanel('ah');
       if (tableKey === 'ab') return renderPremiumPanel('ab');
       if (tableKey === 'monitor') return renderMonitorPanel();
-      if (tableKey === 'merger') return renderMergerPanel();
+      if (tableKey === 'merger' || tableKey.startsWith('eventArb')) return renderMergerPanel();
+    }
+
+    const eventArbSubtab = event.target.closest('[data-event-arb-subtab]');
+    if (eventArbSubtab) {
+      const subtab = String(eventArbSubtab.dataset.eventArbSubtab || '').trim();
+      if (!EVENT_ARB_SUBTAB_SEQUENCE.includes(subtab)) return;
+      state.mergerSubview = subtab;
+      renderMergerPanel();
     }
   });
 
@@ -936,15 +971,20 @@ function readMonitorEditorDraft() {
   return state.monitorEditor?.draft || createMonitorDraft();
 }
 
-function setMonitorEditorDraft(draft, mode = 'create') {
+function setMonitorEditorDraft(draft, mode = 'create', open = false) {
   state.monitorEditor = {
     mode,
+    open,
     draft: createMonitorDraft(draft),
   };
 }
 
-function resetMonitorEditor() {
-  setMonitorEditorDraft(createMonitorDraft(), 'create');
+function openMonitorCreateMode() {
+  setMonitorEditorDraft(createMonitorDraft(), 'create', true);
+}
+
+function closeMonitorEditor() {
+  setMonitorEditorDraft(createMonitorDraft(), 'create', false);
 }
 
 function findMonitorById(monitorId) {
@@ -957,7 +997,7 @@ function enterMonitorEditMode(monitorId) {
     showToast('未找到要编辑的监控项目', true);
     return;
   }
-  setMonitorEditorDraft(target, 'edit');
+  setMonitorEditorDraft(target, 'edit', true);
 }
 
 function readMonitorFormPayload(form) {
@@ -965,22 +1005,84 @@ function readMonitorFormPayload(form) {
   const currentDraft = readMonitorEditorDraft();
   return {
     id: String(formData.get('id') || '').trim() || currentDraft.id || undefined,
-    name: String(formData.get('name') || '').trim(),
     acquirerName: String(formData.get('acquirerName') || '').trim(),
-    acquirerCode: String(formData.get('acquirerCode') || '').trim(),
-    acquirerMarket: String(formData.get('acquirerMarket') || 'A').trim(),
-    acquirerCurrency: String(formData.get('acquirerCurrency') || 'CNY').trim(),
     targetName: String(formData.get('targetName') || '').trim(),
-    targetCode: String(formData.get('targetCode') || '').trim(),
-    targetMarket: String(formData.get('targetMarket') || 'A').trim(),
-    targetCurrency: String(formData.get('targetCurrency') || 'CNY').trim(),
-    stockRatio: String(formData.get('stockRatio') || '').trim(),
     safetyFactor: String(formData.get('safetyFactor') || '').trim(),
     cashDistribution: String(formData.get('cashDistribution') || '').trim(),
     cashDistributionCurrency: String(formData.get('cashDistributionCurrency') || 'CNY').trim(),
     cashOptionPrice: String(formData.get('cashOptionPrice') || '').trim(),
     cashOptionCurrency: String(formData.get('cashOptionCurrency') || 'CNY').trim(),
-    note: String(formData.get('note') || '').trim(),
+    name: currentDraft.name || '',
+    acquirerCode: currentDraft.acquirerCode || '',
+    acquirerMarket: currentDraft.acquirerMarket || 'A',
+    acquirerCurrency: currentDraft.acquirerCurrency || 'CNY',
+    targetCode: currentDraft.targetCode || '',
+    targetMarket: currentDraft.targetMarket || 'A',
+    targetCurrency: currentDraft.targetCurrency || 'CNY',
+    stockRatio: currentDraft.stockRatio ?? '',
+    note: currentDraft.note || '',
+  };
+}
+
+function normalizeMonitorEntityText(value) {
+  return String(value || '').trim().replace(/\s+/g, '').toLowerCase();
+}
+
+function isSameMonitorEntityInput(inputText, draftName, draftCode) {
+  const current = normalizeMonitorEntityText(inputText);
+  if (!current) return false;
+  return current === normalizeMonitorEntityText(draftName) || current === normalizeMonitorEntityText(draftCode);
+}
+
+function scoreMonitorSearchMatch(item, keyword) {
+  const text = normalizeMonitorEntityText(keyword);
+  const code = normalizeMonitorEntityText(item?.code);
+  const name = normalizeMonitorEntityText(item?.name);
+  const pinyin = normalizeMonitorEntityText(item?.pinyin);
+  let score = 0;
+  if (code && code === text) score += 120;
+  if (name && name === text) score += 100;
+  if (name && name.includes(text)) score += 60;
+  if (text && pinyin === text) score += 40;
+  if (text && pinyin.startsWith(text)) score += 20;
+  return score;
+}
+
+async function resolveMonitorEntity(keyword, draft = {}) {
+  const rawKeyword = String(keyword || '').trim();
+  if (!rawKeyword) return null;
+
+  if (isSameMonitorEntityInput(rawKeyword, draft.name, draft.code) && draft.code) {
+    return {
+      name: draft.name || rawKeyword,
+      code: draft.code,
+      market: draft.market || 'A',
+      currency: draft.currency || 'CNY',
+    };
+  }
+
+  const endpoint = `${ENDPOINTS.stockSearch}?keyword=${encodeURIComponent(rawKeyword)}&limit=8`;
+  const payload = await fetchJson(endpoint);
+  const rows = Array.isArray(payload?.data) ? payload.data : [];
+  if (!rows.length) {
+    if (draft.code) {
+      return {
+        name: draft.name || rawKeyword,
+        code: draft.code,
+        market: draft.market || 'A',
+        currency: draft.currency || 'CNY',
+      };
+    }
+    return null;
+  }
+
+  const best = [...rows].sort((a, b) => scoreMonitorSearchMatch(b, rawKeyword) - scoreMonitorSearchMatch(a, rawKeyword))[0];
+  if (!best?.code) return null;
+  return {
+    name: best.name || rawKeyword,
+    code: String(best.code || '').trim(),
+    market: String(best.marketType || draft.market || 'A').trim().toUpperCase(),
+    currency: String(best.currency || draft.currency || 'CNY').trim().toUpperCase(),
   };
 }
 
@@ -990,8 +1092,8 @@ async function refreshMonitorResource() {
 
 async function saveMonitorFromForm(form) {
   const payload = readMonitorFormPayload(form);
-  if (!payload.acquirerCode || !payload.targetCode) {
-    showToast('收购方代码和目标方代码都需要填写', true);
+  if (!payload.acquirerName || !payload.targetName) {
+    showToast('收购方和目标方都需要填写', true);
     return;
   }
 
@@ -999,12 +1101,43 @@ async function saveMonitorFromForm(form) {
   renderMonitorPanel();
 
   try {
+    const currentDraft = readMonitorEditorDraft();
+    const [acquirerResolved, targetResolved] = await Promise.all([
+      resolveMonitorEntity(payload.acquirerName, {
+        name: currentDraft.acquirerName,
+        code: currentDraft.acquirerCode,
+        market: currentDraft.acquirerMarket,
+        currency: currentDraft.acquirerCurrency,
+      }),
+      resolveMonitorEntity(payload.targetName, {
+        name: currentDraft.targetName,
+        code: currentDraft.targetCode,
+        market: currentDraft.targetMarket,
+        currency: currentDraft.targetCurrency,
+      }),
+    ]);
+
+    if (!acquirerResolved || !targetResolved) {
+      showToast('无法自动识别收购方或目标方，请输入更准确的公司简称或代码', true);
+      return;
+    }
+
     await fetchJson(ENDPOINTS.monitor, {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        acquirerName: acquirerResolved.name,
+        acquirerCode: acquirerResolved.code,
+        acquirerMarket: acquirerResolved.market,
+        acquirerCurrency: acquirerResolved.currency,
+        targetName: targetResolved.name,
+        targetCode: targetResolved.code,
+        targetMarket: targetResolved.market,
+        targetCurrency: targetResolved.currency,
+      }),
     });
     await refreshMonitorResource();
-    resetMonitorEditor();
+    closeMonitorEditor();
     renderMonitorPanel();
     showToast(payload.id ? '监控参数已更新' : '监控项目已新增');
   } catch (error) {
@@ -1028,7 +1161,7 @@ async function deleteMonitorById(monitorId) {
     await fetchJson(`${ENDPOINTS.monitor}/${encodeURIComponent(monitorId)}`, { method: 'DELETE' });
     await refreshMonitorResource();
     if (String(readMonitorEditorDraft().id || '') === String(monitorId)) {
-      resetMonitorEditor();
+      closeMonitorEditor();
     }
     showToast('监控项目已删除');
   } catch (error) {
@@ -1078,7 +1211,7 @@ function handlePageClick(tableKey, action) {
   if (tableKey === 'ab') renderPremiumPanel('ab');
   if (tableKey === 'monitor') renderMonitorPanel();
   if (tableKey === 'dividend') renderDividendPanel();
-  if (tableKey === 'merger') renderMergerPanel();
+  if (tableKey === 'merger' || tableKey.startsWith('eventArb')) renderMergerPanel();
 }
 
 function readTableSourceRows(tableKey) {
@@ -1087,7 +1220,10 @@ function readTableSourceRows(tableKey) {
   if (tableKey === 'ab') return readResourceArray('ab');
   if (tableKey === 'monitor') return readResourceArray('monitor');
   if (tableKey === 'dividend') return readResourceArray('dividend');
-  if (tableKey === 'merger') return readResourceArray('merger');
+  if (tableKey === 'merger' || tableKey === 'eventArbAnnouncement') return readEventArbitrageCategoryRows('announcement_pool');
+  if (tableKey === 'eventArbHk') return readEventArbitrageCategoryRows('hk_private');
+  if (tableKey === 'eventArbCn') return readEventArbitrageCategoryRows('cn_private');
+  if (tableKey === 'eventArbA') return readEventArbitrageCategoryRows('a_event');
   return [];
 }
 
@@ -1241,6 +1377,10 @@ function resolveRowId(tableKey, row, fallbackIndex) {
   if (tableKey === 'ab') return `${row.aCode || ''}-${row.bCode || ''}-${fallbackIndex}`;
   if (tableKey === 'monitor') return String(row.id || row.name || fallbackIndex);
   if (tableKey === 'merger') return String(row.announcementId || `${row.secCode || ''}-${row.announcementTime || ''}-${fallbackIndex}`);
+  if (tableKey === 'eventArbAnnouncement') return String(row.announcementId || `${row.secCode || ''}-${row.announcementTime || ''}-${fallbackIndex}`);
+  if (tableKey === 'eventArbHk' || tableKey === 'eventArbCn' || tableKey === 'eventArbA') {
+    return String(row.id || `${row.symbol || ''}-${row.detailUrl || fallbackIndex}`);
+  }
   return String(fallbackIndex);
 }
 
@@ -1819,11 +1959,12 @@ function renderMonitorPanel() {
       <div class="module-toolbar">
         <div>
           <div class="tab-title">监控套利</div>
-          <div class="section-note">每个项目直接在主行下方展示参数与计算说明；支持原地新增和编辑已有监控。</div>
+          <div class="section-note">新增/编辑表单默认收起，只在需要时弹出；代码、市场、币种等隐藏字段优先自动判断。</div>
         </div>
-        <div class="panel-meta">
-          <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
-          <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('monitor')))}</span>
+        <div class="button-row inline">
+          <span class="meta-chip">总样本 ${escapeHtml(formatInt(rows.length))}</span>
+          <span class="meta-chip">最近更新 ${escapeHtml(formatDate(readUpdateTime('monitor')))}</span>
+          <button type="button" class="btn-primary" data-monitor-action="open-create" ${state.savingMonitor ? 'disabled' : ''}>新增监控</button>
         </div>
       </div>
       ${renderMonitorEditor()}
@@ -1842,101 +1983,68 @@ function renderMonitorPanel() {
 
 function renderMonitorEditor() {
   const draft = readMonitorEditorDraft();
+  const isOpen = Boolean(state.monitorEditor?.open);
   const isEditMode = state.monitorEditor?.mode === 'edit' && draft.id;
   const submitLabel = isEditMode ? '保存修改' : '新增监控';
+  if (!isOpen) return '';
 
   return `
-    <div class="list-card monitor-editor-card">
-      <div class="monitor-editor-head">
-        <div>
-          <h3>${isEditMode ? '编辑监控项目' : '新增监控项目'}</h3>
-          <div class="section-note">收购方 / 目标方代码、市场、币种、换股比例、现金对价等参数都可直接维护；保存后按最新行情重算。</div>
+    <div class="monitor-editor-modal" data-monitor-overlay="1">
+      <div class="list-card monitor-editor-card monitor-editor-dialog">
+        <div class="monitor-editor-head">
+          <div>
+            <h3>${isEditMode ? '编辑监控项目' : '新增监控项目'}</h3>
+            <div class="section-note">只填写核心业务字段；证券代码、市场和币种优先自动识别，已有隐藏参数会在编辑时自动保留。</div>
+          </div>
+          <div class="button-row">
+            <button type="button" class="btn-secondary" data-monitor-action="close-editor" ${state.savingMonitor ? 'disabled' : ''}>关闭</button>
+          </div>
         </div>
-        <div class="button-row">
-          <button type="button" class="btn-secondary" data-monitor-action="reset" ${state.savingMonitor ? 'disabled' : ''}>新增空白</button>
+        <div class="formula-box formula-box-compact">
+          <h3>计算口径</h3>
+          <div class="formula-lines">
+            <div class="formula-line">股票腿理论对价 = 收购方股价 × 已存换股比例 × 安全系数 + 现金对价</div>
+            <div class="formula-line">现金腿收益率 = (现金选择权 - 目标现价) / 目标现价 × 100</div>
+          </div>
         </div>
+        <form id="monitor-editor-form" class="monitor-editor-form">
+          <input type="hidden" name="id" value="${escapeHtml(draft.id)}" />
+          <div class="monitor-form-grid monitor-form-grid-simple">
+            <div class="input-group">
+              <label for="monitor-acquirer-name">收购方</label>
+              <input id="monitor-acquirer-name" name="acquirerName" type="text" value="${escapeHtml(draft.acquirerName)}" placeholder="例如 中金公司 / 601995" />
+            </div>
+            <div class="input-group">
+              <label for="monitor-target-name">目标方</label>
+              <input id="monitor-target-name" name="targetName" type="text" value="${escapeHtml(draft.targetName)}" placeholder="例如 东兴证券 / 601198 / 02688" />
+            </div>
+            <div class="input-group">
+              <label for="monitor-safety-factor">安全系数</label>
+              <input id="monitor-safety-factor" name="safetyFactor" type="number" min="0" max="1" step="0.0001" value="${escapeHtml(String(draft.safetyFactor ?? 1))}" />
+            </div>
+            <div class="input-group">
+              <label for="monitor-cash-distribution">现金对价</label>
+              <input id="monitor-cash-distribution" name="cashDistribution" type="number" step="0.0001" value="${escapeHtml(String(draft.cashDistribution ?? ''))}" />
+            </div>
+            <div class="input-group">
+              <label for="monitor-cash-distribution-currency">现金对价币种</label>
+              <select id="monitor-cash-distribution-currency" name="cashDistributionCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.cashDistributionCurrency)}</select>
+            </div>
+            <div class="input-group">
+              <label for="monitor-cash-option-price">现金选择权</label>
+              <input id="monitor-cash-option-price" name="cashOptionPrice" type="number" step="0.0001" value="${escapeHtml(String(draft.cashOptionPrice ?? ''))}" />
+            </div>
+            <div class="input-group">
+              <label for="monitor-cash-option-currency">现金选择权币种</label>
+              <select id="monitor-cash-option-currency" name="cashOptionCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.cashOptionCurrency)}</select>
+            </div>
+          </div>
+          <div class="button-row">
+            <button type="submit" class="btn-primary" ${state.savingMonitor ? 'disabled' : ''}>${submitLabel}</button>
+            <button type="button" class="btn-secondary" data-monitor-action="close-editor" ${state.savingMonitor ? 'disabled' : ''}>取消</button>
+          </div>
+        </form>
       </div>
-      <div class="formula-box formula-box-compact">
-        <h3>公式说明</h3>
-        <div class="formula-lines">
-          <div class="formula-line">股票腿理论对价 = 收购方股价 × 换股比例 × 安全系数 + 现金分派</div>
-          <div class="formula-line">股票腿收益率 = (股票腿理论对价 - 目标现价) / 目标现价 × 100</div>
-          <div class="formula-line">现金腿收益率 = (现金对价 - 目标现价) / 目标现价 × 100</div>
-        </div>
-      </div>
-      <form id="monitor-editor-form" class="monitor-editor-form">
-        <input type="hidden" name="id" value="${escapeHtml(draft.id)}" />
-        <div class="monitor-form-grid">
-          <div class="input-group">
-            <label for="monitor-name">监控名称</label>
-            <input id="monitor-name" name="name" type="text" value="${escapeHtml(draft.name)}" placeholder="可选，不填则自动生成" />
-          </div>
-          <div class="input-group">
-            <label for="monitor-acquirer-name">收购方名称</label>
-            <input id="monitor-acquirer-name" name="acquirerName" type="text" value="${escapeHtml(draft.acquirerName)}" placeholder="例如 中金公司" />
-          </div>
-          <div class="input-group">
-            <label for="monitor-acquirer-code">收购方代码</label>
-            <input id="monitor-acquirer-code" name="acquirerCode" type="text" value="${escapeHtml(draft.acquirerCode)}" placeholder="例如 601995" />
-          </div>
-          <div class="input-group">
-            <label for="monitor-acquirer-market">收购方市场</label>
-            <select id="monitor-acquirer-market" name="acquirerMarket">${renderSelectOptions(MONITOR_MARKET_OPTIONS, draft.acquirerMarket)}</select>
-          </div>
-          <div class="input-group">
-            <label for="monitor-acquirer-currency">收购方币种</label>
-            <select id="monitor-acquirer-currency" name="acquirerCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.acquirerCurrency)}</select>
-          </div>
-          <div class="input-group">
-            <label for="monitor-target-name">目标方名称</label>
-            <input id="monitor-target-name" name="targetName" type="text" value="${escapeHtml(draft.targetName)}" placeholder="例如 东兴证券" />
-          </div>
-          <div class="input-group">
-            <label for="monitor-target-code">目标方代码</label>
-            <input id="monitor-target-code" name="targetCode" type="text" value="${escapeHtml(draft.targetCode)}" placeholder="例如 601198 / 02688" />
-          </div>
-          <div class="input-group">
-            <label for="monitor-target-market">目标方市场</label>
-            <select id="monitor-target-market" name="targetMarket">${renderSelectOptions(MONITOR_MARKET_OPTIONS, draft.targetMarket)}</select>
-          </div>
-          <div class="input-group">
-            <label for="monitor-target-currency">目标方币种</label>
-            <select id="monitor-target-currency" name="targetCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.targetCurrency)}</select>
-          </div>
-          <div class="input-group">
-            <label for="monitor-stock-ratio">换股比例</label>
-            <input id="monitor-stock-ratio" name="stockRatio" type="number" step="0.0001" value="${escapeHtml(String(draft.stockRatio ?? ''))}" />
-          </div>
-          <div class="input-group">
-            <label for="monitor-safety-factor">安全系数</label>
-            <input id="monitor-safety-factor" name="safetyFactor" type="number" min="0" max="1" step="0.0001" value="${escapeHtml(String(draft.safetyFactor ?? 1))}" />
-          </div>
-          <div class="input-group">
-            <label for="monitor-cash-distribution">现金分派</label>
-            <input id="monitor-cash-distribution" name="cashDistribution" type="number" step="0.0001" value="${escapeHtml(String(draft.cashDistribution ?? ''))}" />
-          </div>
-          <div class="input-group">
-            <label for="monitor-cash-distribution-currency">现金分派币种</label>
-            <select id="monitor-cash-distribution-currency" name="cashDistributionCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.cashDistributionCurrency)}</select>
-          </div>
-          <div class="input-group">
-            <label for="monitor-cash-option-price">现金对价</label>
-            <input id="monitor-cash-option-price" name="cashOptionPrice" type="number" step="0.0001" value="${escapeHtml(String(draft.cashOptionPrice ?? ''))}" />
-          </div>
-          <div class="input-group">
-            <label for="monitor-cash-option-currency">现金对价币种</label>
-            <select id="monitor-cash-option-currency" name="cashOptionCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.cashOptionCurrency)}</select>
-          </div>
-          <div class="input-group monitor-form-note">
-            <label for="monitor-note">备注</label>
-            <textarea id="monitor-note" name="note" rows="3" placeholder="可选">${escapeHtml(draft.note)}</textarea>
-          </div>
-        </div>
-        <div class="button-row">
-          <button type="submit" class="btn-primary" ${state.savingMonitor ? 'disabled' : ''}>${submitLabel}</button>
-          <button type="button" class="btn-secondary" data-monitor-action="reset" ${state.savingMonitor ? 'disabled' : ''}>清空表单</button>
-        </div>
-      </form>
     </div>
   `;
 }
@@ -2021,29 +2129,234 @@ function renderDividendPanel() {
   `;
 }
 
-function renderMergerPanel() {
-  const panel = dom.tabPanels.merger;
-  const resource = state.resources.merger;
-  if (!panel) return;
+function readEventArbitrageResponse() {
+  return readResourcePayload('merger');
+}
 
-  if (resource.status === 'loading' || resource.status === 'idle') {
-    panel.innerHTML = moduleLoading('收购私有正在拉取公告');
-    return;
-  }
+function readEventArbitrageData() {
+  return readObject(readEventArbitrageResponse().data);
+}
 
-  if (resource.status === 'error') {
-    panel.innerHTML = moduleError('收购私有加载失败', resource.error?.message);
-    return;
-  }
+function readEventArbitrageCategories() {
+  return readObject(readEventArbitrageData().categories);
+}
 
-  const rows = [...readResourceArray('merger')].sort((a, b) => readAnnouncementSortValue(b) - readAnnouncementSortValue(a));
-  if (!rows.length) {
-    panel.innerHTML = moduleEmpty('当前没有收购私有 / 并购公告');
-    return;
-  }
+function readEventArbitrageCategoryRows(category) {
+  const rows = readEventArbitrageCategories()[category];
+  return Array.isArray(rows) ? rows : [];
+}
 
-  const todayRows = rows.filter((row) => isTodayAnnouncement(row));
-  const columns = [
+function readEventArbitrageOverview() {
+  return readObject(readEventArbitrageData().overview);
+}
+
+function readEventArbitrageSourceStatus() {
+  return readObject(readEventArbitrageData().sourceStatus);
+}
+
+function readEventArbitrageStatus(category) {
+  return readObject(readEventArbitrageSourceStatus()[category]);
+}
+
+function readEventArbitrageSubview() {
+  return EVENT_ARB_SUBTAB_SEQUENCE.includes(state.mergerSubview) ? state.mergerSubview : 'overview';
+}
+
+function eventArbStatusLabel(status) {
+  const map = {
+    ok: '正常',
+    empty: '暂无数据',
+    error: '抓取失败',
+    stale_cache: '使用缓存',
+    disabled: '已关闭',
+    disabled_no_public_source: '待接入',
+    pending: '待聚合',
+  };
+  return map[String(status || '').trim()] || '未知';
+}
+
+function eventArbCategoryLabel(category) {
+  const map = {
+    overview: '总览',
+    hk_private: '港股私有化',
+    cn_private: '中概股私有化',
+    a_event: 'A股套利',
+    announcement_pool: '公告池',
+    rights_issue: '港股供股权(待接入)',
+  };
+  return map[category] || category;
+}
+
+function formatBooleanLabel(value) {
+  if (value === true) return '是';
+  if (value === false) return '否';
+  return '--';
+}
+
+function buildAnchor(url, label) {
+  const href = String(url || '').trim();
+  if (!href) return '';
+  return `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>`;
+}
+
+function renderEventArbitrageLinks(row) {
+  const links = [
+    buildAnchor(row?.detailUrl, '详情链接'),
+    buildAnchor(row?.announcementUrl, '公告链接'),
+    buildAnchor(row?.forumUrl, '论坛链接'),
+    buildAnchor(row?.officialMatch?.pdfUrl, '匹配PDF'),
+  ].filter(Boolean);
+  return links.length ? links.join(' / ') : '--';
+}
+
+function renderEventArbitrageMatchText(row) {
+  const match = row?.officialMatch;
+  if (!match || match.matched !== true) return '未匹配';
+  return match.reportAvailable ? '已匹配 / 可生成AI报告' : '已匹配';
+}
+
+function renderEventArbitrageDetail(row) {
+  const items = [
+    { label: '类别', value: eventArbCategoryLabel(row?.category) },
+    { label: '事件阶段', value: row?.eventStage || '--' },
+    { label: '事件类型', value: row?.eventType || '--' },
+    { label: '来源', value: row?.source || '--' },
+    { label: '最新公告标题', value: row?.officialMatch?.title || '--' },
+    { label: '公告日期', value: formatDateOnly(row?.officialMatch?.announcementDate) },
+    { label: 'AI报告', value: row?.officialMatch?.reportAvailable ? '可生成' : '不可生成' },
+    { label: '备注', value: row?.summary || '--' },
+  ];
+  const links = renderEventArbitrageLinks(row);
+  return `
+    ${renderDetailGrid(items)}
+    <div class="slim-note" style="margin-top: 12px;">链接：${links}</div>
+  `;
+}
+
+function renderEventArbitrageSubtabs() {
+  const active = readEventArbitrageSubview();
+  return `
+    <div class="subtab-nav">
+      ${EVENT_ARB_SUBTAB_SEQUENCE.map((key) => {
+        const disabled = key === 'rights_issue';
+        const label = eventArbCategoryLabel(key);
+        return `
+          <button
+            type="button"
+            class="subtab-button ${active === key ? 'active' : ''} ${disabled ? 'disabled' : ''}"
+            data-event-arb-subtab="${escapeHtml(key)}"
+          >
+            ${escapeHtml(label)}
+          </button>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderEventArbitrageOverviewView() {
+  const overview = readEventArbitrageOverview();
+  const sourceStatus = readEventArbitrageSourceStatus();
+  const freshness = readEventArbitrageData().servedFromCache ? '当前展示聚合缓存' : '当前展示实时聚合结果';
+  const statusRows = ['hk_private', 'cn_private', 'a_event', 'announcement_pool', 'rights_issue'].map((key) => {
+    const status = readObject(sourceStatus[key]);
+    return {
+      title: eventArbCategoryLabel(key),
+      subtitle: `${eventArbStatusLabel(status.status)} / 更新时间 ${formatDate(status.updateTime || readUpdateTime('merger'))}`,
+      value: formatInt(status.itemCount || 0),
+      valueClass: status.status === 'error' ? 'negative' : (status.status === 'stale_cache' ? '' : 'positive'),
+    };
+  });
+
+  return `
+    <div class="summary-grid">
+      <section class="summary-card">
+        <h3>公开事件总数</h3>
+        <div class="item-value">${escapeHtml(formatInt(overview.totalCount || 0))}</div>
+        <div class="item-subtitle">港股 + 中概股 + A股事件的统一总览</div>
+      </section>
+      <section class="summary-card">
+        <h3>正套利数量</h3>
+        <div class="item-value positive">${escapeHtml(formatInt(overview.positiveCount || 0))}</div>
+        <div class="item-subtitle">按当前外部事件源返回的正套利空间统计</div>
+      </section>
+      <section class="summary-card">
+        <h3>公告池匹配</h3>
+        <div class="item-value">${escapeHtml(formatInt(overview.todayMatchedCount || 0))}</div>
+        <div class="item-subtitle">按证券代码精确匹配的当日公告命中数</div>
+      </section>
+      <section class="summary-card">
+        <h3>公告池条数</h3>
+        <div class="item-value">${escapeHtml(formatInt(overview.announcementPoolCount || 0))}</div>
+        <div class="item-subtitle">辅助校验与 AI 报告所用的现有公告池</div>
+      </section>
+    </div>
+    <div class="list-card">
+      <h3>来源状态</h3>
+      <div class="section-note" style="margin-bottom: 12px;">${escapeHtml(freshness)}，最近更新 ${escapeHtml(formatDate(readUpdateTime('merger')))}</div>
+      ${renderStackItems(statusRows)}
+    </div>
+  `;
+}
+
+function buildEventArbHkColumns() {
+  return [
+    { key: 'symbol', label: '代码', render: (row) => `<div class="mono-text">${escapeHtml(row.symbol || '--')}</div>` },
+    { key: 'name', label: '名称', render: (row) => escapeHtml(row.name || '--') },
+    { key: 'currentPrice', label: '现价', render: (row) => formatNumber(row.currentPrice, 2) },
+    { key: 'changeRate', label: '涨跌幅', className: (row) => statusClass(row.changeRate), render: (row) => formatPercent(row.changeRate, 2) },
+    { key: 'marketValue', label: '市值', render: (row) => escapeHtml(row.marketValueText || '--') },
+    { key: 'offerPriceText', label: '私有化价格', render: (row) => escapeHtml(row.offerPriceText || '--') },
+    { key: 'spreadRate', label: '套利空间', className: (row) => statusClass(row.spreadRate), render: (row) => formatPercent(row.spreadRate, 2) },
+    { key: 'eventStage', label: '私有化进程', render: (row) => escapeHtml(row.eventStage || '--') },
+    { key: 'offeror', label: '要约方', render: (row) => escapeHtml(row.offeror || '--') },
+    { key: 'offerorHoldingText', label: '要约方持股', render: (row) => escapeHtml(row.offerorHoldingText || '--') },
+    { key: 'registryPlace', label: '注册地', render: (row) => escapeHtml(row.registryPlace || '--') },
+    { key: 'dealMethod', label: '收购方式', render: (row) => escapeHtml(row.dealMethod || '--') },
+    { key: 'canCounter', label: '是否可反套', render: (row) => escapeHtml(formatBooleanLabel(row.canCounter)) },
+    { key: 'canShort', label: '是否可卖空', render: (row) => escapeHtml(formatBooleanLabel(row.canShort)) },
+    { key: 'summary', label: '备注', render: (row) => escapeHtml(row.summary || '--') },
+    { key: 'links', label: '详情链接', render: (row) => renderEventArbitrageLinks(row) },
+  ];
+}
+
+function buildEventArbCnColumns() {
+  return [
+    { key: 'symbol', label: '代码', render: (row) => `<div class="mono-text">${escapeHtml(row.symbol || '--')}</div>` },
+    { key: 'name', label: '名称', render: (row) => escapeHtml(row.name || '--') },
+    { key: 'currentPrice', label: '现价', render: (row) => formatNumber(row.currentPrice, 2) },
+    { key: 'changeRate', label: '涨跌幅', className: (row) => statusClass(row.changeRate), render: (row) => formatPercent(row.changeRate, 2) },
+    { key: 'marketValue', label: '市值', render: (row) => escapeHtml(row.marketValueText || '--') },
+    { key: 'offerPriceText', label: '私有化价格', render: (row) => escapeHtml(row.offerPriceText || '--') },
+    { key: 'spreadRate', label: '套利空间', className: (row) => statusClass(row.spreadRate), render: (row) => formatPercent(row.spreadRate, 2) },
+    { key: 'eventStage', label: '进程', render: (row) => escapeHtml(row.eventStage || '--') },
+    { key: 'offeror', label: '要约方', render: (row) => escapeHtml(row.offeror || '--') },
+    { key: 'dealMethod', label: '收购方式', render: (row) => escapeHtml(row.dealMethod || '--') },
+    { key: 'feesHint', label: '费用提示', render: (row) => escapeHtml(row.feesHint || row.summary || '--') },
+    { key: 'links', label: '详情链接', render: (row) => renderEventArbitrageLinks(row) },
+  ];
+}
+
+function buildEventArbAColumns() {
+  return [
+    { key: 'symbol', label: '代码', render: (row) => `<div class="mono-text">${escapeHtml(row.symbol || '--')}</div>` },
+    { key: 'name', label: '名称', render: (row) => escapeHtml(row.name || '--') },
+    { key: 'currentPrice', label: '现价', render: (row) => formatNumber(row.currentPrice, 2) },
+    { key: 'changeRate', label: '涨跌幅', className: (row) => statusClass(row.changeRate), render: (row) => formatPercent(row.changeRate, 2) },
+    { key: 'safePriceText', label: '安全边际价', render: (row) => escapeHtml(row.safePriceText || '--') },
+    { key: 'safeDiscountRate', label: '安全边际折价', className: (row) => statusClass(row.safeDiscountRate), render: (row) => formatPercent(row.safeDiscountRate, 2) },
+    { key: 'choosePriceText', label: '现金选择权价格', render: (row) => escapeHtml(row.choosePriceText || '--') },
+    { key: 'chooseDiscountRate', label: '现金选择权折价', className: (row) => statusClass(row.chooseDiscountRate), render: (row) => formatPercent(row.chooseDiscountRate, 2) },
+    { key: 'currency', label: '币种', render: (row) => escapeHtml(row.currency || '--') },
+    { key: 'eventType', label: '事件类型', render: (row) => escapeHtml(row.eventType || '--') },
+    { key: 'summary', label: '摘要', render: (row) => escapeHtml(row.summary || '--') },
+    { key: 'announcementUrl', label: '公告链接', render: (row) => buildAnchor(row.announcementUrl || row.detailUrl, '公告链接') || '--' },
+    { key: 'forumUrl', label: '论坛链接', render: (row) => buildAnchor(row.forumUrl, '论坛链接') || '--' },
+  ];
+}
+
+function buildEventArbAnnouncementColumns() {
+  return [
     {
       key: 'announcementTime',
       label: '公告时间',
@@ -2073,29 +2386,132 @@ function renderMergerPanel() {
     { key: 'premiumRate', label: '报价溢价', className: (row) => statusClass(readMergerPremiumRate(row)), render: (row) => formatPercent(readMergerPremiumRate(row), 2) },
     { key: 'links', label: '链接', render: (row) => buildMergerLinks(row) },
   ];
+}
+
+function renderEventArbitrageTableView(options) {
+  const { title, note, tableKey, tableKind, rows, columns, emptyMessage, rowClassName, detailRenderer } = options;
+  const status = readEventArbitrageStatus(options.categoryKey || '');
+  return `
+    <div class="list-card">
+      <div class="module-toolbar">
+        <div>
+          <h3>${escapeHtml(title)}</h3>
+          <div class="section-note">${escapeHtml(note)}</div>
+        </div>
+        <div class="panel-meta">
+          <span>来源状态 ${escapeHtml(eventArbStatusLabel(status.status))}</span>
+          <span>数据条数 ${escapeHtml(formatInt(rows.length))}</span>
+        </div>
+      </div>
+      ${renderPaginatedTable({
+        tableKind,
+        tableKey,
+        columns,
+        rows,
+        emptyMessage,
+        rowClassName,
+        detailRenderer,
+      })}
+    </div>
+  `;
+}
+
+function renderEventArbitrageSubview() {
+  const subtab = readEventArbitrageSubview();
+  if (subtab === 'overview') return renderEventArbitrageOverviewView();
+  if (subtab === 'hk_private') {
+    return renderEventArbitrageTableView({
+      title: '港股私有化',
+      note: '零登录公开源主表，公告池只做精确代码匹配补充。',
+      categoryKey: 'hk_private',
+      tableKey: 'eventArbHk',
+      tableKind: 'merger',
+      rows: readEventArbitrageCategoryRows('hk_private'),
+      columns: buildEventArbHkColumns(),
+      emptyMessage: '当前没有港股私有化数据',
+      detailRenderer: (row) => renderEventArbitrageDetail(row),
+    });
+  }
+  if (subtab === 'cn_private') {
+    return renderEventArbitrageTableView({
+      title: '中概股私有化',
+      note: '当前公开接口返回为空时保持空表，不使用假数据填充。',
+      categoryKey: 'cn_private',
+      tableKey: 'eventArbCn',
+      tableKind: 'merger',
+      rows: readEventArbitrageCategoryRows('cn_private'),
+      columns: buildEventArbCnColumns(),
+      emptyMessage: '当前公开源没有中概股私有化数据',
+      detailRenderer: (row) => renderEventArbitrageDetail(row),
+    });
+  }
+  if (subtab === 'a_event') {
+    return renderEventArbitrageTableView({
+      title: 'A股套利',
+      note: '展示安全边际价、现金选择权和公开公告链接。',
+      categoryKey: 'a_event',
+      tableKey: 'eventArbA',
+      tableKind: 'merger',
+      rows: readEventArbitrageCategoryRows('a_event'),
+      columns: buildEventArbAColumns(),
+      emptyMessage: '当前没有 A 股事件套利数据',
+      detailRenderer: (row) => renderEventArbitrageDetail(row),
+    });
+  }
+  if (subtab === 'announcement_pool') {
+    const rows = [...readEventArbitrageCategoryRows('announcement_pool')].sort((a, b) => readAnnouncementSortValue(b) - readAnnouncementSortValue(a));
+    return renderEventArbitrageTableView({
+      title: '公告池',
+      note: '保留并购公告与 AI 报告能力，用于辅助校验和深挖，不再作为默认主列表。',
+      categoryKey: 'announcement_pool',
+      tableKey: 'eventArbAnnouncement',
+      tableKind: 'merger',
+      rows,
+      columns: buildEventArbAnnouncementColumns(),
+      emptyMessage: '当前没有公告池数据',
+      rowClassName: (row) => (isTodayAnnouncement(row) ? 'merger-row-today' : ''),
+      detailRenderer: (row) => renderDetailGrid(buildMergerDetailItems(row)),
+    });
+  }
+  const status = readEventArbitrageStatus('rights_issue');
+  return `
+    <div class="list-card disabled-card">
+      <h3>港股供股权套利</h3>
+      <div class="section-note">当前按“零登录”约束不接入该页。现有公开源需要登录或权限校验，第一阶段只保留信息架构和禁用态说明。</div>
+      <div class="slim-note" style="margin-top: 12px;">状态：${escapeHtml(eventArbStatusLabel(status.status))} / 最近更新 ${escapeHtml(formatDate(status.updateTime || readUpdateTime('merger')))}</div>
+    </div>
+  `;
+}
+
+function renderMergerPanel() {
+  const panel = dom.tabPanels.merger;
+  const resource = state.resources.merger;
+  if (!panel) return;
+
+  if (resource.status === 'loading' || resource.status === 'idle') {
+    panel.innerHTML = moduleLoading('事件套利正在聚合公开数据');
+    return;
+  }
+
+  if (resource.status === 'error') {
+    panel.innerHTML = moduleError('事件套利加载失败', resource.error?.message);
+    return;
+  }
 
   panel.innerHTML = `
     <div class="module-shell">
       <div class="module-toolbar">
         <div>
-          <div class="tab-title">收购私有</div>
-          <div class="section-note">页面展示全量公告，默认按公告时间倒序；今日公告用高亮底色和标签标出。</div>
+          <div class="tab-title">事件套利</div>
+          <div class="section-note">统一承接港股私有化、中概股私有化、A股套利和公告池辅助校验。</div>
         </div>
         <div class="panel-meta">
-          <span>总公告 ${escapeHtml(formatInt(rows.length))}</span>
-          <span>今日公告 ${escapeHtml(formatInt(todayRows.length))}</span>
           <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('merger')))}</span>
+          <span>${escapeHtml(readEventArbitrageData().servedFromCache ? '当前显示缓存聚合结果' : '当前显示实时聚合结果')}</span>
         </div>
       </div>
-      ${renderPaginatedTable({
-        tableKind: 'merger',
-        tableKey: 'merger',
-        columns,
-        rows,
-        rowClassName: (row) => (isTodayAnnouncement(row) ? 'merger-row-today' : ''),
-        emptyMessage: '当前没有收购私有 / 并购公告',
-        detailRenderer: (row) => renderDetailGrid(buildMergerDetailItems(row)),
-      })}
+      ${renderEventArbitrageSubtabs()}
+      ${renderEventArbitrageSubview()}
     </div>
   `;
 }
@@ -2297,11 +2713,11 @@ function buildMonitorDetailItems(row) {
     { label: '目标方股价', value: `¥${formatNumber(readMonitorTargetPrice(row), 2)}` },
     { label: '换股比例', value: formatNumber(row.stockRatio, 4) },
     { label: '安全系数', value: formatNumber(row.safetyFactor, 4) },
-    { label: '现金分派', value: `¥${formatNumber(row.cashDistributionCny, 2)}` },
+    { label: '现金对价', value: `¥${formatNumber(row.cashDistributionCny, 2)}` },
     { label: '理论对价计算说明', value: buildMonitorPricingText(row) },
     { label: '股票腿理论对价', value: stockLegEnabled ? `¥${formatNumber(row.stockPayout, 2)}` : '未配置股票腿' },
     { label: '股票腿价差', value: stockLegEnabled ? formatSignedNumber(row.stockSpread, 2) : '未配置股票腿' },
-    { label: '现金对价', value: cashLegEnabled ? `¥${formatNumber(row.cashPayout, 2)}` : '未配置现金腿' },
+    { label: '现金选择权', value: cashLegEnabled ? `¥${formatNumber(row.cashPayout, 2)}` : '未配置现金腿' },
     { label: '现金腿价差', value: cashLegEnabled ? formatSignedNumber(row.cashSpread, 2) : '未配置现金腿' },
     { label: '备注', value: row.note || '无' },
   ];
