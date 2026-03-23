@@ -206,8 +206,48 @@ function cbArbOpportunitySets(rows) {
   };
 }
 
+/**
+ * 构建可转债异动提醒候选。
+ * 输入是转债套利公开行，输出是满足阈值的提醒对象，不负责发送与冷却。
+ */
+function buildConvertibleBondAlertCandidates(rows, options = {}) {
+  const cleanRows = sanitizeCbArbRows(rows);
+  const threshold = Number(options.convertPremiumLt);
+  const limit = Number.isFinite(Number(options.limit)) ? Number(options.limit) : 20;
+  const effectiveThreshold = Number.isFinite(threshold) ? threshold : -3;
+
+  return cleanRows
+    .filter((row) => Number.isFinite(Number(row.premiumRate)) && Number(row.premiumRate) < effectiveThreshold)
+    .sort((a, b) => {
+      const premiumDiff = (Number(a.premiumRate) || 0) - (Number(b.premiumRate) || 0);
+      if (premiumDiff !== 0) return premiumDiff;
+      return (Number(b.convertValue) || 0) - (Number(a.convertValue) || 0);
+    })
+    .slice(0, Math.max(1, limit))
+    .map((row) => ({
+      ruleKey: "convert_premium_lt",
+      alertKey: `cb:${pickText(row.code)}:convert_premium_lt`,
+      code: pickText(row.code),
+      bondName: pickText(row.bondName),
+      price: row.price,
+      changePercent: row.changePercent,
+      stockCode: pickText(row.stockCode),
+      stockName: pickText(row.stockName),
+      stockPrice: row.stockPrice,
+      stockChangePercent: row.stockChangePercent,
+      convertValue: row.convertValue,
+      premiumRate: row.premiumRate,
+      doubleLow: row.doubleLow,
+      theoreticalPremiumRate: row.theoreticalPremiumRate,
+      forceRedeemStatus: pickText(row.forceRedeemStatus, ""),
+      putbackStatus: pickText(row.putbackStatus, ""),
+      reason: `转股溢价率低于 ${pctText(effectiveThreshold)}`,
+    }));
+}
+
 module.exports = {
   sanitizeCbArbRows,
   cbArbOpportunitySets,
+  buildConvertibleBondAlertCandidates,
 };
 

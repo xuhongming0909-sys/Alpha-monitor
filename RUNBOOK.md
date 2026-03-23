@@ -274,3 +274,22 @@ Check in this order:
 5. `sudo systemctl status alpha-monitor`
 6. `curl http://127.0.0.1:5000/api/health`
 7. `sudo journalctl -u alpha-monitor -n 100 --no-pager`
+
+## 13. Local agent-assist workflow
+
+This repository now includes a local `mini-SWE-agent` task generator:
+
+```powershell
+npm run agent:mini:task -- --help
+```
+
+Recommended use:
+
+1. Let Codex confirm whether docs/contracts must be updated first.
+2. Generate a repository-safe task prompt with `npm run agent:mini:task -- ...`.
+3. Run `mini-SWE-agent` with the generated task text.
+4. Review the resulting diff before merge.
+
+Project-specific guide:
+
+- [docs/mini-swe-agent-guide.md](docs/mini-swe-agent-guide.md)

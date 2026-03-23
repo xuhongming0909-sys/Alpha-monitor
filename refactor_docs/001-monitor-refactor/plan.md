@@ -3,8 +3,8 @@
 **Date**: `2026-03-22`
 **Feature**: `001-monitor-refactor`
 **Related Docs**:
-- [REQUIREMENTS.md](C:/Users/93724/Desktop/Alpha%20monitor/refactor_docs/001-monitor-refactor/REQUIREMENTS.md)
-- [SPEC.md](C:/Users/93724/Desktop/Alpha%20monitor/refactor_docs/001-monitor-refactor/SPEC.md)
+- [REQUIREMENTS.md](./REQUIREMENTS.md)
+- [SPEC.md](./SPEC.md)
 
 ## 1. 本次目标
 
@@ -894,3 +894,170 @@ Acceptance:
 - `GET /api/dashboard/ui-config` returns the active table UI contract from config.
 - Sorting, pagination, detail expansion, and field semantics remain unchanged.
 - Desktop may use light controlled horizontal scrolling, but the page does not collapse on tablet/mobile widths.
+
+## 30. Phase AB: Repository-local mini-SWE-agent Integration (2026-03-24)
+
+Goal: embed a production-safe `mini-SWE-agent` helper path into the repository so agent execution can follow the same constitution-first workflow as Codex, without introducing a second parallel process.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the repository-local agent-assist contract.
+2. Keep this round lightweight and tooling-only:
+   - no runtime dashboard/API behavior changes
+   - no deployment behavior changes
+   - no background scheduler changes
+3. Add a repository-owned prompt/task generator under `tools/` so `mini-SWE-agent` receives:
+   - constitution-first instructions
+   - plan/requirements/spec gate reminders
+   - module-boundary rules
+   - validation command defaults
+4. Expose the helper through a stable local command entry from `package.json`.
+5. Add a project-local usage guide that explains:
+   - install steps
+   - recommended `confirm` mode
+   - how Codex and `mini-SWE-agent` should split work
+   - example commands for `presentation`, `data_fetch`, and `strategy` scoped tasks
+6. Keep the integration human-in-the-loop:
+   - the tool generates repository-safe task text
+   - it does not auto-run `mini-SWE-agent`
+   - document/code review remains external to this helper
+
+Acceptance:
+- The repository contains a reusable local command that can generate a `mini-SWE-agent` task prompt for this project.
+- The generated prompt explicitly reminds the agent to read `CONSTITUTION.md` first and stop for doc updates when contracts change.
+- The repository contains a concise usage tutorial for installing and using `mini-SWE-agent` with this project.
+- The integration does not alter the live dashboard, API routes, scheduler, or deployment flow.
+
+## 31. Phase AC: Push Refactor to Summary + Event Alerts (2026-03-24)
+
+Goal: replace the old `主推送 + 收购私有专报` structure with a cleaner `定时摘要 + 异动提醒` model that is easier to read, easier to validate, and closer to real decision needs.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, and `contracts/dashboard-api-contract.md` first.
+2. Retire the old merger-report push path from active push settings and scheduler flow:
+   - remove the third push-time input from the homepage
+   - remove merger-report push status from `GET /api/push/config`
+   - stop exposing merger-report push as an active push route
+3. Keep two push entrances only:
+   - fixed-time summary push
+   - event-driven alert push
+4. Update push settings UI and API contract:
+   - keep two summary times
+   - add one editable event-alert cooldown minutes field
+   - show summary push status and event-alert status separately
+5. Rebuild summary push content into a denser readable format:
+   - keep `可转债 / AH / AB / 打新 / 分红 / 自定义监控 / 事件套利新增次日汇总`
+   - keep `自定义监控` full-volume
+   - compress each row into scanable single-line or two-line Markdown
+6. Add first-phase event alert logic for convertible bonds only:
+   - trigger when `转股溢价率 < -3%`
+   - enforce per-bond cooldown with default `30` minutes
+   - alert payload must include only triggered rows, not the full summary
+7. Track event-arbitrage newly discovered rows in push runtime state so the next day's fixed-time summary can include a concise `昨日新增事件套利` section.
+8. After implementation, run local checks, sync the cloud server, set the public push HTML URL if missing, and verify the webpage plus push-config API online.
+
+Acceptance:
+- Push settings no longer contain `收购私有专报`.
+- The dashboard shows `2` summary time inputs and `1` alert cooldown input.
+- `GET /api/push/config` returns summary times, alert cooldown, and separate summary/alert delivery status.
+- Scheduled push content becomes visibly more concise and readable.
+- Event alerts send only convertible-bond trigger rows with `转股溢价率 < -3%`.
+- The same bond is not re-alerted within `30` minutes.
+- Event-arbitrage rows first discovered on day `D` can appear in the summary push on day `D+1`.
+
+## 31. Phase AC: Dashboard UI Density + Hierarchy Coordination (2026-03-24)
+
+Goal: improve dashboard aesthetics, information density, and reading hierarchy together, while keeping all current behavior, data contracts, and interaction semantics unchanged.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with a presentation-only contract.
+2. Keep this round strictly inside the dashboard presentation layer:
+   - no `/api/*` contract changes
+   - no strategy / formula changes
+   - no scheduler / push behavior changes
+   - no route restructuring
+3. Apply the smallest effective UI changes in:
+   - `presentation/templates/dashboard_template.html`
+   - `presentation/dashboard/dashboard_page.js`
+4. Improve first-screen efficiency by tightening:
+   - hero height
+   - section spacing
+   - tab strip height
+   - push strip height
+5. Improve module readability by tightening and reordering visible emphasis for:
+   - title
+   - key counts / update time / freshness state
+   - summary cards
+   - explanatory copy
+6. Keep mobile and tablet safe:
+   - preserve the current responsive structure
+   - only compress spacing and hierarchy
+   - do not create a second mobile-only interaction model
+7. Keep all edits annotated with concise Chinese comments when changing core layout or key style behavior.
+
+Acceptance:
+- The page shows more effective information within the first screen on desktop.
+- Key module metadata is easier to scan than before.
+- Summary areas are more compact without reducing data truthfulness.
+- Existing tabs, tables, sorting, pagination, push settings, and monitor editing behavior remain unchanged.
+
+## 32. Phase AD: Release-path Visibility + Fast Deploy (2026-03-24)
+
+Goal: shorten the real path from `local change -> GitHub -> server -> visible homepage`, and make every stage truthfully expose which version is actually online.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the release-visibility and fast-deploy contracts.
+2. Extend `/api/health` so it exposes deployment/version metadata from the actual running checkout, instead of only generic process health.
+3. Add homepage-visible version text so the user can directly confirm:
+   - current git short SHA
+   - current branch
+   - current app version
+   - current server start time
+4. Keep the current full deploy path as the default safe path:
+   - `push main -> GitHub Actions -> update_from_github.sh`
+5. Add a separate fast deploy wrapper for dependency-unchanged releases:
+   - still performs git sync
+   - still performs service restart
+   - still performs health check
+   - still performs homepage marker verification
+   - skips Node/Python dependency installation and Python import verification by default
+6. Allow GitHub Actions manual dispatch to select `full` or `fast`, while normal `push main` keeps using `full`.
+7. Keep this round minimal and deployment-focused:
+   - no change to market-data formulas
+   - no change to scheduler business rules
+   - no change to module ordering or routing semantics
+
+Acceptance:
+- `/api/health` returns parseable version metadata from the running service.
+- Homepage visibly shows the currently deployed version instead of forcing the user to infer from behavior.
+- Repository contains a dedicated fast-deploy entry script for dependency-unchanged updates.
+- GitHub manual deploy can choose `fast` mode, while `push main` remains the safe full deploy path.
+- Fast deploy still fails loudly if health check or homepage marker verification fails.
+- The implementation remains limited to minimal front-end presentation changes.
+
+## 33. Phase AE: Governance Rollback + Config-driven Access Entry (2026-03-24)
+
+Goal: cancel the newly introduced `PROJECT_*` root-doc requirement and repair the homepage access entry so it no longer hardcodes `127.0.0.1:5000`.
+
+Plan:
+1. Keep this round minimal and split into one governance rollback plus one access-entry truthfulness repair.
+2. Governance rollback:
+   - remove the new `PROJECT_PLAN.md / PROJECT_REQUIREMENTS.md / PROJECT_TECH_STACK.md` requirement from `CONSTITUTION.md`
+   - keep the existing repository workflow gate centered on `refactor_docs/001-monitor-refactor/plan.md / REQUIREMENTS.md / SPEC.md`
+   - delete the temporary root-level `PROJECT_*` entry files added only for the now-cancelled rule
+3. Access-entry repair:
+   - update contracts first in `REQUIREMENTS.md` and `SPEC.md`
+   - stop hardcoding `http://127.0.0.1:5000` in the root `index.html`
+   - expose a lightweight runtime access-info API from the Node server
+   - let the root entry page render the real configured service/public URL at runtime when served by the app
+   - when `index.html` is opened directly as a local file, keep preview usable and degrade gracefully instead of pretending a fixed port is always correct
+4. Keep this round narrow:
+   - no market-data formula changes
+   - no scheduler behavior changes
+   - no module layout refactor
+
+Acceptance:
+- `CONSTITUTION.md` and `.specify/memory/constitution.md` no longer require `PROJECT_PLAN.md / PROJECT_REQUIREMENTS.md / PROJECT_TECH_STACK.md`.
+- The temporary root-level `PROJECT_*` files are removed from the active repository surface.
+- The root `index.html` no longer displays or links to a hardcoded `http://127.0.0.1:5000`.
+- The access entry page shows the real runtime service URL when opened through the running app.
+- Direct local-file preview still works and no longer claims a fixed service URL that may be false.

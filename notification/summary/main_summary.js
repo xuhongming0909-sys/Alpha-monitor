@@ -1,10 +1,9 @@
 "use strict";
 
 /**
- * main_summary推送服务。
- * 负责把各模块摘要拼装为 Markdown，并调用推送client发送。
+ * 定时摘要推送服务。
+ * 负责收集摘要数据、拼装 Markdown，并调用发送器发送。
  */
-
 function createMainSummaryService(options = {}) {
   const collectSummaryDatasets = options.collectSummaryDatasets;
   const buildSummaryMarkdown = options.buildSummaryMarkdown;
@@ -31,7 +30,7 @@ function createMainSummaryService(options = {}) {
     const normalizedModules = normalizePushConfig({ modules: input.modules || getPushConfig().modules }).modules;
     const hasSummaryModules = Object.entries(normalizedModules).some(([, enabled]) => Boolean(enabled));
     if (!hasSummaryModules) {
-      throw new Error("请至少选择一个推送板块");
+      throw new Error("请至少选择一个推送模块");
     }
 
     const summary = await pushSummaryToWeCom({ modules: normalizedModules });
@@ -40,7 +39,6 @@ function createMainSummaryService(options = {}) {
       modules: normalizedModules,
       summary,
       summarySent: Boolean(summary),
-      mergerSentCount: 0,
     };
   }
 
@@ -53,5 +51,3 @@ function createMainSummaryService(options = {}) {
 module.exports = {
   createMainSummaryService,
 };
-
-

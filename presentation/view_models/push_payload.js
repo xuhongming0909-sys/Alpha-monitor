@@ -9,20 +9,20 @@ function buildPushConfigResponse(config, runtimeState = {}, deliveryStatus = {})
   return {
     ...config,
     times: config?.times,
-    mergerSchedule: config?.mergerSchedule,
+    eventAlert: config?.eventAlert,
     lastMainPushDate: runtimeState?.lastMainPushDate || null,
-    lastMergerReportDate: runtimeState?.lastMergerReportDate || null,
     deliveryStatus: {
       webhookConfigured: Boolean(deliveryStatus?.webhookConfigured),
+      pushHtmlUrlConfigured: Boolean(deliveryStatus?.pushHtmlUrlConfigured),
       schedulerEnabled: deliveryStatus?.schedulerEnabled !== false,
       calendarMode: deliveryStatus?.calendarMode || null,
       selectedModules,
       lastMainPushAttemptAt: runtimeState?.lastMainPushAttemptAt || null,
       lastMainPushSuccessAt: runtimeState?.lastMainPushSuccessAt || null,
       lastMainPushError: runtimeState?.lastMainPushError || null,
-      lastMergerPushAttemptAt: runtimeState?.lastMergerPushAttemptAt || null,
-      lastMergerPushSuccessAt: runtimeState?.lastMergerPushSuccessAt || null,
-      lastMergerPushError: runtimeState?.lastMergerPushError || null,
+      lastEventAlertAttemptAt: runtimeState?.lastEventAlertAttemptAt || null,
+      lastEventAlertSuccessAt: runtimeState?.lastEventAlertSuccessAt || null,
+      lastEventAlertError: runtimeState?.lastEventAlertError || null,
     },
   };
 }

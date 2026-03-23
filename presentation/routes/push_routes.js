@@ -2,7 +2,7 @@
 
 /**
  * 推送接口路由。
- * 把配置读写和人工触发入口统一放到展示层 API，主入口只负责装配依赖。
+ * 统一承接推送配置读写、手工摘要推送和手工异动推送入口。
  */
 function registerPushRoutes(options = {}) {
   const {
@@ -14,7 +14,7 @@ function registerPushRoutes(options = {}) {
     buildPushConfigResponse,
     getPushRuntimeState,
     pushByModulesToWeCom,
-    pushMergerReportToWeCom,
+    pushEventAlertsToWeCom,
   } = options;
 
   app.get("/api/push/config", (_req, res) => {
@@ -40,10 +40,10 @@ function registerPushRoutes(options = {}) {
     }
   });
 
-  app.post("/api/push/wecom/merger-report", async (req, res) => {
+  app.post("/api/push/wecom/event-alerts", async (req, res) => {
     try {
       const force = Boolean(req.body && typeof req.body === "object" && req.body.force);
-      return sendSuccess(res, await pushMergerReportToWeCom({ force }));
+      return sendSuccess(res, await pushEventAlertsToWeCom({ force }));
     } catch (error) {
       return sendError(res, error, 500, null);
     }
@@ -53,4 +53,3 @@ function registerPushRoutes(options = {}) {
 module.exports = {
   registerPushRoutes,
 };
-

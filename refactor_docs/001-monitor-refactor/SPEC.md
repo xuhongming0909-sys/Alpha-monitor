@@ -1251,7 +1251,7 @@ GitHub 自动部署正式链路固定为：
     - `ak.stock_financial_abstract_ths(symbol=code, indicator="按报告期")`
     - `ak.stock_financial_abstract(symbol=code)`
 
-## 22. Constitution Sync Guardrail Spec (2026-03-23)
+## 22A. Constitution Sync Guardrail Spec (2026-03-23)
 
 ### 22.1 Scope
 - This round adds only a governance guardrail and does not change business API behavior.
@@ -1279,6 +1279,49 @@ GitHub 自动部署正式链路固定为：
 ### 22.4 Success behavior
 - On success, the checker prints a concise confirmation that the two constitution files are synchronized.
 - The checker performs no file mutation, network access, or side effects beyond stdout/stderr output and exit code.
+
+### 22.5 Governance rollback note (2026-03-24)
+- This guardrail continues to protect only:
+  - `CONSTITUTION.md`
+  - `.specify/memory/constitution.md`
+- The previously added root-level `PROJECT_PLAN.md / PROJECT_REQUIREMENTS.md / PROJECT_TECH_STACK.md` requirement is cancelled in this round.
+- No checker logic should be expanded to require those files.
+
+## 22B. Access Entry Runtime Spec (2026-03-24)
+
+### 23.1 Scope
+- This round repairs only the root access-entry truthfulness problem.
+- No dashboard business dataset, scheduler logic, or market calculation changes are included.
+
+### 23.2 Runtime access-info API
+- Node service must expose a lightweight read-only access-info endpoint.
+- Response payload must include at least:
+  - `serverBaseUrl`
+  - `publicBaseUrl`
+  - `publicHealthUrl`
+  - `environment`
+- Values come from the same runtime config already resolved by the server:
+  - `config.yaml > app.server_base_url`
+  - `config.yaml > deployment.public_base_url`
+  - derived health URL
+
+### 23.3 Root entry page behavior
+- `index.html` must not hardcode `http://127.0.0.1:5000` in visible text, primary action links, or health probes.
+- When the page is served by the running app:
+  - it fetches the access-info endpoint from the same origin
+  - it renders the returned URLs into the page
+  - it uses the returned service URL for the primary open-service action
+- When the page is opened as a local file:
+  - it keeps local template preview available
+  - it does not claim a fixed service URL
+  - health probing may be skipped or degrade silently instead of forcing a false fixed-port assumption
+
+### 23.4 Safety boundary
+- This round must not change:
+  - `presentation/templates/dashboard_template.html`
+  - dashboard data-fetch behavior
+  - scheduler config or push behavior
+  - market API payload semantics
 
 ## 23. LOF Arbitrage Zero-login Spec (2026-03-23)
 
@@ -1722,3 +1765,280 @@ GitHub 自动部署正式链路固定为：
   - `merger`
 - Unknown former LOF route access must fall back to the project's normal API 404 behavior.
 - No active code path may still request, preload, or dispatch LOF data.
+
+## 27. Repository-local mini-SWE-agent Integration Spec (2026-03-24)
+
+### 27.1 Scope
+- This round adds only a local development helper for `mini-SWE-agent`.
+- No dashboard route, runtime preload, scheduler path, deployment path, or market-data contract changes in this round.
+
+### 27.2 Local command contract
+- `package.json` must expose a stable local command entry:
+  - `npm run agent:mini:task`
+- The command must execute a repository-owned script under `tools/`.
+- The command is a text-generation helper only:
+  - it may print a ready-to-use task prompt
+  - it may optionally write that prompt to a local file
+  - it must not directly launch `mini-SWE-agent`
+
+### 27.3 Prompt-generation contract
+- The helper output must always include:
+  - read `CONSTITUTION.md` first
+  - stop and update `plan.md` / `REQUIREMENTS.md` / `SPEC.md` before coding if behavior, config, API, deployment, or contract meaning changes
+  - respect `data_fetch / strategy / presentation / notification / shared` boundaries
+  - avoid fake data
+  - prefer minimal changes
+- The helper output must include a `Task:` section populated from caller input.
+- The helper output must include a `Validation:` section.
+- Default validation commands must include:
+  - `npm run check`
+  - `npm run check:boundaries`
+- The helper may allow additional validation commands to be appended from CLI arguments.
+
+### 27.4 Scope-hint contract
+- The helper must support a caller-provided scope hint.
+- Supported scope hints in this round must include at least:
+  - `presentation`
+  - `data_fetch`
+  - `strategy`
+  - `notification`
+  - `shared`
+  - `docs`
+  - `full_repo`
+- When a narrow scope is chosen, the generated prompt must explicitly say which directories should not be modified unless the agent first stops for approval/doc updates.
+
+### 27.5 Documentation contract
+- The repository must include a local usage guide for `mini-SWE-agent`.
+- The guide must cover at least:
+  - installation steps
+  - how to generate a task prompt with `npm run agent:mini:task -- ...`
+  - recommended `confirm` mode
+  - example task-generation commands for common repository scopes
+  - a recommended collaboration split where Codex handles planning/contracts/review and `mini-SWE-agent` handles narrow implementation tasks
+
+### 27.6 Safety boundary
+- The helper script must not read or mutate runtime data as part of prompt generation.
+- The helper script must not require network access.
+- The helper script must not auto-discover server secrets or deployment credentials.
+- The helper script must stay deterministic for the same CLI inputs.
+
+## 28. Push Summary + Event-alert Refactor Spec (2026-03-24)
+
+### 28.1 Scope
+- This round changes active push behavior, push settings UI, and push runtime state.
+- This round does not remove the event-arbitrage page itself.
+- This round removes merger-report push scheduling from the active push surface only.
+
+### 28.2 Push settings contract
+- Dashboard push settings keep only:
+  - `push-time-1`
+  - `push-time-2`
+  - `push-alert-cooldown`
+- The old third merger-report input is removed.
+- Save payload contract:
+  - `times`: exactly two normalized `HH:MM` values
+  - `eventAlert.cooldownMinutes`: positive integer
+- Response payload contract:
+  - `times`
+  - `eventAlert.enabled`
+  - `eventAlert.cooldownMinutes`
+  - `eventAlert.convertibleBond.convertPremiumLt`
+  - `deliveryStatus.lastMainPushAttemptAt`
+  - `deliveryStatus.lastMainPushSuccessAt`
+  - `deliveryStatus.lastMainPushError`
+  - `deliveryStatus.lastEventAlertAttemptAt`
+  - `deliveryStatus.lastEventAlertSuccessAt`
+  - `deliveryStatus.lastEventAlertError`
+  - `deliveryStatus.pushHtmlUrlConfigured`
+- The active response contract must not include merger-report schedule or merger-report delivery fields.
+
+### 28.3 Summary push content rule
+- Summary push remains Markdown for enterprise-wecom.
+- The summary template and event-alert template must be separated.
+- Summary modules for this round:
+  - `AH / AB`
+  - `可转债`
+  - `打新`
+  - `分红`
+  - `自定义监控`
+  - `昨日新增事件套利`
+- `自定义监控` stays full-volume.
+- Each summary item should prefer scanable compact output such as:
+  - `代码 | 关键价格 | 核心指标 | 触发原因`
+- Summary must not degrade into a large dense free-text paragraph block.
+
+### 28.4 Convertible-bond alert rule
+- A new event-alert path is added for convertible bonds only in this round.
+- Candidate rows come from sanitized public convertible-bond arbitrage rows.
+- Trigger rule:
+  - `premiumRate < convertPremiumLt`
+- Default threshold:
+  - `convertPremiumLt = -3`
+- Alert payload row must include at least:
+  - bond name / code
+  - bond price
+  - stock name / code
+  - stock change percent
+  - convert value
+  - premium rate
+  - trigger time
+- Alert title is fixed to `可转债异动提醒`.
+- Alert content must include only the triggered rows and must not append the full summary content.
+
+### 28.5 Cooldown and runtime-state rule
+- Cooldown is tracked per bond + rule key.
+- Default cooldown is `30` minutes and remains user-editable from the dashboard.
+- Runtime state must track at least:
+  - `lastEventAlertAttemptAt`
+  - `lastEventAlertSuccessAt`
+  - `lastEventAlertError`
+  - per-item alert send timestamps for cooldown judgment
+- Failed sends must not advance cooldown records.
+
+### 28.6 Event-arbitrage next-day summary rule
+- The system must track newly discovered event-arbitrage rows in push runtime state.
+- On first initialization with no historical seen-map, the current live set is seeded silently and must not be treated as a new-item burst.
+- Rows first discovered on day `D` may appear in the summary push on day `D+1`.
+- This round does not send same-day event-arbitrage alert pushes.
+- The concise event-arbitrage summary item should include:
+  - name / symbol
+  - event type
+  - event stage or spread text when available
+
+### 28.7 Config rule
+- `config.yaml` active notification config must include:
+  - `notification.summary`
+  - `notification.event_alert`
+- `notification.scheduler.merger_schedule` is removed from the active push config contract.
+- `notification.enabled_modules.merger` is removed from the active summary-push module contract.
+- `notification.wecom.push_html_url` remains part of the active config contract and should be backed by a real public URL in deployed runtime.
+
+## 28. Dashboard UI Density And Hierarchy Spec (2026-03-24)
+
+### 28.1 Scope
+- This round changes only dashboard presentation behavior.
+- No market-data schema, route path, sort rule, pagination size, push-config semantics, or monitor formula changes are allowed.
+- Primary write scope is limited to:
+  - `presentation/templates/dashboard_template.html`
+  - `presentation/dashboard/dashboard_page.js`
+
+### 28.2 Global layout rule
+- Homepage structure remains:
+  1. hero
+  2. subscription section
+  3. root tab navigation
+  4. active module panel
+  5. push strip
+- The visual hierarchy must be tightened by reducing unnecessary vertical height in:
+  - hero
+  - section wrappers
+  - cards
+  - summary blocks
+  - pagination / empty states
+- The page keeps the existing dark-red design language and may refine contrast and spacing, but must not switch to a new visual system.
+
+### 28.3 Toolbar and metadata rule
+- Module toolbars must continue to expose current metadata, but with clearer scan order:
+  - module title
+  - key counts
+  - update time
+  - freshness/cache state
+  - primary action when applicable
+- Metadata emphasis may be changed through layout and typography only; wording and truthfulness must remain intact.
+
+### 28.4 Summary-area rule
+- Convertible-bond and premium summary areas remain visible, but become more compact.
+- Summary rendering may tighten:
+  - card padding
+  - row spacing
+  - title/subtitle spacing
+  - value emphasis
+- Summary content count stays aligned with current logic:
+  - convertible-bond keeps three summary groups
+  - AH / AB keep top-three and bottom-three groups
+- Summary optimization must help the main tables enter the viewport earlier on desktop.
+
+### 28.5 Shared component density rule
+- Shared presentation elements may be compacted uniformly, including:
+  - button height
+  - input height
+  - tab height
+  - subtab height
+  - table-wrapper padding perception
+  - empty/loading-state minimum height
+  - pagination spacing
+- Shared density changes must preserve readability and clickability.
+
+### 28.6 Responsive rule
+- Existing breakpoints remain valid.
+- Desktop prioritizes information density and hierarchy.
+- Tablet/mobile keep the same responsive logic and may only receive proportional spacing compression.
+- No new mobile-only card-table rewrite is allowed in this round.
+
+### 28.7 Annotation rule
+- Core layout changes and key style adjustments must keep concise Chinese comments in the implementation to explain intent and boundary.
+
+## 29. Release-path Visibility And Fast Deploy Spec (2026-03-24)
+
+### 29.1 `/api/health` version contract
+- `GET /api/health` keeps the existing liveness payload and additionally returns:
+  - `version.appVersion`
+  - `version.gitSha`
+  - `version.gitShortSha`
+  - `version.gitBranch`
+  - `version.gitCommitTime`
+  - `version.startedAt`
+  - `version.source`
+- `version.source` is fixed to one of:
+  - `git`
+  - `env`
+  - `package_only`
+- `startedAt` is the current Node service process start time in ISO format.
+- Version metadata resolution must be best-effort:
+  - prefer explicit env override if present
+  - otherwise read the current git checkout
+  - otherwise fall back to package version only
+- Health endpoint failure is forbidden just because git metadata lookup is unavailable.
+
+### 29.2 Homepage version rendering rule
+- The dashboard frontend may read version metadata from `GET /api/health`.
+- Homepage hero must render a visible version text area that shows at least:
+  - git short SHA when available
+  - branch when available
+  - app version
+  - started-at time
+- If version metadata is temporarily unavailable, the page must render an explicit fallback such as `版本信息暂未返回`.
+- This version area is informational only and must not block the rest of the dashboard render.
+
+### 29.3 Fast deploy wrapper contract
+- New server-side wrapper script:
+  - `tools/deploy/update_fast.sh`
+- `update_fast.sh` must delegate to `tools/deploy/update_from_github.sh` instead of duplicating deploy logic.
+- `update_fast.sh` must set the existing deploy script into a dependency-skip mode by default:
+  - `INSTALL_NODE_MODULES=0`
+  - `INSTALL_PYTHON_REQUIREMENTS=0`
+  - `VERIFY_PYTHON_IMPORTS=0`
+- `update_fast.sh` must preserve the following checks from the full deploy path:
+  - config syntax validation
+  - git sync
+  - service stop/restart
+  - `/api/health` readiness check
+  - homepage marker verification
+
+### 29.4 Full deploy script extension
+- `tools/deploy/update_from_github.sh` must support a new env flag:
+  - `INSTALL_NODE_MODULES`
+- `INSTALL_NODE_MODULES=1` keeps the current Node dependency install behavior.
+- `INSTALL_NODE_MODULES=0` skips `npm ci` / `npm install` and logs that the step was intentionally skipped.
+- Existing full deploy defaults remain unchanged.
+
+### 29.5 GitHub Actions dispatch rule
+- `.github/workflows/deploy.yml` keeps:
+  - `push main` automatic deploy
+  - `workflow_dispatch` manual deploy
+- Manual dispatch adds `deploy_mode` with allowed values:
+  - `full`
+  - `fast`
+- `push main` must continue using `full`.
+- Manual `fast` deploy must execute `tools/deploy/update_fast.sh`.
+- Manual `full` deploy and push-triggered deploy must execute `tools/deploy/update_from_github.sh`.

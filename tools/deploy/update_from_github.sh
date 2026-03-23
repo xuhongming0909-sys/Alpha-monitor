@@ -23,6 +23,7 @@ FORCE_RELEASE_APP_PORT="${FORCE_RELEASE_APP_PORT:-1}"
 VERIFY_HOMEPAGE_MARKER="${VERIFY_HOMEPAGE_MARKER:-1}"
 EXPECTED_HOME_MARKER="${EXPECTED_HOME_MARKER:-dashboard_page.js}"
 FORBIDDEN_HOME_MARKERS="${FORBIDDEN_HOME_MARKERS:-app.js|message-form}"
+INSTALL_NODE_MODULES="${INSTALL_NODE_MODULES:-1}"
 INSTALL_PYTHON_REQUIREMENTS="${INSTALL_PYTHON_REQUIREMENTS:-1}"
 VERIFY_PYTHON_IMPORTS="${VERIFY_PYTHON_IMPORTS:-1}"
 PYTHON_BIN_CANDIDATES="${PYTHON_BIN_CANDIDATES:-python3 python}"
@@ -521,6 +522,7 @@ if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
       GIT_RETRY_DELAY_SECONDS="$GIT_RETRY_DELAY_SECONDS" \
       SERVICE_RETRY_COUNT="$SERVICE_RETRY_COUNT" \
       SERVICE_RETRY_DELAY_SECONDS="$SERVICE_RETRY_DELAY_SECONDS" \
+      INSTALL_NODE_MODULES="$INSTALL_NODE_MODULES" \
       INSTALL_PYTHON_REQUIREMENTS="$INSTALL_PYTHON_REQUIREMENTS" \
       VERIFY_PYTHON_IMPORTS="$VERIFY_PYTHON_IMPORTS" \
       PYTHON_BIN_CANDIDATES="$PYTHON_BIN_CANDIDATES" \
@@ -544,12 +546,16 @@ else
   warn "python runtime not found in candidates: ${PYTHON_BIN_CANDIDATES}"
 fi
 
-if [[ -f package-lock.json ]]; then
-  log "installing Node dependencies with npm ci"
-  npm ci
+if [[ "$INSTALL_NODE_MODULES" == "1" ]]; then
+  if [[ -f package-lock.json ]]; then
+    log "installing Node dependencies with npm ci"
+    npm ci
+  else
+    log "package-lock.json not found, using npm install"
+    npm install
+  fi
 else
-  log "package-lock.json not found, using npm install"
-  npm install
+  log "skip Node dependency install because INSTALL_NODE_MODULES=${INSTALL_NODE_MODULES}"
 fi
 
 install_python_requirements "$PYTHON_BIN"

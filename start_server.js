@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const { promisify } = require('util');
 const { getConfig, loadEnvFile } = require('./shared/config/node_config');
 const { getPathPolicy, ensureDir } = require('./shared/paths/node_paths');
@@ -20,14 +20,19 @@ const { createPushConfigStore } = require('./notification/scheduler/push_config_
 const { createPushRuntimeStore } = require('./notification/scheduler/push_runtime_store');
 const { createWeComClient } = require('./notification/wecom/client');
 const { buildSummaryMarkdown: buildNotificationSummaryMarkdown } = require('./notification/styles/markdown_style');
+const { buildConvertibleBondAlertMarkdown } = require('./notification/styles/event_alert_markdown');
 const { createMainSummaryService } = require('./notification/summary/main_summary');
+const { createEventAlertService } = require('./notification/alerts/event_alert_service');
 const { createMergerReportService } = require('./notification/merger_report/service');
 const { createWeComScheduler } = require('./notification/scheduler/wecom_scheduler');
 const {
   sanitizeSubscriptionRows: strategySanitizeSubscriptionRows,
   sanitizeSubscriptionResult: strategySanitizeSubscriptionResult,
 } = require('./strategy/subscription/service');
-const { sanitizeCbArbRows: strategySanitizeCbArbRows } = require('./strategy/convertible_bond/service');
+const {
+  sanitizeCbArbRows: strategySanitizeCbArbRows,
+  buildConvertibleBondAlertCandidates: strategyBuildConvertibleBondAlertCandidates,
+} = require('./strategy/convertible_bond/service');
 const {
   round: monitorRound,
   toFiniteNumber: monitorToFiniteNumber,
@@ -52,6 +57,7 @@ const { registerDashboardRoutes } = require('./presentation/routes/dashboard_rou
 const ROOT = __dirname;
 loadEnvFile();
 const PYTHON_PATH_SEPARATOR = process.platform === 'win32' ? ';' : ':';
+const PACKAGE_JSON_PATH = path.resolve(ROOT, 'package.json');
 
 const APP_CONFIG = getConfig();
 const PATH_POLICY = getPathPolicy();
@@ -135,6 +141,7 @@ function buildNotificationModuleDefaults() {
     cbArb: raw.cb_arb !== false,
     monitor: raw.custom_monitor !== false,
     dividend: raw.dividend !== false,
+    eventArb: raw.event_arbitrage !== false,
   };
 }
 
@@ -183,22 +190,27 @@ const DEFAULT_MAIN_PUSH_TIMES = normalizeTimeListConfig(
   NOTIFICATION_CONFIG?.scheduler?.default_times,
   DEFAULT_MAIN_PUSH_TIME
 );
+const NOTIFICATION_SUMMARY_CONFIG = (NOTIFICATION_CONFIG?.summary && typeof NOTIFICATION_CONFIG.summary === 'object')
+  ? NOTIFICATION_CONFIG.summary
+  : {};
 const PUSH_CALENDAR_MODE = String(
   NOTIFICATION_CONFIG?.scheduler?.calendar_mode || 'daily'
 ).trim().toLowerCase() || 'daily';
 const DEFAULT_NOTIFICATION_MODULES = buildNotificationModuleDefaults();
-const DEFAULT_MERGER_PUSH_TIME = normalizeTimeConfig(
-  NOTIFICATION_CONFIG?.scheduler?.merger_schedule?.default_time,
-  DEFAULT_MAIN_PUSH_TIME
-);
+const EVENT_ALERT_CONFIG = (NOTIFICATION_CONFIG?.event_alert && typeof NOTIFICATION_CONFIG.event_alert === 'object')
+  ? NOTIFICATION_CONFIG.event_alert
+  : {};
 const DEFAULT_PUSH_CONFIG = {
   enabled: Boolean(NOTIFICATION_CONFIG?.scheduler?.enabled),
   time: DEFAULT_MAIN_PUSH_TIMES[0],
-  times: DEFAULT_MAIN_PUSH_TIMES,
+  times: DEFAULT_MAIN_PUSH_TIMES.slice(0, 2),
   modules: DEFAULT_NOTIFICATION_MODULES,
-  mergerSchedule: {
-    enabled: Boolean(NOTIFICATION_CONFIG?.scheduler?.merger_schedule?.enabled),
-    time: DEFAULT_MERGER_PUSH_TIME,
+  eventAlert: {
+    enabled: EVENT_ALERT_CONFIG.enabled !== false,
+    cooldownMinutes: toIntConfig(EVENT_ALERT_CONFIG.cooldown_minutes, 30),
+    convertibleBond: {
+      convertPremiumLt: Number(EVENT_ALERT_CONFIG?.convertible_bond?.convert_premium_lt ?? -3),
+    },
   },
 };
 
@@ -224,6 +236,65 @@ function buildDashboardTableUiConfig(config = {}) {
 }
 
 const DASHBOARD_TABLE_UI = buildDashboardTableUiConfig(PRESENTATION_DASHBOARD_TABLE_UI_CONFIG);
+const PROCESS_STARTED_AT = sharedNowIso();
+const APP_PACKAGE_VERSION = (() => {
+  try {
+    const raw = fs.readFileSync(PACKAGE_JSON_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    return String(parsed?.version || '0.0.0').trim() || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
+
+function safeExecTrim(command) {
+  try {
+    return execSync(command, {
+      cwd: ROOT,
+      stdio: ['ignore', 'pipe', 'ignore'],
+      encoding: 'utf8',
+    }).trim();
+  } catch {
+    return '';
+  }
+}
+
+function resolveRuntimeVersionMetadata() {
+  const envGitSha = String(process.env.APP_GIT_SHA || '').trim();
+  const envGitShortSha = String(process.env.APP_GIT_SHORT_SHA || '').trim();
+  const envGitBranch = String(process.env.APP_GIT_BRANCH || '').trim();
+  const envGitCommitTime = String(process.env.APP_GIT_COMMIT_TIME || '').trim();
+
+  if (envGitSha || envGitShortSha || envGitBranch || envGitCommitTime) {
+    return {
+      appVersion: APP_PACKAGE_VERSION,
+      gitSha: envGitSha || null,
+      gitShortSha: envGitShortSha || (envGitSha ? envGitSha.slice(0, 7) : null),
+      gitBranch: envGitBranch || null,
+      gitCommitTime: envGitCommitTime || null,
+      startedAt: PROCESS_STARTED_AT,
+      source: 'env',
+    };
+  }
+
+  const gitSha = safeExecTrim('git rev-parse HEAD');
+  const gitShortSha = safeExecTrim('git rev-parse --short HEAD') || (gitSha ? gitSha.slice(0, 7) : '');
+  const gitBranch = safeExecTrim('git rev-parse --abbrev-ref HEAD');
+  const gitCommitTime = safeExecTrim('git log -1 --format=%cI');
+  const hasGitMetadata = Boolean(gitSha || gitShortSha || gitBranch || gitCommitTime);
+
+  return {
+    appVersion: APP_PACKAGE_VERSION,
+    gitSha: gitSha || null,
+    gitShortSha: gitShortSha || null,
+    gitBranch: gitBranch || null,
+    gitCommitTime: gitCommitTime || null,
+    startedAt: PROCESS_STARTED_AT,
+    source: hasGitMetadata ? 'git' : 'package_only',
+  };
+}
+
+const RUNTIME_VERSION = resolveRuntimeVersionMetadata();
 
 function readJson(filePath, fallbackValue) {
   return sharedReadJson(filePath, fallbackValue);
@@ -441,15 +512,16 @@ const stateStore = STATE_REGISTRY.read('market_refresh_state', 'market_refresh_s
 const pushConfigStore = STATE_REGISTRY.read('push_config', 'push_config.json', JSON.parse(JSON.stringify(DEFAULT_PUSH_CONFIG)));
 const pushRuntimeState = STATE_REGISTRY.read('push_runtime_state', 'push_runtime_state.json', {
   lastMainPushDate: null,
-  lastMergerReportDate: null,
   lastMainPushAttemptAt: null,
   lastMainPushSuccessAt: null,
   lastMainPushError: null,
-  lastMergerPushAttemptAt: null,
-  lastMergerPushSuccessAt: null,
-  lastMergerPushError: null,
+  lastEventAlertAttemptAt: null,
+  lastEventAlertSuccessAt: null,
+  lastEventAlertError: null,
   mainPushRecords: {},
-  mergerPushRecords: {},
+  eventAlertRecords: {},
+  eventArbSeenItems: {},
+  eventArbDailyNewItems: {},
 });
 const mergerReportStore = STATE_REGISTRY.read('merger_company_reports', 'merger_company_reports.json', { reports: {} });
 const refreshLocks = new Map();
@@ -514,6 +586,7 @@ const runtimeHealth = {
     reverseProxyType: REVERSE_PROXY_TYPE,
     systemdServiceName: SYSTEMD_SERVICE_NAME,
     indexFile: INDEX_FILE,
+    version: RUNTIME_VERSION,
   }),
   data_jobs: createHealthSection('starting', 'Background data jobs have not run yet'),
   push_scheduler: createHealthSection('starting', 'Push scheduler has not run yet'),
@@ -589,6 +662,7 @@ function buildHealthSnapshot() {
       enabled: REVERSE_PROXY_ENABLED,
       type: REVERSE_PROXY_TYPE,
     },
+    version: cloneJsonSafe(RUNTIME_VERSION, {}),
     pid: process.pid,
     sections,
   };
@@ -686,6 +760,7 @@ const pushRuntimeDomain = createPushRuntimeStore({
   state: pushRuntimeState,
   save: savePushRuntimeState,
   parsePushMinutes: (value) => pushConfigDomain.parsePushMinutes(value),
+  nowIso,
 });
 const weComClient = createWeComClient({
   webhookUrl: WECOM_WEBHOOK_URL,
@@ -699,6 +774,15 @@ const mainSummaryService = createMainSummaryService({
   sendMarkdown: (markdown) => weComClient.sendMarkdown(markdown),
   getPushConfig,
   normalizePushConfig,
+  nowIso,
+});
+const eventAlertService = createEventAlertService({
+  collectAlertDatasets,
+  buildConvertibleBondAlertCandidates,
+  buildConvertibleBondAlertMarkdown,
+  sendMarkdown: (markdown) => weComClient.sendMarkdown(markdown),
+  getPushConfig,
+  runtimeStore: pushRuntimeDomain,
   nowIso,
 });
 const mergerReportService = createMergerReportService({
@@ -723,12 +807,12 @@ const weComScheduler = createWeComScheduler({
   getPushConfig,
   runtimeStore: pushRuntimeDomain,
   pushByModulesToWeCom,
-  pushMergerReportToWeCom,
+  pushEventAlertsToWeCom,
+  syncEventArbSummaryState,
   getShanghaiParts,
   parsePushMinutes: (value) => pushConfigDomain.parsePushMinutes(value),
   calendarMode: PUSH_CALENDAR_MODE,
   isTradingSession,
-  defaultMergerSchedule: DEFAULT_PUSH_CONFIG.mergerSchedule,
   nowIso,
   logError: (scope, error) => console.error(scope, error?.message || error),
 });
@@ -736,6 +820,7 @@ const weComScheduler = createWeComScheduler({
 function getPushDeliveryStatus() {
   return {
     webhookConfigured: Boolean(WECOM_WEBHOOK_URL),
+    pushHtmlUrlConfigured: Boolean(PUSH_HTML_URL),
     schedulerEnabled: Boolean(NOTIFICATION_CONFIG?.scheduler?.enabled),
     calendarMode: PUSH_CALENDAR_MODE,
   };
@@ -1140,8 +1225,7 @@ async function runPushSchedulerCycle(context = 'tick') {
   const details = { context };
 
   try {
-    await runMainPushIfNeeded();
-    await runMergerPushIfNeeded();
+    await weComScheduler.runTick();
     updateHealthSection('push_scheduler', 'ok', 'Push scheduler is healthy', details);
   } catch (error) {
     updateHealthSection('push_scheduler', 'warn', `Push scheduler degraded: ${error?.message || error}`, {
@@ -1787,6 +1871,15 @@ function buildWeComSummaryMarkdown(input, modules) {
     generatedAtText: new Date().toLocaleString('zh-CN', { hour12: false }),
     todayText: getShanghaiParts().date,
     todayDividendRecord: upcomingDividends(1),
+    summaryConfig: {
+      ahTopN: toIntConfig(NOTIFICATION_SUMMARY_CONFIG.ah_top_n, 2),
+      abTopN: toIntConfig(NOTIFICATION_SUMMARY_CONFIG.ab_top_n, 2),
+      cbTopN: toIntConfig(NOTIFICATION_SUMMARY_CONFIG.cb_top_n, 4),
+      eventArbitrageTopN: toIntConfig(NOTIFICATION_SUMMARY_CONFIG.event_arbitrage_top_n, 6),
+    },
+    cbPushCategories: Array.isArray(STRATEGY_CONFIG?.convertible_bond?.push_categories)
+      ? STRATEGY_CONFIG.convertible_bond.push_categories
+      : [],
   });
 }
 
@@ -1794,17 +1887,56 @@ async function sendWeComMarkdown(markdown) {
   return weComClient.sendMarkdown(markdown);
 }
 
+function buildConvertibleBondAlertCandidates(rows, options = {}) {
+  return strategyBuildConvertibleBondAlertCandidates(rows, options);
+}
+
+function shiftShanghaiDate(dateText, days) {
+  const base = Date.parse(`${normalizeDateText(dateText)}T00:00:00+08:00`);
+  if (!Number.isFinite(base)) return '';
+  return new Date(base + (days * 24 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+}
+
+function flattenEventArbRows(payload) {
+  const root = payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+  const categories = root?.categories && typeof root.categories === 'object' ? root.categories : {};
+  return Object.values(categories).flatMap((items) => Array.isArray(items) ? items : []);
+}
+
+async function syncEventArbSummaryState() {
+  const payload = await getDataset('eventArb');
+  const rows = flattenEventArbRows(payload);
+  const result = pushRuntimeDomain.syncEventArbSeenItems(rows, getShanghaiParts().date);
+  if (result.seeded || result.newItems.length) {
+    pushRuntimeDomain.save();
+  }
+  return result;
+}
+
 async function collectSummaryDatasets() {
-  const [ah, ab, ipo, bonds, cbArb, merger, monitors] = await Promise.all([
+  const [ah, ab, ipo, bonds, cbArb, monitors] = await Promise.all([
     getDataset('ah'),
     getDataset('ab'),
     getDataset('ipo'),
     getDataset('bonds'),
     getDataset('cbArb'),
-    getDataset('merger'),
     getAllMonitors(),
   ]);
-  return { ah, ab, ipo, bonds, cbArb, merger, monitors };
+  const yesterday = shiftShanghaiDate(getShanghaiParts().date, -1);
+  return {
+    ah,
+    ab,
+    ipo,
+    bonds,
+    cbArb,
+    monitors,
+    eventArbNextDaySummary: pushRuntimeDomain.getEventArbDailyNewItems(yesterday),
+  };
+}
+
+async function collectAlertDatasets() {
+  const cbArb = await getDataset('cbArb');
+  return { cbArb };
 }
 
 async function pushSummaryToWeCom(options = {}) {
@@ -1821,6 +1953,10 @@ function getPushRecord(recordType, date) {
 
 function setPushRecord(recordType, date, times) {
   return pushRuntimeDomain.setPushRecord(recordType, date, times);
+}
+
+async function pushEventAlertsToWeCom(options = {}) {
+  return eventAlertService.pushConvertibleBondAlerts(options);
 }
 
 async function callDeepSeekChatCompletion({ systemPrompt, userPrompt, temperature = 0.2 }) {
@@ -1926,29 +2062,12 @@ async function ensureMergerCompanyReport({ date, code, name, force = false }) {
   return mergerReportService.ensureMergerCompanyReport({ date, code, name, force });
 }
 
-async function pushMergerReportsByCompanyToWeCom(options = {}) {
-  return mergerReportService.pushMergerReportsByCompanyToWeCom(options);
-}
-
-async function pushMergerReportToWeCom(options = {}) {
-  const result = await mergerReportService.pushMergerReportsByCompanyToWeCom(options);
-  if (result.sentCount > 0) {
-    pushRuntimeDomain.setLastMergerReportDate(result.date);
-    pushRuntimeDomain.save();
-  }
-  return result;
-}
-
 async function pushByModulesToWeCom(options = {}) {
   return mainSummaryService.pushByModulesToWeCom(options);
 }
 
 async function runMainPushIfNeeded() {
   return weComScheduler.runMainPushIfNeeded();
-}
-
-async function runMergerPushIfNeeded() {
-  return weComScheduler.runMergerPushIfNeeded();
 }
 
 function normalizeError(error) {
@@ -2026,7 +2145,7 @@ registerPushRoutes({
   buildPushConfigResponse: buildPushConfigViewModel,
   getPushRuntimeState: () => pushRuntimeState,
   pushByModulesToWeCom,
-  pushMergerReportToWeCom,
+  pushEventAlertsToWeCom,
 });
 
 registerDashboardRoutes({
@@ -2043,6 +2162,12 @@ registerDashboardRoutes({
       tabletFontPx: DASHBOARD_TABLE_UI.tabletFontPx,
       minWidthByKind: { ...DASHBOARD_TABLE_UI.minWidthByKind },
     },
+  }),
+  getAccessInfo: () => ({
+    serverBaseUrl: SERVER_BASE_URL,
+    publicBaseUrl: PUBLIC_BASE_URL,
+    publicHealthUrl: PUBLIC_HEALTHCHECK_URL,
+    environment: APP_ENVIRONMENT,
   }),
   getShanghaiParts,
   normalizeDateText,
@@ -2103,6 +2228,7 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`Alpha Monitor internal URL: ${SERVER_BASE_URL}`);
   console.log(`Alpha Monitor public URL : ${PUBLIC_BASE_URL}`);
   console.log(`Alpha Monitor health URL : ${PUBLIC_HEALTHCHECK_URL}`);
+  console.log(`Alpha Monitor version    : ${RUNTIME_VERSION.gitShortSha || APP_PACKAGE_VERSION}`);
   startScheduler();
 });
 

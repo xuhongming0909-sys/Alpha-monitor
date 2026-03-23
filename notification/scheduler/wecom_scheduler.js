@@ -1,22 +1,21 @@
 "use strict";
 
 /**
- * wecom定时调度器。
- * 负责读取推送配置、查询已发送记录，并在达到时间点时触发推送。
+ * 企业微信定时调度器。
+ * 负责读取推送配置，在固定时间发送摘要，并在每次 tick 中检查异动提醒。
  */
-
 function createWeComScheduler(options = {}) {
   const getPushConfig = options.getPushConfig;
   const runtimeStore = options.runtimeStore;
   const pushByModulesToWeCom = options.pushByModulesToWeCom;
-  const pushMergerReportToWeCom = options.pushMergerReportToWeCom;
+  const pushEventAlertsToWeCom = options.pushEventAlertsToWeCom;
+  const syncEventArbSummaryState = options.syncEventArbSummaryState;
   const getShanghaiParts = options.getShanghaiParts;
   const parsePushMinutes = options.parsePushMinutes;
   const calendarMode = String(options.calendarMode || "daily").trim().toLowerCase();
   const isTradingSession = typeof options.isTradingSession === "function"
     ? options.isTradingSession
     : () => true;
-  const defaultMergerSchedule = options.defaultMergerSchedule || { enabled: false, time: "08:00" };
   const logError = options.logError || ((scope, error) => console.error(scope, error));
   const nowIso = typeof options.nowIso === "function"
     ? options.nowIso
@@ -64,51 +63,41 @@ function createWeComScheduler(options = {}) {
         runtimeStore.setPushError("main", error?.message || error);
         runtimeStore.save();
         logError("[push] main schedule failed:", error?.message || error);
-        continue;
       }
     }
 
     if (updated) runtimeStore.save();
   }
 
-  async function runMergerPushIfNeeded() {
-    const config = getPushConfig();
-    const mergerConfig = config.mergerSchedule || defaultMergerSchedule;
-    if (!mergerConfig.enabled) return;
-
+  async function runEventAlertsIfNeeded() {
     const sh = getShanghaiParts();
     if (!shouldRunToday(sh)) return;
-    const targetMinutes = parsePushMinutes(mergerConfig.time);
-    if (targetMinutes === null) return;
-    const nowMinutes = sh.hour * 60 + sh.minute;
-    if (nowMinutes < targetMinutes) return;
-
-    const sentTimes = runtimeStore.getPushRecord("merger", sh.date);
-    if (sentTimes.includes(mergerConfig.time)) return;
-
-    const attemptAt = nowIso();
-    runtimeStore.setPushAttempt("merger", attemptAt);
     try {
-      const result = await pushMergerReportToWeCom({ force: false });
-      runtimeStore.setPushRecord("merger", sh.date, [...sentTimes, mergerConfig.time]);
-      runtimeStore.setPushSuccess("merger", attemptAt, sh.date);
-      runtimeStore.save();
-      return result;
+      await pushEventAlertsToWeCom({ force: false });
     } catch (error) {
-      runtimeStore.setPushError("merger", error?.message || error);
-      runtimeStore.save();
-      logError("[push] merger schedule failed:", error?.message || error);
+      logError("[push] event alert failed:", error?.message || error);
     }
+  }
+
+  async function runTick() {
+    if (typeof syncEventArbSummaryState === "function") {
+      try {
+        await syncEventArbSummaryState();
+      } catch (error) {
+        logError("[push] event-arbitrage summary sync failed:", error?.message || error);
+      }
+    }
+    await runMainPushIfNeeded();
+    await runEventAlertsIfNeeded();
   }
 
   return {
     runMainPushIfNeeded,
-    runMergerPushIfNeeded,
+    runEventAlertsIfNeeded,
+    runTick,
   };
 }
 
 module.exports = {
   createWeComScheduler,
 };
-
-

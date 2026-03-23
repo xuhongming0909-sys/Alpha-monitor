@@ -56,6 +56,17 @@ creating new dashboard-only APIs.
 ### `GET /api/push/config`
 
 - Purpose: Load current push configuration into the dashboard form.
+- Required response contract for the current push round:
+  - `data.times`
+  - `data.eventAlert.cooldownMinutes`
+  - `data.eventAlert.convertibleBond.convertPremiumLt`
+  - `data.deliveryStatus.lastMainPushSuccessAt`
+  - `data.deliveryStatus.lastEventAlertSuccessAt`
+  - `data.deliveryStatus.lastMainPushError`
+  - `data.deliveryStatus.lastEventAlertError`
+  - `data.deliveryStatus.webhookConfigured`
+  - `data.deliveryStatus.pushHtmlUrlConfigured`
+- The dashboard must not depend on merger-report push fields in this round.
 
 ### `GET /api/dashboard/ui-config`
 
@@ -70,6 +81,9 @@ creating new dashboard-only APIs.
 - Required dashboard behavior:
   - Submit normalized form data.
   - Render save success and failure feedback clearly.
+- Current writable fields are limited to:
+  - two fixed-time summary push values
+  - event-alert cooldown minutes
 
 ## Contract rules
 

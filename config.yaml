@@ -312,15 +312,23 @@ notification:
     cb_arb: true
     custom_monitor: true
     dividend: true
-    merger: true
+    event_arbitrage: true
+  summary:
+    ah_top_n: 2
+    ab_top_n: 2
+    cb_top_n: 4
+    event_arbitrage_top_n: 6
   scheduler:
     enabled: true
     calendar_mode: "daily"
     default_times:
       - "08:00"
-    merger_schedule:
-      enabled: true
-      default_time: "08:00"
+      - "20:18"
+  event_alert:
+    enabled: true
+    cooldown_minutes: 30
+    convertible_bond:
+      convert_premium_lt: -3
   wecom:
     webhook_url: "${WECOM_WEBHOOK_URL}"
     push_html_url: "${PUSH_HTML_URL}"

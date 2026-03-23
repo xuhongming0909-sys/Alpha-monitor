@@ -5,6 +5,15 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      deploy_mode:
+        description: Deploy mode
+        required: true
+        default: fast
+        type: choice
+        options:
+          - fast
+          - full
 
 jobs:
   deploy:
@@ -42,24 +51,37 @@ jobs:
         run: |
           SERVER_APP_DIR="${SERVER_APP_DIR:-/home/ubuntu/Alpha monitor}"
           SERVER_SERVICE_NAME="${SERVER_SERVICE_NAME:-alpha-monitor}"
+          DEPLOY_MODE="full"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.deploy_mode }}" ]; then
+            DEPLOY_MODE="${{ github.event.inputs.deploy_mode }}"
+          fi
           echo "Host: $SERVER_HOST"
           echo "Port: $SERVER_PORT"
           echo "User: $SERVER_USER"
           echo "App dir: $SERVER_APP_DIR"
           echo "Service: $SERVER_SERVICE_NAME"
+          echo "Deploy mode: $DEPLOY_MODE"
 
       - name: Deploy over SSH
         run: |
           set -euo pipefail
           SERVER_APP_DIR="${SERVER_APP_DIR:-/home/ubuntu/Alpha monitor}"
           SERVER_SERVICE_NAME="${SERVER_SERVICE_NAME:-alpha-monitor}"
+          DEPLOY_MODE="full"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.deploy_mode }}" ]; then
+            DEPLOY_MODE="${{ github.event.inputs.deploy_mode }}"
+          fi
+          DEPLOY_SCRIPT="tools/deploy/update_from_github.sh"
+          if [ "$DEPLOY_MODE" = "fast" ]; then
+            DEPLOY_SCRIPT="tools/deploy/update_fast.sh"
+          fi
           echo "[stage] Trigger remote script"
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
             set -euo pipefail
-            test -f \"$SERVER_APP_DIR/tools/deploy/update_from_github.sh\" || {
-              echo \"Missing remote deploy script: $SERVER_APP_DIR/tools/deploy/update_from_github.sh\" >&2
+            test -f \"$SERVER_APP_DIR/$DEPLOY_SCRIPT\" || {
+              echo \"Missing remote deploy script: $SERVER_APP_DIR/$DEPLOY_SCRIPT\" >&2
               exit 1
             }
-            PROJECT_ROOT=\"$SERVER_APP_DIR\" PROJECT_OWNER=\"$SERVER_USER\" SERVICE_NAME=\"$SERVER_SERVICE_NAME\" TARGET_BRANCH=\"$TARGET_BRANCH\" GIT_RETRY_COUNT=10 GIT_RETRY_DELAY_SECONDS=10 SERVICE_RETRY_COUNT=10 SERVICE_RETRY_DELAY_SECONDS=2 bash \"$SERVER_APP_DIR/tools/deploy/update_from_github.sh\"
+            PROJECT_ROOT=\"$SERVER_APP_DIR\" PROJECT_OWNER=\"$SERVER_USER\" SERVICE_NAME=\"$SERVER_SERVICE_NAME\" TARGET_BRANCH=\"$TARGET_BRANCH\" GIT_RETRY_COUNT=10 GIT_RETRY_DELAY_SECONDS=10 SERVICE_RETRY_COUNT=10 SERVICE_RETRY_DELAY_SECONDS=2 bash \"$SERVER_APP_DIR/$DEPLOY_SCRIPT\"
           "
           echo "[stage] Deployment done"

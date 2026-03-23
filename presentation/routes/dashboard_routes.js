@@ -55,6 +55,18 @@ function registerDashboardRoutes(options = {}) {
       : { tableUi: null }
   ));
 
+  app.get("/api/dashboard/access-info", (_req, res) => sendSuccess(
+    res,
+    typeof options.getAccessInfo === "function"
+      ? options.getAccessInfo()
+      : {
+          serverBaseUrl: "",
+          publicBaseUrl: "",
+          publicHealthUrl: "",
+          environment: "",
+        }
+  ));
+
   app.get("/api/merger/reports/today", async (_req, res) => {
     try {
       const { date, groups } = await getTodayMergerGroups();

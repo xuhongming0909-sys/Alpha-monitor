@@ -727,7 +727,7 @@
   - `volatility60` is the annualized standard deviation of recent stock close-to-close log returns
   - the page must not present volatility-driven theoretical metrics as certainty-level values
 
-## 31. Constitution Governance Alignment Contract (2026-03-23)
+## 31A. Constitution Governance Alignment Contract (2026-03-23)
 - `CONSTITUTION.md` and `.specify/memory/constitution.md` must remain logically一致，不能出现一处修改、另一处滞后的状态。
 - 当宪法文本发生修订时，两份文件都必须同步更新以下元数据：
   - `Version`
@@ -742,6 +742,25 @@
   - 只修治理链路和防回归护栏
   - 不借机把无关业务模块拉入大重构
   - 如发现更大的结构性问题，应另起计划，不在本轮混改
+- 本轮取消新增的 `PROJECT_PLAN.md / PROJECT_REQUIREMENTS.md / PROJECT_TECH_STACK.md` 根目录要求：
+  - 项目正式工作流仍以 `refactor_docs/001-monitor-refactor/plan.md / REQUIREMENTS.md / SPEC.md` 为准
+  - 不再额外维护第二套根目录文档入口
+
+## 31B. Access Entry Truthfulness Contract (2026-03-24)
+- 根入口页 `index.html` 不得继续写死 `http://127.0.0.1:5000` 作为唯一服务地址。
+- 入口页展示和跳转的服务地址必须来自运行时真实配置，而不是散落硬编码。
+- 仓库应提供一个轻量只读接口，供入口页获取当前访问信息，至少包括：
+  - `serverBaseUrl`
+  - `publicBaseUrl`
+  - `publicHealthUrl`
+  - `environment`
+- 当入口页通过正在运行的 Node 服务访问时：
+  - 页面必须展示真实可访问的服务地址
+  - “打开服务版页面”按钮必须指向真实运行地址
+- 当 `index.html` 被直接当作本地文件打开时：
+  - 页面可以继续提供本地预览
+  - 页面不得继续声称固定服务地址一定是 `127.0.0.1:5000`
+  - 页面应提示以 `config.yaml > app.server_base_url` 或当前运行服务为准
 
 ## 32. LOF Arbitrage Zero-login Module Contract (2026-03-23)
 - Dashboard adds a new top-level module `LOF套利`.
@@ -968,3 +987,140 @@
 - `GET /api/market/lof-arbitrage` must no longer be exposed as an active route.
 - `data_fetch/lof_arbitrage` and `strategy/lof_arbitrage` are retired implementation directories and should be removed from the active repository surface.
 - Any older LOF requirements in this document are superseded by this complete-removal contract.
+
+## 38. Repository-local mini-SWE-agent Integration Contract (2026-03-24)
+- This round adds only a repository-local agent-assist workflow for development and does not change product runtime behavior.
+- The repository must provide a stable local helper entry for generating `mini-SWE-agent` task text from project rules.
+- The generated task text must explicitly include the current workflow gate:
+  - read `CONSTITUTION.md` first
+  - update `refactor_docs/001-monitor-refactor/plan.md` before implementation when scope changes
+  - update `refactor_docs/001-monitor-refactor/REQUIREMENTS.md` and `refactor_docs/001-monitor-refactor/SPEC.md` before coding when contracts change
+- The generated task text must remind the agent to respect repository layering:
+  - `data_fetch/` fetch + normalize only
+  - `strategy/` business calculation and rule judgment only
+  - `presentation/` page, API shaping, and display logic only
+  - `notification/` push configuration and delivery only
+  - `shared/` reusable cross-domain support only
+- The helper must support narrowing the requested implementation scope by module or area so the caller can keep changes minimal.
+- The helper must include default validation guidance for this repository, at least:
+  - `npm run check`
+  - `npm run check:boundaries`
+- The repository must include a local usage guide covering at least:
+  - `mini-SWE-agent` installation
+  - recommended `confirm` mode before any `yolo`-style execution
+  - how to invoke the repository helper
+  - how Codex and `mini-SWE-agent` should divide responsibilities in this project
+- This integration is human-in-the-loop only in this round:
+  - it may generate prompt/task text
+  - it may document command examples
+  - it must not auto-launch or auto-approve `mini-SWE-agent` actions from project code
+- The live dashboard, API routes, scheduler, deploy scripts, and production runtime state must remain unchanged by this round.
+
+## 39. Push Summary + Event-alert Refactor Contract (2026-03-24)
+- Active push entrances are reduced to two:
+  - fixed-time summary push
+  - event-driven alert push
+- `收购私有专报` is removed from the active push product contract in this round.
+- Dashboard push settings must render:
+  - summary time 1
+  - summary time 2
+  - event-alert cooldown minutes
+- Dashboard push settings must not render a third merger-report push time input.
+- `GET /api/push/config` must return parseable JSON including at least:
+  - `times`
+  - `eventAlert.enabled`
+  - `eventAlert.cooldownMinutes`
+  - `eventAlert.convertibleBond.convertPremiumLt`
+  - `deliveryStatus.webhookConfigured`
+  - `deliveryStatus.pushHtmlUrlConfigured`
+  - `deliveryStatus.schedulerEnabled`
+  - `deliveryStatus.lastMainPushSuccessAt`
+  - `deliveryStatus.lastMainPushError`
+  - `deliveryStatus.lastEventAlertSuccessAt`
+  - `deliveryStatus.lastEventAlertError`
+- `GET /api/push/config` must not expose merger-report push schedule or merger-report push delivery state.
+- `POST /api/push/config` must save only:
+  - the two summary times
+  - the event-alert cooldown minutes
+- Summary push content contract for this round:
+  - keep `可转债 / AH / AB / 打新 / 分红 / 自定义监控 / 事件套利新增次日汇总`
+  - `自定义监控` remains full-volume
+  - each summary item must be compressed into a scanable concise line or short block
+  - summary push must avoid large dense paragraphs
+- Event-arbitrage push contract for this round:
+  - only rows newly discovered on day `D` may appear in the next day's summary
+  - this round does not add same-day event-arbitrage alert pushes
+- First-phase event-alert contract:
+  - source is convertible-bond arbitrage rows only
+  - trigger rule is `转股溢价率 < -3%`
+  - same bond same rule must respect a per-item cooldown
+  - default cooldown is `30` minutes
+  - alert message must include only triggered rows and must not append the full summary
+- Active notification config must include formal event-alert settings in `config.yaml`, at least:
+  - `notification.event_alert.enabled`
+  - `notification.event_alert.cooldown_minutes`
+  - `notification.event_alert.convertible_bond.convert_premium_lt`
+  - concise summary row-count settings under `notification.summary`
+- Active push contract must include a real public HTML URL so enterprise-wecom messages can link back to the live webpage.
+
+## 39. Dashboard UI Coordination Contract (2026-03-24)
+- This round is presentation-only and focuses on coordinated improvement of:
+  - aesthetics
+  - readability
+  - information density
+- The round must follow the least-change rule:
+  - keep existing functions
+  - keep existing business meaning
+  - keep existing route and data contracts
+  - avoid unrelated refactors
+- Dashboard optimization priority is fixed to:
+  - surface more effective information per screen
+  - reduce wasted blank space
+  - strengthen visual hierarchy
+  - preserve stable interaction semantics
+- The homepage must keep the same module order and functional meaning:
+  - hero
+  - top subscription table
+  - root tabs
+  - active module panel
+  - bottom push strip
+- The page may tighten layout through shared presentation adjustments only, including:
+  - container padding
+  - vertical gaps
+  - card density
+  - toolbar composition
+  - summary layout
+  - button/input sizing
+  - empty/loading/pagination footprint
+- The page must not fake or invent new summary content for visual effect.
+- `转债套利 / AH溢价 / AB溢价 / 监控套利 / 分红提醒 / 事件套利` must keep their current interaction logic and data semantics.
+- Desktop and mobile must remain usable under the same responsive structure; this round may compress spacing but must not introduce a new page model.
+- Core layout and key style adjustments in the implementation must retain concise Chinese comments.
+
+## 40. Release-path Visibility + Fast Deploy Contract (2026-03-24)
+- `/api/health` must expose deployment/version metadata from the currently running checkout, not only generic liveness status.
+- The health payload must include at least:
+  - `version.appVersion`
+  - `version.gitSha`
+  - `version.gitShortSha`
+  - `version.gitBranch`
+  - `version.gitCommitTime`
+  - `version.startedAt`
+  - `version.source`
+- If git metadata cannot be resolved at runtime, the service must still return `/api/health` successfully and clearly mark the missing fields instead of failing the health endpoint.
+- Homepage must visibly display the currently deployed version metadata sourced from the live server, so the user can directly confirm whether the page is old or new.
+- The homepage version area must not invent build numbers; it may only display real values returned by `/api/health`.
+- The repository must include a dedicated fast deploy entry script:
+  - `tools/deploy/update_fast.sh`
+- `tools/deploy/update_fast.sh` is only for dependency-unchanged releases and must keep the same safety rails as the full deploy path:
+  - git sync
+  - service restart
+  - health check
+  - homepage marker verification
+- `tools/deploy/update_fast.sh` must skip heavy dependency refresh by default:
+  - skip Node dependency install
+  - skip Python dependency install
+  - skip Python import verification
+- The default automatic `push main` deploy path must remain the safe full deploy path and must not silently switch to fast mode.
+- GitHub Actions manual deploy must support selecting `full` or `fast` mode.
+- If fast deploy is used when dependencies have actually changed, the failure must remain visible through service restart failure, health failure, or homepage marker failure; the script must not fake success.

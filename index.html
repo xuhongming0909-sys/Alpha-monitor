@@ -116,6 +116,11 @@
         border-color: var(--line);
       }
 
+      .btn[aria-disabled='true'] {
+        pointer-events: none;
+        opacity: 0.55;
+      }
+
       .panel {
         margin-top: 18px;
         padding: 20px;
@@ -165,7 +170,7 @@
         <div class="status" id="service-status">正在检查本地服务状态...</div>
         <p>
           这个入口页支持两种打开方式：如果本地服务已经启动，就直接进入
-          <span class="muted-code">http://127.0.0.1:5000/</span>；
+          <span class="muted-code" data-service-url>待检测</span>；
           如果你只是双击打开 HTML 文件，也能先看到本地预览页。
         </p>
         <p>
@@ -175,39 +180,121 @@
           <span class="muted-code">npm run start:stable</span>。
         </p>
         <div class="actions">
-          <a class="btn btn-primary" href="http://127.0.0.1:5000/" target="_blank" rel="noreferrer">打开服务版页面</a>
-          <a class="btn btn-secondary" href="./presentation/templates/dashboard_template.html" target="_blank" rel="noreferrer">打开本地预览页</a>
+          <a class="btn btn-primary" id="service-link" href="#" target="_blank" rel="noreferrer" aria-disabled="true">打开服务版页面</a>
+          <a class="btn btn-secondary" id="preview-link" href="./presentation/templates/dashboard_template.html" target="_blank" rel="noreferrer">打开本地预览页</a>
         </div>
       </section>
 
       <section class="card panel">
         <h2>使用说明</h2>
         <ul>
-          <li>正式访问地址：<span class="muted-code">http://127.0.0.1:5000/</span></li>
+          <li>正式访问地址：<span class="muted-code" data-service-url>待检测</span></li>
           <li>本地模板文件：<span class="muted-code">presentation/templates/dashboard_template.html</span></li>
-          <li>如果模板能打开但没有数据，通常说明前端文件没问题，只是后端服务还没启动。</li>
+          <li id="service-hint">如果模板能打开但没有数据，通常说明前端文件没问题，只是后端服务还没启动。</li>
         </ul>
       </section>
 
       <section class="card panel">
         <h2>本地预览</h2>
-        <iframe src="./presentation/templates/dashboard_template.html" title="Alpha Monitor 本地预览"></iframe>
+        <iframe id="preview-frame" src="./presentation/templates/dashboard_template.html" title="Alpha Monitor 本地预览"></iframe>
       </section>
     </div>
 
     <script>
       const statusNode = document.getElementById('service-status');
-      const healthUrl = 'http://127.0.0.1:5000/api/health';
+      const serviceLinkNode = document.getElementById('service-link');
+      const previewLinkNode = document.getElementById('preview-link');
+      const previewFrameNode = document.getElementById('preview-frame');
+      const serviceHintNode = document.getElementById('service-hint');
+      const serviceUrlNodes = Array.from(document.querySelectorAll('[data-service-url]'));
+      const previewTemplatePath = './presentation/templates/dashboard_template.html';
+
+      function normalizeBaseUrl(value) {
+        const text = String(value || '').trim();
+        return text ? text.replace(/\/+$/, '') : '';
+      }
+
+      function buildPreviewUrl(serviceBaseUrl) {
+        const baseUrl = normalizeBaseUrl(serviceBaseUrl);
+        if (!baseUrl) return previewTemplatePath;
+        return `${previewTemplatePath}?apiBase=${encodeURIComponent(baseUrl)}`;
+      }
+
+      function setServiceLink(serviceBaseUrl) {
+        if (!serviceLinkNode) return;
+        if (!serviceBaseUrl) {
+          serviceLinkNode.setAttribute('aria-disabled', 'true');
+          serviceLinkNode.setAttribute('href', '#');
+          return;
+        }
+        serviceLinkNode.setAttribute('aria-disabled', 'false');
+        serviceLinkNode.setAttribute('href', serviceBaseUrl);
+      }
+
+      function applyAccessInfo(accessInfo) {
+        const serviceBaseUrl = normalizeBaseUrl(
+          accessInfo?.publicBaseUrl || accessInfo?.serverBaseUrl
+        );
+        const previewUrl = buildPreviewUrl(serviceBaseUrl);
+        const visibleServiceUrl = serviceBaseUrl || '以 config.yaml > app.server_base_url 为准';
+        serviceUrlNodes.forEach((node) => {
+          node.textContent = visibleServiceUrl;
+        });
+        setServiceLink(serviceBaseUrl);
+        if (previewLinkNode) previewLinkNode.href = previewUrl;
+        if (previewFrameNode) previewFrameNode.src = previewUrl;
+        if (serviceHintNode && !serviceBaseUrl) {
+          serviceHintNode.textContent = '当前是本地静态预览，服务地址以 config.yaml > app.server_base_url 和实际启动结果为准。';
+        }
+        return {
+          serviceBaseUrl,
+          publicHealthUrl: normalizeBaseUrl(accessInfo?.publicHealthUrl),
+        };
+      }
+
+      async function loadAccessInfo() {
+        if (window.location.protocol === 'file:') {
+          return {
+            serverBaseUrl: '',
+            publicBaseUrl: '',
+            publicHealthUrl: '',
+            environment: 'file-preview',
+          };
+        }
+        try {
+          const response = await fetch('./api/dashboard/access-info', { cache: 'no-store' });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const payload = await response.json();
+          return payload?.data || {};
+        } catch (_error) {
+          const origin = normalizeBaseUrl(window.location.origin);
+          return {
+            serverBaseUrl: origin,
+            publicBaseUrl: origin,
+            publicHealthUrl: origin ? `${origin}/api/health` : '',
+            environment: 'fallback',
+          };
+        }
+      }
 
       async function updateServiceStatus() {
+        const accessInfo = await loadAccessInfo();
+        const applied = applyAccessInfo(accessInfo);
+        const healthUrl = applied.publicHealthUrl || (applied.serviceBaseUrl ? `${applied.serviceBaseUrl}/api/health` : '');
+        if (!healthUrl) {
+          statusNode.textContent = '当前未锁定服务地址，已切换为本地静态预览模式。';
+          return;
+        }
         try {
           const response = await fetch(healthUrl, { cache: 'no-store' });
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
           }
           statusNode.textContent = '本地服务已启动，可以直接打开服务版页面。';
-        } catch (error) {
-          statusNode.textContent = '本地服务未启动，当前可先使用本地预览页。';
+        } catch (_error) {
+          statusNode.textContent = '服务暂不可达，当前可先使用本地预览页。';
         }
       }
 

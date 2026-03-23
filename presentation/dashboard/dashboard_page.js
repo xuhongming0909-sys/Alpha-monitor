@@ -1,6 +1,17 @@
 ﻿'use strict';
 
-const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000' : '';
+function normalizeApiBase(value) {
+  const text = String(value || '').trim();
+  return text ? text.replace(/\/+$/, '') : '';
+}
+
+function resolveApiBase() {
+  if (window.location.protocol !== 'file:') return '';
+  const params = new URLSearchParams(window.location.search);
+  return normalizeApiBase(params.get('apiBase'));
+}
+
+const API_BASE = resolveApiBase();
 const PAGE_SIZE = 50;
 const FORCE_REFRESH_RESOURCE_KEYS = ['exchangeRate', 'ipo', 'bonds', 'cbArb', 'ah', 'ab', 'merger'];
 const CRITICAL_CACHE_REVALIDATION_KEYS = ['exchangeRate', 'cbArb', 'ah', 'ab'];
@@ -24,6 +35,7 @@ const DEFAULT_TABLE_UI_CONFIG = Object.freeze({
 
 const ENDPOINTS = {
   uiConfig: '/api/dashboard/ui-config',
+  health: '/api/health',
   exchangeRate: '/api/market/exchange-rate',
   ipo: '/api/market/ipo',
   bonds: '/api/market/convertible-bonds',
@@ -48,6 +60,7 @@ const PUSH_MODULE_LABELS = {
   cbArb: '转债',
   monitor: '监控',
   dividend: '分红',
+  eventArb: '事件套利',
 };
 const MONITOR_LOOKUP_DEBOUNCE_MS = 280;
 
@@ -118,6 +131,7 @@ const state = {
   },
   resources: {
     uiConfig: resourceState(),
+    health: resourceState(),
     exchangeRate: resourceState(),
     ipo: resourceState(),
     bonds: resourceState(),
@@ -143,13 +157,15 @@ const dom = {
   },
   statusLine: document.getElementById('status-line'),
   statusUpdateText: document.getElementById('status-update-text'),
+  buildVersionText: document.getElementById('build-version-text'),
   lastRefreshText: document.getElementById('last-refresh-text'),
   subscriptionSummary: document.getElementById('subscription-summary'),
   pushStateText: document.getElementById('push-state-text'),
+  pushAlertStateText: document.getElementById('push-alert-state-text'),
   pushForm: document.getElementById('push-form'),
   pushTime1: document.getElementById('push-time-1'),
   pushTime2: document.getElementById('push-time-2'),
-  pushTime3: document.getElementById('push-time-3'),
+  pushAlertCooldown: document.getElementById('push-alert-cooldown'),
   savePushButton: document.getElementById('save-push-button'),
   reloadDataButton: document.getElementById('reload-data-button'),
   toast: document.getElementById('toast'),
@@ -667,6 +683,7 @@ function bindEvents() {
 
 function renderHeaderOnly() {
   renderStatusLine();
+  renderRuntimeVersionText();
   renderSubscriptionSummary();
   renderPushSettings();
 }
@@ -706,6 +723,7 @@ async function bootstrap(options = {}) {
 
   const tasks = [
     loadResource('uiConfig', ENDPOINTS.uiConfig, applyTableUiConfigFromState),
+    loadResource('health', ENDPOINTS.health, renderHeaderOnly),
     loadResource('exchangeRate', ENDPOINTS.exchangeRate, renderHeaderOnly, { force: forceMarket }),
     loadResource('ipo', ENDPOINTS.ipo, renderHeaderOnly, { force: forceMarket }),
     loadResource('bonds', ENDPOINTS.bonds, renderHeaderOnly, { force: forceMarket }),
@@ -753,6 +771,43 @@ function renderTabs() {
     if (!panel) return;
     panel.classList.toggle('active', key === state.activeTab);
   });
+}
+
+function readHealthResponse() {
+  return readResourceObject('health').data || readResourceObject('health');
+}
+
+function renderRuntimeVersionText() {
+  if (!dom.buildVersionText) return;
+
+  const resource = state.resources.health;
+  if (resource.status === 'loading' || resource.status === 'idle') {
+    dom.buildVersionText.textContent = '版本信息读取中';
+    return;
+  }
+
+  if (resource.status === 'error') {
+    dom.buildVersionText.textContent = '版本信息读取失败';
+    return;
+  }
+
+  const version = readObject(readHealthResponse().version);
+  const parts = [];
+  if (version.gitBranch || version.gitShortSha) {
+    parts.push(`${String(version.gitBranch || '--')} @ ${String(version.gitShortSha || 'unknown')}`);
+  } else if (version.gitSha) {
+    parts.push(String(version.gitSha).slice(0, 7));
+  }
+  if (version.appVersion) {
+    parts.push(`v${String(version.appVersion)}`);
+  }
+  if (version.startedAt) {
+    parts.push(`启动 ${formatDate(version.startedAt)}`);
+  }
+
+  dom.buildVersionText.textContent = parts.length
+    ? `当前版本 ${parts.join(' / ')}`
+    : '版本信息暂未返回';
 }
 
 function renderStatusLine() {
@@ -912,7 +967,7 @@ function renderSubscriptionTable(rows) {
     : `
       <tr>
         <td colspan="8">
-          <div class="empty-state" style="min-height: 120px; padding: 20px;">今日无数据</div>
+          <div class="empty-state">今日无数据</div>
         </td>
       </tr>
     `;
@@ -988,11 +1043,12 @@ function readPushConfigViewModel() {
 
 function resolvePushConfigTimes(config = {}) {
   const times = Array.isArray(config.times) ? config.times : [];
+  const eventAlert = (config.eventAlert && typeof config.eventAlert === 'object') ? config.eventAlert : {};
   return {
     times,
     mainTime1: times[0] || config.time || "",
     mainTime2: times[1] || "",
-    mergerTime: config?.mergerSchedule?.time || times[2] || "",
+    cooldownMinutes: String(eventAlert.cooldownMinutes ?? ""),
   };
 }
 
@@ -1000,7 +1056,7 @@ function applyPushConfigToInputs(config = {}) {
   const next = resolvePushConfigTimes(config);
   if (dom.pushTime1) dom.pushTime1.value = next.mainTime1;
   if (dom.pushTime2) dom.pushTime2.value = next.mainTime2;
-  if (dom.pushTime3) dom.pushTime3.value = next.mergerTime;
+  if (dom.pushAlertCooldown) dom.pushAlertCooldown.value = next.cooldownMinutes;
 }
 
 function readEnabledPushModules(config = {}) {
@@ -1018,28 +1074,38 @@ function buildPushStateText(config = {}) {
   const next = resolvePushConfigTimes(config);
   const delivery = config.deliveryStatus || {};
   const moduleText = readEnabledPushModules(config).join(' / ') || '--';
-  const mainText = config.enabled === false
-    ? "主推送已关闭"
-    : `主推送 ${[next.mainTime1, next.mainTime2].filter(Boolean).join(" / ") || "--"}`;
-  const mergerText = config?.mergerSchedule?.enabled === false
-    ? "收购私有专报已关闭"
-    : `收购私有 ${next.mergerTime || "--"}`;
-  const runtimeParts = [
+  const eventAlert = (config.eventAlert && typeof config.eventAlert === 'object') ? config.eventAlert : {};
+  const threshold = eventAlert.convertibleBond && typeof eventAlert.convertibleBond === 'object'
+    ? eventAlert.convertibleBond.convertPremiumLt
+    : null;
+
+  const summaryLine = [
+    config.enabled === false
+      ? '定时推送已关闭'
+      : `定时推送 ${[next.mainTime1, next.mainTime2].filter(Boolean).join(' / ') || '--'}`,
     `模块 ${moduleText}`,
     `调度 ${delivery.calendarMode || '--'}`,
+    delivery.webhookConfigured === false ? 'Webhook 未配置' : 'Webhook 已配置',
+    delivery.pushHtmlUrlConfigured === false ? '网页入口未配置' : '网页入口已配置',
     delivery.schedulerEnabled === false ? '服务端调度已关闭' : '',
-    delivery.webhookConfigured === false ? '企业微信 Webhook 未配置' : '企业微信 Webhook 已配置',
-    delivery.lastMainPushSuccessAt ? `主推送成功 ${formatDate(delivery.lastMainPushSuccessAt)}` : '',
-    delivery.lastMainPushError ? `主推送失败 ${shortErrorText(delivery.lastMainPushError)}` : '',
-    delivery.lastMergerPushSuccessAt ? `专报成功 ${formatDate(delivery.lastMergerPushSuccessAt)}` : '',
-    delivery.lastMergerPushError ? `专报失败 ${shortErrorText(delivery.lastMergerPushError)}` : '',
-  ].filter(Boolean);
-  return [mainText, mergerText, ...runtimeParts].join(" / ");
+    delivery.lastMainPushSuccessAt ? `最近成功 ${formatDate(delivery.lastMainPushSuccessAt)}` : '',
+    delivery.lastMainPushError ? `最近失败 ${shortErrorText(delivery.lastMainPushError)}` : '',
+  ].filter(Boolean).join(' / ');
+
+  const alertLine = [
+    eventAlert.enabled === false ? '异动推送已关闭' : '异动推送开启',
+    threshold === null ? '规则 --' : `规则 转股溢价率 < ${formatPercent(threshold, 2)}`,
+    `冷却 ${next.cooldownMinutes || '--'} 分钟`,
+    delivery.lastEventAlertSuccessAt ? `最近成功 ${formatDate(delivery.lastEventAlertSuccessAt)}` : '',
+    delivery.lastEventAlertError ? `最近失败 ${shortErrorText(delivery.lastEventAlertError)}` : '',
+  ].filter(Boolean).join(' / ');
+
+  return { summaryLine, alertLine };
 }
 
 function renderPushSettings() {
   const resource = state.resources.pushConfig;
-  if (!dom.pushStateText || !dom.savePushButton) return;
+  if (!dom.pushStateText || !dom.pushAlertStateText || !dom.savePushButton) return;
 
   dom.savePushButton.disabled = resource.status === "loading" || state.savingPush;
   if (dom.reloadDataButton) {
@@ -1047,7 +1113,8 @@ function renderPushSettings() {
   }
 
   if (resource.status === "loading" && !resource.data) {
-    dom.pushStateText.textContent = "正在读取推送配置";
+    dom.pushStateText.textContent = "正在读取定时推送状态";
+    dom.pushAlertStateText.textContent = "正在读取异动推送状态";
     return;
   }
 
@@ -1060,31 +1127,41 @@ function renderPushSettings() {
 
   if (resource.status === "error" && !hasConfig) {
     dom.pushStateText.textContent = "推送配置读取失败";
+    dom.pushAlertStateText.textContent = "异动推送配置读取失败";
     return;
   }
 
   if (state.savingPush) {
     dom.pushStateText.textContent = "正在保存推送设置";
+    dom.pushAlertStateText.textContent = "正在同步异动推送设置";
     return;
   }
 
   if (resource.status === "error") {
     dom.pushStateText.textContent = "推送配置读取失败，保留当前输入";
+    dom.pushAlertStateText.textContent = "异动推送配置读取失败，保留当前输入";
     return;
   }
 
-  dom.pushStateText.textContent = buildPushStateText(config);
+  const pushState = buildPushStateText(config);
+  dom.pushStateText.textContent = pushState.summaryLine;
+  dom.pushAlertStateText.textContent = pushState.alertLine;
 }
 
 async function savePushConfig() {
   const config = readPushConfigViewModel();
   const time1 = dom.pushTime1?.value.trim();
   const time2 = dom.pushTime2?.value.trim();
-  const time3 = dom.pushTime3?.value.trim();
+  const cooldownText = dom.pushAlertCooldown?.value.trim();
   const validTimes = [time1, time2].filter(Boolean);
+  const cooldownMinutes = Number(cooldownText);
 
-  if (!time1 || !time2 || !time3) {
-    showToast("三个时间框都需要填写", true);
+  if (!time1 || !time2 || !cooldownText) {
+    showToast("两个定时推送时间和异动冷却都需要填写", true);
+    return;
+  }
+  if (!Number.isFinite(cooldownMinutes) || cooldownMinutes < 1 || cooldownMinutes > 1440) {
+    showToast("异动冷却分钟数必须在 1 到 1440 之间", true);
     return;
   }
 
@@ -1098,9 +1175,12 @@ async function savePushConfig() {
         enabled: config.enabled !== false,
         modules: config.modules || {},
         times: validTimes,
-        mergerSchedule: {
-          enabled: true,
-          time: time3,
+        eventAlert: {
+          enabled: config?.eventAlert?.enabled !== false,
+          cooldownMinutes,
+          convertibleBond: {
+            convertPremiumLt: config?.eventAlert?.convertibleBond?.convertPremiumLt,
+          },
         },
       }),
     });
@@ -2202,7 +2282,7 @@ function renderConvertibleBondPanel() {
       <div class="module-toolbar">
         <div>
           <div class="tab-title">转债套利</div>
-          <div class="section-note">主表直接展示 ROE、负债率、赎回/回售、波动率、期权与理论价值参数，避免再把核心信息藏进详情里。</div>
+          <div class="section-note">主表直出核心定价字段，减少在详情区来回切换。</div>
         </div>
         <div class="panel-meta">
           <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
@@ -2213,7 +2293,7 @@ function renderConvertibleBondPanel() {
       <div class="summary-grid summary-grid-three">${summaryCards}</div>
       <div class="list-card">
         <h3>转债套利主表</h3>
-        <div class="section-note">理论价值 = 纯债价值 + 期权理论价值；期权理论价值 = 看涨期权价值 - 看跌期权价值。当前 60 日波动率是基于正股近期收盘收益率年化得到的历史口径，期权/理论价值仅作参考，不建议当成高置信主指标。</div>
+        <div class="section-note">理论价值 = 纯债价值 + 期权理论价值；60 日波动率与理论相关字段仅作历史参考。</div>
         ${renderPaginatedTable({
           tableKey: "cbArb",
           tableKind: "convertible",
@@ -2261,7 +2341,7 @@ function renderPremiumPanel(type) {
       <div class="premium-toolbar">
         <div>
           <div class="tab-title">${config.title}</div>
-          <div class="section-note">主表按关键列紧凑展示，样本数和样本区间直接放进默认行，不再依赖详情列。</div>
+          <div class="section-note">主表按关键列紧凑展示，样本信息直接留在默认行。</div>
         </div>
         <div class="panel-meta">
           <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
@@ -2282,7 +2362,7 @@ function renderPremiumPanel(type) {
       </div>
       <div class="list-card">
         <h3>${config.title}主表</h3>
-        <div class="section-note">样本信息直接放在主表默认行；样本区间采用压缩格式显示，例如 250520-260321。</div>
+        <div class="section-note">样本区间采用压缩格式显示，例如 250520-260321。</div>
         ${renderPaginatedTable({
           tableKey: type,
           tableKind: 'premium',
@@ -2572,15 +2652,19 @@ function renderDividendPanel() {
       <div class="module-toolbar">
         <div>
           <div class="tab-title">分红提醒</div>
-          <div class="section-note">页面主内容直接强调“今日登记日提醒”</div>
+          <div class="section-note">优先强调今日登记日提醒，再展示完整观察名单。</div>
         </div>
-        <div class="section-note">最近更新 ${escapeHtml(formatDate(readUpdateTime('dividend')))}</div>
+        <div class="panel-meta">
+          <span>今日提醒 ${escapeHtml(formatInt(todayRows.length))}</span>
+          <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
+          <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('dividend')))}</span>
+        </div>
       </div>
-      <div class="list-card" style="margin-bottom: 14px;">
+      <div class="list-card card-stack">
         <h3>今日登记日提醒</h3>
         ${todayList.length ? renderStackItems(todayList) : '<div class="empty-state"><div>今天没有登记日提醒</div></div>'}
       </div>
-      <div class="list-card">
+      <div class="list-card card-stack">
         <h3>分红观察名单</h3>
         ${renderPaginatedTable({
           tableKind: 'dividend',
@@ -2696,7 +2780,7 @@ function renderEventArbitrageDetail(row) {
   const links = renderEventArbitrageLinks(row);
   return `
     ${renderDetailGrid(items)}
-    <div class="slim-note" style="margin-top: 12px;">链接：${links}</div>
+    <div class="slim-note detail-note">链接：${links}</div>
   `;
 }
 
@@ -2760,7 +2844,7 @@ function renderEventArbitrageOverviewView() {
     </div>
     <div class="list-card">
       <h3>来源状态</h3>
-      <div class="section-note" style="margin-bottom: 12px;">${escapeHtml(freshness)}，最近更新 ${escapeHtml(formatDate(readUpdateTime('merger')))}</div>
+      <div class="section-note detail-note">${escapeHtml(freshness)}，最近更新 ${escapeHtml(formatDate(readUpdateTime('merger')))}</div>
       ${renderStackItems(statusRows)}
     </div>
   `;
@@ -2825,7 +2909,7 @@ function buildEventArbAnnouncementColumns() {
       label: '公告时间',
       render: (row) => `
         <div>${escapeHtml(readAnnouncementLabel(row))}</div>
-        ${isTodayAnnouncement(row) ? '<div style="margin-top: 6px;"><span class="today-badge">今日公告</span></div>' : ''}
+        ${isTodayAnnouncement(row) ? '<div class="today-badge-row"><span class="today-badge">今日公告</span></div>' : ''}
       `,
     },
     {
@@ -2907,7 +2991,7 @@ function renderEventArbitrageSubview() {
   if (subtab === 'hk_private') {
     return renderEventArbitrageTableView({
       title: '港股套利',
-      note: '只展示抓取到的核心字段，并补充源侧原始核心公告链接。',
+      note: '只保留抓取到的核心字段与源侧原始公告链接。',
       categoryKey: 'hk_private',
       tableKey: 'eventArbHk',
       tableKind: 'merger',
@@ -2921,7 +3005,7 @@ function renderEventArbitrageSubview() {
   if (subtab === 'cn_private') {
     return renderEventArbitrageTableView({
       title: '中概私有',
-      note: '当前公开接口返回为空时保持空表，不使用假数据填充。',
+      note: '公开接口为空时保持空表，不使用假数据填充。',
       categoryKey: 'cn_private',
       tableKey: 'eventArbCn',
       tableKind: 'merger',
@@ -2935,7 +3019,7 @@ function renderEventArbitrageSubview() {
   if (subtab === 'a_event') {
     return renderEventArbitrageTableView({
       title: 'A股套利',
-      note: '展示安全边际价、现金选择权和公开公告链接。',
+      note: '主表展示安全边际价、现金选择权与公开公告链接。',
       categoryKey: 'a_event',
       tableKey: 'eventArbA',
       tableKind: 'merger',
@@ -2950,7 +3034,7 @@ function renderEventArbitrageSubview() {
     const rows = [...readEventArbitrageCategoryRows('announcement_pool')].sort((a, b) => readAnnouncementSortValue(b) - readAnnouncementSortValue(a));
     return renderEventArbitrageTableView({
       title: '最新公告',
-      note: '保留并购公告与 AI 报告能力，用于辅助校验和深挖，不再作为默认主列表。',
+      note: '用于辅助校验和深挖，不再作为默认主列表。',
       categoryKey: 'announcement_pool',
       tableKey: 'eventArbAnnouncement',
       tableKind: 'merger',
@@ -2965,7 +3049,7 @@ function renderEventArbitrageSubview() {
     <div class="list-card disabled-card">
       <h3>港供套利</h3>
       <div class="section-note">当前按“零登录”约束不接入该页。现有公开源需要登录或权限校验，第一阶段只保留信息架构和禁用态说明。</div>
-      <div class="slim-note" style="margin-top: 12px;">状态：${escapeHtml(eventArbStatusLabel(status.status))} / 最近更新 ${escapeHtml(formatDate(status.updateTime || readUpdateTime('merger')))}</div>
+      <div class="slim-note detail-note">状态：${escapeHtml(eventArbStatusLabel(status.status))} / 最近更新 ${escapeHtml(formatDate(status.updateTime || readUpdateTime('merger')))}</div>
     </div>
   `;
 }
@@ -2990,7 +3074,7 @@ function renderMergerPanel() {
       <div class="module-toolbar">
         <div>
           <div class="tab-title">事件套利</div>
-          <div class="section-note">统一承接港股私有化、中概股私有化、A股套利和公告池辅助校验。</div>
+          <div class="section-note">统一承接港股私有化、中概私有化、A股套利与公告池辅助校验。</div>
         </div>
         <div class="panel-meta">
           <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('merger')))}</span>

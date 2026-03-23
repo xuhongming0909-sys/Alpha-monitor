@@ -2,9 +2,8 @@
 
 /**
  * 推送配置存储。
- * 负责normalizer UI 传入配置、读取当前配置、写回运行态配置文件。
+ * 负责规范化 UI 写入的时间与冷却参数，不参与真正的推送判断。
  */
-
 function createPushConfigStore(options = {}) {
   const state = options.state || {};
   const defaultConfig = options.defaultConfig || {};
@@ -17,6 +16,12 @@ function createPushConfigStore(options = {}) {
     return h * 60 + m;
   }
 
+  function normalizeCooldownMinutes(value, fallback) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return fallback;
+    return Math.max(1, Math.min(1440, Math.round(num)));
+  }
+
   function normalizePushConfig(input = {}) {
     const fallbackModules = { ...(defaultConfig.modules || {}) };
     const rawModules = (input.modules && typeof input.modules === "object") ? input.modules : fallbackModules;
@@ -25,40 +30,50 @@ function createPushConfigStore(options = {}) {
     );
 
     const defaultTime = String(defaultConfig.time || "08:00").trim();
-    const rawTime = String(input.time || defaultTime).trim();
-    const timeFallback = /^\d{2}:\d{2}$/.test(rawTime) && parsePushMinutes(rawTime) !== null
-      ? rawTime
-      : defaultTime;
-    const rawTimes = Array.isArray(input.times) ? input.times : [timeFallback];
+    const rawTimes = Array.isArray(input.times) ? input.times : defaultConfig.times;
     const times = Array.from(new Set(
-      rawTimes
+      (Array.isArray(rawTimes) ? rawTimes : [defaultTime])
         .map((item) => String(item || "").trim())
         .filter((item) => /^\d{2}:\d{2}$/.test(item) && parsePushMinutes(item) !== null)
     ))
       .sort((a, b) => (parsePushMinutes(a) ?? 0) - (parsePushMinutes(b) ?? 0))
-      .slice(0, 3);
-    if (!times.length) times.push(defaultTime);
+      .slice(0, 2);
+    while (times.length < 2) {
+      times.push(times[0] || defaultTime);
+    }
 
-    const defaultMergerSchedule = defaultConfig.mergerSchedule || { enabled: false, time: defaultTime };
-    const rawMergerSchedule = (input.mergerSchedule && typeof input.mergerSchedule === "object")
-      ? input.mergerSchedule
+    const defaultEventAlert = (defaultConfig.eventAlert && typeof defaultConfig.eventAlert === "object")
+      ? defaultConfig.eventAlert
       : {};
-    const mergerTime = String(rawMergerSchedule.time || defaultMergerSchedule.time || defaultTime).trim();
-    const mergerSchedule = {
-      enabled: typeof rawMergerSchedule.enabled === "boolean"
-        ? rawMergerSchedule.enabled
-        : Boolean(defaultMergerSchedule.enabled),
-      time: /^\d{2}:\d{2}$/.test(mergerTime) && parsePushMinutes(mergerTime) !== null
-        ? mergerTime
-        : String(defaultMergerSchedule.time || defaultTime),
-    };
+    const rawEventAlert = (input.eventAlert && typeof input.eventAlert === "object")
+      ? input.eventAlert
+      : {};
+    const defaultCbAlert = (defaultEventAlert.convertibleBond && typeof defaultEventAlert.convertibleBond === "object")
+      ? defaultEventAlert.convertibleBond
+      : {};
+    const rawCbAlert = (rawEventAlert.convertibleBond && typeof rawEventAlert.convertibleBond === "object")
+      ? rawEventAlert.convertibleBond
+      : {};
 
     return {
       enabled: typeof input.enabled === "boolean" ? input.enabled : Boolean(defaultConfig.enabled),
       time: times[0],
       times,
       modules,
-      mergerSchedule,
+      eventAlert: {
+        enabled: typeof rawEventAlert.enabled === "boolean"
+          ? rawEventAlert.enabled
+          : Boolean(defaultEventAlert.enabled),
+        cooldownMinutes: normalizeCooldownMinutes(
+          rawEventAlert.cooldownMinutes,
+          normalizeCooldownMinutes(defaultEventAlert.cooldownMinutes, 30)
+        ),
+        convertibleBond: {
+          convertPremiumLt: Number.isFinite(Number(rawCbAlert.convertPremiumLt))
+            ? Number(rawCbAlert.convertPremiumLt)
+            : Number(defaultCbAlert.convertPremiumLt ?? -3),
+        },
+      },
     };
   }
 
@@ -68,7 +83,7 @@ function createPushConfigStore(options = {}) {
     state.time = normalized.time;
     state.times = normalized.times;
     state.modules = normalized.modules;
-    state.mergerSchedule = normalized.mergerSchedule;
+    state.eventAlert = normalized.eventAlert;
     return normalized;
   }
 
@@ -78,7 +93,7 @@ function createPushConfigStore(options = {}) {
     state.time = normalized.time;
     state.times = normalized.times;
     state.modules = normalized.modules;
-    state.mergerSchedule = normalized.mergerSchedule;
+    state.eventAlert = normalized.eventAlert;
     save();
     return normalized;
   }
@@ -96,5 +111,3 @@ function createPushConfigStore(options = {}) {
 module.exports = {
   createPushConfigStore,
 };
-
-
