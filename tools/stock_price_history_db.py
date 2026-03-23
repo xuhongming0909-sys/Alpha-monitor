@@ -30,8 +30,9 @@ def cutoff_date(days: int = 800) -> str:
 
 def connect() -> sqlite3.Connection:
     ensure_dir(DB_PATH.parent)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=60)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 60000;")
     return conn
 
 
