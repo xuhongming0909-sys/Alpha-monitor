@@ -374,6 +374,19 @@ release_stale_port_owner() {
   fi
 }
 
+stop_conflicting_pm2_process() {
+  [[ -n "$SERVICE_NAME" ]] || return 0
+  command -v pm2 >/dev/null 2>&1 || return 0
+
+  if ! pm2 jlist 2>/dev/null | grep -q "\"name\":\"${SERVICE_NAME}\""; then
+    return 0
+  fi
+
+  warn "detected legacy PM2 process '${SERVICE_NAME}', removing it to avoid port conflicts"
+  pm2 delete "$SERVICE_NAME" >/dev/null 2>&1 || pm2 stop "$SERVICE_NAME" >/dev/null 2>&1 || true
+  pm2 save >/dev/null 2>&1 || true
+}
+
 run_health_check() {
   local resolved_port="${1:-}"
   local health_url
@@ -493,6 +506,7 @@ if service_exists; then
   refresh_systemd_unit
   log "stopping system service before restart: ${SERVICE_NAME}"
   run_systemctl stop "$SERVICE_NAME" || true
+  stop_conflicting_pm2_process
   release_stale_port_owner "$RESOLVED_APP_PORT"
   log "restarting system service: ${SERVICE_NAME}"
   run_systemctl restart "$SERVICE_NAME"
