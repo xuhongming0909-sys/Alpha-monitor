@@ -96,6 +96,8 @@ detect_python_bin() {
 
 install_python_requirements() {
   local python_bin="${1:-}"
+  local pip_log
+  local pip_rc
   [[ "$INSTALL_PYTHON_REQUIREMENTS" == "1" ]] || {
     log "skip Python dependency install because INSTALL_PYTHON_REQUIREMENTS=${INSTALL_PYTHON_REQUIREMENTS}"
     return 0
@@ -108,7 +110,22 @@ install_python_requirements() {
 
   [[ -n "$python_bin" ]] || die "python runtime not found; cannot install requirements"
   log "installing Python dependencies with ${python_bin} -m pip install -r requirements.txt"
-  "$python_bin" -m pip install -r "$PROJECT_ROOT/requirements.txt"
+  pip_log="$(mktemp)"
+  if "$python_bin" -m pip install -r "$PROJECT_ROOT/requirements.txt" > >(tee "$pip_log") 2> >(tee -a "$pip_log" >&2); then
+    rm -f "$pip_log"
+    return 0
+  fi
+
+  pip_rc=$?
+  if grep -qi "externally-managed-environment" "$pip_log"; then
+    warn "system Python is externally managed; retrying pip install with --break-system-packages"
+    "$python_bin" -m pip install --break-system-packages -r "$PROJECT_ROOT/requirements.txt"
+    rm -f "$pip_log"
+    return 0
+  fi
+
+  rm -f "$pip_log"
+  return "$pip_rc"
 }
 
 verify_python_imports() {
