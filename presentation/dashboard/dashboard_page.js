@@ -829,9 +829,9 @@ function renderStatusLine() {
     dom.statusLine.innerHTML = `
       <span class="status-inline-item"><span>市场状态</span><strong>加载失败</strong></span>
       <span class="status-separator">/</span>
-      <span class="status-inline-item"><span>请确认</span><strong>本地服务已启动</strong></span>
+      <span class="status-inline-item"><span>请确认</span><strong>云端服务可访问</strong></span>
     `;
-    dom.statusUpdateText.textContent = '请先确认本地服务已经启动';
+    dom.statusUpdateText.textContent = '请先确认云端服务健康并可访问';
     return;
   }
 
@@ -916,6 +916,7 @@ function buildTodaySubscriptionRows(ipoRows, bondRows) {
       if (normalizeDateKey(row.listingDate) === today) stages.push(SUBSCRIPTION_STAGES[2]);
       stages.forEach((stage) => {
         rows.push({
+          // 申购总览表按字段拆列展示，避免“名称/代码”“发行价/转股价”耦合后占用额外行高
           stageLabel: stage.label,
           stageClassName: stage.className,
           typeLabel,
@@ -925,8 +926,8 @@ function buildTodaySubscriptionRows(ipoRows, bondRows) {
           paymentDisplayDate,
           listingDate: row.listingDate,
           subscribeLimit: row.subscribeLimit,
-          issueOrConvertLabel: recordType === 'ipo' ? '发行价' : '转股价',
-          issueOrConvertValue: recordType === 'ipo' ? row.issuePrice : row.convertPrice,
+          issuePrice: recordType === 'ipo' ? row.issuePrice : null,
+          convertPrice: recordType === 'ipo' ? null : row.convertPrice,
         });
       });
     });
@@ -953,20 +954,19 @@ function renderSubscriptionTable(rows) {
     <tr class="subscription-row ${escapeHtml(row.stageClassName)}">
       <td><span class="stage-pill ${escapeHtml(row.stageClassName)}">${escapeHtml(row.stageLabel)}</span></td>
       <td><span class="type-tag">${escapeHtml(row.typeLabel)}</span></td>
-      <td>
-        <div>${escapeHtml(row.name)}</div>
-        <div class="muted mono-text">${escapeHtml(row.code)}</div>
-      </td>
+      <td>${escapeHtml(row.name)}</td>
+      <td><span class="mono-text">${escapeHtml(row.code)}</span></td>
       <td>${escapeHtml(formatDateOnly(row.subscribeDate))}</td>
       <td>${escapeHtml(formatDateOnly(row.paymentDisplayDate))}</td>
       <td>${escapeHtml(formatDateOnly(row.listingDate))}</td>
       <td>${escapeHtml(formatSubscribeLimit(row.subscribeLimit))}</td>
-      <td>${escapeHtml(`${row.issueOrConvertLabel} ${formatNumber(row.issueOrConvertValue, 2)}`)}</td>
+      <td>${escapeHtml(formatNumber(row.issuePrice, 2))}</td>
+      <td>${escapeHtml(formatNumber(row.convertPrice, 2))}</td>
     </tr>
   `).join('')
     : `
       <tr>
-        <td colspan="8">
+        <td colspan="10">
           <div class="empty-state">今日无数据</div>
         </td>
       </tr>
@@ -974,17 +974,19 @@ function renderSubscriptionTable(rows) {
 
   return `
     <div class="table-wrap">
-      <table>
+      <table data-table-kind="subscription">
         <thead>
           <tr>
             <th>当前阶段</th>
             <th>类型</th>
-            <th>名称 / 代码</th>
+            <th>名称</th>
+            <th>代码</th>
             <th>申购日</th>
             <th>中签缴款日</th>
             <th>上市日</th>
             <th>申购上限</th>
-            <th>发行价 / 转股价</th>
+            <th>发行价</th>
+            <th>转股价</th>
           </tr>
         </thead>
         <tbody>${tableRows}</tbody>
@@ -1010,23 +1012,25 @@ function loadingInlineStatus() {
 function loadingSubscriptionTable() {
   return `
     <div class="table-wrap">
-      <table>
+      <table data-table-kind="subscription">
         <thead>
           <tr>
             <th>当前阶段</th>
             <th>类型</th>
-            <th>名称 / 代码</th>
+            <th>名称</th>
+            <th>代码</th>
             <th>申购日</th>
             <th>中签缴款日</th>
             <th>上市日</th>
             <th>申购上限</th>
-            <th>发行价 / 转股价</th>
+            <th>发行价</th>
+            <th>转股价</th>
           </tr>
         </thead>
         <tbody>
           ${Array.from({ length: 3 }, () => `
             <tr>
-              <td colspan="9">
+              <td colspan="10">
                 <div class="loading-line"></div>
               </td>
             </tr>
@@ -1955,53 +1959,63 @@ function renderSummaryCard(title, rows, extraClass = "") {
 function buildConvertibleColumns() {
   return [
     { key: 'index', label: '序号' },
-    {
-      key: 'bondInfo',
-      label: '转债',
-      sortable: true,
-      sortType: 'text',
-      defaultDir: 'asc',
-      sortValue: (row) => `${row.bondName || ''}-${row.code || ''}`,
-      render: (row) => `
-        <div>${escapeHtml(row.bondName || '--')}</div>
-        <div class="muted mono-text">${escapeHtml(row.code || '--')}</div>
-      `,
-    },
+    { key: 'bondName', label: '转债名称', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.bondName || ''), render: (row) => escapeHtml(row.bondName || '--') },
+    { key: 'code', label: '转债代码', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.code || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.code || '--')}</span>` },
     {
       key: 'price',
-      label: '转债现价 / 涨跌',
+      label: '转债现价',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
       sortValue: (row) => toNumber(row.price),
-      render: (row) => `
-        <div>${escapeHtml(formatNumber(row.price, 2))}</div>
-        <div class="muted ${escapeHtml(statusClass(row.changePercent))}">${escapeHtml(formatPercent(row.changePercent, 2))}</div>
-      `,
+      render: (row) => formatNumber(row.price, 2),
     },
     {
-      key: 'stockInfo',
-      label: '正股',
+      key: 'changePercent',
+      label: '转债涨跌幅',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.changePercent),
+      className: (row) => statusClass(row.changePercent),
+      render: (row) => formatPercent(row.changePercent, 2),
+    },
+    {
+      key: 'stockName',
+      label: '正股名称',
       sortable: true,
       sortType: 'text',
       defaultDir: 'asc',
-      sortValue: (row) => `${row.stockName || ''}-${row.stockCode || ''}`,
-      render: (row) => `
-        <div>${escapeHtml(row.stockName || '--')}</div>
-        <div class="muted mono-text">${escapeHtml(row.stockCode || '--')}</div>
-      `,
+      sortValue: (row) => String(row.stockName || ''),
+      render: (row) => escapeHtml(row.stockName || '--'),
+    },
+    {
+      key: 'stockCode',
+      label: '正股代码',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'asc',
+      sortValue: (row) => String(row.stockCode || ''),
+      render: (row) => `<span class="mono-text">${escapeHtml(row.stockCode || '--')}</span>`,
     },
     {
       key: 'stockPrice',
-      label: '正股现价 / 涨跌',
+      label: '正股现价',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
       sortValue: (row) => toNumber(row.stockPrice),
-      render: (row) => `
-        <div>${escapeHtml(formatNumber(row.stockPrice, 2))}</div>
-        <div class="muted ${escapeHtml(statusClass(row.stockChangePercent))}">${escapeHtml(formatPercent(row.stockChangePercent, 2))}</div>
-      `,
+      render: (row) => formatNumber(row.stockPrice, 2),
+    },
+    {
+      key: 'stockChangePercent',
+      label: '正股涨跌幅',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.stockChangePercent),
+      className: (row) => statusClass(row.stockChangePercent),
+      render: (row) => formatPercent(row.stockChangePercent, 2),
     },
     {
       key: 'stockAvgRoe3Y',
@@ -2023,16 +2037,22 @@ function buildConvertibleColumns() {
       render: (row) => formatPercent(row.stockDebtRatio, 2),
     },
     {
-      key: 'convertMetrics',
-      label: '转股价 / 转股价值',
+      key: 'convertPrice',
+      label: '转股价',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.convertPrice),
+      render: (row) => formatNumber(row.convertPrice, 2),
+    },
+    {
+      key: 'convertValue',
+      label: '转股价值',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
       sortValue: (row) => toNumber(row.convertValue),
-      render: (row) => `
-        <div>转股价 ${escapeHtml(formatNumber(row.convertPrice, 2))}</div>
-        <div class="muted">转股值 ${escapeHtml(formatNumber(row.convertValue, 2))}</div>
-      `,
+      render: (row) => formatNumber(row.convertValue, 2),
     },
     { key: 'premiumRate', label: '转股溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premiumRate), className: (row) => statusClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate, 2) },
     {
@@ -2145,41 +2165,21 @@ function buildPremiumColumns(type) {
   const config = getPremiumConfig(type);
   return [
     { key: 'index', label: '序号' },
-    {
-      key: 'aInfo',
-      label: 'A股',
-      sortable: true,
-      sortType: 'text',
-      defaultDir: 'asc',
-      sortValue: (row) => `${row.aName || ''}-${row.aCode || ''}`,
-      render: (row) => `
-        <div>${escapeHtml(row.aName || '--')}</div>
-        <div class="muted mono-text">${escapeHtml(row.aCode || '--')}</div>
-      `,
-    },
-    {
-      key: 'peerInfo',
-      label: config.peerNameLabel,
-      sortable: true,
-      sortType: 'text',
-      defaultDir: 'asc',
-      sortValue: (row) => `${row[config.peerNameKey] || ''}-${row[config.peerCodeKey] || ''}`,
-      render: (row) => `
-        <div>${escapeHtml(row[config.peerNameKey] || '--')}</div>
-        <div class="muted mono-text">${escapeHtml(row[config.peerCodeKey] || '--')}</div>
-      `,
-    },
+    { key: 'aCode', label: 'A股代码', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.aCode || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.aCode || '--')}</span>` },
+    { key: 'aName', label: 'A股名称', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.aName || ''), render: (row) => escapeHtml(row.aName || '--') },
+    { key: config.peerCodeKey, label: config.peerCodeLabel, sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row[config.peerCodeKey] || ''), render: (row) => `<span class="mono-text">${escapeHtml(row[config.peerCodeKey] || '--')}</span>` },
+    { key: config.peerNameKey, label: config.peerNameLabel, sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row[config.peerNameKey] || ''), render: (row) => escapeHtml(row[config.peerNameKey] || '--') },
     { key: 'aPrice', label: 'A股价', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.aPrice), render: (row) => formatNumber(row.aPrice, 2) },
     {
       key: config.peerMarketPriceKey,
-      label: '对手市场价',
+      label: config.peerMarketPriceLabel,
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
       sortValue: (row) => toNumber(row[config.peerMarketPriceKey]),
       render: (row) => formatNumber(row[config.peerMarketPriceKey], 2),
     },
-    { key: config.peerPriceKey, label: '对手人民币价', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row[config.peerPriceKey]), render: (row) => formatNumber(row[config.peerPriceKey], 2) },
+    { key: config.peerPriceKey, label: config.peerPriceLabel, sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row[config.peerPriceKey]), render: (row) => formatNumber(row[config.peerPriceKey], 2) },
     {
       key: 'priceGap',
       label: '价差',
@@ -2193,14 +2193,15 @@ function buildPremiumColumns(type) {
     { key: 'premium', label: '溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premium), className: (row) => statusClass(row.premium), render: (row) => formatPercent(row.premium, 2) },
     { key: 'percentile', label: '近三年分位', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.percentile), render: (row) => formatPercent(row.percentile, 2) },
     {
-      key: 'sampleInfo',
-      label: '样本信息',
-      sortable: false,
-      render: (row) => `
-        <div>样本 ${escapeHtml(formatInt(row.historyCount))}</div>
-        <div class="muted mono-text">${escapeHtml(formatHistoryRange(row))}</div>
-      `,
+      key: 'historyCount',
+      label: '样本数',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.historyCount),
+      render: (row) => formatInt(row.historyCount),
     },
+    { key: 'historyRange', label: '样本区间', sortable: false, render: (row) => `<span class="mono-text">${escapeHtml(formatHistoryRange(row))}</span>` },
   ];
 }
 
@@ -2282,7 +2283,6 @@ function renderConvertibleBondPanel() {
       <div class="module-toolbar">
         <div>
           <div class="tab-title">转债套利</div>
-          <div class="section-note">主表直出核心定价字段，减少在详情区来回切换。</div>
         </div>
         <div class="panel-meta">
           <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
@@ -2292,8 +2292,7 @@ function renderConvertibleBondPanel() {
       </div>
       <div class="summary-grid summary-grid-three">${summaryCards}</div>
       <div class="list-card">
-        <h3>转债套利主表</h3>
-        <div class="section-note">理论价值 = 纯债价值 + 期权理论价值；60 日波动率与理论相关字段仅作历史参考。</div>
+        <h3>主表</h3>
         ${renderPaginatedTable({
           tableKey: "cbArb",
           tableKind: "convertible",
@@ -2301,6 +2300,7 @@ function renderConvertibleBondPanel() {
           rows,
           emptyMessage: "转债套利暂时没有返回数据",
         })}
+        <div class="slim-note">理论价值 = 纯债价值 + 期权理论价值；60 日波动率与理论相关字段仅作历史参考。</div>
       </div>
     </div>
   `;
@@ -2341,7 +2341,6 @@ function renderPremiumPanel(type) {
       <div class="premium-toolbar">
         <div>
           <div class="tab-title">${config.title}</div>
-          <div class="section-note">主表按关键列紧凑展示，样本信息直接留在默认行。</div>
         </div>
         <div class="panel-meta">
           <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
@@ -2361,8 +2360,7 @@ function renderPremiumPanel(type) {
         )}
       </div>
       <div class="list-card">
-        <h3>${config.title}主表</h3>
-        <div class="section-note">样本区间采用压缩格式显示，例如 250520-260321。</div>
+        <h3>主表</h3>
         ${renderPaginatedTable({
           tableKey: type,
           tableKind: 'premium',
@@ -2386,7 +2384,7 @@ function buildPremiumSummaryRows(rows, config, summaryColumn) {
 }
 
 function buildPremiumExplainText(type, rows) {
-  const parts = ['“近三年百分位”按数据库当前可用历史样本计算，“样本区间”显示的是当前可用样本起止日期，不等于完整三年交易日。'];
+  const parts = ['“近三年分位”基于当前可用历史样本计算，“样本区间”显示实际覆盖起止日期。'];
   const catlRow = type === 'ah' ? rows.find((row) => String(row.aCode) === '300750') : null;
   if (catlRow) {
     parts.push(`宁德时代 300750 / 03750 当前样本区间为 ${formatHistoryRange(catlRow)}，可用样本数为 ${formatInt(catlRow.historyCount)}。`);
@@ -3130,8 +3128,10 @@ function renderStackItems(rows) {
           (row) => `
             <div class="stack-row">
               <div class="item-main">
-                <div class="item-title">${escapeHtml(row.title)}</div>
-                <div class="item-subtitle">${escapeHtml(row.subtitle)}</div>
+                <div class="item-title">
+                  ${escapeHtml(row.title)}
+                  ${row.subtitle ? `<span class="item-subtitle">${escapeHtml(row.subtitle)}</span>` : ''}
+                </div>
               </div>
               <div class="item-value ${escapeHtml(row.valueClass || '')}">${escapeHtml(row.value)}</div>
             </div>

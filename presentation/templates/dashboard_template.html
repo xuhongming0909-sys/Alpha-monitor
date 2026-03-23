@@ -132,7 +132,7 @@
       .hero {
         overflow: hidden;
         /* 首屏压缩：减少标题区高度，让主表更早进入视野 */
-        padding: 18px 22px 14px;
+        padding: 12px 16px 8px;
         box-shadow: var(--shadow-lg);
         background:
           radial-gradient(circle at right top, rgba(255, 85, 102, 0.18), transparent 24%),
@@ -150,18 +150,18 @@
       }
 
       .eyebrow {
-        margin: 0 0 6px;
+        margin: 0 0 4px;
         color: rgba(255, 226, 226, 0.74);
-        font-size: 10px;
-        letter-spacing: 0.24em;
+        font-size: 9px;
+        letter-spacing: 0.18em;
         text-transform: uppercase;
       }
 
       .hero h1 {
         margin: 0;
-        font-size: clamp(28px, 3.3vw, 42px);
-        letter-spacing: 0.04em;
-        line-height: 0.96;
+        font-size: clamp(24px, 2.8vw, 34px);
+        letter-spacing: 0.03em;
+        line-height: 1;
       }
 
       .hero-status-row {
@@ -171,44 +171,25 @@
         flex-wrap: wrap;
         gap: 8px 12px;
         align-items: center;
-        margin-top: 14px;
-        padding-top: 10px;
+        margin-top: 10px;
+        padding-top: 8px;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
-      }
-
-      .hero-version-row {
-        position: relative;
-        z-index: 1;
-        margin-top: 6px;
-      }
-
-      .hero-version-row .status-inline-note {
-        display: inline-flex;
-        align-items: center;
-        min-height: 24px;
-        padding: 0 10px;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        background: rgba(255, 255, 255, 0.025);
       }
 
       .status-inline {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px 8px;
+        gap: 4px 10px;
         min-height: 18px;
-        color: var(--text-soft);
+        color: rgba(245, 243, 241, 0.86);
         font-size: 13px;
       }
 
       .status-inline-item {
         display: inline-flex;
-        gap: 6px;
+        gap: 5px;
         align-items: center;
-        padding: 4px 10px;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.035);
+        padding: 0;
       }
 
       .status-inline-item strong {
@@ -221,18 +202,18 @@
       }
 
       .status-inline-note {
-        color: var(--text-faint);
+        color: rgba(245, 243, 241, 0.62);
         font-size: 12px;
       }
 
       .top-section {
-        margin-top: 12px;
+        margin-top: 8px;
       }
 
       .subscription-panel,
       .module-shell {
         /* 统一模块密度，避免卡片壳层过厚 */
-        padding: 14px 16px;
+        padding: 10px 12px;
       }
 
       .section-head,
@@ -242,7 +223,7 @@
         justify-content: space-between;
         align-items: flex-start;
         gap: 10px;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
       }
 
       .section-head > :first-child,
@@ -256,16 +237,16 @@
       .section-head h2,
       .tab-title {
         margin: 0;
-        font-size: 18px;
+        font-size: 17px;
         font-weight: 700;
       }
 
       .section-note,
       .panel-meta,
       .slim-note {
-        color: var(--text-soft);
+        color: rgba(245, 243, 241, 0.72);
         font-size: calc(var(--table-font-size-desktop) - 1px);
-        line-height: 1.45;
+        line-height: 1.32;
       }
 
       .panel-meta {
@@ -277,11 +258,11 @@
       .panel-meta span {
         display: inline-flex;
         align-items: center;
-        min-height: 30px;
-        padding: 0 10px;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.035);
+        min-height: 24px;
+        padding: 0 7px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(255, 255, 255, 0.025);
       }
 
       .subscription-table-wrap,
@@ -297,14 +278,10 @@
 
       .push-strip {
         display: grid;
-        gap: 10px;
-        margin-top: 12px;
-        padding: 10px 12px 12px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: var(--radius-md);
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0)),
-          rgba(255, 255, 255, 0.018);
+        gap: 8px;
+        margin-top: 10px;
+        padding: 6px 0 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
       }
 
       .push-strip-head {
@@ -330,7 +307,7 @@
       .push-strip-note {
         color: var(--text-soft);
         font-size: 12px;
-        max-width: 680px;
+        max-width: 620px;
         text-align: right;
       }
 
@@ -357,7 +334,7 @@
       select,
       textarea {
         width: 100%;
-        min-height: 38px;
+        min-height: 36px;
         padding: 8px 12px;
         border-radius: var(--radius-sm);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -411,7 +388,7 @@
       .btn-secondary,
       .tab-button,
       .pagination-button {
-        padding: 9px 14px;
+        padding: 7px 12px;
         font-size: 13px;
       }
 
@@ -474,15 +451,8 @@
         /* 主导航压缩为更像信息切换条，而不是大卡片按钮组 */
         display: grid;
         grid-template-columns: repeat(6, minmax(0, 1fr));
-        gap: 10px;
-        margin: 12px 0 10px;
-        padding: 8px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 18px;
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0)),
-          rgba(255, 255, 255, 0.016);
-        backdrop-filter: blur(16px);
+        gap: 6px;
+        margin: 8px 0 6px;
       }
 
       .tab-button {
@@ -492,6 +462,8 @@
         font-weight: 700;
         letter-spacing: 0.02em;
         text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.025);
       }
 
       .tab-button::after {
@@ -551,8 +523,8 @@
       .summary-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-        margin-bottom: 10px;
+        gap: 6px;
+        margin-bottom: 6px;
       }
 
       .summary-grid.summary-grid-three {
@@ -561,7 +533,7 @@
 
       .summary-card,
       .list-card {
-        padding: 12px 13px;
+        padding: 9px 10px;
         border-radius: var(--radius-md);
         background:
           linear-gradient(180deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.01)),
@@ -583,8 +555,8 @@
 
       .summary-card h3,
       .list-card h3 {
-        margin: 0 0 8px;
-        font-size: 15px;
+        margin: 0 0 4px;
+        font-size: 13px;
       }
 
       .summary-card .stack-row {
@@ -596,7 +568,7 @@
       }
 
       .summary-card .item-value {
-        font-size: 16px;
+        font-size: 15px;
       }
 
       .negative-card .item-value {
@@ -604,16 +576,16 @@
       }
 
       .card-stack + .card-stack {
-        margin-top: 10px;
+        margin-top: 8px;
       }
 
       .summary-card.compact-card {
-        padding: 10px 11px;
+        padding: 7px 8px;
       }
 
       .summary-card.compact-card h3 {
-        margin-bottom: 8px;
-        font-size: 14px;
+        margin-bottom: 4px;
+        font-size: 13px;
       }
 
       .monitor-editor-card {
@@ -751,14 +723,15 @@
 
       .stack-list {
         display: grid;
-        gap: 8px;
+        gap: 6px;
       }
 
       .stack-row {
         display: flex;
         justify-content: space-between;
-        gap: 12px;
-        padding: 8px 10px;
+        align-items: center;
+        gap: 10px;
+        padding: 5px 8px;
         border-radius: 12px;
         background: rgba(255, 255, 255, 0.03);
       }
@@ -778,19 +751,21 @@
       .item-title {
         font-size: 14px;
         font-weight: 700;
+        line-height: 1.32;
       }
 
       .item-subtitle {
-        margin-top: 2px;
+        margin-left: 5px;
         color: var(--text-soft);
         font-size: 12px;
-        line-height: 1.4;
+        line-height: 1.35;
+        font-weight: 400;
       }
 
       .item-value {
         flex-shrink: 0;
         text-align: right;
-        font-size: 15px;
+        font-size: 14px;
         font-weight: 700;
       }
 
@@ -827,9 +802,12 @@
       }
 
       table {
-        width: 100%;
+        /* 让列宽优先跟随内容，横向滚动用于承载更多真实字段 */
+        width: max-content;
+        min-width: 100%;
         border-collapse: collapse;
-        table-layout: fixed;
+        /* 表格以数据可读性优先，避免 fixed 布局导致无意义折行 */
+        table-layout: auto;
       }
 
       table[data-table-kind="subscription"] {
@@ -868,7 +846,9 @@
         vertical-align: top;
         font-size: var(--table-font-size-desktop);
         line-height: var(--table-line-height-desktop);
-        word-break: break-word;
+        white-space: nowrap;
+        word-break: normal;
+        overflow-wrap: normal;
         font-variant-numeric: tabular-nums;
       }
 
@@ -922,8 +902,8 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 4px 10px;
-        border-radius: 999px;
+        padding: 3px 8px;
+        border-radius: 8px;
         font-size: 12px;
         font-weight: 700;
         white-space: nowrap;
@@ -963,6 +943,30 @@
 
       .mono-text {
         font-family: "Consolas", "SFMono-Regular", "Courier New", monospace;
+      }
+
+      .cell-inline {
+        display: inline-flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 2px 6px;
+        min-width: 0;
+      }
+
+      .cell-inline.tight {
+        gap: 2px 6px;
+      }
+
+      .cell-code {
+        color: var(--text-soft);
+      }
+
+      .cell-muted {
+        color: var(--text-soft);
+      }
+
+      .cell-divider {
+        color: rgba(255, 255, 255, 0.28);
       }
 
       .expand-button {
@@ -1061,8 +1065,8 @@
         display: grid;
         gap: 8px;
         place-items: center;
-        min-height: 120px;
-        padding: 18px;
+        min-height: 92px;
+        padding: 14px;
         text-align: center;
         color: var(--text-soft);
       }
@@ -1073,8 +1077,8 @@
         align-items: center;
         gap: 12px;
         flex-wrap: wrap;
-        margin-top: 10px;
-        padding-top: 10px;
+        margin-top: 6px;
+        padding-top: 6px;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
       }
 
@@ -1307,9 +1311,6 @@
         <div class="hero-status-row">
           <div id="status-line" class="status-inline"></div>
           <div id="status-update-text" class="status-inline-note">正在连接市场接口</div>
-        </div>
-        <div class="hero-version-row">
-          <div id="build-version-text" class="status-inline-note">版本信息读取中</div>
         </div>
       </header>
 

@@ -1959,6 +1959,10 @@ async function pushEventAlertsToWeCom(options = {}) {
   return eventAlertService.pushConvertibleBondAlerts(options);
 }
 
+async function pushManualEventAlertsToWeCom(options = {}) {
+  return pushEventAlertsToWeCom({ ...options, force: true });
+}
+
 async function callDeepSeekChatCompletion({ systemPrompt, userPrompt, temperature = 0.2 }) {
   if (!DEEPSEEK_API_KEY) {
     throw new Error('未配置 DEEPSEEK_API_KEY');
@@ -2066,6 +2070,21 @@ async function pushByModulesToWeCom(options = {}) {
   return mainSummaryService.pushByModulesToWeCom(options);
 }
 
+async function pushManualSummaryToWeCom(options = {}) {
+  const attemptAt = nowIso();
+  pushRuntimeDomain.setPushAttempt('main', attemptAt);
+  try {
+    const result = await mainSummaryService.pushByModulesToWeCom(options);
+    pushRuntimeDomain.setPushSuccess('main', attemptAt, getShanghaiParts().date);
+    pushRuntimeDomain.save();
+    return result;
+  } catch (error) {
+    pushRuntimeDomain.setPushError('main', error?.message || error);
+    pushRuntimeDomain.save();
+    throw error;
+  }
+}
+
 async function runMainPushIfNeeded() {
   return weComScheduler.runMainPushIfNeeded();
 }
@@ -2144,8 +2163,8 @@ registerPushRoutes({
   updatePushConfig: (payload) => pushConfigDomain.updatePushConfig(payload),
   buildPushConfigResponse: buildPushConfigViewModel,
   getPushRuntimeState: () => pushRuntimeState,
-  pushByModulesToWeCom,
-  pushEventAlertsToWeCom,
+  pushByModulesToWeCom: pushManualSummaryToWeCom,
+  pushEventAlertsToWeCom: pushManualEventAlertsToWeCom,
 });
 
 registerDashboardRoutes({

@@ -271,16 +271,16 @@ presentation:
   show_empty_modules: true
   show_failure_state: true
   dashboard_table_ui:
-    desktop_font_px: 14
-    desktop_header_font_px: 14
-    desktop_line_height: 1.58
-    desktop_cell_padding_y: 10
-    desktop_cell_padding_x: 12
-    tablet_font_px: 13
+    desktop_font_px: 16
+    desktop_header_font_px: 15
+    desktop_line_height: 1.42
+    desktop_cell_padding_y: 7
+    desktop_cell_padding_x: 10
+    tablet_font_px: 15
     min_width_by_kind:
       subscription: 1180
-      convertible: 1560
-      premium: 1240
+      convertible: 2360
+      premium: 1560
       monitor: 1320
       dividend: 1100
       merger: 1280
