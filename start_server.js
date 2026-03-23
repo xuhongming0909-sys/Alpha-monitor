@@ -126,6 +126,22 @@ function normalizeTimeListConfig(values, fallback) {
   return items.length ? items : [fallback];
 }
 
+function isLoopbackHost(hostname) {
+  const text = String(hostname || '').trim().toLowerCase();
+  return text === '127.0.0.1' || text === 'localhost' || text === '0.0.0.0';
+}
+
+function isLoopbackUrl(urlText) {
+  const text = String(urlText || '').trim();
+  if (!text) return true;
+  try {
+    const parsed = new URL(text);
+    return isLoopbackHost(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function pluginFetchConfig(key) {
   const config = DATA_FETCH_CONFIG?.[key];
   return config && typeof config === 'object' ? config : {};
@@ -196,6 +212,10 @@ const NOTIFICATION_SUMMARY_CONFIG = (NOTIFICATION_CONFIG?.summary && typeof NOTI
 const PUSH_CALENDAR_MODE = String(
   NOTIFICATION_CONFIG?.scheduler?.calendar_mode || 'daily'
 ).trim().toLowerCase() || 'daily';
+const PUSH_SCHEDULER_RUNTIME_ENABLED = Boolean(NOTIFICATION_CONFIG?.scheduler?.enabled) && !isLoopbackUrl(PUBLIC_BASE_URL);
+const PUSH_SCHEDULER_DISABLED_REASON = PUSH_SCHEDULER_RUNTIME_ENABLED
+  ? ''
+  : (Boolean(NOTIFICATION_CONFIG?.scheduler?.enabled) ? 'loopback_public_base_url' : 'scheduler_config_disabled');
 const DEFAULT_NOTIFICATION_MODULES = buildNotificationModuleDefaults();
 const EVENT_ALERT_CONFIG = (NOTIFICATION_CONFIG?.event_alert && typeof NOTIFICATION_CONFIG.event_alert === 'object')
   ? NOTIFICATION_CONFIG.event_alert
@@ -821,8 +841,9 @@ function getPushDeliveryStatus() {
   return {
     webhookConfigured: Boolean(WECOM_WEBHOOK_URL),
     pushHtmlUrlConfigured: Boolean(PUSH_HTML_URL),
-    schedulerEnabled: Boolean(NOTIFICATION_CONFIG?.scheduler?.enabled),
+    schedulerEnabled: PUSH_SCHEDULER_RUNTIME_ENABLED,
     calendarMode: PUSH_CALENDAR_MODE,
+    schedulerDisabledReason: PUSH_SCHEDULER_DISABLED_REASON || null,
   };
 }
 
@@ -1222,7 +1243,17 @@ async function runDataJobsCycle(context = 'tick', options = {}) {
 }
 
 async function runPushSchedulerCycle(context = 'tick') {
-  const details = { context };
+  const details = {
+    context,
+    runtimeEnabled: PUSH_SCHEDULER_RUNTIME_ENABLED,
+    disabledReason: PUSH_SCHEDULER_DISABLED_REASON || null,
+    publicBaseUrl: PUBLIC_BASE_URL,
+  };
+
+  if (!PUSH_SCHEDULER_RUNTIME_ENABLED) {
+    updateHealthSection('push_scheduler', 'ok', 'Push scheduler is intentionally disabled in local runtime', details);
+    return;
+  }
 
   try {
     await weComScheduler.runTick();
@@ -1240,7 +1271,18 @@ function startScheduler() {
   if (schedulerStarted) return;
   schedulerStarted = true;
   updateHealthSection('data_jobs', 'starting', 'Background data jobs are starting');
-  updateHealthSection('push_scheduler', 'starting', 'Push scheduler is starting');
+  if (PUSH_SCHEDULER_RUNTIME_ENABLED) {
+    updateHealthSection('push_scheduler', 'starting', 'Push scheduler is starting', {
+      runtimeEnabled: true,
+      publicBaseUrl: PUBLIC_BASE_URL,
+    });
+  } else {
+    updateHealthSection('push_scheduler', 'ok', 'Push scheduler is disabled in local runtime', {
+      runtimeEnabled: false,
+      disabledReason: PUSH_SCHEDULER_DISABLED_REASON || null,
+      publicBaseUrl: PUBLIC_BASE_URL,
+    });
+  }
 
   refreshTimer = setInterval(async () => {
     if (schedulerTickRunning) return;
@@ -1340,6 +1382,7 @@ const dividendRuntimeService = createDividendRuntimeService({
   nowIso,
   callDataCore,
   getStockPrice,
+  loadMonitors: () => customMonitorRuntimeService.loadMonitors(),
 });
 
 const {

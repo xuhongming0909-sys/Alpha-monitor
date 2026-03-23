@@ -1049,7 +1049,7 @@ Plan:
    - stop hardcoding `http://127.0.0.1:5000` in the root `index.html`
    - expose a lightweight runtime access-info API from the Node server
    - let the root entry page render the real configured service/public URL at runtime when served by the app
-   - when `index.html` is opened directly as a local file, keep preview usable and degrade gracefully instead of pretending a fixed port is always correct
+   - when `index.html` is opened directly as a local file, do not provide local preview; instead clearly guide the user to the configured cloud public URL
 4. Keep this round narrow:
    - no market-data formula changes
    - no scheduler behavior changes
@@ -1060,4 +1060,128 @@ Acceptance:
 - The temporary root-level `PROJECT_*` files are removed from the active repository surface.
 - The root `index.html` no longer displays or links to a hardcoded `http://127.0.0.1:5000`.
 - The access entry page shows the real runtime service URL when opened through the running app.
-- Direct local-file preview still works and no longer claims a fixed service URL that may be false.
+- Direct local-file open no longer provides local preview and instead directs the user to the cloud runtime path.
+
+## 34. Phase AF: Cloud-only Runtime Surface (2026-03-24)
+
+Goal: align the repository with the new rule that Alpha Monitor is officially a cloud-only runtime and no longer provides a local operator-facing access path.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the cloud-only runtime contract.
+2. Keep developer-only local validation capability (`npm run dev`) for coding and checks, but stop treating any Windows-local helper path as an official runtime surface.
+3. Remove repository-level local stable-runtime entrypoints and task installers that were previously used to keep a Windows-local service alive.
+4. Replace the root `index.html` access page so it points users to the configured cloud public URL and health endpoint instead of local preview/service guidance.
+5. Remove local-preview and local-service wording from dashboard user-facing copy where it implies the product should be opened from a local machine.
+6. Update `RUNBOOK.md` and `quickstart.md` so they distinguish:
+   - cloud runtime = official/long-term
+   - local run = development validation only
+
+Acceptance:
+- The repository no longer exposes Windows-local stable-runtime commands as official package scripts.
+- Local watcher/task helper files are removed from the active runtime surface.
+- The root access page no longer offers local preview or local service start guidance.
+- User-facing dashboard copy no longer tells the operator to confirm a local service.
+- Docs consistently state that official access is through the cloud public URL only.
+
+## 35. Phase AG: Local Push-scheduler Suppression (2026-03-24)
+
+Goal: prevent accidental local startup from triggering repeated push failures when the runtime is still a loopback-only development instance.
+
+Plan:
+1. Keep this round minimal and runtime-scoped:
+   - no deploy-flow change
+   - no push content change
+   - no webhook contract change
+2. Treat loopback-only access configuration as a local/development runtime for push purposes.
+3. When the effective public base URL resolves to loopback/localhost, suppress the push scheduler instead of attempting timed sends.
+4. Keep cloud/public runtimes unchanged so the server still performs scheduled pushes normally.
+5. Reflect the suppression truthfully in health and push-delivery status instead of surfacing repeated missing-webhook errors.
+
+Acceptance:
+- Local startup with `127.0.0.1`/`localhost` public URL no longer logs repeated `未配置 WECOM_WEBHOOK_URL` scheduled-push failures.
+- Cloud runtime with a real public URL keeps scheduled push behavior unchanged.
+- `/api/health` and push delivery status clearly show that local push scheduling is intentionally disabled rather than degraded.
+
+## 35. Phase AG: Core Cloud-env Sync From Server Profile (2026-03-24)
+
+Goal: make cloud runtime core parameters syncable from the repository-local server profile, so later Codex sessions can directly push the latest webhook/public URL class parameters to the server without asking again.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the cloud-env-sync contract.
+2. Keep this round limited to deployment/config sync only:
+   - no market-data fetch changes
+   - no dashboard behavior changes
+   - no push rule changes
+3. Add a repository-owned sync script that:
+   - reads `ops/server_profile.local.yaml`
+   - derives the authoritative remote env values for core parameters
+   - writes them into the configured remote `.env`
+   - optionally restarts the managed service and checks health
+4. Expose a stable local command entry so future Codex sessions can call the same path directly.
+5. Keep precedence explicit:
+   - server profile public URL is the source of truth for `PUBLIC_BASE_URL` and push HTML URL class fields
+   - server profile webhook is the source of truth for `WECOM_WEBHOOK_URL`
+   - effective local config may continue supplying other env-backed secrets when present
+6. After implementation, execute one real sync against the configured cloud server and verify health.
+
+Acceptance:
+- Repository contains a stable cloud-env sync command.
+- The command reads `ops/server_profile.local.yaml` instead of requiring re-entry of host/password/webhook/public URL.
+- The command can update the remote `.env` keys for webhook/public URL style core parameters.
+- When the sync changes effective values, the managed service is restarted and the health check passes.
+- A later Codex session can reuse the same stored parameters and command path directly.
+
+## 36. Phase AH: Core-table Concentration + Dividend Watchlist Merge (2026-03-24)
+
+Goal: finish the latest dashboard usability corrections without changing existing route semantics or business formulas.
+
+Plan:
+1. Keep this round minimal and presentation-first:
+   - no new page
+   - no unrelated refactor
+   - keep existing sorting / pagination / route semantics
+2. Clarify convertible-bond volatility wording and visibility:
+   - `60日波动率` remains an existing real field
+   - wording must reflect historical K-line based real-data calculation
+   - the column stays in the default main-reading area
+3. Improve wide-table readability so more core fields stay in the first screen:
+   - prioritize core convertible fields in earlier columns
+   - reduce unnecessary horizontal padding / min-width inflation
+   - allow content-aware width squeezing when columns are many
+   - keep tables auto-adapting to container width when columns are fewer
+4. Fix premium top-summary behavior:
+   - `AB溢价` top summary must stay anchored to `溢价率前三 / 倒数前三`
+   - it must not switch to `近三年分位` just because the table sort column changed
+5. Repair dividend watchlist source coverage:
+   - the dividend page must include the user’s existing selected stocks
+   - current dividend portfolio and existing custom-monitor stock selections must be merged into one read path
+   - duplicate codes must be de-duplicated
+
+Acceptance:
+ - `60日波动率` is visibly present in the convertible main table and the page copy states it comes from historical K-line real data.
+ - Convertible core columns require less horizontal sliding than the previous version.
+ - Wide tables squeeze column usage when fields are many, but still stretch naturally when fields are fewer.
+ - `AB溢价` top summary always shows premium top/bottom leaders.
+ - Dividend page shows the previously selected watchlist rows instead of only the standalone dividend portfolio file.
+
+## 37. Phase AI: Subscription Payment-day Truth Fix (2026-03-24)
+
+Goal: repair the top subscription table so `今日中签缴款` reflects the real payment day instead of incorrectly using the lottery-announcement day.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the corrected payment-day contract.
+2. Keep this round minimal and scoped to the subscription display path:
+   - no data-fetch source change
+   - no API route shape change
+   - no unrelated dashboard refactor
+3. Correct the page rule:
+   - `今日中签缴款` must be triggered by `paymentDate = today`
+   - the visible `中签缴款日` column must display `paymentDate`
+   - `lotteryDate` must no longer masquerade as `中签缴款日`
+4. Keep the existing “不单独显示摇号/中签公告列” rule, but restore truthful wording and matching dates.
+5. Verify against live 2026-03-24 subscription data that multiple IPO payment rows appear instead of the current single wrong hit.
+
+Acceptance:
+- On 2026-03-24, the top subscription table no longer labels `隆源股份` as `今日中签缴款`.
+- The same table includes the real 2026-03-24 payment rows such as `盛龙股份`、`慧谷新材`、`泰金新能`.
+- The visible `中签缴款日` column matches the same `paymentDate` field used by the stage judgment.

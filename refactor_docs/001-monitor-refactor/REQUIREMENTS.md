@@ -758,9 +758,9 @@
   - 页面必须展示真实可访问的服务地址
   - “打开服务版页面”按钮必须指向真实运行地址
 - 当 `index.html` 被直接当作本地文件打开时：
-  - 页面可以继续提供本地预览
+  - 页面不得继续提供本地预览
   - 页面不得继续声称固定服务地址一定是 `127.0.0.1:5000`
-  - 页面应提示以 `config.yaml > app.server_base_url` 或当前运行服务为准
+  - 页面应明确提示正式访问只认云端 `deployment.public_base_url`
 
 ## 32. LOF Arbitrage Zero-login Module Contract (2026-03-23)
 - Dashboard adds a new top-level module `LOF套利`.
@@ -1124,3 +1124,85 @@
 - The default automatic `push main` deploy path must remain the safe full deploy path and must not silently switch to fast mode.
 - GitHub Actions manual deploy must support selecting `full` or `fast` mode.
 - If fast deploy is used when dependencies have actually changed, the failure must remain visible through service restart failure, health failure, or homepage marker failure; the script must not fake success.
+
+## 41. Cloud-only Runtime Contract (2026-03-24)
+- The official Alpha Monitor runtime target is cloud-only.
+- Official user/operator access must use the configured cloud public URL, not a Windows-local helper entry, local preview page, or local scheduled task.
+- The repository may keep developer-only local execution for coding and verification, but that path must be clearly labeled as development-only and must not be presented as the product's formal access method.
+- Package-level official scripts must not expose Windows-local stable-runtime management commands such as:
+  - local watcher bootstrap
+  - local watcher stop
+  - local scheduled-task install/uninstall
+  - local access-info display
+- The root repository access page must stop offering:
+  - local preview
+  - local service start instructions
+  - local-service-first wording
+- The root access page must instead guide the user to:
+  - configured public homepage URL
+  - configured public `/api/health`
+  - deployment/runbook instructions when public URL is not yet available
+- Dashboard user-facing failure copy must not tell the user to "confirm local service is started"; the wording must stay environment-neutral or cloud-oriented.
+- `RUNBOOK.md` and `quickstart.md` must explicitly state:
+  - cloud runtime is the only official long-term operating mode
+  - local `npm run dev` exists only for development validation
+
+## 42. Local Push-scheduler Suppression Contract (2026-03-24)
+- Loopback-only runtime must not execute scheduled push attempts.
+- The suppression trigger for this round is:
+  - effective public base URL host is `127.0.0.1`, `localhost`, or `0.0.0.0`
+- Under this local-runtime condition:
+  - timed push scheduler must be skipped
+  - local startup must not repeatedly fail because `WECOM_WEBHOOK_URL` is absent
+  - health/push status must expose that the scheduler is intentionally disabled
+- Cloud runtime with a non-loopback public URL must keep the existing timed push behavior unchanged.
+
+## 42. Core Cloud-env Sync Contract (2026-03-24)
+- Cloud runtime core parameters backed by environment variables must be syncable to the server without a full GitHub deploy.
+- The authoritative connection/runtime source for this sync path is `ops/server_profile.local.yaml`.
+- Later Codex sessions must be able to read that file and reuse:
+  - server host / port / user / auth
+  - remote app directory
+  - remote `.env` file path
+  - managed service name
+  - stored webhook / public URL values
+- The repository must provide a stable local command entry for this sync path.
+- The sync path must at least cover the following remote env keys when authoritative values exist:
+  - `WECOM_WEBHOOK_URL`
+  - `PUBLIC_BASE_URL`
+  - `PUSH_HTML_URL`
+  - `ALPHA_MONITOR_HTML_URL`
+- Public-URL class values must prefer the server profile public URL as the source of truth instead of stale local `.env` leftovers.
+- Webhook values must prefer the server profile stored webhook when present.
+- Other env-backed secrets that already exist in effective local config may also be synced, but this round must not require inventing new secret storage.
+- After remote `.env` values change, the sync path must restart the managed service and verify the configured health endpoint.
+- If no effective value changed, the sync path may skip restart but must still report that the server is already aligned.
+
+## 43. Core-table Concentration + Dividend Watchlist Merge Contract (2026-03-24)
+- This round keeps existing route paths, pagination size, and business formulas unchanged unless explicitly stated below.
+- `转债套利` page must treat `60日波动率` as an existing core field rather than a hidden trailing field.
+- The visible wording for `60日波动率` must state that it is calculated from the historical K-line store using real price data.
+- Wide-table presentation must prioritize “core fields on the first screen”:
+  - keep one field per column
+  - keep single-line cells by default
+  - reduce unnecessary horizontal whitespace
+  - allow light horizontal scrolling for the remaining non-core fields
+- When a table has fewer columns, it must still expand naturally to use available width instead of staying artificially narrow.
+- `AB溢价` top summary cards are fixed to:
+  - `溢价率前三`
+  - `溢价率倒数前三`
+- `AB溢价` top summary cards must not switch to `近三年分位` because of temporary table sorting changes.
+- Historical percentile calculation is a data-side contract and should move toward adjusted-price history; this round must not fake percentile values in the UI.
+- Dividend page watchlist contract for this round:
+  - visible rows come from the union of the saved dividend portfolio and the user’s existing custom-monitor stock selections
+  - rows are de-duplicated by stock code
+  - auto-merged rows must not break existing manual dividend add/remove behavior
+
+## 43. Subscription Payment-day Truth Contract (2026-03-24)
+- This contract supersedes older subscription wording that treated `lotteryDate` as the payment-day display source.
+- In the top `股债打新` table:
+  - the visible `中签缴款日` column must display the real `paymentDate`
+  - the `今日中签缴款` stage must be triggered by `paymentDate = 今天`
+  - `lotteryDate` must not masquerade as `中签缴款日`
+- The page may still keep `摇号日 / 中签公告日` hidden as a standalone column, but hiding that column must not change the meaning of the visible payment-day field.
+- On 2026-03-24, the page must show the real payment-day rows from live source data, including the currently due IPO rows, instead of only a single `lotteryDate = 今天` false hit.

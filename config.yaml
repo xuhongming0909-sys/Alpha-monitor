@@ -275,12 +275,12 @@ presentation:
     desktop_header_font_px: 15
     desktop_line_height: 1.42
     desktop_cell_padding_y: 7
-    desktop_cell_padding_x: 10
+    desktop_cell_padding_x: 8
     tablet_font_px: 15
     min_width_by_kind:
       subscription: 1180
-      convertible: 2360
-      premium: 1560
+      convertible: 2080
+      premium: 1440
       monitor: 1320
       dividend: 1100
       merger: 1280

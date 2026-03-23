@@ -1312,9 +1312,9 @@ GitHub 自动部署正式链路固定为：
   - it renders the returned URLs into the page
   - it uses the returned service URL for the primary open-service action
 - When the page is opened as a local file:
-  - it keeps local template preview available
+  - it does not provide local template preview
   - it does not claim a fixed service URL
-  - health probing may be skipped or degrade silently instead of forcing a false fixed-port assumption
+  - it clearly guides the user to the configured cloud public URL
 
 ### 23.4 Safety boundary
 - This round must not change:
@@ -2042,3 +2042,189 @@ GitHub 自动部署正式链路固定为：
 - `push main` must continue using `full`.
 - Manual `fast` deploy must execute `tools/deploy/update_fast.sh`.
 - Manual `full` deploy and push-triggered deploy must execute `tools/deploy/update_from_github.sh`.
+
+## 30. Cloud-only Runtime Surface Spec (2026-03-24)
+
+### 30.1 Official runtime boundary
+- Official runtime surface is fixed to:
+  - cloud server process
+  - cloud reverse proxy public entry
+  - public homepage URL
+  - public `/api/health`
+- Windows-local stable-runtime helper flow is removed from the active repository runtime surface.
+- Developer-only local execution remains allowed through:
+  - `npm run dev`
+  - `npm run start`
+- These local commands are for development/verification only and must not be described as the formal operator entry.
+
+### 30.2 Package-script rule
+- `package.json` must not expose the following local-runtime management scripts:
+  - `start:stable`
+  - `stop:stable`
+  - `show:access`
+  - `install:stable-task`
+  - `uninstall:stable-task`
+- Any removed local-runtime scripts must not remain documented as official entrypoints in `RUNBOOK.md`.
+
+### 30.3 Root access page rule
+- Root `index.html` must become a cloud-access guidance page.
+- It must not render:
+  - local preview iframe
+  - local template-open button
+  - local service startup instructions
+- It may fetch runtime access info when served over HTTP(S), and may show:
+  - public homepage URL
+  - public health URL
+  - environment/access hint
+- When opened directly as a file, it must state that the project is cloud-only and tell the user to use the deployed public URL or runbook instructions.
+
+### 30.4 Dashboard wording rule
+- Dashboard status/failure copy in `presentation/dashboard/dashboard_page.js` must not instruct the user to confirm a local service.
+- Equivalent wording must be updated to neutral/cloud-safe phrasing such as:
+  - confirm service is reachable
+  - confirm cloud service is healthy
+
+### 30.5 Repository file-surface rule
+- The active repository must remove Windows-local stable-runtime helper files from the formal access surface, including:
+  - `start_dashboard.bat`
+  - `stop_dashboard.bat`
+  - `tools/start_stable.ps1`
+  - `tools/stop_stable.ps1`
+  - `tools/keep_running.js`
+  - `tools/install_stable_task.ps1`
+  - `tools/uninstall_stable_task.ps1`
+  - `tools/show_access_info.ps1`
+
+## 31. Local Push-scheduler Suppression Spec (2026-03-24)
+
+### 31.1 Runtime gate rule
+- Timed push scheduling is additionally gated by effective runtime access shape.
+- The scheduler must treat the runtime as local/development-only when `PUBLIC_BASE_URL` resolves to a loopback host:
+  - `127.0.0.1`
+  - `localhost`
+  - `0.0.0.0`
+
+### 31.2 Behavior rule
+- When the runtime is loopback-only:
+  - `runPushSchedulerCycle()` must not call timed push execution
+  - scheduler health must report an intentional disabled state, not an operational failure
+  - push delivery status must report scheduler disabled for runtime reasons
+- Existing data-job scheduling remains unchanged.
+
+### 31.3 Cloud-preservation rule
+- When `PUBLIC_BASE_URL` is non-loopback, timed push scheduling remains unchanged:
+  - same schedule parsing
+  - same retry semantics
+  - same runtime state updates
+
+## 31. Core Cloud-env Sync Spec (2026-03-24)
+
+### 31.1 Scope
+- This round adds a deployment/config-sync helper only.
+- No dashboard route, market-data formula, scheduler rule, or push-format change is allowed in this round.
+
+### 31.2 Command contract
+- `package.json` must expose a stable local command:
+  - `npm run sync:server:env`
+- The command must run a repository-owned script under `tools/deploy/`.
+
+### 31.3 Authoritative input contract
+- The sync script must read `ops/server_profile.local.yaml` first.
+- Required profile fields for this round:
+  - `connection.host`
+  - `connection.port`
+  - `connection.user`
+  - one of `connection.password` or `connection.private_key`
+  - `app.env_file`
+  - `app.service_name`
+- The sync script may also read effective local config to obtain already-known env-backed secrets, but must not ask the operator to re-enter values that are already stored in the profile.
+
+### 31.4 Remote env mapping rule
+- The sync script must upsert remote `.env` keys while preserving unrelated existing keys.
+- The minimum key mapping contract is:
+  - `WECOM_WEBHOOK_URL`
+    - source priority: `ops/server_profile.local.yaml > notifications.wecom_webhook_url`
+  - `PUBLIC_BASE_URL`
+    - source priority: `ops/server_profile.local.yaml public_url > effective config deployment.public_base_url`
+  - `PUSH_HTML_URL`
+    - source priority: `ops/server_profile.local.yaml public_url with trailing slash > effective config notification.wecom.push_html_url`
+  - `ALPHA_MONITOR_HTML_URL`
+    - same normalized value as `PUSH_HTML_URL`
+- Additional keys may be synced when the effective local config already resolves them to non-empty values, including:
+  - `DEEPSEEK_API_KEY`
+  - `DEEPSEEK_BASE_URL`
+  - `JISILU_COOKIE`
+
+### 31.5 Runtime-apply rule
+- When the sync script changes any remote `.env` value, it must:
+  - restart the configured managed service
+  - check the configured local health endpoint on the server
+- When no value changes, the script may skip restart and must report `already_in_sync`-style output.
+
+### 31.6 Safety/output rule
+- The sync script must support a dry-run mode.
+- The script output must summarize:
+  - target host
+  - target remote env file
+  - changed keys
+  - whether service restart was performed
+  - whether health check passed
+- The script must never print full secret values back to stdout.
+
+## 32. Core-table Concentration + Dividend Watchlist Merge Spec (2026-03-24)
+
+### 32.1 Convertible volatility visibility rule
+- `buildConvertibleColumns()` keeps `volatility60 ?? annualizedVolatility` as the visible read path for `60日波动率`.
+- The field stays in the default main table instead of being pushed behind non-core trailing fields.
+- User-facing copy must describe this field as historical K-line real-data volatility, not a fabricated placeholder metric.
+
+### 32.2 Wide-table width rule
+- Shared wide tables continue using one-field-per-column output.
+- Shared table rendering may add column-level width hints so:
+  - code / date / compact numeric columns consume narrower fixed guidance
+  - core text columns keep readable minimum width
+  - low-priority trailing columns absorb the remaining horizontal overflow
+- Shared CSS may reduce horizontal padding and table-kind min widths when this improves first-screen field concentration without shrinking font size back down.
+
+### 32.3 AB top-summary rule
+- `renderPremiumPanel('ab')` must resolve its visible summary column independently from the current table sort state.
+- `AB溢价` top cards always use the `premium` field for:
+  - title text
+  - top-three sorting
+  - bottom-three sorting
+  - value rendering / status color
+- `AH溢价` may keep the current summary-column-follow-sort behavior unless a later approved round changes it.
+
+### 32.4 Dividend watchlist merge rule
+- Dividend runtime reading is split into:
+  - manual dividend portfolio rows
+  - auto-derived stock rows from existing custom monitors
+- Merge rules:
+  - prefer manual dividend row data when the same code exists in both sources
+  - only add monitor-derived rows when their stock code is non-empty and not already present
+  - keep de-duplication by normalized code
+- Refresh rules:
+  - manual dividend portfolio persistence remains the source of truth for explicit dividend adds/removes
+  - auto-derived monitor rows are enrichable for display but must not silently break manual persistence semantics
+
+## 32. Subscription Payment-day Truth Spec (2026-03-24)
+
+### 32.1 Scope
+- This round changes only the subscription top-table display judgment.
+- No subscription fetch source, route shape, or historical row schema changes are allowed.
+
+### 32.2 Stage rule
+- `今日申购` remains `subscribeDate = today`.
+- `今日中签缴款` is corrected to `paymentDate = today`.
+- `今日上市` remains `listingDate = today`.
+
+### 32.3 Visible date mapping rule
+- In the dashboard top subscription table:
+  - `申购日` renders `subscribeDate`
+  - `中签缴款日` renders `paymentDate`
+  - `上市日` renders `listingDate`
+- `lotteryDate` must not be used as the rendered value of `中签缴款日`.
+
+### 32.4 Regression acceptance
+- For live 2026-03-24 data, `隆源股份` must not be classified as `今日中签缴款` because its `paymentDate` is 2026-03-25.
+- The same day view must include the real 2026-03-24 payment rows such as `盛龙股份`、`慧谷新材`、`泰金新能`.

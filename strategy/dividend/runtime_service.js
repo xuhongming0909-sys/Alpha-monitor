@@ -12,15 +12,81 @@ function createDividendRuntimeService(options = {}) {
     nowIso,
     callDataCore,
     getStockPrice,
+    loadMonitors,
   } = options;
 
-  function loadPortfolio() {
+  function readManualPortfolio() {
     const rows = stateRegistry.read("dividend_portfolio", "dividend_portfolio.json", []);
     return Array.isArray(rows) ? rows : [];
   }
 
-  function savePortfolio(rows) {
+  function saveManualPortfolio(rows) {
     stateRegistry.write("dividend_portfolio", "dividend_portfolio.json", rows);
+  }
+
+  function normalizeCode(value) {
+    return String(value || "").trim();
+  }
+
+  function dedupePortfolioRows(rows) {
+    const merged = new Map();
+    for (const row of Array.isArray(rows) ? rows : []) {
+      const code = normalizeCode(row?.code);
+      if (!code) continue;
+      if (!merged.has(code)) {
+        merged.set(code, { ...row, code });
+        continue;
+      }
+      merged.set(code, { ...row, ...merged.get(code), code });
+    }
+    return Array.from(merged.values());
+  }
+
+  function readMonitorDerivedPortfolio() {
+    const monitorRows = typeof loadMonitors === "function" ? loadMonitors() : [];
+    const derived = [];
+    const slots = [
+      { codeField: "acquirerCode", nameField: "acquirerName", marketField: "acquirerMarket" },
+      { codeField: "targetCode", nameField: "targetName", marketField: "targetMarket" },
+    ];
+
+    for (const monitor of Array.isArray(monitorRows) ? monitorRows : []) {
+      for (const slot of slots) {
+        const code = normalizeCode(monitor?.[slot.codeField]);
+        const market = String(monitor?.[slot.marketField] || "").trim().toUpperCase();
+        if (!code || !/^\d{5,6}$/.test(code)) continue;
+        if (!["A", "B"].includes(market)) continue;
+        derived.push({
+          code,
+          name: String(monitor?.[slot.nameField] || code).trim() || code,
+          addTime: monitor?.updateTime || monitor?.createTime || nowIso(),
+          source: "monitor_watch",
+          dividendData: null,
+        });
+      }
+    }
+    return dedupePortfolioRows(derived);
+  }
+
+  function mergePortfolioRows(manualRows, monitorRows) {
+    const manualMap = new Map();
+    for (const row of Array.isArray(manualRows) ? manualRows : []) {
+      const code = normalizeCode(row?.code);
+      if (!code) continue;
+      manualMap.set(code, { ...row, code });
+    }
+
+    const merged = [...manualMap.values()];
+    for (const row of Array.isArray(monitorRows) ? monitorRows : []) {
+      const code = normalizeCode(row?.code);
+      if (!code || manualMap.has(code)) continue;
+      merged.push({ ...row, code });
+    }
+    return merged;
+  }
+
+  function loadPortfolio() {
+    return mergePortfolioRows(readManualPortfolio(), readMonitorDerivedPortfolio());
   }
 
   function isMissingOrCodeName(name, code) {
@@ -75,6 +141,8 @@ function createDividendRuntimeService(options = {}) {
   }
 
   async function refreshPortfolio() {
+    const manualRows = readManualPortfolio();
+    const manualCodes = new Set(manualRows.map((row) => normalizeCode(row?.code)).filter(Boolean));
     const refreshed = await Promise.all(loadPortfolio().map(async (row) => {
       try {
         const latest = await fetchDividend(row.code);
@@ -119,7 +187,7 @@ function createDividendRuntimeService(options = {}) {
       }
     }));
 
-    savePortfolio(refreshed);
+    saveManualPortfolio(refreshed.filter((row) => manualCodes.has(normalizeCode(row?.code))));
     return refreshed;
   }
 
@@ -128,8 +196,8 @@ function createDividendRuntimeService(options = {}) {
     if (!trimmed) throw new Error("股票代码不能为空");
     if (!/^\d{5,6}$/.test(trimmed)) throw new Error("股票代码格式错误");
 
-    const portfolio = loadPortfolio();
-    if (portfolio.find((row) => row.code === trimmed)) throw new Error("该股票已在dividend组合中");
+    const portfolio = readManualPortfolio();
+    if (portfolio.find((row) => normalizeCode(row?.code) === trimmed)) throw new Error("该股票已在dividend组合中");
 
     const stockMeta = await resolveStockMetaByCode(trimmed);
     if (!stockMeta?.name) throw new Error("无效股票代码，无法添加到dividend组合");
@@ -144,15 +212,15 @@ function createDividendRuntimeService(options = {}) {
       addTime: nowIso(),
       dividendData: await fetchDividend(trimmed),
     });
-    savePortfolio(portfolio);
-    return portfolio;
+    saveManualPortfolio(portfolio);
+    return loadPortfolio();
   }
 
   function removeDividendStock(code) {
     const trimmed = String(code || "").trim();
-    const next = loadPortfolio().filter((row) => row.code !== trimmed);
-    savePortfolio(next);
-    return next;
+    const next = readManualPortfolio().filter((row) => normalizeCode(row?.code) !== trimmed);
+    saveManualPortfolio(next);
+    return loadPortfolio();
   }
 
   // dividend提醒规则只消费当前组合快照，不直接依赖 UI。
@@ -160,7 +228,7 @@ function createDividendRuntimeService(options = {}) {
 
   return {
     loadPortfolio,
-    savePortfolio,
+    savePortfolio: saveManualPortfolio,
     refreshPortfolio,
     addDividendStock,
     removeDividendStock,

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Historical premium (AH/AB) backed by local SQLite cache (5Y, unadjusted)."""
+"""Historical premium (AH/AB) backed by local SQLite cache (5Y, A-share HFQ when available)."""
 
 from __future__ import annotations
 
@@ -255,10 +255,13 @@ def premium_history_summaries(stock_type: str, codes: List[str]) -> Dict[str, Di
 def _fetch_price_series(code: str, market: str, days: int) -> List[Dict[str, Any]]:
     cutoff = db.cutoff_date(days)
     result: List[Dict[str, Any]] = []
+    start_date = cutoff.replace("-", "")
+    end_date = datetime.now().strftime("%Y%m%d")
 
     try:
         if market in {"sh", "sz"}:
-            df = ak.stock_zh_a_hist_tx(symbol=f"{market}{code}")
+            # A 股历史分位优先使用后复权收盘价，减少分红送转对长期百分位的扭曲
+            df = ak.stock_zh_a_hist(symbol=str(code), period="daily", start_date=start_date, end_date=end_date, adjust="hfq")
             date_col = "date"
             close_col = "close"
         elif market == "hk":

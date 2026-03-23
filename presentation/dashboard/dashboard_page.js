@@ -909,7 +909,8 @@ function buildTodaySubscriptionRows(ipoRows, bondRows) {
 
   const pushRow = (records, typeLabel, recordType) => {
     records.forEach((row) => {
-      const paymentDisplayDate = row.lotteryDate || row.paymentDate;
+      // “中签缴款日”必须回到真实缴款日口径，不能再拿摇号/中签公告日顶替。
+      const paymentDisplayDate = row.paymentDate;
       const stages = [];
       if (normalizeDateKey(row.subscribeDate) === today) stages.push(SUBSCRIPTION_STAGES[0]);
       if (normalizeDateKey(paymentDisplayDate) === today) stages.push(SUBSCRIPTION_STAGES[1]);
@@ -1091,7 +1092,9 @@ function buildPushStateText(config = {}) {
     `调度 ${delivery.calendarMode || '--'}`,
     delivery.webhookConfigured === false ? 'Webhook 未配置' : 'Webhook 已配置',
     delivery.pushHtmlUrlConfigured === false ? '网页入口未配置' : '网页入口已配置',
-    delivery.schedulerEnabled === false ? '服务端调度已关闭' : '',
+    delivery.schedulerEnabled === false
+      ? (delivery.schedulerDisabledReason === 'loopback_public_base_url' ? '本地运行已禁用服务端推送调度' : '服务端调度已关闭')
+      : '',
     delivery.lastMainPushSuccessAt ? `最近成功 ${formatDate(delivery.lastMainPushSuccessAt)}` : '',
     delivery.lastMainPushError ? `最近失败 ${shortErrorText(delivery.lastMainPushError)}` : '',
   ].filter(Boolean).join(' / ');
@@ -1771,20 +1774,21 @@ function renderTableHeader(columns, tableKey, options = {}) {
   const includeDetails = Boolean(options.includeDetails);
   const cells = columns
     .map((column) => {
-      if (column.key === 'index') return '<th>序号</th>';
+      if (column.key === 'index') return '<th class="col-index">序号</th>';
+      const columnClass = escapeHtml(column.columnClassName || '');
       const labelText = escapeHtml(column.label);
       const label = column.group
         ? `${labelText}<span class="th-group-tag">${escapeHtml(column.group)}</span>`
         : labelText;
 
       if (!column.sortable) {
-        return `<th>${label}</th>`;
+        return `<th${columnClass ? ` class="${columnClass}"` : ''}>${label}</th>`;
       }
 
       const isActive = tableState.sortKey === column.key;
       const indicator = isActive ? (tableState.sortDir === 'desc' ? '↓' : '↑') : '↕';
       return `
-        <th>
+        <th${columnClass ? ` class="${columnClass}"` : ''}>
           <button
             type="button"
             class="sort-head ${isActive ? 'active' : ''}"
@@ -1805,11 +1809,12 @@ function renderTableHeader(columns, tableKey, options = {}) {
 
 function renderTableCell(column, row, rowNumber) {
   if (column.key === 'index') {
-    return `<td class="mono-text">${escapeHtml(String(rowNumber))}</td>`;
+    return `<td class="mono-text col-index">${escapeHtml(String(rowNumber))}</td>`;
   }
 
   const value = typeof column.render === 'function' ? column.render(row, rowNumber) : escapeHtml(row[column.key] || '--');
-  const cellClass = typeof column.className === 'function' ? column.className(row, rowNumber) : column.className || '';
+  const semanticClass = typeof column.className === 'function' ? column.className(row, rowNumber) : column.className || '';
+  const cellClass = [column.columnClassName || '', semanticClass].filter(Boolean).join(' ');
   return `<td${cellClass ? ` class="${escapeHtml(cellClass)}"` : ''}>${value}</td>`;
 }
 
@@ -1959,11 +1964,12 @@ function renderSummaryCard(title, rows, extraClass = "") {
 function buildConvertibleColumns() {
   return [
     { key: 'index', label: '序号' },
-    { key: 'bondName', label: '转债名称', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.bondName || ''), render: (row) => escapeHtml(row.bondName || '--') },
-    { key: 'code', label: '转债代码', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.code || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.code || '--')}</span>` },
+    { key: 'code', label: '转债代码', columnClassName: 'col-code', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.code || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.code || '--')}</span>` },
+    { key: 'bondName', label: '转债名称', columnClassName: 'col-name', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.bondName || ''), render: (row) => escapeHtml(row.bondName || '--') },
     {
       key: 'price',
       label: '转债现价',
+      columnClassName: 'col-num',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -1973,6 +1979,7 @@ function buildConvertibleColumns() {
     {
       key: 'changePercent',
       label: '转债涨跌幅',
+      columnClassName: 'col-percent',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -1981,17 +1988,9 @@ function buildConvertibleColumns() {
       render: (row) => formatPercent(row.changePercent, 2),
     },
     {
-      key: 'stockName',
-      label: '正股名称',
-      sortable: true,
-      sortType: 'text',
-      defaultDir: 'asc',
-      sortValue: (row) => String(row.stockName || ''),
-      render: (row) => escapeHtml(row.stockName || '--'),
-    },
-    {
       key: 'stockCode',
       label: '正股代码',
+      columnClassName: 'col-code',
       sortable: true,
       sortType: 'text',
       defaultDir: 'asc',
@@ -1999,8 +1998,19 @@ function buildConvertibleColumns() {
       render: (row) => `<span class="mono-text">${escapeHtml(row.stockCode || '--')}</span>`,
     },
     {
+      key: 'stockName',
+      label: '正股名称',
+      columnClassName: 'col-name',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'asc',
+      sortValue: (row) => String(row.stockName || ''),
+      render: (row) => escapeHtml(row.stockName || '--'),
+    },
+    {
       key: 'stockPrice',
       label: '正股现价',
+      columnClassName: 'col-num',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -2010,6 +2020,7 @@ function buildConvertibleColumns() {
     {
       key: 'stockChangePercent',
       label: '正股涨跌幅',
+      columnClassName: 'col-percent',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -2018,8 +2029,52 @@ function buildConvertibleColumns() {
       render: (row) => formatPercent(row.stockChangePercent, 2),
     },
     {
+      key: 'convertPrice',
+      label: '转股价',
+      columnClassName: 'col-num',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.convertPrice),
+      render: (row) => formatNumber(row.convertPrice, 2),
+    },
+    {
+      key: 'convertValue',
+      label: '转股价值',
+      columnClassName: 'col-num',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.convertValue),
+      render: (row) => formatNumber(row.convertValue, 2),
+    },
+    { key: 'premiumRate', label: '转股溢价率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premiumRate), className: (row) => statusClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate, 2) },
+    { key: 'doubleLow', label: '双低', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'asc', sortValue: (row) => toNumber(row.doubleLow), render: (row) => formatNumber(row.doubleLow, 2) },
+    {
+      // 60 日波动率是已有核心字段，前移到主阅读区，避免在超宽表里被误认为缺失
+      key: 'volatility60',
+      label: '60日波动率',
+      columnClassName: 'col-percent',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.volatility60 ?? row.annualizedVolatility),
+      render: (row) => formatPercent(row.volatility60 ?? row.annualizedVolatility, 2),
+    },
+    {
+      key: 'rating',
+      label: '评级',
+      columnClassName: 'col-rating',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'desc',
+      sortValue: (row) => String(row.rating || ''),
+      render: (row) => escapeHtml(row.rating || '--'),
+    },
+    {
       key: 'stockAvgRoe3Y',
       label: '3Y平均ROE',
+      columnClassName: 'col-percent',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -2030,6 +2085,7 @@ function buildConvertibleColumns() {
     {
       key: 'stockDebtRatio',
       label: '资产负债率',
+      columnClassName: 'col-percent',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -2037,27 +2093,9 @@ function buildConvertibleColumns() {
       render: (row) => formatPercent(row.stockDebtRatio, 2),
     },
     {
-      key: 'convertPrice',
-      label: '转股价',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.convertPrice),
-      render: (row) => formatNumber(row.convertPrice, 2),
-    },
-    {
-      key: 'convertValue',
-      label: '转股价值',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.convertValue),
-      render: (row) => formatNumber(row.convertValue, 2),
-    },
-    { key: 'premiumRate', label: '转股溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premiumRate), className: (row) => statusClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate, 2) },
-    {
       key: 'pureBondValue',
       label: '纯债价值',
+      columnClassName: 'col-num',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -2067,6 +2105,7 @@ function buildConvertibleColumns() {
     {
       key: 'pureBondPremiumRate',
       label: '纯债溢价率',
+      columnClassName: 'col-percent',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -2074,10 +2113,10 @@ function buildConvertibleColumns() {
       className: (row) => statusClass(computePureBondPremiumRate(row)),
       render: (row) => formatPercent(computePureBondPremiumRate(row), 2),
     },
-    { key: 'doubleLow', label: '双低', sortable: true, sortType: 'number', defaultDir: 'asc', sortValue: (row) => toNumber(row.doubleLow), render: (row) => formatNumber(row.doubleLow, 2) },
     {
       key: 'redeemTriggerPrice',
       label: '强赎价',
+      columnClassName: 'col-num',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -2087,6 +2126,7 @@ function buildConvertibleColumns() {
     {
       key: 'putbackPrice',
       label: '回售价',
+      columnClassName: 'col-num',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -2094,17 +2134,9 @@ function buildConvertibleColumns() {
       render: (row) => formatNumber(row.putbackPrice, 2),
     },
     {
-      key: 'volatility60',
-      label: '60日波动率(历史)',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.volatility60 ?? row.annualizedVolatility),
-      render: (row) => formatPercent(row.volatility60 ?? row.annualizedVolatility, 2),
-    },
-    {
       key: 'optionTheoreticalValue',
       label: '期权理论价值(参考)',
+      columnClassName: 'col-num',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -2115,16 +2147,18 @@ function buildConvertibleColumns() {
     {
       key: 'theoreticalPrice',
       label: '理论价值(参考)',
+      columnClassName: 'col-num',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
       sortValue: (row) => toNumber(row.theoreticalPrice),
       render: (row) => formatNumber(row.theoreticalPrice, 2),
     },
-    { key: 'theoreticalPremiumRate', label: '理论溢价率(参考)', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.theoreticalPremiumRate), className: (row) => statusClass(row.theoreticalPremiumRate), render: (row) => formatPercent(row.theoreticalPremiumRate, 2) },
+    { key: 'theoreticalPremiumRate', label: '理论溢价率(参考)', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.theoreticalPremiumRate), className: (row) => statusClass(row.theoreticalPremiumRate), render: (row) => formatPercent(row.theoreticalPremiumRate, 2) },
     {
       key: 'listingDate',
       label: '上市日',
+      columnClassName: 'col-date',
       sortable: true,
       sortType: 'date',
       defaultDir: 'desc',
@@ -2134,6 +2168,7 @@ function buildConvertibleColumns() {
     {
       key: 'convertStartDate',
       label: '转股起始日',
+      columnClassName: 'col-date',
       sortable: true,
       sortType: 'date',
       defaultDir: 'desc',
@@ -2143,20 +2178,12 @@ function buildConvertibleColumns() {
     {
       key: 'maturityDate',
       label: '到期日',
+      columnClassName: 'col-date',
       sortable: true,
       sortType: 'date',
       defaultDir: 'asc',
       sortValue: (row) => normalizeDateKey(row.maturityDate),
       render: (row) => formatDateOnly(row.maturityDate),
-    },
-    {
-      key: 'rating',
-      label: '评级',
-      sortable: true,
-      sortType: 'text',
-      defaultDir: 'desc',
-      sortValue: (row) => String(row.rating || ''),
-      render: (row) => escapeHtml(row.rating || '--'),
     },
   ];
 }
@@ -2165,24 +2192,26 @@ function buildPremiumColumns(type) {
   const config = getPremiumConfig(type);
   return [
     { key: 'index', label: '序号' },
-    { key: 'aCode', label: 'A股代码', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.aCode || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.aCode || '--')}</span>` },
-    { key: 'aName', label: 'A股名称', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.aName || ''), render: (row) => escapeHtml(row.aName || '--') },
-    { key: config.peerCodeKey, label: config.peerCodeLabel, sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row[config.peerCodeKey] || ''), render: (row) => `<span class="mono-text">${escapeHtml(row[config.peerCodeKey] || '--')}</span>` },
-    { key: config.peerNameKey, label: config.peerNameLabel, sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row[config.peerNameKey] || ''), render: (row) => escapeHtml(row[config.peerNameKey] || '--') },
-    { key: 'aPrice', label: 'A股价', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.aPrice), render: (row) => formatNumber(row.aPrice, 2) },
+    { key: 'aCode', label: 'A股代码', columnClassName: 'col-code', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.aCode || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.aCode || '--')}</span>` },
+    { key: 'aName', label: 'A股名称', columnClassName: 'col-name', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.aName || ''), render: (row) => escapeHtml(row.aName || '--') },
+    { key: config.peerCodeKey, label: config.peerCodeLabel, columnClassName: 'col-code', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row[config.peerCodeKey] || ''), render: (row) => `<span class="mono-text">${escapeHtml(row[config.peerCodeKey] || '--')}</span>` },
+    { key: config.peerNameKey, label: config.peerNameLabel, columnClassName: 'col-name', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row[config.peerNameKey] || ''), render: (row) => escapeHtml(row[config.peerNameKey] || '--') },
+    { key: 'aPrice', label: 'A股价', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.aPrice), render: (row) => formatNumber(row.aPrice, 2) },
     {
       key: config.peerMarketPriceKey,
       label: config.peerMarketPriceLabel,
+      columnClassName: 'col-num',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
       sortValue: (row) => toNumber(row[config.peerMarketPriceKey]),
       render: (row) => formatNumber(row[config.peerMarketPriceKey], 2),
     },
-    { key: config.peerPriceKey, label: config.peerPriceLabel, sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row[config.peerPriceKey]), render: (row) => formatNumber(row[config.peerPriceKey], 2) },
+    { key: config.peerPriceKey, label: config.peerPriceLabel, columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row[config.peerPriceKey]), render: (row) => formatNumber(row[config.peerPriceKey], 2) },
     {
       key: 'priceGap',
       label: '价差',
+      columnClassName: 'col-num',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
@@ -2190,18 +2219,19 @@ function buildPremiumColumns(type) {
       className: (row) => statusClass(computePremiumGap(row, config.peerPriceKey)),
       render: (row) => formatSignedNumber(computePremiumGap(row, config.peerPriceKey), 2),
     },
-    { key: 'premium', label: '溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premium), className: (row) => statusClass(row.premium), render: (row) => formatPercent(row.premium, 2) },
-    { key: 'percentile', label: '近三年分位', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.percentile), render: (row) => formatPercent(row.percentile, 2) },
+    { key: 'premium', label: '溢价率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premium), className: (row) => statusClass(row.premium), render: (row) => formatPercent(row.premium, 2) },
+    { key: 'percentile', label: '近三年分位', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.percentile), render: (row) => formatPercent(row.percentile, 2) },
     {
       key: 'historyCount',
       label: '样本数',
+      columnClassName: 'col-num',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
       sortValue: (row) => toNumber(row.historyCount),
       render: (row) => formatInt(row.historyCount),
     },
-    { key: 'historyRange', label: '样本区间', sortable: false, render: (row) => `<span class="mono-text">${escapeHtml(formatHistoryRange(row))}</span>` },
+    { key: 'historyRange', label: '样本区间', columnClassName: 'col-range', sortable: false, render: (row) => `<span class="mono-text">${escapeHtml(formatHistoryRange(row))}</span>` },
   ];
 }
 
@@ -2300,7 +2330,7 @@ function renderConvertibleBondPanel() {
           rows,
           emptyMessage: "转债套利暂时没有返回数据",
         })}
-        <div class="slim-note">理论价值 = 纯债价值 + 期权理论价值；60 日波动率与理论相关字段仅作历史参考。</div>
+        <div class="slim-note">60日波动率基于历史K线库真实收盘价年化计算；理论价值相关字段继续作为参考指标。</div>
       </div>
     </div>
   `;
@@ -2331,7 +2361,7 @@ function renderPremiumPanel(type) {
 
   const columns = buildPremiumColumns(type);
   const tableModel = getProcessedTableRows(type, rows, columns);
-  const summaryColumn = resolvePremiumSummaryColumn(tableModel.sortColumn, columns);
+  const summaryColumn = resolvePremiumSummaryColumn(type, tableModel.sortColumn, columns);
   const summaryLabel = summaryColumn?.label || '溢价率';
   const topRows = sortRowsByColumn(rows, summaryColumn, 'desc').slice(0, 3);
   const bottomRows = sortRowsByColumn(rows, summaryColumn, 'asc').slice(0, 3);
@@ -2384,7 +2414,7 @@ function buildPremiumSummaryRows(rows, config, summaryColumn) {
 }
 
 function buildPremiumExplainText(type, rows) {
-  const parts = ['“近三年分位”基于当前可用历史样本计算，“样本区间”显示实际覆盖起止日期。'];
+  const parts = ['“近三年分位”基于当前可用历史样本计算；A股历史价格优先使用后复权收盘价，“样本区间”显示实际覆盖起止日期。'];
   const catlRow = type === 'ah' ? rows.find((row) => String(row.aCode) === '300750') : null;
   if (catlRow) {
     parts.push(`宁德时代 300750 / 03750 当前样本区间为 ${formatHistoryRange(catlRow)}，可用样本数为 ${formatInt(catlRow.historyCount)}。`);
@@ -2411,7 +2441,10 @@ function readPremiumSummaryClass(row, summaryColumn, peerPriceKey) {
   return '';
 }
 
-function resolvePremiumSummaryColumn(activeColumn, columns) {
+function resolvePremiumSummaryColumn(type, activeColumn, columns) {
+  if (type === 'ab') {
+    return columns.find((item) => item.key === 'premium') || activeColumn;
+  }
   const supportedKeys = new Set(['priceGap', 'premium', 'percentile', 'aPrice', 'hPriceCny', 'bPriceCny']);
   if (activeColumn && supportedKeys.has(activeColumn.key)) return activeColumn;
   return columns.find((item) => item.key === 'premium') || activeColumn;

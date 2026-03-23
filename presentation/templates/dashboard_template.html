@@ -864,6 +864,54 @@
         white-space: nowrap;
       }
 
+      /* 宽表压缩规则：把代码/日期/数值列收窄，让核心字段尽量留在首屏 */
+      th.col-index,
+      td.col-index {
+        width: 46px;
+        min-width: 46px;
+      }
+
+      th.col-code,
+      td.col-code {
+        width: 84px;
+        min-width: 84px;
+      }
+
+      th.col-name,
+      td.col-name {
+        min-width: 108px;
+      }
+
+      th.col-num,
+      td.col-num {
+        width: 80px;
+        min-width: 80px;
+      }
+
+      th.col-percent,
+      td.col-percent {
+        width: 88px;
+        min-width: 88px;
+      }
+
+      th.col-date,
+      td.col-date {
+        width: 98px;
+        min-width: 98px;
+      }
+
+      th.col-rating,
+      td.col-rating {
+        width: 64px;
+        min-width: 64px;
+      }
+
+      th.col-range,
+      td.col-range {
+        width: 112px;
+        min-width: 112px;
+      }
+
       tbody tr {
         transition: background 0.16s ease;
       }
