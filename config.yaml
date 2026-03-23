@@ -49,6 +49,7 @@ storage:
     push_config: "push_config.json"
     push_runtime_state: "push_runtime_state.json"
     event_arbitrage_cache: "event_arbitrage_cache.json"
+    lof_arbitrage_cache: "lof_arbitrage_cache.json"
 
 logging:
   # Minimal logging defaults
@@ -96,6 +97,9 @@ plugins:
     event_arbitrage:
       enabled: true
       folder: "data_fetch/event_arbitrage"
+    lof_arbitrage:
+      enabled: true
+      folder: "data_fetch/lof_arbitrage"
     subscription:
       enabled: true
       folder: "data_fetch/subscription"
@@ -121,6 +125,9 @@ plugins:
     event_arbitrage:
       enabled: true
       folder: "strategy/event_arbitrage"
+    lof_arbitrage:
+      enabled: true
+      folder: "strategy/lof_arbitrage"
     subscription:
       enabled: true
       folder: "strategy/subscription"
@@ -198,6 +205,23 @@ data_fetch:
           enabled: true
         rights_issue:
           enabled: false
+    lof_arbitrage:
+      intraday: true
+      refresh_interval_ms: 300000
+      daily_incremental_sync: false
+      timeout_ms: 30000
+      cache_ttl_ms: 300000
+      source: "jisilu_qdii"
+      categories:
+        europe_us:
+          enabled: true
+          bucket_code: "E"
+        asia:
+          enabled: true
+          bucket_code: "A"
+        commodity:
+          enabled: true
+          bucket_code: "C"
     convertible_bond:
       intraday: true
       refresh_interval_ms: 300000
@@ -248,6 +272,13 @@ strategy:
     match_by: "sec_code_only"
     match_lookback_days: 365
     enable_push: false
+  lof_arbitrage:
+    primary_source: "jisilu_qdii"
+    premium_threshold_pct: 1.5
+    min_net_premium_pct: 0.5
+    nav_only_allows_candidate: false
+    low_liquidity_volume_wan: 300
+    treat_limited_apply_as_watch_only: true
   dividend:
     trigger_rule: "record_date_same_day"
   subscription:
@@ -280,6 +311,10 @@ presentation:
     default_subtab: "a_event"
     show_disabled_categories: true
     module_name: "事件套利"
+  lof_arbitrage:
+    default_sort: "premiumRate"
+    default_sort_dir: "desc"
+    module_name: "LOF套利"
   historical_premium:
     default_days: 1825
     max_days: 10000

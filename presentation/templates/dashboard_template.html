@@ -404,7 +404,7 @@
 
       .tab-nav {
         display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         gap: 12px;
         margin: 16px 0 14px;
       }
@@ -1127,6 +1127,7 @@
         <button class="tab-button" data-tab="monitor" type="button">监控套利</button>
         <button class="tab-button" data-tab="dividend" type="button">分红提醒</button>
         <button class="tab-button" data-tab="merger" type="button">事件套利</button>
+        <button class="tab-button" data-tab="lof-arb" type="button">LOF套利</button>
       </nav>
 
       <section id="tab-panels">
@@ -1136,6 +1137,7 @@
         <section id="panel-monitor" class="panel-surface tab-panel"></section>
         <section id="panel-dividend" class="panel-surface tab-panel"></section>
         <section id="panel-merger" class="panel-surface tab-panel"></section>
+        <section id="panel-lof-arb" class="panel-surface tab-panel"></section>
       </section>
 
       <section class="push-strip" aria-label="推送设置">
@@ -1166,6 +1168,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <script src="/presentation/dashboard/dashboard_page.js?v=20260323-5"></script>
+    <script src="/presentation/dashboard/dashboard_page.js?v=20260323-6"></script>
   </body>
 </html>

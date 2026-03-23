@@ -15,6 +15,8 @@ from data_fetch.event_arbitrage.fetcher import fetch_event_arbitrage_snapshot
 from data_fetch.event_arbitrage.normalizer import normalize_event_arbitrage_snapshot
 from data_fetch.exchange_rate.fetcher import fetch_exchange_rate_snapshot
 from data_fetch.exchange_rate.normalizer import normalize_exchange_rate_snapshot
+from data_fetch.lof_arbitrage.fetcher import fetch_lof_arbitrage_snapshot
+from data_fetch.lof_arbitrage.normalizer import normalize_lof_arbitrage_snapshot
 from data_fetch.merger.fetcher import fetch_merger_snapshot
 from data_fetch.merger.normalizer import normalize_merger_snapshot
 from data_fetch.subscription.fetcher import fetch_bond_subscription_snapshot, fetch_ipo_snapshot
@@ -27,6 +29,7 @@ from strategy.ah_premium.service import build_ah_response
 from strategy.convertible_bond.service import build_convertible_bond_response
 from strategy.dividend.service import build_dividend_response
 from strategy.event_arbitrage.service import build_event_arbitrage_response
+from strategy.lof_arbitrage.service import build_lof_arbitrage_response
 from strategy.merger.service import build_merger_response
 from strategy.subscription.service import build_subscription_response
 
@@ -124,6 +127,14 @@ def action_event_arbitrage() -> dict:
     return build_event_arbitrage_response(payload, records)
 
 
+def action_lof_arbitrage() -> dict:
+    """lof_arbitrage快照。"""
+
+    payload = fetch_lof_arbitrage_snapshot()
+    records = normalize_lof_arbitrage_snapshot(payload)
+    return build_lof_arbitrage_response(payload, records)
+
+
 def action_dividend(code: str) -> dict:
     """单只股票dividend查询。"""
 
@@ -175,6 +186,8 @@ def main() -> None:
             dump(action_merger())
         elif action == "event-arbitrage":
             dump(action_event_arbitrage())
+        elif action == "lof-arbitrage":
+            dump(action_lof_arbitrage())
         elif action == "historical-premium":
             dump(
                 ensure_history_for_code(

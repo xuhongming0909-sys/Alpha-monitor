@@ -468,6 +468,28 @@ Acceptance:
 - `/api/market/ipo` returns a parseable success payload with empty arrays when no IPO history is available yet.
 - The homepage no longer looks "stuck loading" just because one optional data source currently has no stored history.
 
+## 19. Phase P: Public CB Payload Slimming (2026-03-23)
+
+Goal: fix the remaining homepage slow-open issue by shrinking the public `convertible-bond-arbitrage` response to the fields the dashboard actually renders.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep the existing convertible-bond calculations unchanged.
+3. Keep the route path unchanged:
+   - `/api/market/convertible-bond-arbitrage`
+4. Add a response-shaping step in the Node/service layer after row sanitization:
+   - preserve the fields the dashboard uses for summary cards and dense main-table rendering
+   - drop unused per-row fields that are inflating the payload by multiple megabytes
+   - stop emitting duplicated public aliases for the same row collection and keep `data` as the single outward row array
+5. Do not move this slimming into the raw Python fetch layer for this round; keep the raw fetch result available internally and only slim the outward-facing HTTP payload.
+
+Acceptance:
+- Public homepage no longer waits on a 6+ MB convertible-bond JSON payload.
+- Cached `convertible-bond-arbitrage` HTTP response size is materially smaller than the current payload.
+- Dashboard `转债套利` main table and summary cards still render the same user-visible values after slimming.
+
+- Public `convertible-bond-arbitrage` response no longer repeats the same rows in top-level `list` / `rows` aliases.
+
 ## 19. Phase P: Event Arbitrage UI Simplification (2026-03-23)
 
 Goal: simplify the `事件套利` reading path so the user lands directly on real category data, and A-share rows display only the core scraped content without forum links or expandable detail toggles.
@@ -494,3 +516,100 @@ Acceptance:
 - The A-share announcement link label is `官方公告`.
 - Event-arbitrage tables no longer show `展开 / 收起` controls.
 - A-share rows show `摘要` directly below the main row using the existing detail-row visual style.
+
+## 20. Phase Q: Constitution Alignment Audit And Guardrail (2026-03-23)
+
+Goal: align the repository with the newly amended constitution using the smallest effective change set, and prevent future constitution drift from silently reappearing.
+
+Plan:
+1. Sync `CONSTITUTION.md` and `.specify/memory/constitution.md`, and update amendment metadata so the constitution contract is self-consistent again.
+2. Treat this round as a governance-alignment change, not a broad architecture rewrite:
+   - prioritize direct fixes with the shortest path
+   - avoid mixing unrelated module refactors into the same round
+   - record larger follow-up refactors separately if they are discovered during audit
+3. Add a dedicated repo check for constitution drift:
+   - compare the two constitution files as normalized UTF-8 text
+   - fail with a clear diff preview when they diverge
+   - expose the check through a stable command entry
+4. Keep product behavior unchanged in this round unless a constitution violation requires a direct fix.
+
+Acceptance:
+- `CONSTITUTION.md` and `.specify/memory/constitution.md` stay synchronized after the amendment.
+- Constitution version and amendment metadata reflect the 2026-03-23 change.
+- The repository provides a one-command constitution sync check with non-zero exit on drift.
+- This alignment round does not bundle unrelated product logic changes.
+
+## 21. Phase R: Same-day Subscription Truthfulness + Invalid CB Exclusion + Dense CB Core Fields (2026-03-23)
+
+Goal: fix three current user-visible regressions in one direct round:
+1. `股债打新` must show today's real subscribe / lottery / listing items again, including current Beijing exchange IPO rows.
+2. `转债套利` must stop showing obviously invalid rows such as zero-price or zero-turnover bonds that have already entered the delist / cease / force-redeem end state.
+3. `转债套利` main table must surface the requested dense core parameters directly in the default row set.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep the existing `股债打新` page structure, but repair the data truth path:
+   - recognize Beijing exchange IPO codes correctly
+   - do not keep trusting a fresh-looking empty cache snapshot when IPO history is still empty
+   - redeploy the fixed IPO source so the live server can repopulate same-day rows
+3. Harden `转债套利` visible-row filtering in the strategy/service layer:
+   - continue honoring delist / cease / maturity dates
+   - additionally exclude clearly invalid end-state rows such as `price <= 0`
+   - exclude zero-turnover rows that have already entered the terminal delist / cease / maturity chain
+4. Expand the outward-facing CB payload whitelist only to the fields needed by the dense table contract.
+5. Refactor the frontend CB main table to display the requested core fields directly, without reintroducing the old detail-button reading path.
+
+Acceptance:
+- Opening the dashboard on the live server can show today's IPO subscribe row again when the upstream source has one, including Beijing exchange rows.
+- `恒逸转债` and the other obviously invalid zero-price / terminal zero-turnover rows no longer appear in the visible CB list.
+- `荣23转债` and similar rows already in the terminal cease / delist chain are excluded from the visible CB list.
+- The CB main table directly shows:
+  - bond / stock identity and price-change fields
+  - stock 3Y ROE and debt ratio
+  - convert metrics
+  - premium and pure-bond premium metrics
+  - redeem / putback / volatility / option / theoretical / maturity-yield fields
+  - listing / convert-start / maturity / rating fields
+
+## 22. Phase S: LOF Arbitrage Zero-login MVP (2026-03-23)
+
+Goal: add a first production-safe `LOF套利` module without destabilizing the existing homepage, while continuing to investigate zero-login IOPV sources in parallel.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the new LOF module contract, zero-login scope, and IOPV fallback rules.
+2. Keep the current Node + Python layered architecture:
+   - `data_fetch/lof_arbitrage` only fetches and normalizes Jisilu QDII rows
+   - `strategy/lof_arbitrage` only computes signal basis, fees, and action status
+   - `presentation` only exposes the new API and dashboard tab
+3. Use direct public JSON endpoints as phase-1 primary source:
+   - `/data/qdii/qdii_list/E`
+   - `/data/qdii/qdii_list/A`
+   - `/data/qdii/qdii_list/C`
+4. Do not block phase 1 on official IOPV completeness:
+   - if `iopv` / `iopv_discount_rt` is available, use it as high-confidence signal
+   - else if intraday estimate fields are available, use them as medium-confidence signal
+   - else degrade to NAV premium as low-confidence observation only
+5. Keep Firecrawl out of the hot path in this round:
+   - direct JSON first
+   - Firecrawl only documented as future fallback if the public JSON disappears
+6. Add a new public API `GET /api/market/lof-arbitrage`.
+7. Add a new top-level dashboard tab `LOF套利` with one phase-1 table, summary cards, and always-visible risk/detail rows.
+8. Keep the module webpage-only in phase 1:
+   - no push integration
+   - no auto-execution
+   - no changes to existing modules beyond adding the new tab and refresh path
+9. Record the ongoing IOPV search status explicitly in the outward payload so the UI can show whether the current zero-login chain has usable IOPV or only NAV fallback.
+
+Acceptance:
+- The homepage still opens normally after the new LOF module is added.
+- `GET /api/market/lof-arbitrage` returns real rows from the zero-login Jisilu QDII endpoints.
+- The `LOF套利` page shows:
+  - current price
+  - NAV premium
+  - IOPV premium when publicly available
+  - estimate premium when publicly available
+  - signal basis
+  - apply status
+  - action status
+- When IOPV is missing, the page clearly downgrades to observation mode instead of pretending the signal is execution-grade.
+- A single-source failure in one LOF category degrades only that category and does not blank the homepage.

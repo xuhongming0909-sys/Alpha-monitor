@@ -404,6 +404,12 @@ const DATASETS = {
     dbDailySync: Boolean(pluginFetchConfig('event_arbitrage').daily_incremental_sync),
     fetch: (options = {}) => buildEventArbitrageDataset(options),
   },
+  lofArb: {
+    intraday: pluginFetchConfig('lof_arbitrage').intraday !== false,
+    refreshIntervalMs: toIntConfig(pluginFetchConfig('lof_arbitrage').refresh_interval_ms, 5 * 60 * 1000),
+    dbDailySync: Boolean(pluginFetchConfig('lof_arbitrage').daily_incremental_sync),
+    fetch: () => callDataCore(['lof-arbitrage'], { timeout: 120000, maxBuffer: 1024 * 1024 * 50 }),
+  },
 };
 const stateStore = STATE_REGISTRY.read('market_refresh_state', 'market_refresh_state.json', {
   lastDailySyncDate: null,
@@ -594,7 +600,19 @@ function writeDatasetCache(key, payload) {
 function readDatasetCachePayload(key) {
   const cached = readDatasetCache(key);
   if (!cached || typeof cached !== 'object' || cached.success === false) return null;
-  return cloneJsonSafe(cached);
+  return normalizeDatasetPayload(key, cloneJsonSafe(cached));
+}
+
+function hasNonEmptyRows(value) {
+  return Array.isArray(value) && value.length > 0;
+}
+
+function shouldBypassStaleEmptySubscriptionCache(key, payload) {
+  if (!['ipo', 'bonds'].includes(key)) return false;
+  if (!payload || typeof payload !== 'object') return false;
+  const historyCount = Number(payload.historyCount);
+  const hasVisibleRows = hasNonEmptyRows(payload.data) || hasNonEmptyRows(payload.upcoming);
+  return !hasVisibleRows && (!Number.isFinite(historyCount) || historyCount <= 0);
 }
 
 function readDatasetTimestamp(result) {
@@ -826,18 +844,65 @@ function sanitizeCbArbRows(rows) {
   return strategySanitizeCbArbRows(rows);
 }
 
+const CB_ARB_PUBLIC_ROW_KEYS = [
+  'code',
+  'bondName',
+  'stockCode',
+  'stockName',
+  'price',
+  'changePercent',
+  'stockPrice',
+  'stockChangePercent',
+  'stockAvgRoe3Y',
+  'stockDebtRatio',
+  'convertPrice',
+  'convertValue',
+  'premiumRate',
+  'bondValue',
+  'doubleLow',
+  'redeemTriggerPrice',
+  'putbackPrice',
+  'volatility60',
+  'annualizedVolatility',
+  'pureBondValue',
+  'callOptionValue',
+  'putOptionValue',
+  'theoreticalPrice',
+  'theoreticalPremiumRate',
+  'yieldToMaturityPretax',
+  'rating',
+  'maturityDate',
+  'remainingYears',
+  'remainingSizeYi',
+  'turnoverAmountYi',
+  'listingDate',
+  'convertStartDate',
+];
+
+function shapeCbArbPublicRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    if (!row || typeof row !== 'object') return row;
+    const shaped = {};
+    for (const key of CB_ARB_PUBLIC_ROW_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(row, key)) {
+        shaped[key] = row[key];
+      }
+    }
+    return shaped;
+  });
+}
+
 function normalizeDatasetPayload(key, result) {
   if (!result || typeof result !== 'object') return result;
   if (result.success === false) return result;
   if (key === 'ipo') return sanitizeSubscriptionResult(result, 'ipo');
   if (key === 'bonds') return sanitizeSubscriptionResult(result, 'bond');
   if (key === 'cbArb') {
-    const rows = sanitizeCbArbRows(result.data);
+    const rows = shapeCbArbPublicRows(sanitizeCbArbRows(result.data));
+    const { data: _rawData, list: _legacyList, rows: _legacyRows, ...rest } = result;
     return {
-      ...result,
+      ...rest,
       data: rows,
-      list: rows,
-      rows,
     };
   }
   return result;
@@ -908,11 +973,12 @@ function isCbArbSchemaReady(result) {
   const baseReady = Boolean(
     row &&
     typeof row === 'object' &&
-    Object.prototype.hasOwnProperty.call(row, 'pureBondValue') &&
+    (Object.prototype.hasOwnProperty.call(row, 'pureBondValue') || Object.prototype.hasOwnProperty.call(row, 'bondValue')) &&
     Object.prototype.hasOwnProperty.call(row, 'maturityDate') &&
     Object.prototype.hasOwnProperty.call(row, 'remainingYears') &&
-    Object.prototype.hasOwnProperty.call(row, 'callOptionValue60') &&
-    Object.prototype.hasOwnProperty.call(row, 'putOptionValue60')
+    Object.prototype.hasOwnProperty.call(row, 'theoreticalPrice') &&
+    Object.prototype.hasOwnProperty.call(row, 'callOptionValue') &&
+    Object.prototype.hasOwnProperty.call(row, 'putOptionValue')
   );
   if (!baseReady) return false;
   if (!rows.length) return true;
@@ -970,6 +1036,9 @@ async function getDataset(key, options = {}) {
 
   const cached = readDatasetCachePayload(key);
   if (cached) {
+    if (shouldBypassStaleEmptySubscriptionCache(key, cached)) {
+      return refreshDataset(key, options);
+    }
     if (!isDatasetCacheFresh(key, cached)) {
       const lockKey = `${key}:normal`;
       if (!refreshLocks.has(lockKey)) scheduleDatasetRefresh(key, options);
@@ -1027,7 +1096,7 @@ async function runDataJobsCycle(context = 'tick', options = {}) {
 
   try {
     if (options.preloadDatasets) {
-      const preloadKeys = ['exchangeRate', 'ah', 'ab', 'cbArb', 'merger', 'eventArb', 'ipo', 'bonds'];
+      const preloadKeys = ['exchangeRate', 'ah', 'ab', 'cbArb', 'merger', 'eventArb', 'lofArb', 'ipo', 'bonds'];
       await Promise.allSettled(preloadKeys.map((key) => getDataset(key)));
       details.preloadedDatasets = preloadKeys;
     }

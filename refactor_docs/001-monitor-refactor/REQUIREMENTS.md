@@ -2,7 +2,7 @@
 
 ## 1. 仪表盘首页
 - 功能清单：
-  - 打开首页后，直接看到真实市场数据、股债打新、推送设置和 6 个功能页。
+  - 打开首页后，直接看到真实市场数据、股债打新、推送设置和 7 个功能页。
 - 数据库和数据来源：
   - 页面只读取现有 `/api/*` 接口，不新增专用页面接口。
 - 业务规则（核心）：
@@ -14,14 +14,14 @@
 - UI界面：
   - 最上方是标题和状态文字。
   - 中上部是“股债打新”长表。
-  - 中部是 6 个功能页签和对应数据面板。
+  - 中部是 7 个功能页签和对应数据面板。
   - 页面最末尾是简洁版“推送设置”。
 - 配置项说明：
   - 首页入口：`config.yaml > presentation.dashboard_entry`
 
 ## 2. 功能页名称
 - 功能清单：
-  - 首页主导航固定为 6 个功能页。
+  - 首页主导航固定为 7 个功能页。
 - 数据库和数据来源：
   - 继续使用原有模块对应 API。
 - 业务规则（核心）：
@@ -517,7 +517,7 @@
 - 对于隐藏字段，系统应优先自动判断；编辑已有项目时，如用户未改动主体对象，必须保留原有隐藏字段，不能因表单简化把老数据清空。
 ## 28. Event Arbitrage Unified Module Contract (2026-03-23)
 - Dashboard top-level module `鏀惰喘绉佹湁` is upgraded to `浜嬩欢濂楀埄`.
-- The top-level dashboard still has exactly 6 tabs; `浜嬩欢濂楀埄` replaces the old merger/private tab and does not add a seventh root entry.
+- The event-arbitrage rename rule remains valid, but the dashboard now has 7 top-level tabs after the new `LOF套利` module is added.
 - `浜嬩欢濂楀埄` must become a unified entry for:
   - `娓偂绉佹湁鍖?`
   - `涓鑲＄鏈夊寲`
@@ -609,6 +609,21 @@
   - `upcoming = []`
   - optional warning text is allowed
 - The homepage must not appear broken or permanently loading just because IPO history is currently empty on the server.
+## 30. Public Convertible Bond Payload Slimming (2026-03-23)
+- Public dashboard opening speed must not be dominated by downloading an oversized `convertible-bond-arbitrage` JSON payload.
+- The outward-facing `转债套利` API may return fewer fields than the internal calculation result, as long as the dashboard keeps the same visible values and sorting behavior.
+- Payload slimming for this round is limited to response shaping:
+  - no formula changes
+  - no route-path changes
+  - no fake aggregation or sample truncation
+- The outward-facing row payload must preserve at least the fields needed by:
+  - `转债套利` summary cards
+  - the dense main table columns
+  - existing daily delist filtering and row sanitization logic before shaping
+
+- The public HTTP contract for this round keeps only one primary row array:
+  - `data`
+- The same outward row collection must not be duplicated again in top-level `list` or `rows`.
 
 ## 30. Event Arbitrage UI Simplification Contract (2026-03-23)
 - The phase-1 `事件套利` page must no longer render a visible `总览` sub-tab.
@@ -629,3 +644,123 @@
   - a dedicated summary column
   - an expandable detail area
   - an additional nested tab
+
+## 31. Same-day Subscription Truthfulness And Dense CB Core Fields (2026-03-23)
+- `股债打新` must show today's subscribe / lottery / listing items from the latest available server-side fetch result, instead of staying blank because a same-day empty cache snapshot was treated as healthy.
+- Beijing exchange IPO rows must be recognized correctly in the subscription source path, including `92*` code segments.
+- When IPO runtime history is still empty, the server must not keep serving an apparently fresh empty cache forever; it must retry the live fetch path on later requests until real rows are available or the source explicitly returns none again.
+- `转债套利` visible rows must exclude clearly invalid end-state bonds, including at least:
+  - `price <= 0`
+  - zero-turnover rows that have already entered the terminal `cease / delist / maturity` chain
+- This round does not change existing CB calculation formulas; it only tightens visible-row validity rules and front-end field placement.
+- `转债套利` main table must directly show the following core fields:
+  - `序号`
+  - `转债名称/代码`
+  - `转债现价/涨跌`
+  - `正股名称/代码`
+  - `正股现价/涨跌`
+  - `正股近三年平均ROE`
+  - `资产负债率`
+  - `转股价/转股价值`
+  - `转股溢价率`
+  - `纯债溢价率`
+  - `双低`
+  - `强赎价`
+  - `回售价`
+  - `60日波动率`
+  - `期权理论价值`
+  - `理论价值/理论溢价率`
+  - `上市日`
+  - `转股起始日`
+  - `到期日`
+  - `评级`
+  - `到期税前收益率`
+- The outward-facing CB payload may continue slimming unused fields, but it must preserve every field needed by the table above.
+
+## 31. Constitution Governance Alignment Contract (2026-03-23)
+- `CONSTITUTION.md` and `.specify/memory/constitution.md` must remain logically一致，不能出现一处修改、另一处滞后的状态。
+- 当宪法文本发生修订时，两份文件都必须同步更新以下元数据：
+  - `Version`
+  - `Last Amended`
+  - `Amendment Summary`
+- 仓库必须提供一个明确的自动校验入口，用于检查宪法主文件和镜像文件是否同步。
+- 该校验在发现以下任一问题时必须失败并返回非零退出码：
+  - 任一文件缺失
+  - 两份文件正文不一致
+  - 两份文件仅因近期修订而发生漂移但尚未同步
+- 本轮宪法对齐实施遵守“最短链条”和“奥卡姆剃刀”原则：
+  - 只修治理链路和防回归护栏
+  - 不借机把无关业务模块拉入大重构
+  - 如发现更大的结构性问题，应另起计划，不在本轮混改
+
+## 32. LOF Arbitrage Zero-login Module Contract (2026-03-23)
+- Dashboard adds a new top-level module `LOF套利`.
+- Phase-1 `LOF套利` scope is fixed to zero-login public data only:
+  - Jisilu `QDII` public JSON endpoints
+  - no login-gated member fields as hard dependencies
+  - no fake IOPV values
+- New public API contract is provided by `GET /api/market/lof-arbitrage`.
+- `GET /api/market/lof-arbitrage` must return:
+  - `overview`
+  - `rows`
+  - `groups`
+  - `sourceStatus`
+  - `updateTime`
+  - `cacheTime`
+  - `servedFromCache`
+  - `iopvSearch`
+- Phase-1 source groups are fixed to:
+  - `europe_us`
+  - `asia`
+  - `commodity`
+- Phase-1 LOF rows must expose at least:
+  - `id`
+  - `source`
+  - `category`
+  - `symbol`
+  - `name`
+  - `issuer`
+  - `currentPrice`
+  - `changeRate`
+  - `volumeWan`
+  - `navValue`
+  - `navDate`
+  - `navPremiumRate`
+  - `iopv`
+  - `iopvTime`
+  - `iopvPremiumRate`
+  - `estimatedValue`
+  - `estimatedTime`
+  - `estimatedPremiumRate`
+  - `premiumBasis`
+  - `premiumRate`
+  - `netPremiumRate`
+  - `applyStatus`
+  - `applyOpen`
+  - `applyFeeRate`
+  - `redeemStatus`
+  - `redeemFeeRate`
+  - `managementFeeRate`
+  - `currency`
+  - `t0`
+  - `actionStatus`
+  - `riskFlags`
+  - `detailUrl`
+  - `raw`
+- Signal basis hierarchy is fixed to:
+  - `iopv` first
+  - `estimate` second
+  - `nav` last
+- When only `nav` premium is available, phase 1 must default to `仅观察` unless a later approved plan explicitly changes that rule.
+- `LOF套利` must consider application constraints in the outward reading path:
+  - `applyStatus`
+  - whether apply is open
+  - visible fee fields
+  - liquidity warning
+- Phase-1 action statuses are fixed to:
+  - `套利候选`
+  - `仅观察`
+  - `无明显溢价`
+  - `不可参与`
+- The page must clearly expose that the project is still searching for better zero-login IOPV coverage.
+- Firecrawl is allowed only as a future fallback adapter for HTML-to-JSON conversion when the current public JSON disappears; it is not the primary production source in phase 1.
