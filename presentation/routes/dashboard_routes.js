@@ -9,6 +9,7 @@ function registerDashboardRoutes(options = {}) {
     app,
     nowIso,
     getHealthSnapshot,
+    getDashboardUiConfig,
     getShanghaiParts,
     normalizeDateText,
     pickText,
@@ -45,6 +46,13 @@ function registerDashboardRoutes(options = {}) {
     typeof getHealthSnapshot === "function"
       ? getHealthSnapshot()
       : { status: "ok", timestamp: nowIso() }
+  ));
+
+  app.get("/api/dashboard/ui-config", (_req, res) => sendSuccess(
+    res,
+    typeof getDashboardUiConfig === "function"
+      ? getDashboardUiConfig()
+      : { tableUi: null }
   ));
 
   app.get("/api/merger/reports/today", async (_req, res) => {

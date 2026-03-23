@@ -340,6 +340,21 @@ Acceptance:
 - The homepage remains reachable throughout the repair and verification process.
 ## 14. Phase K: Cloud Runtime Preservation + First-Install Proxy Closure (2026-03-23)
 
+## 27. Phase X: Dashboard Render Recovery For Template/Script Drift (2026-03-24)
+
+Goal: recover the public dashboard from a full-page render crash caused by template/script tab mismatch.
+
+Plan:
+1. Keep the current dashboard information architecture unchanged; this round is a runtime recovery fix, not a product-contract change.
+2. Align `presentation/dashboard/dashboard_page.js` with the currently served dashboard template tab set.
+3. Add null-safe panel activation so missing optional panels cannot crash the whole page render path.
+4. Verify the public homepage and key APIs render again after the hotfix is synced.
+
+Acceptance:
+- Opening the public homepage no longer results in a blank or data-less dashboard caused by frontend initialization failure.
+- `转债套利 / AH / AB / LOF套利 / 监控套利 / 分红提醒 / 事件套利` tabs can switch normally.
+- A missing or temporarily removed panel node does not crash `renderTabs()`.
+
 Goal: make the cloud deploy path safe for long-term unattended operation by preserving runtime state and reducing first-install proxy drift.
 
 Plan:
@@ -613,3 +628,269 @@ Acceptance:
   - action status
 - When IOPV is missing, the page clearly downgrades to observation mode instead of pretending the signal is execution-grade.
 - A single-source failure in one LOF category degrades only that category and does not blank the homepage.
+
+## 23. Phase T: CB Truth-source Yield + Formula Hint + Column Split Polish (2026-03-23)
+
+Goal: finish the current convertible-bond dense-table round so the visible fields and source truthfulness match the latest user contract.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep the existing theoretical-pricing engine unchanged for this round:
+   - continue using `理论价值 = 纯债价值 + 期权理论价值`
+   - continue using `期权理论价值 = 看涨期权价值 - 看跌期权价值`
+3. Refine the `转债套利` main table rendering contract:
+   - add `纯债价值` before `纯债溢价率`
+   - split `理论价值` and `理论溢价率` into two separate visible columns
+   - add a page-visible formula hint instead of hiding the pricing口径 only in code
+4. Replace local `到期税前收益率` backfill with a real upstream field:
+   - prefer Jisilu `bond_cb_jsl()` `到期税前收益`
+   - do not continue using a local approximation formula as the outward field value
+5. Keep `ROE` and `资产负债率` on real upstream financial fetches only, and make that source contract explicit in docs:
+   - allow Eastmoney bulk financial tables as the stable server-side fallback when THS / Sina endpoints fail
+6. Redeploy and verify both the API payload and the public page.
+
+Acceptance:
+- `转债套利` main table shows `纯债价值` immediately before `纯债溢价率`.
+- `理论价值` and `理论溢价率` render as separate columns.
+- The page visibly explains the current `理论价值` formula.
+- `yieldToMaturityPretax` comes from a real upstream field and is no longer populated by the local fallback formula in this round.
+- `stockAvgRoe3Y` and `stockDebtRatio` remain sourced from real upstream financial interfaces.
+
+## 24. Phase U: Homepage Root-Module Cleanup (2026-03-24)
+
+Goal: restore the stable homepage module contract, keep `LOF套利` as the visible fourth root tab, and reduce the active premium family back to `AH / AB`.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the cleaned homepage and premium contracts.
+2. Keep homepage root navigation fixed at `7` modules, with `LOF套利` restored as the visible fourth root tab.
+3. Remove abandoned premium experiments from public runtime scope:
+   - no extra homepage root tab
+   - no extra public market route
+   - no extra historical-premium type
+   - no scheduler/cache/bootstrap loading for removed datasets
+4. Keep premium-history active contracts limited to `AH / AB`.
+5. Keep LOF and existing premium modules stable:
+   - `AH / AB` behavior unchanged
+   - `LOF套利` remains accessible from the homepage
+   - unrelated modules do not regress
+
+Acceptance:
+- Homepage root tabs remain `7`, and one visible tab is `LOF套利`.
+- Premium-history active contracts remain limited to `AH / AB`.
+- Existing `AH / AB / LOF套利 / 转债 / 监控 / 分红 / 事件套利` behavior does not regress.
+
+## 24. Phase U: LOF Authenticated Enrichment + Market Subtabs (2026-03-23)
+
+Goal: upgrade the current `LOF套利` MVP into a fuller real-data page that is closer to the live Jisilu reading path, while still refusing to fabricate unavailable `IOPV` fields.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep the current layered architecture:
+   - `data_fetch/lof_arbitrage` only fetches source rows and cache fallback
+   - `strategy/lof_arbitrage` only computes outward row semantics and overview
+   - `presentation` only renders page structure and columns
+3. Add optional authenticated enhancement on top of the current Jisilu QDII endpoints:
+   - if `data_fetch.plugins.lof_arbitrage.jisilu_cookie` is configured, send it and use the larger logged-in result set
+   - if cookie is missing or invalid, automatically fall back to the public result set
+4. Keep truthfulness strict:
+   - more rows are allowed after login enhancement
+   - `IOPV` / `IOPV溢价率` may still stay empty
+   - outward payload and UI must state that clearly instead of inventing values
+5. Expand standardized LOF fields so the page can render the practical long-table view, including:
+   - code / name / issuer
+   - current price / change rate / 成交额
+   - 场内份额 / 场内新增份额
+   - T-2 净值 / 净值日期 / 净值溢价
+   - IOPV / IOPV溢价
+   - 估值 / 估值溢价
+   - 相关指数 / 指数涨幅
+   - 申购费 / 申购状态 / 赎回费 / 赎回状态 / 管托费
+   - 官方基金页链接 / 集思录详情链接
+6. Refactor the LOF page into visible market subtabs:
+   - `欧美市场`
+   - `亚洲市场`
+   - `商品`
+7. Keep the module stable-first:
+   - no push integration
+   - no auto-trading semantics
+   - a single-source failure only degrades the affected subtab
+
+Acceptance:
+- `LOF套利` can display the larger logged-in dataset when a valid cookie is present, while still working without it.
+- The page exposes more of the real Jisilu fields instead of only the MVP summary view.
+- `欧美市场 / 亚洲市场 / 商品` can be switched directly inside the LOF module.
+- `IOPV` fields remain empty when the source truly does not return them, and the UI explains that they are currently unavailable.
+- Homepage stability and other modules remain unaffected.
+
+## 26. Phase W: Event-arbitrage Detail Text Responsive Width Fix (2026-03-24)
+
+Goal: fix the `事件套利` detail-text layout so A-share `摘要` and HK/CN `备注` adapt to available screen width instead of being squeezed into the left quarter of the detail grid.
+
+Plan:
+1. Keep the data contract unchanged and only adjust presentation behavior.
+2. Update the page contract docs first for the event-arbitrage detail-text layout.
+3. Change the event-arbitrage detail renderers to use a single-column full-width detail block for:
+   - A-share `摘要`
+   - HK/CN `备注`
+4. Add minimal CSS for a responsive single-column detail-grid variant, without changing other modules' shared detail layout.
+
+Acceptance:
+- `事件套利` A-share `摘要` occupies the usable detail-row width instead of staying compressed on the left.
+- `港股套利` and `中概私有` `备注` follow the same full-width responsive behavior.
+- Other detail-grid based modules keep their existing layout.
+
+## 25. Phase V: LOF Estimated-value Completion From Source Change Rate (2026-03-23)
+
+Goal: complete the currently missing actionable LOF estimate fields by deriving them only from real Jisilu source fields, while keeping `IOPV` empty unless the upstream truly returns it.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the derived-estimate contract.
+2. Keep the LOF source truth contract strict:
+   - `IOPV` is still direct-source only
+   - `IOPV溢价率` is still direct-source only
+   - `估值` and `估值溢价` may be derived only when Jisilu already provides `est_val_increase_rt`
+3. Add a deterministic source-based derivation path:
+   - `estimatedValue = navValue * (1 + est_val_increase_rt / 100)`
+   - `estimatedPremiumRate = ((currentPrice / estimatedValue) - 1) * 100`
+4. Persist derivation provenance in the outward payload so the page can explain where the value came from:
+   - direct source
+   - derived from `est_val_increase_rt`
+5. Expand the LOF page so the strategy view is easier to use:
+   - add visible `结论`
+   - add visible `信号溢价`
+   - add estimate-source, estimate-time, estimate-change, reference-price, and calculation-tips detail fields
+6. Keep deployment risk low:
+   - no push integration changes
+   - no homepage root-tab changes
+   - no changes to unrelated modules
+
+Acceptance:
+- Rows with real `est_val_increase_rt` now expose `estimatedValue` and `estimatedPremiumRate` instead of leaving the estimate area blank.
+- `IOPV` and `IOPV溢价率` remain empty when upstream still does not provide them.
+- LOF main table visibly shows `结论` and `信号溢价`.
+- LOF detail area clearly explains whether the estimate is direct-source or derived from Jisilu estimate-change fields.
+- The page remains loadable even if one LOF source category fails.
+
+## 26. Phase W: CB Yield Removal + Volatility Trust Warning (2026-03-24)
+
+Goal: reduce false precision in the convertible-bond main table by removing the now-unwanted maturity-yield display and explicitly downgrading volatility-driven theoretical metrics to reference-only status.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep the current backend theoretical-pricing calculation unchanged in this round:
+   - do not silently swap the volatility engine yet
+   - do not change the API field schema just because the page is hiding one column
+3. Refine the `转债套利` visible table contract:
+   - remove `到期税前收益率` from the default visible columns
+   - remove the same field from the default detail block
+4. Clarify the trust boundary of the volatility-driven fields on the page:
+   - `60日波动率` is the current historical annualized volatility estimate derived from recent equity closes
+   - `期权理论价值 / 理论价值 / 理论溢价率` are reference values rather than execution-grade truth
+5. Record the current volatility口径 explicitly in docs so the next volatility-refactor round can replace it cleanly.
+
+Acceptance:
+- `转债套利` page no longer displays `到期税前收益率`.
+- `60日波动率` and the volatility-derived theoretical metrics are visibly marked as historical/reference values on the page.
+- The current volatility formula and trust boundary are documented.
+## 27. Phase Y: LOF Summary-card Removal + Detail-first Reading Path (2026-03-24)
+
+Goal: simplify the `LOF套利` page by removing the current top summary-card band and making the long-table detail rows the default supplementary reading path.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep the LOF fetch/strategy/API schema unchanged in this round:
+   - `data.overview` may remain in the API for aggregation/debugging
+   - no calculation or classification logic changes
+3. Refine the LOF page structure contract:
+   - remove the visible top summary cards `套利候选 / 仅观察 / 数据链路`
+   - keep title/status text and market subtabs
+   - keep the long table as the immediate primary reading path
+4. Preserve the current always-visible secondary detail rows under each LOF item so explanatory fields remain directly readable without a separate summary-card strip.
+
+Acceptance:
+- `LOF套利` no longer renders the visible top summary-card area.
+- The page still shows toolbar status, market subtabs, and the active-market long table.
+- LOF secondary detail rows remain visible and continue to expose estimate/source/risk context.
+
+## 28. Phase Z: LOF Module Cancellation From Homepage (2026-03-24)
+
+Goal: remove `LOF套利` from the public homepage module set while keeping the rest of the dashboard stable.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Treat this round as a homepage/module-scope cancellation rather than a full backend feature purge:
+   - remove the visible `LOF套利` root tab
+   - remove homepage startup loading of LOF data
+   - keep unrelated modules unchanged
+3. Stop spending homepage/runtime preload cost on LOF:
+   - dashboard bootstrap no longer requests `lofArb`
+   - server preload no longer includes `lofArb`
+4. Keep the existing LOF backend implementation archived in place for now, but disconnected from the public homepage reading path.
+
+Acceptance:
+- The homepage no longer shows `LOF套利`.
+- Dashboard initial load no longer requests LOF data.
+- Server preload no longer includes `lofArb`.
+- `转债套利 / AH / AB / 监控套利 / 分红提醒 / 事件套利` remain usable.
+
+## 29. Phase AA: LOF Complete Removal (2026-03-24)
+
+Goal: fully retire `LOF套利` from the repository and runtime surface instead of only hiding it from the homepage.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Remove all active LOF runtime surfaces:
+   - dashboard render/bind/bootstrap logic
+   - public market route
+   - server dataset registration and preload
+   - `data_dispatch.py` action
+3. Remove all active LOF config contracts from `config.yaml`.
+4. Delete the retired implementation directories:
+   - `data_fetch/lof_arbitrage`
+   - `strategy/lof_arbitrage`
+5. Verify the homepage still works and old LOF route access falls back to normal API 404 behavior.
+
+Acceptance:
+- No active homepage, server, route, or CLI path still references LOF.
+- LOF implementation directories are removed.
+- Homepage and remaining modules continue working.
+
+## 29. Phase AA: Shared Dashboard Table Readability Upgrade (2026-03-24)
+
+Goal: improve the readability of all dashboard long tables by upgrading shared presentation density, while keeping business meaning, sorting rules, pagination, and data pipelines unchanged.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the shared table-readability contract.
+2. Keep this round strictly inside the presentation contract:
+   - no fetch changes
+   - no strategy calculation changes
+   - no business-field meaning changes
+3. Add minimum presentation config under `config.yaml > presentation.dashboard_table_ui` for:
+   - desktop table font size
+   - desktop header font size
+   - desktop line height
+   - desktop cell padding
+   - tablet table font size
+   - table-kind min widths
+4. Add a light read-only endpoint `GET /api/dashboard/ui-config` so the static dashboard page can consume presentation config instead of hardcoding table density.
+5. Keep the shared table renderer as the only main entry:
+   - continue using `renderPaginatedTable()`
+   - continue using `renderSimpleTable()`
+   - do not fork separate table frameworks by module
+6. Refine shared table rendering and CSS:
+   - increase table text size and line height on desktop
+   - enlarge header/body padding
+   - keep sticky headers, sorting, pagination, and expand details unchanged
+   - use per-table-kind min-width rules instead of relying only on `table-layout: fixed`
+   - add clearer row separation and tabular-number alignment
+7. Keep mobile safe:
+   - only limited font growth under narrow breakpoints
+   - continue using existing horizontal scroll containers when needed
+   - do not introduce a second mobile-only table layout in this round
+
+Acceptance:
+- Desktop table text is visibly larger than the current `12px` baseline.
+- Shared table renderers remain the primary rendering path for dashboard tables.
+- `GET /api/dashboard/ui-config` returns the active table UI contract from config.
+- Sorting, pagination, detail expansion, and field semantics remain unchanged.
+- Desktop may use light controlled horizontal scrolling, but the page does not collapse on tablet/mobile widths.

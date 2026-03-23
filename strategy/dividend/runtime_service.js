@@ -32,8 +32,12 @@ function createDividendRuntimeService(options = {}) {
   }
 
   async function fetchDividend(code) {
-    const result = await callDataCore(["dividend", code], { timeout: 90000 });
-    return result?.success && result?.data ? result.data : null;
+    try {
+      const result = await callDataCore(["dividend", code], { timeout: 90000 });
+      return result?.success && result?.data ? result.data : null;
+    } catch {
+      return null;
+    }
   }
 
   async function resolveStockNameByCode(code, fallback = "") {
@@ -72,43 +76,47 @@ function createDividendRuntimeService(options = {}) {
 
   async function refreshPortfolio() {
     const refreshed = await Promise.all(loadPortfolio().map(async (row) => {
-      const latest = await fetchDividend(row.code);
-      if (latest) {
-        const latestRawName = String(latest.name || "").trim();
-        const fallbackName = String(row.name || row.dividendData?.name || "").trim();
-        const resolvedName = isMissingOrCodeName(latestRawName, row.code)
-          ? await resolveStockNameByCode(row.code, fallbackName)
-          : latestRawName;
+      try {
+        const latest = await fetchDividend(row.code);
+        if (latest) {
+          const latestRawName = String(latest.name || "").trim();
+          const fallbackName = String(row.name || row.dividendData?.name || "").trim();
+          const resolvedName = isMissingOrCodeName(latestRawName, row.code)
+            ? await resolveStockNameByCode(row.code, fallbackName)
+            : latestRawName;
+          return {
+            ...row,
+            name: resolvedName || row.code,
+            dividendData: {
+              ...latest,
+              name: resolvedName || latestRawName || row.code,
+            },
+          };
+        }
+
+        if (!row.dividendData) return row;
+        const market = row.code.startsWith("9") || row.code.startsWith("2") ? "b" : "a";
+        const bMarket = row.code.startsWith("9") ? "sh" : "sz";
+        const priceResult = await getStockPrice(row.code, market, bMarket);
+        const latestPrice = Number(priceResult?.data?.price || 0);
+        if (!latestPrice) return row;
+
+        const dividendPerShare = Number(row.dividendData.dividendPerShare || 0);
+        const dividendYield = latestPrice ? (dividendPerShare / latestPrice) * 100 : null;
         return {
           ...row,
-          name: resolvedName || row.code,
+          name: isMissingOrCodeName(row.name, row.code)
+            ? (await resolveStockNameByCode(row.code, row.dividendData?.name || "")) || row.code
+            : row.name,
           dividendData: {
-            ...latest,
-            name: resolvedName || latestRawName || row.code,
+            ...row.dividendData,
+            currentPrice: latestPrice,
+            dividendYield: Number.isFinite(dividendYield) ? Number(dividendYield.toFixed(2)) : null,
           },
         };
+      } catch {
+        return row;
       }
-
-      if (!row.dividendData) return row;
-      const market = row.code.startsWith("9") || row.code.startsWith("2") ? "b" : "a";
-      const bMarket = row.code.startsWith("9") ? "sh" : "sz";
-      const priceResult = await getStockPrice(row.code, market, bMarket);
-      const latestPrice = Number(priceResult?.data?.price || 0);
-      if (!latestPrice) return row;
-
-      const dividendPerShare = Number(row.dividendData.dividendPerShare || 0);
-      const dividendYield = latestPrice ? (dividendPerShare / latestPrice) * 100 : null;
-      return {
-        ...row,
-        name: isMissingOrCodeName(row.name, row.code)
-          ? (await resolveStockNameByCode(row.code, row.dividendData?.name || "")) || row.code
-          : row.name,
-        dividendData: {
-          ...row.dividendData,
-          currentPrice: latestPrice,
-          dividendYield: Number.isFinite(dividendYield) ? Number(dividendYield.toFixed(2)) : null,
-        },
-      };
     }));
 
     savePortfolio(refreshed);

@@ -31,6 +31,19 @@
         --radius-sm: 12px;
         --shadow-lg: 0 32px 80px rgba(0, 0, 0, 0.34);
         --shadow-md: 0 18px 42px rgba(0, 0, 0, 0.26);
+        --table-font-size-desktop: 14px;
+        --table-header-font-size-desktop: 14px;
+        --table-line-height-desktop: 1.58;
+        --table-cell-padding-y-desktop: 10px;
+        --table-cell-padding-x-desktop: 12px;
+        --table-font-size-tablet: 13px;
+        --table-min-width-subscription: 1180px;
+        --table-min-width-convertible: 1560px;
+        --table-min-width-premium: 1240px;
+        --table-min-width-monitor: 1320px;
+        --table-min-width-dividend: 1100px;
+        --table-min-width-merger: 1280px;
+        --table-min-width-lof: 1680px;
       }
 
       * {
@@ -220,8 +233,8 @@
       .panel-meta,
       .slim-note {
         color: var(--text-soft);
-        font-size: 13px;
-        line-height: 1.65;
+        font-size: calc(var(--table-font-size-desktop) - 1px);
+        line-height: 1.6;
       }
 
       .panel-meta {
@@ -717,37 +730,43 @@
       }
 
       table[data-table-kind="subscription"] {
-        min-width: 0;
+        min-width: var(--table-min-width-subscription);
       }
 
       table[data-table-kind="convertible"] {
-        min-width: 0;
+        min-width: var(--table-min-width-convertible);
       }
 
       table[data-table-kind="premium"] {
-        min-width: 0;
+        min-width: var(--table-min-width-premium);
       }
 
       table[data-table-kind="monitor"] {
-        min-width: 0;
+        min-width: var(--table-min-width-monitor);
       }
 
       table[data-table-kind="dividend"] {
-        min-width: 0;
+        min-width: var(--table-min-width-dividend);
       }
 
       table[data-table-kind="merger"] {
-        min-width: 0;
+        min-width: var(--table-min-width-merger);
+      }
+
+      table[data-table-kind="lof"] {
+        min-width: var(--table-min-width-lof);
       }
 
       th,
       td {
-        padding: 8px 8px;
+        padding: var(--table-cell-padding-y-desktop) var(--table-cell-padding-x-desktop);
         text-align: left;
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         vertical-align: top;
-        font-size: 12px;
+        font-size: var(--table-font-size-desktop);
+        line-height: var(--table-line-height-desktop);
         word-break: break-word;
+        font-variant-numeric: tabular-nums;
       }
 
       th {
@@ -757,11 +776,17 @@
         background: rgba(18, 18, 22, 0.98);
         color: var(--text-soft);
         font-weight: 600;
+        font-size: var(--table-header-font-size-desktop);
+        line-height: 1.45;
         white-space: nowrap;
       }
 
       tbody tr {
         transition: background 0.16s ease;
+      }
+
+      tbody tr:not(.detail-row):not(.subscription-row):not(.merger-row-today):nth-child(even) {
+        background: rgba(255, 255, 255, 0.018);
       }
 
       tbody tr:hover {
@@ -839,12 +864,13 @@
 
       .expand-button {
         min-height: 28px;
-        padding: 5px 10px;
-        font-size: 12px;
+        padding: 6px 12px;
+        font-size: calc(var(--table-font-size-desktop) - 1px);
         border-radius: 10px;
         color: var(--text);
         background: rgba(255, 255, 255, 0.04);
         border: 1px solid rgba(255, 255, 255, 0.08);
+        font-variant-numeric: tabular-nums;
       }
 
       .expand-button:hover {
@@ -875,16 +901,17 @@
 
       .detail-label {
         color: var(--text-faint);
-        font-size: 12px;
+        font-size: calc(var(--table-font-size-desktop) - 1px);
       }
 
       .detail-value {
         margin-top: 2px;
         color: var(--text);
-        font-size: 13px;
-        line-height: 1.45;
+        font-size: var(--table-font-size-desktop);
+        line-height: var(--table-line-height-desktop);
         white-space: normal;
         word-break: break-word;
+        font-variant-numeric: tabular-nums;
       }
 
       .muted {
@@ -942,7 +969,9 @@
 
       .pagination-status {
         color: var(--text-soft);
-        font-size: 13px;
+        font-size: calc(var(--table-font-size-desktop) - 1px);
+        line-height: 1.5;
+        font-variant-numeric: tabular-nums;
       }
 
       .pagination-buttons {
@@ -1003,6 +1032,33 @@
         to {
           opacity: 1;
           transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 1379px) and (min-width: 861px) {
+        th,
+        td {
+          font-size: var(--table-font-size-tablet);
+          padding:
+            calc(var(--table-cell-padding-y-desktop) - 1px)
+            calc(var(--table-cell-padding-x-desktop) - 2px);
+        }
+
+        th {
+          font-size: var(--table-font-size-tablet);
+        }
+
+        .section-note,
+        .panel-meta,
+        .slim-note,
+        .detail-label,
+        .pagination-status,
+        .expand-button {
+          font-size: calc(var(--table-font-size-tablet) - 1px);
+        }
+
+        .detail-value {
+          font-size: var(--table-font-size-tablet);
         }
       }
 
@@ -1095,6 +1151,30 @@
         .detail-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
+
+        th,
+        td {
+          font-size: calc(var(--table-font-size-tablet) - 0.5px);
+          padding: 8px 9px;
+        }
+
+        th {
+          font-size: var(--table-font-size-tablet);
+        }
+
+        .section-note,
+        .panel-meta,
+        .slim-note,
+        .detail-label,
+        .pagination-status,
+        .expand-button {
+          font-size: calc(var(--table-font-size-tablet) - 1px);
+        }
+
+        .detail-value {
+          font-size: var(--table-font-size-tablet);
+          line-height: 1.55;
+        }
       }
 
       @media (max-width: 560px) {
@@ -1176,6 +1256,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <script src="/presentation/dashboard/dashboard_page.js?v=20260324-lof-cancel-1"></script>
+    <script src="/presentation/dashboard/dashboard_page.js?v=20260324-dividend-stability-1"></script>
   </body>
 </html>

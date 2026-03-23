@@ -4,8 +4,26 @@ const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000' 
 const PAGE_SIZE = 50;
 const FORCE_REFRESH_RESOURCE_KEYS = ['exchangeRate', 'ipo', 'bonds', 'cbArb', 'ah', 'ab', 'merger'];
 const CRITICAL_CACHE_REVALIDATION_KEYS = ['exchangeRate', 'cbArb', 'ah', 'ab'];
+const DEFAULT_TABLE_UI_CONFIG = Object.freeze({
+  desktopFontPx: 14,
+  desktopHeaderFontPx: 14,
+  desktopLineHeight: 1.58,
+  desktopCellPaddingY: 10,
+  desktopCellPaddingX: 12,
+  tabletFontPx: 13,
+  minWidthByKind: {
+    subscription: 1180,
+    convertible: 1560,
+    premium: 1240,
+    monitor: 1320,
+    dividend: 1100,
+    merger: 1280,
+    lof: 1680,
+  },
+});
 
 const ENDPOINTS = {
+  uiConfig: '/api/dashboard/ui-config',
   exchangeRate: '/api/market/exchange-rate',
   ipo: '/api/market/ipo',
   bonds: '/api/market/convertible-bonds',
@@ -14,14 +32,14 @@ const ENDPOINTS = {
   ab: '/api/market/ab',
   monitor: '/api/monitors',
   stockSearch: '/api/stock/search',
-  dividend: '/api/dividend?action=refresh',
+  dividend: '/api/dividend?action=portfolio',
+  dividendRefresh: '/api/dividend?action=refresh',
   merger: '/api/market/event-arbitrage',
   pushConfig: '/api/push/config',
 };
 
 const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'monitor', 'dividend', 'merger'];
 const EVENT_ARB_SUBTAB_SEQUENCE = ['a_event', 'hk_private', 'cn_private', 'rights_issue', 'announcement_pool'];
-const LOF_SUBTAB_SEQUENCE = ['europe_us', 'asia', 'commodity'];
 const MONITOR_MARKET_OPTIONS = ['A', 'H', 'B'];
 const MONITOR_CURRENCY_OPTIONS = ['CNY', 'HKD', 'USD'];
 const PUSH_MODULE_LABELS = {
@@ -61,9 +79,6 @@ const TABLE_DEFAULTS = {
   monitor: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   dividend: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   merger: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  lofArbEurope: { sortKey: 'premiumRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  lofArbAsia: { sortKey: 'premiumRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  lofArbCommodity: { sortKey: 'premiumRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   eventArbHk: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   eventArbCn: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   eventArbA: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
@@ -102,6 +117,7 @@ const state = {
     eventArbAnnouncement: createTableState('eventArbAnnouncement'),
   },
   resources: {
+    uiConfig: resourceState(),
     exchangeRate: resourceState(),
     ipo: resourceState(),
     bonds: resourceState(),
@@ -138,6 +154,59 @@ const dom = {
   reloadDataButton: document.getElementById('reload-data-button'),
   toast: document.getElementById('toast'),
 };
+
+function normalizePositiveNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function normalizeTableUiConfig(payload) {
+  const root = payload && typeof payload === 'object' ? payload : {};
+  const tableUi = root.tableUi && typeof root.tableUi === 'object' ? root.tableUi : root;
+  const minWidthSource = tableUi.minWidthByKind && typeof tableUi.minWidthByKind === 'object'
+    ? tableUi.minWidthByKind
+    : {};
+  return {
+    desktopFontPx: normalizePositiveNumber(tableUi.desktopFontPx, DEFAULT_TABLE_UI_CONFIG.desktopFontPx),
+    desktopHeaderFontPx: normalizePositiveNumber(tableUi.desktopHeaderFontPx, DEFAULT_TABLE_UI_CONFIG.desktopHeaderFontPx),
+    desktopLineHeight: normalizePositiveNumber(tableUi.desktopLineHeight, DEFAULT_TABLE_UI_CONFIG.desktopLineHeight),
+    desktopCellPaddingY: normalizePositiveNumber(tableUi.desktopCellPaddingY, DEFAULT_TABLE_UI_CONFIG.desktopCellPaddingY),
+    desktopCellPaddingX: normalizePositiveNumber(tableUi.desktopCellPaddingX, DEFAULT_TABLE_UI_CONFIG.desktopCellPaddingX),
+    tabletFontPx: normalizePositiveNumber(tableUi.tabletFontPx, DEFAULT_TABLE_UI_CONFIG.tabletFontPx),
+    minWidthByKind: {
+      subscription: normalizePositiveNumber(minWidthSource.subscription, DEFAULT_TABLE_UI_CONFIG.minWidthByKind.subscription),
+      convertible: normalizePositiveNumber(minWidthSource.convertible, DEFAULT_TABLE_UI_CONFIG.minWidthByKind.convertible),
+      premium: normalizePositiveNumber(minWidthSource.premium, DEFAULT_TABLE_UI_CONFIG.minWidthByKind.premium),
+      monitor: normalizePositiveNumber(minWidthSource.monitor, DEFAULT_TABLE_UI_CONFIG.minWidthByKind.monitor),
+      dividend: normalizePositiveNumber(minWidthSource.dividend, DEFAULT_TABLE_UI_CONFIG.minWidthByKind.dividend),
+      merger: normalizePositiveNumber(minWidthSource.merger, DEFAULT_TABLE_UI_CONFIG.minWidthByKind.merger),
+      lof: normalizePositiveNumber(minWidthSource.lof, DEFAULT_TABLE_UI_CONFIG.minWidthByKind.lof),
+    },
+  };
+}
+
+function applyTableUiConfig(rawPayload) {
+  const tableUi = normalizeTableUiConfig(rawPayload);
+  const root = document.documentElement;
+  root.style.setProperty('--table-font-size-desktop', `${tableUi.desktopFontPx}px`);
+  root.style.setProperty('--table-header-font-size-desktop', `${tableUi.desktopHeaderFontPx}px`);
+  root.style.setProperty('--table-line-height-desktop', String(tableUi.desktopLineHeight));
+  root.style.setProperty('--table-cell-padding-y-desktop', `${tableUi.desktopCellPaddingY}px`);
+  root.style.setProperty('--table-cell-padding-x-desktop', `${tableUi.desktopCellPaddingX}px`);
+  root.style.setProperty('--table-font-size-tablet', `${tableUi.tabletFontPx}px`);
+  root.style.setProperty('--table-min-width-subscription', `${tableUi.minWidthByKind.subscription}px`);
+  root.style.setProperty('--table-min-width-convertible', `${tableUi.minWidthByKind.convertible}px`);
+  root.style.setProperty('--table-min-width-premium', `${tableUi.minWidthByKind.premium}px`);
+  root.style.setProperty('--table-min-width-monitor', `${tableUi.minWidthByKind.monitor}px`);
+  root.style.setProperty('--table-min-width-dividend', `${tableUi.minWidthByKind.dividend}px`);
+  root.style.setProperty('--table-min-width-merger', `${tableUi.minWidthByKind.merger}px`);
+  root.style.setProperty('--table-min-width-lof', `${tableUi.minWidthByKind.lof}px`);
+}
+
+function applyTableUiConfigFromState() {
+  const payload = state.resources.uiConfig?.data?.data || null;
+  applyTableUiConfig(payload);
+}
 
 function createTableState(key) {
   return { ...TABLE_DEFAULTS[key] };
@@ -457,6 +526,14 @@ async function loadResource(key, endpoint, onRender, options = {}) {
   onRender();
 }
 
+async function refreshDividendResource(options = {}) {
+  const background = options.background !== false;
+  await loadResource('dividend', ENDPOINTS.dividendRefresh, renderEverything, {
+    force: Boolean(options.force),
+    background,
+  });
+}
+
 function bindEvents() {
   if (state.eventsBound) return;
 
@@ -622,11 +699,13 @@ async function revalidateCriticalResourcesOnce() {
 
 async function bootstrap(options = {}) {
   bindEvents();
+  applyTableUiConfigFromState();
   renderAll();
   const forceMarket = Boolean(options.forceMarket);
   const skipCacheRevalidation = Boolean(options.skipCacheRevalidation);
 
   const tasks = [
+    loadResource('uiConfig', ENDPOINTS.uiConfig, applyTableUiConfigFromState),
     loadResource('exchangeRate', ENDPOINTS.exchangeRate, renderHeaderOnly, { force: forceMarket }),
     loadResource('ipo', ENDPOINTS.ipo, renderHeaderOnly, { force: forceMarket }),
     loadResource('bonds', ENDPOINTS.bonds, renderHeaderOnly, { force: forceMarket }),
@@ -637,11 +716,14 @@ async function bootstrap(options = {}) {
     loadResource('monitor', ENDPOINTS.monitor, renderEverything),
     loadResource('dividend', ENDPOINTS.dividend, renderEverything),
     loadResource('merger', ENDPOINTS.merger, renderEverything, { force: forceMarket }),
-    loadResource('lofArb', ENDPOINTS.lofArb, renderEverything, { force: forceMarket }),
   ];
 
   await Promise.allSettled(tasks);
   renderAll();
+
+  if (!forceMarket) {
+    void refreshDividendResource({ background: true });
+  }
 
   if (!forceMarket && !skipCacheRevalidation) {
     await revalidateCriticalResourcesOnce();
@@ -1468,7 +1550,6 @@ function handleSortClick(tableKey, sortKey) {
   if (tableKey === 'cbArb') renderConvertibleBondPanel();
   if (tableKey === 'ah') renderPremiumPanel('ah');
   if (tableKey === 'ab') renderPremiumPanel('ab');
-  if (tableKey.startsWith('lofArb')) renderLofArbitragePanel();
 }
 
 function handlePageClick(tableKey, action) {
@@ -1488,7 +1569,6 @@ function handlePageClick(tableKey, action) {
   if (tableKey === 'ab') renderPremiumPanel('ab');
   if (tableKey === 'monitor') renderMonitorPanel();
   if (tableKey === 'dividend') renderDividendPanel();
-  if (tableKey.startsWith('lofArb')) renderLofArbitragePanel();
   if (tableKey === 'merger' || tableKey.startsWith('eventArb')) renderMergerPanel();
 }
 
@@ -1498,9 +1578,6 @@ function readTableSourceRows(tableKey) {
   if (tableKey === 'ab') return readResourceArray('ab');
   if (tableKey === 'monitor') return readResourceArray('monitor');
   if (tableKey === 'dividend') return readResourceArray('dividend');
-  if (tableKey === 'lofArbEurope') return readLofArbitrageGroupRows('europe_us');
-  if (tableKey === 'lofArbAsia') return readLofArbitrageGroupRows('asia');
-  if (tableKey === 'lofArbCommodity') return readLofArbitrageGroupRows('commodity');
   if (tableKey === 'merger' || tableKey === 'eventArbAnnouncement') return readEventArbitrageCategoryRows('announcement_pool');
   if (tableKey === 'eventArbHk') return readEventArbitrageCategoryRows('hk_private');
   if (tableKey === 'eventArbCn') return readEventArbitrageCategoryRows('cn_private');
@@ -1512,7 +1589,6 @@ function getTableColumns(tableKey) {
   if (tableKey === 'cbArb') return buildConvertibleColumns();
   if (tableKey === 'ah') return buildPremiumColumns('ah');
   if (tableKey === 'ab') return buildPremiumColumns('ab');
-  if (tableKey.startsWith('lofArb')) return buildLofArbitrageColumns();
   return [];
 }
 
@@ -1658,7 +1734,6 @@ function resolveRowId(tableKey, row, fallbackIndex) {
   if (tableKey === 'ah') return `${row.aCode || ''}-${row.hCode || ''}-${fallbackIndex}`;
   if (tableKey === 'ab') return `${row.aCode || ''}-${row.bCode || ''}-${fallbackIndex}`;
   if (tableKey === 'monitor') return String(row.id || row.name || fallbackIndex);
-  if (tableKey.startsWith('lofArb')) return String(row.id || `${row.symbol || ''}-${fallbackIndex}`);
   if (tableKey === 'merger') return String(row.announcementId || `${row.secCode || ''}-${row.announcementTime || ''}-${fallbackIndex}`);
   if (tableKey === 'eventArbAnnouncement') return String(row.announcementId || `${row.secCode || ''}-${row.announcementTime || ''}-${fallbackIndex}`);
   if (tableKey === 'eventArbHk' || tableKey === 'eventArbCn' || tableKey === 'eventArbA') {
@@ -2053,7 +2128,6 @@ function renderActivePanel() {
   if (state.activeTab === 'cb-arb') return renderConvertibleBondPanel();
   if (state.activeTab === 'ah') return renderPremiumPanel('ah');
   if (state.activeTab === 'ab') return renderPremiumPanel('ab');
-  if (state.activeTab === 'lof-arb') return renderLofArbitragePanel();
   if (state.activeTab === 'monitor') return renderMonitorPanel();
   if (state.activeTab === 'dividend') return renderDividendPanel();
   if (state.activeTab === 'merger') return renderMergerPanel();
@@ -2520,434 +2594,10 @@ function renderDividendPanel() {
   `;
 }
 
-function readLofArbitrageResponse() {
-  return readResourcePayload('lofArb');
-}
-
-function readLofArbitrageData() {
-  return readObject(readLofArbitrageResponse().data);
-}
-
-function readLofArbitrageRows() {
-  return readArray(readLofArbitrageData().rows);
-}
-
-function readLofArbitrageGroups() {
-  return readObject(readLofArbitrageData().groups);
-}
-
-function readLofArbitrageGroupRows(category) {
-  return readArray(readLofArbitrageGroups()[category]);
-}
-
-function readLofArbitrageOverview() {
-  return readObject(readLofArbitrageData().overview);
-}
-
-function readLofArbitrageSourceStatus() {
-  return readObject(readLofArbitrageData().sourceStatus);
-}
-
-function lofCategoryLabel(category) {
-  const map = {
-    europe_us: '欧美市场',
-    asia: '亚洲市场',
-    commodity: '商品',
-  };
-  return map[String(category || '').trim()] || '--';
-}
-
-function readLofSubview() {
-  return LOF_SUBTAB_SEQUENCE.includes(state.lofSubview) ? state.lofSubview : 'europe_us';
-}
-
-function lofTableKey(category) {
-  if (category === 'asia') return 'lofArbAsia';
-  if (category === 'commodity') return 'lofArbCommodity';
-  return 'lofArbEurope';
-}
-
-function readLofSourceStatus(category) {
-  return readObject(readLofArbitrageSourceStatus()[category]);
-}
-
-function lofActionClass(status) {
-  if (status === '套利候选') return 'positive';
-  if (status === '不可参与') return 'negative';
-  return '';
-}
-
-function lofPremiumBasisLabel(basis) {
-  const map = {
-    iopv: 'IOPV',
-    estimate: '估值',
-    nav: '净值',
-  };
-  return map[String(basis || '').trim()] || '--';
-}
-
-function lofAuthModeLabel(mode) {
-  const map = {
-    public: '公开结果',
-    authenticated: '已登录增强',
-    authenticated_fallback_public: '登录失败后回退公开结果',
-  };
-  return map[String(mode || '').trim()] || '--';
-}
-
-function lofEstimateSourceLabel(source) {
-  const map = {
-    direct_source: '源直接返回',
-    derived_from_est_val_increase_rt: 'Jisilu估值涨幅推导',
-  };
-  return map[String(source || '').trim()] || '当前源未返回';
-}
-
 function renderRiskFlags(flags) {
   const items = Array.isArray(flags) ? flags.filter(Boolean) : [];
   return items.length ? items.join('；') : '--';
 }
-
-function renderLofValue(value, digits = 4, fallbackText = '') {
-  const parsed = toNumber(value);
-  if (parsed !== null) return formatNumber(parsed, digits);
-  const text = String(fallbackText || '').trim();
-  return text || '当前源未返回';
-}
-
-function renderLofPercent(value, digits = 2, fallbackText = '') {
-  const parsed = toNumber(value);
-  if (parsed !== null) return formatPercent(parsed, digits);
-  const text = String(fallbackText || '').trim();
-  return text || '当前源未返回';
-}
-
-function renderLofSubtabs() {
-  const active = readLofSubview();
-  return `
-    <div class="subtab-nav">
-      ${LOF_SUBTAB_SEQUENCE.map((key) => `
-        <button
-          type="button"
-          class="subtab-button ${key === active ? 'active' : ''}"
-          data-lof-subtab="${escapeHtml(key)}"
-        >
-          ${escapeHtml(lofCategoryLabel(key))}
-        </button>
-      `).join('')}
-    </div>
-  `;
-}
-
-function buildLofArbitrageColumns() {
-  return [
-    { key: 'index', label: '序号' },
-    {
-      key: 'symbol',
-      label: '代码',
-      sortable: true,
-      sortType: 'text',
-      defaultDir: 'asc',
-      render: (row) => `<div class="mono-text">${escapeHtml(row.symbol || '--')}</div>`,
-    },
-    {
-      key: 'name',
-      label: '名称',
-      sortable: true,
-      sortType: 'text',
-      defaultDir: 'asc',
-      render: (row) => escapeHtml(row.name || '--'),
-    },
-    {
-      key: 'actionStatus',
-      label: '结论',
-      sortable: true,
-      sortType: 'text',
-      defaultDir: 'desc',
-      className: (row) => lofActionClass(row.actionStatus),
-      render: (row) => escapeHtml(row.actionStatus || '--'),
-    },
-    {
-      key: 'premiumRate',
-      label: '信号溢价',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.premiumRate),
-      className: (row) => statusClass(row.premiumRate),
-      render: (row) => formatPercent(row.premiumRate, 2),
-    },
-    {
-      key: 'currentPrice',
-      label: '现价',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.currentPrice),
-      render: (row) => formatNumber(row.currentPrice, 3),
-    },
-    {
-      key: 'changeRate',
-      label: '涨跌幅',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.changeRate),
-      className: (row) => statusClass(row.changeRate),
-      render: (row) => formatPercent(row.changeRate, 2),
-    },
-    {
-      key: 'volumeWan',
-      label: '成交额(万元)',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.volumeWan),
-      render: (row) => formatNumber(row.volumeWan, 2),
-    },
-    {
-      key: 'amountWanShares',
-      label: '场内份额(万份)',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.amountWanShares),
-      render: (row) => formatNumber(row.amountWanShares, 0),
-    },
-    {
-      key: 'amountIncreaseWanShares',
-      label: '场内新增(万份)',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.amountIncreaseWanShares),
-      render: (row) => formatSignedNumber(row.amountIncreaseWanShares, 0),
-    },
-    {
-      key: 'iopv',
-      label: 'IOPV',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.iopv),
-      render: (row) => escapeHtml(renderLofValue(row.iopv, 4, row.iopvText)),
-    },
-    {
-      key: 'iopvPremiumRate',
-      label: 'IOPV溢价率',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.iopvPremiumRate),
-      className: (row) => statusClass(row.iopvPremiumRate),
-      render: (row) => escapeHtml(renderLofPercent(row.iopvPremiumRate, 2, row.iopvPremiumRateText)),
-    },
-    {
-      key: 'navValue',
-      label: 'T-2净值',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.navValue),
-      render: (row) => escapeHtml(renderLofValue(row.navValue, 4, row.navValueText)),
-    },
-    {
-      key: 'navDate',
-      label: '净值日期',
-      sortable: true,
-      sortType: 'text',
-      defaultDir: 'desc',
-      render: (row) => formatDateOnly(row.navDate),
-    },
-    {
-      key: 'navPremiumRate',
-      label: 'T-2净值溢价',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.navPremiumRate),
-      className: (row) => statusClass(row.navPremiumRate),
-      render: (row) => escapeHtml(renderLofPercent(row.navPremiumRate, 2, row.navPremiumRateText)),
-    },
-    {
-      key: 'referenceIndexChangeRate',
-      label: 'T-1指数涨幅',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.referenceIndexChangeRate),
-      className: (row) => statusClass(row.referenceIndexChangeRate),
-      render: (row) => formatPercent(row.referenceIndexChangeRate, 2),
-    },
-    {
-      key: 'referenceIndex',
-      label: '相关指数',
-      sortable: true,
-      sortType: 'text',
-      defaultDir: 'asc',
-      render: (row) => escapeHtml(row.referenceIndex || '--'),
-    },
-    {
-      key: 'applyFeeText',
-      label: '申购费',
-      render: (row) => escapeHtml(row.applyFeeText || '--'),
-    },
-    {
-      key: 'applyStatus',
-      label: '申购状态',
-      sortable: true,
-      sortType: 'text',
-      defaultDir: 'asc',
-      render: (row) => escapeHtml(row.applyStatus || '--'),
-    },
-    {
-      key: 'redeemFeeText',
-      label: '赎回费',
-      render: (row) => escapeHtml(row.redeemFeeText || '--'),
-    },
-    {
-      key: 'redeemStatus',
-      label: '赎回状态',
-      sortable: true,
-      sortType: 'text',
-      defaultDir: 'asc',
-      render: (row) => escapeHtml(row.redeemStatus || '--'),
-    },
-    {
-      key: 'managementFeeText',
-      label: '管托费',
-      render: (row) => escapeHtml(row.managementFeeText || '--'),
-    },
-    {
-      key: 'issuer',
-      label: '基金公司',
-      sortable: true,
-      sortType: 'text',
-      defaultDir: 'asc',
-      render: (row) => escapeHtml(row.issuer || '--'),
-    },
-    {
-      key: 'officialUrl',
-      label: '官方链接',
-      render: (row) => buildAnchor(row.officialUrl, '基金官网') || '--',
-    },
-    {
-      key: 'sourceDetailUrl',
-      label: '集思录详情',
-      render: (row) => buildAnchor(row.sourceDetailUrl || row.detailUrl, '详情页') || '--',
-    },
-  ];
-}
-
-function renderLofArbitrageDetail(row) {
-  const items = [
-    { label: '结论', value: row.actionStatus || '--' },
-    { label: '信号来源', value: `${lofPremiumBasisLabel(row.premiumBasis)} / ${row.confidence || '--'}` },
-    { label: '信号溢价', value: formatPercent(row.premiumRate, 2) },
-    { label: '扣费后溢价', value: formatPercent(row.netPremiumRate, 2) },
-    { label: '估值', value: renderLofValue(row.estimatedValue, 4, row.estimatedValueText) },
-    { label: '估值来源', value: lofEstimateSourceLabel(row.estimatedSource) },
-    { label: '估值溢价', value: renderLofPercent(row.estimatedPremiumRate, 2, row.estimatedPremiumRateText) },
-    { label: '估值涨幅', value: renderLofPercent(row.estimatedIncreaseRate, 2, row.estimatedIncreaseRateText) },
-    { label: 'IOPV时间', value: row.iopvTime || '当前源未返回' },
-    { label: '估值时间', value: row.estimatedTime || '当前源未返回' },
-    { label: '场内新增比例', value: formatPercent(row.amountIncreaseRate, 2) },
-    { label: '币种 / T+0', value: `${row.currency || '--'} / ${formatBooleanLabel(row.t0)}` },
-    { label: '参考价', value: row.referencePriceText || '--' },
-    { label: '报价时间', value: row.quoteTimeText || '--' },
-    { label: '报价日期', value: formatDateOnly(row.priceDate) },
-    { label: '换手率', value: formatPercent(row.turnoverRate, 2) },
-    { label: '基金类型', value: row.fundType || '--' },
-    { label: '场内交易费', value: formatPercent(row.tradeFeeRate, 2) },
-    { label: '管托费说明', value: row.managementFeeTips || row.managementFeeText || '--' },
-    { label: '估值说明', value: row.calculationTips || '--' },
-    { label: '风险提示', value: renderRiskFlags(row.riskFlags) },
-  ];
-  return renderDetailGrid(items);
-}
-
-function renderLofArbitragePanel() {
-  const panel = dom.tabPanels['lof-arb'];
-  const resource = state.resources.lofArb;
-  if (!panel) return;
-
-  if (resource.status === 'loading' || resource.status === 'idle') {
-    panel.innerHTML = moduleLoading('LOF套利正在聚合公开 QDII 数据');
-    return;
-  }
-
-  if (resource.status === 'error') {
-    panel.innerHTML = moduleError('LOF套利加载失败', resource.error?.message);
-    return;
-  }
-
-  const rows = readLofArbitrageRows();
-  const overview = readLofArbitrageOverview();
-  const iopvSearch = readObject(readLofArbitrageData().iopvSearch);
-  const activeCategory = readLofSubview();
-  const activeRows = readLofArbitrageGroupRows(activeCategory);
-  const activeStatus = readLofSourceStatus(activeCategory);
-  if (!rows.length) {
-    panel.innerHTML = moduleEmpty('当前公开链路暂未返回 LOF 套利数据');
-    return;
-  }
-
-  const authText = overview.authenticatedGroupCount
-    ? `已登录增强 ${formatInt(overview.authenticatedGroupCount)} 个子市场`
-    : (overview.cookieConfigured ? '已配置登录增强，当前未生效' : '未配置登录增强');
-  const iopvStatusText = iopvSearch.loginEnhancementUsed ? '已启用登录增强' : '当前未用登录增强';
-  const estimateStatusText = iopvSearch.estimateComputationMode === 'derived_from_est_val_increase_rt'
-    ? '估值涨幅推导'
-    : (iopvSearch.publicSourceStatus || '--');
-
-  panel.innerHTML = `
-    <div class="module-shell">
-      <div class="module-toolbar">
-        <div>
-          <div class="tab-title">LOF套利</div>
-          <div class="section-note">这一版继续按市场长表展示。估值优先使用源直接返回；如果源没给估值但给了估值涨幅，就按 Jisilu 的净值和估值涨幅推导当前估值。IOPV 仍然只认源直出，缺失时明确显示“当前源未返回”。</div>
-        </div>
-        <div class="panel-meta">
-          <span>总样本 ${escapeHtml(formatInt(overview.totalCount))}</span>
-          <span>${escapeHtml(authText)}</span>
-          <span>估值可用 ${escapeHtml(formatInt(overview.estimateAvailableCount))}</span>
-          <span>估值推导 ${escapeHtml(formatInt(overview.estimateDerivedCount))}</span>
-          <span>IOPV可用 ${escapeHtml(formatInt(overview.iopvAvailableCount))}</span>
-          <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('lofArb')))}</span>
-          <span>${escapeHtml(readFreshnessText('lofArb'))}</span>
-        </div>
-      </div>
-      ${renderLofSubtabs()}
-      <div class="list-card">
-        <div class="module-toolbar">
-          <div>
-            <h3>${escapeHtml(lofCategoryLabel(activeCategory))}</h3>
-            <div class="section-note">主表按套利阅读路径展示结论和信号溢价；下方次级信息继续直接展示估值来源、估值说明和风险提示，不再额外保留顶部摘要栏目。</div>
-          </div>
-          <div class="panel-meta">
-            <span>当前子市场 ${escapeHtml(formatInt(activeRows.length))} 条</span>
-            <span>来源状态 ${escapeHtml(eventArbStatusLabel(activeStatus.status))}</span>
-            <span>模式 ${escapeHtml(lofAuthModeLabel(activeStatus.authMode))}</span>
-            <span>IOPV状态 ${escapeHtml(iopvSearch.currentIopvAvailability === 'available' ? '已返回' : '未返回')}</span>
-            <span>IOPV链路 ${escapeHtml(iopvStatusText)}</span>
-            <span>估值状态 ${escapeHtml(iopvSearch.currentEstimateAvailability === 'available' ? '已返回' : '未返回')}</span>
-            <span>估值链路 ${escapeHtml(estimateStatusText)}</span>
-          </div>
-        </div>
-        ${renderPaginatedTable({
-          tableKey: lofTableKey(activeCategory),
-          tableKind: 'merger',
-          columns: buildLofArbitrageColumns(),
-          rows: activeRows,
-          emptyMessage: `当前没有${lofCategoryLabel(activeCategory)}数据`,
-          detailRenderer: renderLofArbitrageDetail,
-          detailMode: 'always',
-        })}
-      </div>
-    </div>
-  `;
-}
-
 function readEventArbitrageResponse() {
   return readResourcePayload('merger');
 }

@@ -54,6 +54,14 @@ If the constitution is amended, update both `CONSTITUTION.md` and `.specify/memo
 For any server login, deployment, environment-variable, or service-restart task:
 
 1. Read `ops/server_profile.local.yaml` first if it exists.
-2. Reuse the stored connection and service parameters instead of asking again.
-3. If required fields are still blank, ask only for the missing items.
+2. Treat the file as the authoritative source for:
+   - server host / port / user
+   - password or SSH key
+   - app directory
+   - service name
+   - env file path
+   - public URL
+   - webhook and other server-side secrets
+3. Reuse the stored connection and service parameters instead of asking again.
+4. If required fields are still blank, ask only for the missing items.
 <!-- MANUAL ADDITIONS END -->

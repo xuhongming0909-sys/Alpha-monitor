@@ -63,6 +63,7 @@ const NOTIFICATION_CONFIG = APP_CONFIG?.notification || {};
 const PRESENTATION_STOCK_SEARCH_CONFIG = PRESENTATION_CONFIG?.stock_search || {};
 const PRESENTATION_DIVIDEND_CONFIG = PRESENTATION_CONFIG?.dividend || {};
 const PRESENTATION_HISTORICAL_PREMIUM_CONFIG = PRESENTATION_CONFIG?.historical_premium || {};
+const PRESENTATION_DASHBOARD_TABLE_UI_CONFIG = PRESENTATION_CONFIG?.dashboard_table_ui || {};
 const EVENT_ARB_STRATEGY_CONFIG = STRATEGY_CONFIG?.event_arbitrage || {};
 const INDEX_FILE = path.resolve(ROOT, PRESENTATION_CONFIG.dashboard_entry || './index.html');
 const STATIC_DATA_DIR = PATH_POLICY.dataRootDir;
@@ -74,6 +75,11 @@ const execAsync = promisify(exec);
 function toIntConfig(value, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toPositiveNumberConfig(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function toBooleanConfig(value, fallback = false) {
@@ -195,6 +201,29 @@ const DEFAULT_PUSH_CONFIG = {
     time: DEFAULT_MERGER_PUSH_TIME,
   },
 };
+
+function buildDashboardTableUiConfig(config = {}) {
+  const minWidthSource = config && typeof config.min_width_by_kind === 'object' ? config.min_width_by_kind : {};
+  return {
+    desktopFontPx: toPositiveNumberConfig(config.desktop_font_px, 14),
+    desktopHeaderFontPx: toPositiveNumberConfig(config.desktop_header_font_px, 14),
+    desktopLineHeight: toPositiveNumberConfig(config.desktop_line_height, 1.58),
+    desktopCellPaddingY: toPositiveNumberConfig(config.desktop_cell_padding_y, 10),
+    desktopCellPaddingX: toPositiveNumberConfig(config.desktop_cell_padding_x, 12),
+    tabletFontPx: toPositiveNumberConfig(config.tablet_font_px, 13),
+    minWidthByKind: {
+      subscription: toPositiveNumberConfig(minWidthSource.subscription, 1180),
+      convertible: toPositiveNumberConfig(minWidthSource.convertible, 1560),
+      premium: toPositiveNumberConfig(minWidthSource.premium, 1240),
+      monitor: toPositiveNumberConfig(minWidthSource.monitor, 1320),
+      dividend: toPositiveNumberConfig(minWidthSource.dividend, 1100),
+      merger: toPositiveNumberConfig(minWidthSource.merger, 1280),
+      lof: toPositiveNumberConfig(minWidthSource.lof, 1680),
+    },
+  };
+}
+
+const DASHBOARD_TABLE_UI = buildDashboardTableUiConfig(PRESENTATION_DASHBOARD_TABLE_UI_CONFIG);
 
 function readJson(filePath, fallbackValue) {
   return sharedReadJson(filePath, fallbackValue);
@@ -403,12 +432,6 @@ const DATASETS = {
     refreshIntervalMs: toIntConfig(pluginFetchConfig('event_arbitrage').refresh_interval_ms, 5 * 60 * 1000),
     dbDailySync: Boolean(pluginFetchConfig('event_arbitrage').daily_incremental_sync),
     fetch: (options = {}) => buildEventArbitrageDataset(options),
-  },
-  lofArb: {
-    intraday: pluginFetchConfig('lof_arbitrage').intraday !== false,
-    refreshIntervalMs: toIntConfig(pluginFetchConfig('lof_arbitrage').refresh_interval_ms, 5 * 60 * 1000),
-    dbDailySync: Boolean(pluginFetchConfig('lof_arbitrage').daily_incremental_sync),
-    fetch: () => callDataCore(['lof-arbitrage'], { timeout: 120000, maxBuffer: 1024 * 1024 * 50 }),
   },
 };
 const stateStore = STATE_REGISTRY.read('market_refresh_state', 'market_refresh_state.json', {
@@ -1096,7 +1119,7 @@ async function runDataJobsCycle(context = 'tick', options = {}) {
 
   try {
     if (options.preloadDatasets) {
-      const preloadKeys = ['exchangeRate', 'ah', 'ab', 'cbArb', 'merger', 'eventArb', 'lofArb', 'ipo', 'bonds'];
+      const preloadKeys = ['exchangeRate', 'ah', 'ab', 'cbArb', 'merger', 'eventArb', 'ipo', 'bonds'];
       await Promise.allSettled(preloadKeys.map((key) => getDataset(key)));
       details.preloadedDatasets = preloadKeys;
     }
@@ -2010,6 +2033,17 @@ registerDashboardRoutes({
   app,
   nowIso,
   getHealthSnapshot: buildHealthSnapshot,
+  getDashboardUiConfig: () => ({
+    tableUi: {
+      desktopFontPx: DASHBOARD_TABLE_UI.desktopFontPx,
+      desktopHeaderFontPx: DASHBOARD_TABLE_UI.desktopHeaderFontPx,
+      desktopLineHeight: DASHBOARD_TABLE_UI.desktopLineHeight,
+      desktopCellPaddingY: DASHBOARD_TABLE_UI.desktopCellPaddingY,
+      desktopCellPaddingX: DASHBOARD_TABLE_UI.desktopCellPaddingX,
+      tabletFontPx: DASHBOARD_TABLE_UI.tabletFontPx,
+      minWidthByKind: { ...DASHBOARD_TABLE_UI.minWidthByKind },
+    },
+  }),
   getShanghaiParts,
   normalizeDateText,
   pickText,

@@ -15,6 +15,7 @@
     "install:firewall": "powershell -ExecutionPolicy Bypass -File ./tools/install_firewall_rule.ps1",
     "uninstall:firewall": "powershell -ExecutionPolicy Bypass -File ./tools/uninstall_firewall_rule.ps1",
     "check": "node smoke_check.js",
+    "check:constitution": "python tools/check_constitution_sync.py",
     "check:boundaries": "python tools/check_plugin_boundaries.py",
     "sync:pairs": "python tools/export_pair_pool.py --refresh",
     "sync:subscriptions": "python data_dispatch.py ipo && python data_dispatch.py bonds",

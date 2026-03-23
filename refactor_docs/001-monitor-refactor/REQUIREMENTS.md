@@ -29,13 +29,42 @@
     - `转债套利`
     - `AH溢价`
     - `AB溢价`
+    - `LOF套利`
     - `监控套利`
     - `分红提醒`
-    - `收购私有`
+    - `事件套利`
 - UI界面：
-  - 6 个名称作为首页主 tab。
+  - 7 个名称作为首页主 tab。
 - 配置项说明：
   - 本轮名称是固定页面文案，不单独放配置项。
+
+## 3. 共享表格可读性
+- 功能清单：
+  - 统一提升首页各功能页长表的可读性。
+- 数据库和数据来源：
+  - 继续使用现有业务接口。
+  - 新增只读展示配置接口：`GET /api/dashboard/ui-config`
+- 业务规则（核心）：
+  - 本轮只改展示层，不改业务字段含义、排序口径、分页规则和数据抓取链路。
+  - 共享主表继续通过现有共享渲染器输出，不为各模块拆出独立表格框架。
+  - 桌面端主表 `th / td` 字号必须明显高于当前 `12px` 基线。
+  - 桌面端允许“受控的轻度横向滚动”，不再要求所有长表在大字号下继续零滚动硬压。
+  - 表格密度优化优先通过共享样式提升和单元格内信息分层完成，不靠大规模删列解决问题。
+  - 50 条分页规则保持不变。
+  - 排序、展开详情、字段解释、颜色语义保持不变。
+- UI界面：
+  - 桌面端表格字体、行高、单元格内边距、详情文字、分页状态文字同步上调。
+  - 数字列需要使用更稳定的等宽数字对齐表现，提升价格/百分比扫读效率。
+  - 表格行之间需要有更清晰的分隔或弱斑马纹，但不覆盖今日高亮和阶段高亮。
+  - 移动端继续使用现有横向容器和自然换行，不做第二套专用布局。
+- 配置项说明：
+  - `config.yaml > presentation.dashboard_table_ui.desktop_font_px`
+  - `config.yaml > presentation.dashboard_table_ui.desktop_header_font_px`
+  - `config.yaml > presentation.dashboard_table_ui.desktop_line_height`
+  - `config.yaml > presentation.dashboard_table_ui.desktop_cell_padding_y`
+  - `config.yaml > presentation.dashboard_table_ui.desktop_cell_padding_x`
+  - `config.yaml > presentation.dashboard_table_ui.tablet_font_px`
+  - `config.yaml > presentation.dashboard_table_ui.min_width_by_kind`
 
 ## 3. 顶部状态行
 - 功能清单：
@@ -652,7 +681,7 @@
 - `转债套利` visible rows must exclude clearly invalid end-state bonds, including at least:
   - `price <= 0`
   - zero-turnover rows that have already entered the terminal `cease / delist / maturity` chain
-- This round does not change existing CB calculation formulas; it only tightens visible-row validity rules and front-end field placement.
+- This round keeps the existing CB theoretical-pricing formula, but refines the visible field contract and the truth-source contract for outward display fields.
 - `转债套利` main table must directly show the following core fields:
   - `序号`
   - `转债名称/代码`
@@ -663,19 +692,40 @@
   - `资产负债率`
   - `转股价/转股价值`
   - `转股溢价率`
+  - `纯债价值`
   - `纯债溢价率`
   - `双低`
   - `强赎价`
   - `回售价`
   - `60日波动率`
   - `期权理论价值`
-  - `理论价值/理论溢价率`
+  - `理论价值`
+  - `理论溢价率`
   - `上市日`
   - `转股起始日`
   - `到期日`
   - `评级`
-  - `到期税前收益率`
+- The page must visibly提示当前理论价值公式，至少包含：
+  - `理论价值 = 纯债价值 + 期权理论价值`
+  - `期权理论价值 = 看涨期权价值 - 看跌期权价值`
+- `到期税前收益率` must come from a real upstream source field and must not continue using a locally computed approximation as the outward displayed value.
+- `正股近三年平均ROE` and `资产负债率` must come from real upstream financial statement interfaces rather than local heuristic calculations.
+- `60日波动率` for the current round is only a historical-estimate display field, not an execution-grade truth field.
+- `期权理论价值 / 理论价值 / 理论溢价率` must be displayed as reference values because they are driven by the current historical-volatility estimate.
 - The outward-facing CB payload may continue slimming unused fields, but it must preserve every field needed by the table above.
+
+## 33. Convertible-bond Truth-source Yield And Formula Hint Contract (2026-03-23)
+- `yieldToMaturityPretax` outward value is fixed to a real source field for this round:
+  - prefer Jisilu `bond_cb_jsl()` `到期税前收益`
+  - if the upstream row has no real value, keep the field empty rather than fabricating a local approximation
+- `理论价值` visible explanation belongs on the page itself and may not be discoverable only by reading source code.
+- `stockAvgRoe3Y` and `stockDebtRatio` remain real-source fields:
+  - the server may use Eastmoney report-summary / balance-sheet tables as the stable bulk source
+  - if bulk source misses a code, it may fallback to `ak.stock_financial_abstract_ths` and `ak.stock_financial_abstract`
+- The page-visible `转债套利` contract no longer requires rendering `yieldToMaturityPretax`.
+- Current volatility truth boundary is fixed for this round:
+  - `volatility60` is the annualized standard deviation of recent stock close-to-close log returns
+  - the page must not present volatility-driven theoretical metrics as certainty-level values
 
 ## 31. Constitution Governance Alignment Contract (2026-03-23)
 - `CONSTITUTION.md` and `.specify/memory/constitution.md` must remain logically一致，不能出现一处修改、另一处滞后的状态。
@@ -764,3 +814,157 @@
   - `不可参与`
 - The page must clearly expose that the project is still searching for better zero-login IOPV coverage.
 - Firecrawl is allowed only as a future fallback adapter for HTML-to-JSON conversion when the current public JSON disappears; it is not the primary production source in phase 1.
+
+## 34. LOF Authenticated Enrichment Contract (2026-03-23)
+- `LOF套利` keeps the existing public Jisilu QDII endpoints as its base source, but this round allows an authenticated enhancement path.
+- When `data_fetch.plugins.lof_arbitrage.jisilu_cookie` is configured, the fetch layer must send that cookie to Jisilu and prefer the larger logged-in result set.
+- When the cookie is missing, expired, or rejected, the module must automatically degrade back to the existing public result set instead of failing the page.
+- Login enhancement is only a row-coverage enhancement in this round:
+  - it may increase row count materially
+  - it does not authorize fabricating `IOPV` or `IOPV溢价率`
+  - if the source still returns empty `IOPV`, the outward payload must keep them empty
+- `LOF套利` must add visible market subtabs:
+  - `欧美市场`
+  - `亚洲市场`
+  - `商品`
+- The default visible LOF subtab is `欧美市场`.
+- `LOF套利` must not render the visible top summary-card band for:
+  - `套利候选`
+  - `仅观察`
+  - `数据链路`
+- The LOF long-table view for this round must surface at least:
+  - `代码`
+  - `名称`
+  - `现价`
+  - `涨跌幅`
+  - `成交额(万元)`
+  - `场内份额(万份)`
+  - `场内新增(万份)`
+  - `IOPV`
+  - `IOPV溢价率`
+  - `T-2净值`
+  - `净值日期`
+  - `T-2净值溢价`
+  - `T-1指数涨幅`
+  - `相关指数`
+  - `申购费`
+  - `申购状态`
+  - `赎回费`
+  - `赎回状态`
+  - `管托费`
+  - `基金公司`
+  - `官方链接`
+  - `集思录详情`
+- When a value is truly absent, the page must display an explicit unavailable state such as `当前源未返回`, not a fabricated numeric placeholder.
+- The outward LOF response must additionally expose source-readability context for this round, including at least:
+  - whether cookie enhancement is configured
+  - whether the current response used authenticated enhancement
+  - whether `IOPV` is actually available in the current payload
+- `LOF套利` secondary detail rows may continue to show explanatory text, but must not hide the core long-table fields behind an expand-only path.
+- The LOF long table and its always-visible secondary detail rows are the default reading path; overview-style aggregation may remain in the API but is not part of the required visible page structure.
+
+## 35. LOF Derived Estimate Completion Contract (2026-03-23)
+- `LOF套利` must keep `IOPV` truthfulness strict:
+  - if upstream `iopv` is empty, outward `IOPV` stays empty
+  - if upstream `iopv_discount_rt` is empty, outward `IOPV溢价率` stays empty
+- `LOF套利` may fill `估值` and `估值溢价` only from real source fields already returned by Jisilu.
+- The allowed phase-1 estimate-derivation rule is fixed to:
+  - when `estimate_value` is missing
+  - and `fund_nav` exists
+  - and `est_val_increase_rt` exists
+  - then `estimatedValue = navValue * (1 + est_val_increase_rt / 100)`
+- When `discount_rt` is missing but `estimatedValue` and `currentPrice` are available, `estimatedPremiumRate` is fixed to:
+  - `((currentPrice / estimatedValue) - 1) * 100`
+- Derived estimate values are allowed because they are based on real upstream source fields, not fabricated placeholders.
+- The outward LOF payload must expose estimate provenance fields for this round, including at least:
+  - `estimatedSource`
+  - `estimatedSourceLabel`
+  - `estimatedIncreaseRate`
+  - `estimatedIncreaseRateText`
+- Allowed `estimatedSource` values are fixed to:
+  - `direct_source`
+  - `derived_from_est_val_increase_rt`
+- The page must visibly distinguish these two estimate modes instead of pretending they are identical.
+- The LOF main table for this round must additionally show:
+  - `结论`
+  - `信号溢价`
+- The LOF detail row must additionally surface at least:
+  - `估值来源`
+  - `估值时间`
+  - `估值涨幅`
+  - `参考价`
+  - `估值说明`
+  - `报价时间`
+- If neither direct estimate nor derivable estimate exists, the estimate fields must stay empty and show an explicit unavailable state.
+
+## 36. Event-arbitrage Detail Text Responsive Contract (2026-03-24)
+- `事件套利` A-share `摘要` must render as an always-visible full-width secondary detail block below the row.
+- `港股套利` and `中概私有` `备注` must use the same full-width secondary detail style.
+- These detail-text blocks must adapt to available screen width:
+  - desktop must not constrain them to the left quarter of a shared multi-column detail grid
+  - mobile must continue wrapping naturally
+- This round changes presentation only and does not alter the event-arbitrage data schema.
+## 36. LOF Homepage Cancellation Contract (2026-03-24)
+- `LOF套利` is cancelled as a public homepage module in this round.
+- Homepage visible root modules return to:
+  - `转债套利`
+  - `AH溢价`
+  - `AB溢价`
+  - `监控套利`
+  - `分红提醒`
+  - `事件套利`
+- Homepage initial dashboard loading must not request `GET /api/market/lof-arbitrage`.
+- Server-side homepage/runtime preload must not include `lofArb`.
+- Existing LOF backend/API code may remain archived in the repository, but it is no longer part of the required public homepage contract.
+
+## 37. Shared Dashboard Table Readability Contract (2026-03-24)
+- This round upgrades dashboard table readability through the shared presentation layer only.
+- A new read-only presentation contract is exposed by:
+  - `GET /api/dashboard/ui-config`
+- `GET /api/dashboard/ui-config` must return at least:
+  - `tableUi.desktopFontPx`
+  - `tableUi.desktopHeaderFontPx`
+  - `tableUi.desktopLineHeight`
+  - `tableUi.desktopCellPaddingY`
+  - `tableUi.desktopCellPaddingX`
+  - `tableUi.tabletFontPx`
+  - `tableUi.minWidthByKind`
+- Active `tableUi.minWidthByKind` keys must cover at least:
+  - `subscription`
+  - `convertible`
+  - `premium`
+  - `monitor`
+  - `dividend`
+  - `merger`
+  - `lof`
+- Shared table rendering must continue using the existing common renderer path for:
+  - `转债套利`
+  - `AH溢价`
+  - `AB溢价`
+  - `监控套利`
+  - `分红提醒`
+  - `事件套利`
+  - `LOF套利` if the page is re-enabled later
+  - 顶部股债打新长表
+- Desktop readability contract for this round:
+  - visible table text is larger than the current `12px` baseline
+  - row height and cell padding are visibly relaxed
+  - table numbers use stable tabular alignment
+  - long tables may use light controlled horizontal scrolling instead of hard compression
+- Mobile contract for this round:
+  - page must remain loadable at narrow widths
+  - existing horizontal container behavior remains valid
+  - no second mobile-only card-table layout is introduced
+
+## 37. LOF Complete Removal Contract (2026-03-24)
+- `LOF套利` is fully removed from the active product scope in this round.
+- The project must not keep any active LOF public contract in:
+  - homepage navigation
+  - dashboard bootstrap
+  - server runtime preload
+  - public market API routes
+  - `data_dispatch.py` public actions
+  - active `config.yaml` plugin/strategy/presentation sections
+- `GET /api/market/lof-arbitrage` must no longer be exposed as an active route.
+- `data_fetch/lof_arbitrage` and `strategy/lof_arbitrage` are retired implementation directories and should be removed from the active repository surface.
+- Any older LOF requirements in this document are superseded by this complete-removal contract.

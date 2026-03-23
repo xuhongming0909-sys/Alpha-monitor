@@ -116,7 +116,7 @@ def _market_from_code(code: str) -> str:
         return "SH"
     if code.startswith(("0", "3")):
         return "SZ"
-    if code.startswith(("4", "8")):
+    if code.startswith(("4", "8", "9")):
         return "BJ"
     return "UNKNOWN"
 
@@ -233,11 +233,13 @@ def get_ipo_data() -> Dict[str, Any]:
     stored_rows = db.load_rows("ipo")
     if not stored_rows:
         return {
-            "success": False,
+            "success": True,
             "data": [],
             "upcoming": [],
             "updateTime": now.isoformat(),
-            "error": fetch_error or "IPO subscription history is empty.",
+            "source": sync_source,
+            "historyCount": 0,
+            "warning": fetch_error or "IPO subscription history is empty.",
         }
 
     rows = []
@@ -246,13 +248,18 @@ def get_ipo_data() -> Dict[str, Any]:
         subscribe_date = _parse_date(item.get("subscribeDate"))
         if not subscribe_date:
             continue
+        code = _normalize_code(item.get("code") or item.get("stockCode") or item.get("subscribeCode"))
         listing_date = _parse_date(item.get("listingDate"))
         lottery_date = _parse_date(item.get("lotteryDate"))
         payment_date = _parse_date(item.get("paymentDate"))
         lottery_date, payment_date = _normalize_schedule_dates(subscribe_date, lottery_date, payment_date)
         status_info = _status(subscribe_date, listing_date, payment_date, today)
+        market = str(item.get("market") or "").strip().upper()
+        if market in {"UNKNOWN", "未知", ""}:
+            market = _market_from_code(code)
         normalized = {
             **item,
+            "market": market,
             "lotteryDate": _date_str(lottery_date),
             "paymentDate": _date_str(payment_date),
             "status": status_info["status"],

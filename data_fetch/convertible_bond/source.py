@@ -7,9 +7,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import akshare as ak
@@ -25,6 +28,7 @@ HISTORY_LOOKBACK_DAYS = 420
 MAX_VOL_SYNC_WORKERS = 8
 MAX_FINANCIAL_WORKERS = 10
 INLINE_HISTORY_HYDRATE_LIMIT = 24
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def _is_null(value: Any) -> bool:
@@ -86,6 +90,22 @@ def _to_date_str(value: Any) -> Optional[str]:
         return parsed.date().isoformat()
     except Exception:
         return None
+
+
+def _load_jisilu_cookie() -> str:
+    cookie = os.getenv("JISILU_COOKIE", "").strip()
+    if cookie:
+        return cookie
+    env_path = ROOT / ".env"
+    if not env_path.exists():
+        return ""
+    try:
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("JISILU_COOKIE="):
+                return line.split("=", 1)[1].strip()
+    except Exception:
+        return ""
+    return ""
 
 
 def _derive_remaining_years(row: Dict[str, Any], as_of: date) -> Optional[float]:
@@ -300,6 +320,133 @@ def _fetch_stock_financial_metrics(stock_code: str) -> Dict[str, Optional[float]
     }
 
 
+@lru_cache(maxsize=8)
+def _fetch_em_annual_roe_map(report_date: str) -> Dict[str, Optional[float]]:
+    fetcher = getattr(ak, "stock_yjbb_em", None)
+    if fetcher is None:
+        return {}
+    try:
+        df = fetcher(date=report_date)
+    except Exception:
+        return {}
+    if df is None or df.empty:
+        return {}
+
+    code_col = _pick_col(list(df.columns), ["股票代码", "证券代码"])
+    roe_col = _pick_col(list(df.columns), ["净资产收益率"])
+    if not code_col or not roe_col:
+        return {}
+
+    result: Dict[str, Optional[float]] = {}
+    for _, record in df.iterrows():
+        code = _to_code6(record.get(code_col))
+        if not code:
+            continue
+        result[code] = _to_float(record.get(roe_col))
+    return result
+
+
+@lru_cache(maxsize=8)
+def _fetch_em_debt_ratio_map(report_date: str) -> Dict[str, Optional[float]]:
+    fetcher = getattr(ak, "stock_zcfz_em", None)
+    if fetcher is None:
+        return {}
+    try:
+        df = fetcher(date=report_date)
+    except Exception:
+        return {}
+    if df is None or df.empty:
+        return {}
+
+    code_col = _pick_col(list(df.columns), ["股票代码", "证券代码"])
+    debt_col = _pick_col(list(df.columns), ["资产负债率"])
+    if not code_col or not debt_col:
+        return {}
+
+    result: Dict[str, Optional[float]] = {}
+    for _, record in df.iterrows():
+        code = _to_code6(record.get(code_col))
+        if not code:
+            continue
+        result[code] = _to_float(record.get(debt_col))
+    return result
+
+
+def _recent_annual_report_dates(as_of: date, count: int = 6) -> list[str]:
+    result: list[str] = []
+    for year in range(as_of.year, as_of.year - 8, -1):
+        report_date = date(year, 12, 31)
+        if report_date <= as_of:
+            result.append(report_date.strftime("%Y%m%d"))
+        if len(result) >= count:
+            break
+    return result
+
+
+def _recent_report_dates(as_of: date, count: int = 8) -> list[str]:
+    quarter_ends = ((12, 31), (9, 30), (6, 30), (3, 31))
+    result: list[str] = []
+    for year in range(as_of.year, as_of.year - 3, -1):
+        for month, day in quarter_ends:
+            report_date = date(year, month, day)
+            if report_date > as_of:
+                continue
+            result.append(report_date.strftime("%Y%m%d"))
+            if len(result) >= count:
+                return result
+    return result
+
+
+def _build_em_financial_metrics_map(stock_codes: list[str], as_of: date) -> Dict[str, Dict[str, Optional[float]]]:
+    targets = sorted({_to_code6(code) for code in stock_codes if _to_code6(code)})
+    if not targets:
+        return {}
+
+    result: Dict[str, Dict[str, Optional[float]]] = {
+        code: {"stockAvgRoe3Y": None, "stockDebtRatio": None}
+        for code in targets
+    }
+
+    annual_dates = _recent_annual_report_dates(as_of)
+    debt_dates = _recent_report_dates(as_of)
+
+    roe_history: Dict[str, list[float]] = {code: [] for code in targets}
+    for report_date in annual_dates:
+        roe_map = _fetch_em_annual_roe_map(report_date)
+        if not roe_map:
+            continue
+        for code in targets:
+            if len(roe_history[code]) >= 3:
+                continue
+            value = _to_float(roe_map.get(code))
+            if value is not None:
+                roe_history[code].append(value)
+        if all(len(values) >= 3 for values in roe_history.values()):
+            break
+
+    for code, values in roe_history.items():
+        if len(values) >= 3:
+            result[code]["stockAvgRoe3Y"] = round(sum(values[:3]) / 3.0, 4)
+
+    pending_debt_codes = {code for code in targets}
+    for report_date in debt_dates:
+        debt_map = _fetch_em_debt_ratio_map(report_date)
+        if not debt_map:
+            continue
+        resolved_now = set()
+        for code in pending_debt_codes:
+            value = _to_float(debt_map.get(code))
+            if value is None:
+                continue
+            result[code]["stockDebtRatio"] = round(value, 4)
+            resolved_now.add(code)
+        pending_debt_codes -= resolved_now
+        if not pending_debt_codes:
+            break
+
+    return result
+
+
 def _extract_percent_values(text: Any) -> list[float]:
     payload = str(text or "")
     values: list[float] = []
@@ -383,30 +530,6 @@ def _extract_maturity_redeem_price(redeem_clause: Any) -> Optional[float]:
     if not values:
         return None
     return max(values)
-
-
-def _calc_ytm_pretax(row: Dict[str, Any]) -> Optional[float]:
-    price = _to_positive_float(row.get("price"))
-    years = _to_float(row.get("remainingYears"))
-    if price is None or years is None or years <= 0:
-        return None
-
-    coupon_rate = _to_float(row.get("couponRate"))
-    coupon_cash = 0.0 if coupon_rate is None else max(coupon_rate, 0.0)
-    coupon_cash = 100.0 * (coupon_cash / 100.0)
-
-    maturity_redeem = _to_positive_float(row.get("maturityRedeemPrice"))
-    if maturity_redeem is None:
-        maturity_redeem = _extract_maturity_redeem_price(row.get("redeemClause")) or 100.0
-
-    avg_capital = (maturity_redeem + price) / 2.0
-    if avg_capital <= 0:
-        return None
-
-    ytm = ((coupon_cash + ((maturity_redeem - price) / years)) / avg_capital) * 100.0
-    if not math.isfinite(ytm):
-        return None
-    return ytm
 
 
 def _should_exclude_by_delist_or_expiry(row: Dict[str, Any], as_of_date: date) -> bool:
@@ -585,6 +708,43 @@ def _build_cov_quote_map() -> Dict[str, Dict[str, Any]]:
             "price": _to_float(series.get(price_col)) if price_col else None,
         }
     return result
+
+
+def _build_cb_jsl_map(cookie: str = "") -> Dict[str, Dict[str, Any]]:
+    fetcher = getattr(ak, "bond_cb_jsl", None)
+    if fetcher is None:
+        return {}
+    try:
+        df = fetcher(cookie=cookie or "")
+    except Exception:
+        return {}
+    if df is None or df.empty:
+        return {}
+
+    def pick_col(candidates: list[str]) -> Optional[str]:
+        for name in candidates:
+            if name in df.columns:
+                return name
+        return None
+
+    code_col = pick_col(["代码", "债券代码", "bond_id"])
+    if not code_col:
+        return {}
+
+    ytm_col = pick_col(["到期税前收益", "到期税前收益率", "ytm_rt"])
+    remaining_years_col = pick_col(["剩余年限", "year_left"])
+
+    result: Dict[str, Dict[str, Any]] = {}
+    for _, series in df.iterrows():
+        code = _to_code6(series.get(code_col))
+        if not code:
+            continue
+        result[code] = {
+            "yieldToMaturityPretax": _to_float(series.get(ytm_col)) if ytm_col else None,
+            "remainingYears": _to_float(series.get(remaining_years_col)) if remaining_years_col else None,
+        }
+    return result
+
 
 def _build_ths_cov_info_map() -> Dict[str, Dict[str, Any]]:
     try:
@@ -867,6 +1027,8 @@ def _resolve_redeem_trigger_price(row: Dict[str, Any]) -> tuple[Optional[float],
 def get_bond_cb_data() -> Dict[str, Any]:
     now = datetime.now()
     now_iso = now.isoformat()
+    jisilu_cookie = _load_jisilu_cookie()
+    cookie_configured = bool(jisilu_cookie)
     try:
         price_db.init_db()
         realtime_items = _build_cov_realtime_map()
@@ -878,7 +1040,7 @@ def get_bond_cb_data() -> Dict[str, Any]:
             "updateTime": now_iso,
             "error": str(exc),
             "source": "sina_cov_spot+eastmoney_cov",
-            "cookieConfigured": False,
+            "cookieConfigured": cookie_configured,
         }
     if not realtime_items and cov_quote_items:
         fallback_items: Dict[str, Dict[str, Any]] = {}
@@ -902,7 +1064,7 @@ def get_bond_cb_data() -> Dict[str, Any]:
             "updateTime": now_iso,
             "error": "bond_zh_hs_cov_spot and bond_zh_cov both returned empty data",
             "source": "sina_cov_spot+eastmoney_cov",
-            "cookieConfigured": False,
+            "cookieConfigured": cookie_configured,
         }
 
     try:
@@ -914,11 +1076,12 @@ def get_bond_cb_data() -> Dict[str, Any]:
             "updateTime": now_iso,
             "error": f"10Y treasury yield unavailable: {exc}",
             "source": "sina_cov_spot+eastmoney_cov",
-            "cookieConfigured": False,
+            "cookieConfigured": cookie_configured,
         }
     vol_cache_items: Dict[str, Dict[str, Any]] = {}
     stock_change_cache_items: Dict[str, Any] = {}
     cov_basic_items = _build_cov_basic_map()
+    cb_jsl_items = _build_cb_jsl_map(jisilu_cookie)
     ths_cov_info_items = _build_ths_cov_info_map()
 
     rows = []
@@ -1014,6 +1177,15 @@ def get_bond_cb_data() -> Dict[str, Any]:
         resolved_redeem_price, resolved_source = _resolve_redeem_trigger_price(row)
         row["redeemTriggerPrice"] = resolved_redeem_price
         row["redeemTriggerPriceSource"] = resolved_source
+
+        cb_jsl_row = cb_jsl_items.get(code) if isinstance(cb_jsl_items, dict) else None
+        if isinstance(cb_jsl_row, dict):
+            cb_jsl_ytm = _to_float(cb_jsl_row.get("yieldToMaturityPretax"))
+            cb_jsl_remaining_years = _to_float(cb_jsl_row.get("remainingYears"))
+            if cb_jsl_ytm is not None:
+                row["yieldToMaturityPretax"] = cb_jsl_ytm
+            if cb_jsl_remaining_years is not None:
+                row["remainingYears"] = cb_jsl_remaining_years
 
         cov_row = cov_basic_items.get(code) if isinstance(cov_basic_items, dict) else None
         if isinstance(cov_row, dict):
@@ -1180,17 +1352,33 @@ def get_bond_cb_data() -> Dict[str, Any]:
     financial_cache_items: Dict[str, Dict[str, Optional[float]]] = {}
     unique_missing_financial_codes = sorted(set(code for code in missing_financial_stock_codes if code))
     if unique_missing_financial_codes:
-        with ThreadPoolExecutor(max_workers=min(MAX_FINANCIAL_WORKERS, max(1, len(unique_missing_financial_codes)))) as executor:
-            future_map = {
-                executor.submit(_fetch_stock_financial_metrics, code): code
-                for code in unique_missing_financial_codes
-            }
-            for future in as_completed(future_map):
-                code = future_map[future]
-                try:
-                    financial_cache_items[code] = future.result()
-                except Exception:
-                    financial_cache_items[code] = {"stockAvgRoe3Y": None, "stockDebtRatio": None}
+        financial_cache_items.update(_build_em_financial_metrics_map(unique_missing_financial_codes, now.date()))
+
+        unresolved_financial_codes = [
+            code
+            for code in unique_missing_financial_codes
+            if (
+                financial_cache_items.get(code, {}).get("stockAvgRoe3Y") is None
+                or financial_cache_items.get(code, {}).get("stockDebtRatio") is None
+            )
+        ]
+        if unresolved_financial_codes:
+            with ThreadPoolExecutor(max_workers=min(MAX_FINANCIAL_WORKERS, max(1, len(unresolved_financial_codes)))) as executor:
+                future_map = {
+                    executor.submit(_fetch_stock_financial_metrics, code): code
+                    for code in unresolved_financial_codes
+                }
+                for future in as_completed(future_map):
+                    code = future_map[future]
+                    try:
+                        metrics = future.result()
+                    except Exception:
+                        metrics = {"stockAvgRoe3Y": None, "stockDebtRatio": None}
+                    cached = financial_cache_items.setdefault(code, {"stockAvgRoe3Y": None, "stockDebtRatio": None})
+                    if cached.get("stockAvgRoe3Y") is None:
+                        cached["stockAvgRoe3Y"] = metrics.get("stockAvgRoe3Y")
+                    if cached.get("stockDebtRatio") is None:
+                        cached["stockDebtRatio"] = metrics.get("stockDebtRatio")
 
         for row in rows:
             stock_code = row.get("stockCode")
@@ -1288,7 +1476,6 @@ def get_bond_cb_data() -> Dict[str, Any]:
         row["isMaturityWithinOneYear"] = (
             row["remainingYears"] is not None and float(row["remainingYears"]) < 1.0
         )
-        row["yieldToMaturityPretax"] = _calc_ytm_pretax(row)
         row["isDelistedOrExpired"] = _should_exclude_by_delist_or_expiry(row, as_of_date)
         row.update(_build_theoretical_metrics(row, float(risk_free["rate"])))
 
@@ -1336,7 +1523,7 @@ def get_bond_cb_data() -> Dict[str, Any]:
         ],
         "updateTime": now_iso,
         "source": "sina_cov_spot+eastmoney_cov+ths",
-        "cookieConfigured": False,
+        "cookieConfigured": cookie_configured,
         "treasuryYield10y": risk_free["percent"],
         "treasuryYield10yDate": risk_free["date"],
         "treasuryYield10ySource": risk_free["source"],

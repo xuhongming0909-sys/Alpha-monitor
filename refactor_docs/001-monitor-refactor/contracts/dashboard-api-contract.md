@@ -57,6 +57,13 @@ creating new dashboard-only APIs.
 
 - Purpose: Load current push configuration into the dashboard form.
 
+### `GET /api/dashboard/ui-config`
+
+- Purpose: Load shared dashboard table readability config for the static page.
+- Required dashboard behavior:
+  - Apply returned table typography and min-width settings through shared CSS variables.
+  - Fall back to built-in defaults when the endpoint is temporarily unavailable.
+
 ### `POST /api/push/config`
 
 - Purpose: Save push configuration changes from the dashboard form.

@@ -1,8 +1,8 @@
 "use strict";
 
 /**
- * 市场数据接口路由。
- * 这一层只负责 HTTP 参数校验与响应整形，不承载真实业务计算。
+ * Market-data routes.
+ * This layer only validates HTTP params and shapes responses.
  */
 function registerMarketRoutes(options = {}) {
   const {
@@ -47,7 +47,6 @@ function registerMarketRoutes(options = {}) {
   registerDatasetRoute("/api/market/convertible-bond-arbitrage", "cbArb", [], (_req, force) => ({ force, syncUniverse: force }));
   registerDatasetRoute("/api/market/merger", "merger", [], (_req, force) => ({ force }));
   registerDatasetRoute("/api/market/event-arbitrage", "eventArb", {}, (_req, force) => ({ force }));
-  registerDatasetRoute("/api/market/lof-arbitrage", "lofArb", {}, (_req, force) => ({ force }));
 
   app.get("/api/market/subscriptions", async (req, res) => {
     try {
@@ -92,7 +91,7 @@ function registerMarketRoutes(options = {}) {
       const code = String(req.query.code || "").trim();
       const days = Number(req.query.days || historicalPremiumDefaultDays);
       if (!code) return sendError(res, "缺少股票代码 code", 400, []);
-      if (!["AH", "AB"].includes(type)) return sendError(res, "type 仅支持 AH 或 AB", 400, []);
+      if (!["AH", "AB"].includes(type)) return sendError(res, "type 仅支持 AH / AB", 400, []);
       if (!Number.isFinite(days) || days < 1 || days > historicalPremiumMaxDays) {
         return sendError(res, `days 必须是 1-${historicalPremiumMaxDays} 的数字`, 400, []);
       }

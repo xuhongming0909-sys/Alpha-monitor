@@ -22,6 +22,7 @@ from fetch_historical_premium import (
     history_needs_sync,
     load_market_latest_dates,
     premium_history_summaries,
+    summary_requires_full_backfill,
     sync_history_for_code,
 )
 from market_pairs import load_dynamic_pairs
@@ -99,6 +100,7 @@ def run(mode: str, stock_type: str = "ALL", limit: int | None = None, resume_fro
         current_pair_code = str(item.get("hCode") or item.get("bCode") or "").strip()
         expected_end_date = expected_end_date_for_pair(current_type, item, market_dates)
         summary = summary_cache[current_type].get(a_code)
+        degraded_summary = summary_requires_full_backfill(summary)
 
         if mode == "update":
             if only_missing and summary:
@@ -119,7 +121,7 @@ def run(mode: str, stock_type: str = "ALL", limit: int | None = None, resume_fro
             current_type,
             a_code,
             days=WINDOW_DAYS,
-            force_full=force_full,
+            force_full=(force_full or degraded_summary),
             pair_data=pair_data,
         )
         done += 1

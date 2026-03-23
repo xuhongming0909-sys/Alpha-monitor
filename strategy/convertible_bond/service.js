@@ -65,9 +65,30 @@ function normalizeComparableDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
 }
 
+function isTerminalZeroTurnoverRow(row) {
+  if (!row || typeof row !== "object") return false;
+  const turnover = Number(row.turnoverAmountYi);
+  if (!Number.isFinite(turnover) || turnover > 0) return false;
+
+  const ceaseDate = normalizeComparableDate(row.ceaseDate);
+  const delistDate = normalizeComparableDate(row.delistDate);
+  if (ceaseDate || delistDate) return true;
+
+  const remainingYears = Number(row.remainingYears);
+  const maturityDate = normalizeComparableDate(row.maturityDate);
+  if (maturityDate && Number.isFinite(remainingYears) && remainingYears <= 0.02) return true;
+
+  const forceRedeemStatus = String(row.forceRedeemStatus || "").trim();
+  return /(完成|摘牌|终止|退市|赎回)/.test(forceRedeemStatus);
+}
+
 function isCbArbRowDelistedOrExpired(row, today = todayShanghaiDate()) {
   if (!row || typeof row !== "object") return true;
   if (row.isDelistedOrExpired === true) return true;
+
+  const price = Number(row.price);
+  if (Number.isFinite(price) && price <= 0) return true;
+  if (isTerminalZeroTurnoverRow(row)) return true;
 
   for (const key of ["delistDate", "ceaseDate"]) {
     const dateText = normalizeComparableDate(row[key]);

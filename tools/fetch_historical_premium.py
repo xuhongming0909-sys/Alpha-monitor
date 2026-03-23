@@ -22,6 +22,8 @@ import premium_history_db as db
 from market_pairs import find_ab_pair, find_ah_pair, load_dynamic_pairs
 
 WINDOW_DAYS = 365 * 5
+MIN_DEGRADED_SAMPLE_COUNT = 1
+MAX_DEGRADED_RANGE_DAYS = 7
 REQUEST_HEADERS = {
     "Referer": "https://gu.qq.com/",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -34,6 +36,13 @@ class PremiumDataError(Exception):
 
 def _parse_date(value: str) -> datetime:
     return datetime.strptime(value, "%Y-%m-%d")
+
+
+def _safe_day_span(start_date: str, end_date: str) -> Optional[int]:
+    try:
+        return (_parse_date(end_date) - _parse_date(start_date)).days
+    except Exception:
+        return None
 
 
 def _safe_date_text(value: Any) -> Optional[str]:
@@ -70,6 +79,8 @@ def _fetch_latest_market_date(market: str, code: str) -> Optional[str]:
             frame = ak.stock_zh_a_hist_tx(symbol=f"{market}{code}")
         elif market == "hk":
             frame = ak.stock_hk_daily(symbol=str(code).zfill(5))
+        elif market == "us":
+            frame = ak.stock_us_daily(symbol=str(code).upper())
         elif market in {"shb", "szb"}:
             frame = ak.stock_zh_b_daily(symbol=f"{market[:2]}{code}")
         else:
@@ -85,6 +96,7 @@ def _pick_market_samples(pair_data: Dict[str, List[Dict[str, Any]]]) -> Dict[str
         "sh": "",
         "sz": "",
         "hk": "",
+        "us": "",
         "shb": "",
         "szb": "",
     }
@@ -198,6 +210,37 @@ def history_needs_sync(
     if expected_end_date and (not summary_end_date or summary_end_date < expected_end_date):
         return True
 
+    if summary_requires_full_backfill(cached_summary):
+        return True
+
+    return False
+
+
+def summary_requires_full_backfill(summary: Optional[Dict[str, Any]]) -> bool:
+    if not summary:
+        return False
+
+    sample_count = int(summary.get("sampleCount") or 0)
+    sample_count_3y = int(summary.get("sampleCount3Y") or 0)
+    start_date = str(summary.get("startDate") or "").strip()
+    end_date = str(summary.get("endDate") or "").strip()
+    start_date_3y = str(summary.get("startDate3Y") or "").strip()
+    end_date_3y = str(summary.get("endDate3Y") or "").strip()
+
+    if sample_count <= MIN_DEGRADED_SAMPLE_COUNT or sample_count_3y <= MIN_DEGRADED_SAMPLE_COUNT:
+        return True
+
+    if sample_count > 0 and (not start_date or not end_date):
+        return True
+
+    if sample_count_3y > 0 and (not start_date_3y or not end_date_3y):
+        return True
+
+    if 0 < sample_count_3y <= 5 and start_date_3y and end_date_3y:
+        span_days = _safe_day_span(start_date_3y, end_date_3y)
+        if span_days is None or span_days <= MAX_DEGRADED_RANGE_DAYS:
+            return True
+
     return False
 
 
@@ -220,6 +263,10 @@ def _fetch_price_series(code: str, market: str, days: int) -> List[Dict[str, Any
             close_col = "close"
         elif market == "hk":
             df = ak.stock_hk_daily(symbol=str(code).zfill(5))
+            date_col = "date"
+            close_col = "close"
+        elif market == "us":
+            df = ak.stock_us_daily(symbol=str(code).upper())
             date_col = "date"
             close_col = "close"
         elif market in {"shb", "szb"}:
@@ -307,6 +354,7 @@ def _build_premium_rows(
     a_prices: List[Dict[str, Any]],
     pair_prices: List[Dict[str, Any]],
     fx_rates: List[Dict[str, Any]],
+    compare_ratio: float = 1.0,
 ) -> List[Dict[str, Any]]:
     a_map = {str(item["date"]): float(item["price"]) for item in a_prices}
     p_map = {str(item["date"]): float(item["price"]) for item in pair_prices}
@@ -326,7 +374,7 @@ def _build_premium_rows(
         if a_price is None or pair_price is None or a_price <= 0:
             continue
 
-        pair_price_cny = pair_price * fx_rate
+        pair_price_cny = pair_price * fx_rate * compare_ratio
         premium = (pair_price_cny / a_price - 1) * 100
 
         rows.append(
@@ -371,6 +419,7 @@ def sync_history_for_code(
         except Exception as exc:
             return {"success": False, "error": f"Failed to load dynamic pairs: {exc}"}
 
+    compare_ratio = 1.0
     if stock_type == "AH":
         pair = find_ah_pair(a_code, pair_data.get("ah", []))
         if not pair:
@@ -420,7 +469,17 @@ def sync_history_for_code(
             return {"success": False, "error": str(exc)}
         db.upsert_fx_rows(currency, fx_rows)
 
-    premium_rows = _build_premium_rows(stock_type, a_code, pair_code, pair_market, currency, a_prices, pair_prices, fx_rows)
+    premium_rows = _build_premium_rows(
+        stock_type,
+        a_code,
+        pair_code,
+        pair_market,
+        currency,
+        a_prices,
+        pair_prices,
+        fx_rows,
+        compare_ratio=compare_ratio,
+    )
     db.upsert_premium_rows(premium_rows)
     db.prune_old_rows(WINDOW_DAYS)
 
@@ -496,7 +555,6 @@ def ensure_history_for_code(stock_type: str, a_code: str, days: int = WINDOW_DAY
         pair_data = load_dynamic_pairs(force_refresh=False)
     except Exception as exc:
         return {"success": False, "error": f"Failed to load dynamic pairs: {exc}"}
-
     pair = resolve_pair_for_code(stock_type, a_code, pair_data)
     if not pair:
         return {"success": False, "error": f"{stock_type} pair not found for aCode={a_code}"}
@@ -507,6 +565,7 @@ def ensure_history_for_code(stock_type: str, a_code: str, days: int = WINDOW_DAY
     cached_result = load_cached_history_for_code(stock_type, a_code, max(1, days))
     summary = premium_history_summary(stock_type, a_code)
 
+    degraded_summary = summary_requires_full_backfill(summary)
     if force_full or not cached_result.get("success") or history_needs_sync(
         stock_type,
         a_code,
@@ -518,7 +577,7 @@ def ensure_history_for_code(stock_type: str, a_code: str, days: int = WINDOW_DAY
             stock_type,
             a_code,
             days=days,
-            force_full=force_full,
+            force_full=(force_full or degraded_summary),
             pair_data=pair_data,
         )
 

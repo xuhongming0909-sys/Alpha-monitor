@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""SQLite store for AH/AB premium history and precomputed summaries."""
+"""SQLite store for premium history and precomputed summaries."""
 
 from __future__ import annotations
 
@@ -507,7 +507,10 @@ def load_premium_history(stock_type: str, a_code: str, days: int = 365 * 5) -> L
         ).fetchall()
 
     result: List[Dict] = []
-    pair_field = "hPrice" if stock_type == "AH" else "bPrice"
+    if stock_type == "AH":
+        pair_field = "hPrice"
+    else:
+        pair_field = "bPrice"
 
     for row in rows:
         result.append(
