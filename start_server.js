@@ -404,6 +404,12 @@ const pushConfigStore = STATE_REGISTRY.read('push_config', 'push_config.json', J
 const pushRuntimeState = STATE_REGISTRY.read('push_runtime_state', 'push_runtime_state.json', {
   lastMainPushDate: null,
   lastMergerReportDate: null,
+  lastMainPushAttemptAt: null,
+  lastMainPushSuccessAt: null,
+  lastMainPushError: null,
+  lastMergerPushAttemptAt: null,
+  lastMergerPushSuccessAt: null,
+  lastMergerPushError: null,
   mainPushRecords: {},
   mergerPushRecords: {},
 });
@@ -673,8 +679,21 @@ const weComScheduler = createWeComScheduler({
   calendarMode: PUSH_CALENDAR_MODE,
   isTradingSession,
   defaultMergerSchedule: DEFAULT_PUSH_CONFIG.mergerSchedule,
+  nowIso,
   logError: (scope, error) => console.error(scope, error?.message || error),
 });
+
+function getPushDeliveryStatus() {
+  return {
+    webhookConfigured: Boolean(WECOM_WEBHOOK_URL),
+    schedulerEnabled: Boolean(NOTIFICATION_CONFIG?.scheduler?.enabled),
+    calendarMode: PUSH_CALENDAR_MODE,
+  };
+}
+
+function buildPushConfigViewModel(config) {
+  return buildPushConfigResponse(config, pushRuntimeState, getPushDeliveryStatus());
+}
 
 function getStateDate(key) {
   const text = String(stateStore?.[key] || '').trim();
@@ -1621,7 +1640,7 @@ registerPushRoutes({
   sendError,
   getPushConfig,
   updatePushConfig: (payload) => pushConfigDomain.updatePushConfig(payload),
-  buildPushConfigResponse,
+  buildPushConfigResponse: buildPushConfigViewModel,
   getPushRuntimeState: () => pushRuntimeState,
   pushByModulesToWeCom,
   pushMergerReportToWeCom,

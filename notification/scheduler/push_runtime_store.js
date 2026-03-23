@@ -52,6 +52,37 @@ function createPushRuntimeStore(options = {}) {
     state.lastMergerReportDate = date || null;
   }
 
+  function setPushAttempt(recordType, isoText) {
+    const value = isoText || null;
+    if (recordType === "merger") {
+      state.lastMergerPushAttemptAt = value;
+      return;
+    }
+    state.lastMainPushAttemptAt = value;
+  }
+
+  function setPushSuccess(recordType, isoText, dateText) {
+    const value = isoText || null;
+    if (recordType === "merger") {
+      state.lastMergerPushSuccessAt = value;
+      state.lastMergerPushError = null;
+      if (dateText) state.lastMergerReportDate = dateText;
+      return;
+    }
+    state.lastMainPushSuccessAt = value;
+    state.lastMainPushError = null;
+    if (dateText) state.lastMainPushDate = dateText;
+  }
+
+  function setPushError(recordType, message) {
+    const text = String(message || "").trim() || null;
+    if (recordType === "merger") {
+      state.lastMergerPushError = text;
+      return;
+    }
+    state.lastMainPushError = text;
+  }
+
   return {
     state,
     normalizePushTimes,
@@ -60,6 +91,9 @@ function createPushRuntimeStore(options = {}) {
     setPushRecord,
     setLastMainPushDate,
     setLastMergerReportDate,
+    setPushAttempt,
+    setPushSuccess,
+    setPushError,
     save,
   };
 }

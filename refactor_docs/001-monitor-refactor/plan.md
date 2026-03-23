@@ -260,3 +260,81 @@ Acceptance:
 - `监控套利` renders successfully when `/api/monitors` returns data and supports 50-row pagination.
 - `转债套利` / `AH溢价` / `AB溢价` / `监控套利` / `分红提醒` / `收购私有` all use 50-row pagination.
 - GitHub main branch and cloud deployment are updated to the latest implementation, and the latest webpage can be opened for verification.
+
+## 11A. Phase H-2: Subscription Stage Alignment + Monitor Inline Editing (2026-03-23)
+
+Goal: finish the remaining dashboard corrections from the latest user review:
+1. `股债打新` must stop labeling bond rows as `今日中签缴款` on 2026-03-23 when the visible date column already shows 2026-03-20.
+2. `监控套利` must support adding new monitor items and editing existing monitor parameters from the dashboard.
+3. `监控套利` supplemental fields must render inline below each item, without a separate `详情` control column, and the wording must match real business terms.
+
+Plan:
+1. Update `REQUIREMENTS.md` and `SPEC.md` first.
+2. Align the subscription stage decision with the visible date contract:
+   - the visible `中签缴款日` keeps using `lotteryDate`
+   - the `今日中签缴款` stage judgment also switches to `lotteryDate`
+3. Refactor the monitor panel into:
+   - top editor area for create / edit
+   - paginated monitor list
+   - fixed inline parameter block under each item
+4. Keep the existing `/api/monitors` contract and reuse `POST /api/monitors` for both create and update by carrying `id`.
+5. Replace inaccurate monitor detail labels such as `股票腿公式` with wording that directly describes pricing inputs and calculation text.
+
+Acceptance:
+- On 2026-03-23, rows whose `lotteryDate` is not 2026-03-23 no longer appear as `今日中签缴款`.
+- Dashboard users can create a new monitor item and edit an existing one without leaving the page.
+- `监控套利` no longer shows a separate `详情` header/button path; supplemental fields are shown directly below each item.
+- Monitor inline wording matches the actual fields returned by the custom monitor strategy.
+
+## 12. Phase I: Fresh Quotes + Dense Core Tables + Push Delivery Truthfulness (2026-03-23)
+
+Goal: finish the current production correction for four user-visible issues in one round:
+1. Dashboard manual refresh and first-screen critical market modules must converge to the latest available quotes in the same session instead of staying on stale cache snapshots.
+2. `杞€哄鍒? / AH婧环 / AB婧环` main tables must become denser and remove the visible `璇︽儏` header/button path as the primary reading mode.
+3. Convertible bond main table must surface the key parameters behind `鐞嗚婧环鐜?` directly in the default row, including `杞€烘定璺屽箙` / `姝ｈ偂娑ㄨ穼骞?` / `60鏃ユ尝鍔ㄧ巼` / `绾€哄€?` / `鐞嗚浠?` / `鍒版湡绋庡墠鏀剁泭鐜?`.
+4. Push delivery state must stop lying: failed sends cannot be recorded as sent, and the UI/API must expose webhook readiness, scheduler mode, selected modules, and last success/failure details.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the new cache-refresh, dense-table, and push-delivery contracts.
+2. Keep the existing cache layer for fast first paint, but:
+   - `鎵嬪姩鍒锋柊` must call force refresh for market datasets
+   - if first dashboard load receives `servedFromCache` for critical quote modules, trigger one background force revalidation in the same session
+   - UI copy must tell the user when a module is still showing cached data
+3. Refactor `杞€哄鍒?` main table to remove the explicit detail column and move key metrics into main-row composite cells.
+4. Refactor `AH / AB` main tables to follow the same dense-table principle and inline sample metadata instead of using the current detail-expansion path.
+5. Harden push runtime recording:
+   - record attempt time, success time, and latest error separately
+   - only mark a schedule slot as sent after the downstream WeCom send succeeds
+   - keep failed slots retryable on later scheduler ticks
+6. Extend `GET /api/push/config` response and dashboard push status text so the user can see:
+   - selected push modules
+   - scheduler mode
+   - webhook configured or missing
+   - last main push / merger push success time
+   - latest push failure reason when present
+7. After implementation, run local verification, push to GitHub `main`, let GitHub Actions trigger the cloud deploy path, and open the latest webpage for final visual confirmation.
+
+Acceptance:
+- Clicking dashboard `鍒锋柊` fetches fresh market data instead of only replaying stale cache.
+- If the initial dashboard render used cache for `exchangeRate / cbArb / ah / ab`, the page performs one background real-time revalidation and updates the visible values in the same visit.
+- `娴峰優杞€? 118008` on the refreshed page matches the latest backend snapshot instead of the previously stale `+3.61%` view.
+- `杞€哄鍒?` main table shows key pricing / volatility / yield fields without a visible `璇︽儏` column.
+- `AH / AB` main tables use the same dense default-row pattern and no longer depend on the old detail-label path.
+- Push scheduler no longer records failed sends as completed.
+- `GET /api/push/config` and the dashboard push strip clearly reveal whether push is blocked by missing webhook configuration or by the last runtime failure.
+- GitHub `main`, cloud deployment, and the latest public webpage are all updated to the new implementation.
+
+## 13. Phase J: Premium History Sync Tolerance For Provider Outliers (2026-03-23)
+
+Goal: recover `data_jobs` health without taking down the live dashboard when a small number of upstream historical-price requests fail for individual symbols.
+
+Plan:
+1. Update `REQUIREMENTS.md` and `SPEC.md` first with the operational tolerance rule for premium-history incremental sync.
+2. Keep full rebuild mode strict, but change update mode so a single-symbol upstream provider anomaly does not fail the whole batch when the local cache can continue serving the dashboard.
+3. Restrict this tolerance to known fetch-layer per-symbol provider failures, and keep the failures visible in script output as warnings.
+4. Avoid restarting the Node web service for this fix; let the next scheduler tick pick up the new script automatically.
+
+Acceptance:
+- `python tools/rebuild_premium_db.py --mode update` can return success while exposing warning details for a small number of provider-outlier symbols.
+- `/api/health` can recover from `data_jobs = warn` to healthy on the next scheduler cycle when only non-fatal provider-outlier errors remain.
+- The homepage remains reachable throughout the repair and verification process.

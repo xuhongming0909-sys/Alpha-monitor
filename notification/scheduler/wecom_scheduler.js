@@ -18,6 +18,9 @@ function createWeComScheduler(options = {}) {
     : () => true;
   const defaultMergerSchedule = options.defaultMergerSchedule || { enabled: false, time: "08:00" };
   const logError = options.logError || ((scope, error) => console.error(scope, error));
+  const nowIso = typeof options.nowIso === "function"
+    ? options.nowIso
+    : () => new Date().toISOString();
 
   function shouldRunToday(shParts) {
     if (calendarMode === "daily") return true;
@@ -48,20 +51,24 @@ function createWeComScheduler(options = {}) {
       if (targetMinutes === null) continue;
       if (nowMinutes < targetMinutes) continue;
       if (sentTimes.includes(timeText)) continue;
+      const attemptAt = nowIso();
+      runtimeStore.setPushAttempt("main", attemptAt);
       try {
         await pushByModulesToWeCom({ modules: config.modules });
+        sentTimes.push(timeText);
+        updated = true;
+        runtimeStore.setPushRecord("main", sh.date, sentTimes);
+        runtimeStore.setPushSuccess("main", attemptAt, sh.date);
+        runtimeStore.save();
       } catch (error) {
+        runtimeStore.setPushError("main", error?.message || error);
+        runtimeStore.save();
         logError("[push] main schedule failed:", error?.message || error);
+        continue;
       }
-      sentTimes.push(timeText);
-      updated = true;
     }
 
-    if (updated) {
-      runtimeStore.setPushRecord("main", sh.date, sentTimes);
-      runtimeStore.setLastMainPushDate(sh.date);
-      runtimeStore.save();
-    }
+    if (updated) runtimeStore.save();
   }
 
   async function runMergerPushIfNeeded() {
@@ -79,17 +86,18 @@ function createWeComScheduler(options = {}) {
     const sentTimes = runtimeStore.getPushRecord("merger", sh.date);
     if (sentTimes.includes(mergerConfig.time)) return;
 
+    const attemptAt = nowIso();
+    runtimeStore.setPushAttempt("merger", attemptAt);
     try {
       const result = await pushMergerReportToWeCom({ force: false });
-      if (result?.sentCount > 0) {
-        runtimeStore.setLastMergerReportDate(sh.date);
-      }
-    } catch (error) {
-      logError("[push] merger schedule failed:", error?.message || error);
-    } finally {
-      sentTimes.push(mergerConfig.time);
-      runtimeStore.setPushRecord("merger", sh.date, sentTimes);
+      runtimeStore.setPushRecord("merger", sh.date, [...sentTimes, mergerConfig.time]);
+      runtimeStore.setPushSuccess("merger", attemptAt, sh.date);
       runtimeStore.save();
+      return result;
+    } catch (error) {
+      runtimeStore.setPushError("merger", error?.message || error);
+      runtimeStore.save();
+      logError("[push] merger schedule failed:", error?.message || error);
     }
   }
 

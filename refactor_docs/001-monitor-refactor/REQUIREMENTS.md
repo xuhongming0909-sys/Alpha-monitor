@@ -64,6 +64,7 @@
   - 表里至少显示：当前阶段、类型、名称/代码、申购日、中签缴款日、上市日、申购上限、发行价或转股价。
   - 页面不再单独显示 `抽签日` 标签。
   - 页面展示的 `中签缴款日` 列本轮固定使用 `lotteryDate` 的日期值。
+  - `今日中签缴款` 阶段判断也必须与页面显示口径一致，按 `lotteryDate = 今天` 归类，不能再按 `paymentDate` 单独判定。
   - 行要按 `今日申购`、`今日中签缴款`、`今日上市` 标出当前阶段。
   - 不同阶段使用不同底色。
 - UI界面：
@@ -224,8 +225,13 @@
   - 默认返回结果要使用最新股价，不允许长期沿用旧价格。
   - 页面必须能稳定显示接口已返回的监控列表，不能因为单独渲染路径失效而整块空白或报错。
   - 主表必须支持分页，每页固定 50 条。
+  - 页面必须支持新增监控项目。
+  - 页面必须支持修改已有监控的参数并原地保存。
+  - 补充参数区直接显示在每个监控项目下方，不再保留单独的 `详情` 标签或展开按钮。
+  - 补充参数区文案必须使用真实业务口径，不能出现用户不认可的虚构标签。
 - UI界面：
   - 展示监控名称、收购方/目标方、两边股价、公式说明、股票腿对价、现金腿对价、两种收益率。
+  - 面板顶部提供新增 / 编辑表单，列表区展示已保存项目。
 - 配置项说明：
   - 刷新频率：`config.yaml > data_fetch.plugins.custom_monitor.refresh_interval_ms`
 
@@ -286,10 +292,12 @@
 - 顶部状态信息是一行文字，不再是大状态卡。
 - `股债打新` 是今日事项长表，并显示关键日期和申购上限等字段。
 - `股债打新` 不再显示 `抽签日` 列，页面上的 `中签缴款日` 使用 `lotteryDate` 的日期值。
+- `股债打新` 的 `今日中签缴款` 阶段与页面显示保持同口径，也按 `lotteryDate` 判定。
 - `推送设置` 位于页面末尾，只保留 3 个时间框，且能保存并立即回显。
 - `转债套利 / AH / AB` 主表都新增序号列。
 - `转债套利 / AH / AB` 主表都支持点击表头排序。
 - `转债套利 / AH / AB / 监控套利 / 分红提醒 / 收购私有` 主表都支持分页，每页 50 条。
+- `监控套利` 支持新增与编辑已有监控，且补充参数直接显示在项目下方，不再依赖单独详情按钮。
 - AH/AB 同时显示前三和倒数前三。
 - AH/AB 主表显示价差、近三年百分位和压缩样本区间。
 - `收购私有` 显示全量公告，今日公告行高亮明显。
@@ -397,3 +405,68 @@
   - `pandas`
   - `requests`
 - If dependency verification fails, deployment must fail fast and block release.
+
+## 22. Fresh Market Data Contract (2026-03-23)
+- Dashboard market modules may keep the cache layer for fast first paint, but the user-facing interaction contract changes to:
+  - clicking `刷新` must request fresh backend data, not only replay the current cache snapshot
+  - if the first dashboard load receives cached payload for `exchangeRate / cbArb / ah / ab`, the page must trigger one same-session force revalidation and replace stale values after the fresh response returns
+- UI must expose whether the currently shown value is still from cache or has completed the real-time revalidation path.
+- Manual verification target for this round is the previously inconsistent `海优转债 118008` premium display: refreshed page value must follow the latest backend snapshot instead of staying on the old `+3.61%` cache view.
+
+## 23. Dense Core Table Contract For CB / AH / AB (2026-03-23)
+- `转债套利 / AH溢价 / AB溢价` main tables must stop relying on a visible `详情` column as the primary reading mode.
+- `转债套利` default-row main table must directly show the following key information:
+  - `转债`
+  - `正股`
+  - `转债现价`
+  - `转债涨跌幅`
+  - `正股现价`
+  - `正股涨跌幅`
+  - `转股价`
+  - `转股价值`
+  - `转股溢价率`
+  - `双低`
+  - `60日波动率`
+  - `纯债价值`
+  - `理论价格`
+  - `理论溢价率`
+  - `到期税前收益率`
+- `AH / AB` must follow the same dense-table principle:
+  - keep `A股 / 对手股 / A股价 / 对手市场价 / 对手人民币价 / 价差 / 溢价率 / 近三年分位`
+  - move sample metadata into the visible default row, including `historyCount` and compressed sample range
+  - do not keep the old detail-label path as the normal reading path
+
+## 24. Push Delivery Reliability And Observability Contract (2026-03-23)
+- Push scheduler success semantics change for this round:
+  - failed downstream WeCom sends must not be recorded as completed schedule slots
+  - only successful sends may write the sent-time record that suppresses retries
+- Push runtime state must retain at least:
+  - last attempt time
+  - last success time
+  - latest failure reason
+  - separated status for main push and merger report push
+- `GET /api/push/config` must surface enough runtime context for the UI to explain why push is or is not working, including:
+  - selected modules
+  - scheduler enabled state
+  - scheduler calendar mode
+  - webhook configured or missing
+  - last main push success/failure
+  - last merger push success/failure
+- Dashboard push strip must clearly warn when push is blocked by missing webhook configuration or by the latest runtime failure.
+- Current main-push content contract remains the enabled summary modules:
+  - `AH/AB`
+
+## 25. Premium History Incremental Sync Resilience (2026-03-23)
+- AH / AB premium-history incremental sync must not degrade the whole dashboard health status just because a small number of symbols hit transient upstream historical-price provider errors during update mode.
+- Update mode may keep serving existing local premium-history cache for those symbols when:
+  - the failure is limited to per-symbol upstream fetch anomalies
+  - the batch still completes for the remaining symbols
+- These tolerated failures must still be visible in script output as warnings with symbol code and short reason.
+- Full rebuild mode remains strict:
+  - provider failures in rebuild mode are still fatal
+  - rebuild mode must not silently downgrade hard failures
+- This resilience rule only applies to premium-history background sync; it must not mask web-service startup failures, config errors, dependency errors, or database write failures.
+  - `打新提醒`
+  - `转债套利`
+  - `监控套利`
+  - `分红提醒`

@@ -2,6 +2,8 @@
 
 const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000' : '';
 const PAGE_SIZE = 50;
+const FORCE_REFRESH_RESOURCE_KEYS = ['exchangeRate', 'ipo', 'bonds', 'cbArb', 'ah', 'ab', 'merger'];
+const CRITICAL_CACHE_REVALIDATION_KEYS = ['exchangeRate', 'cbArb', 'ah', 'ab'];
 
 const ENDPOINTS = {
   exchangeRate: '/api/market/exchange-rate',
@@ -17,6 +19,15 @@ const ENDPOINTS = {
 };
 
 const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'monitor', 'dividend', 'merger'];
+const MONITOR_MARKET_OPTIONS = ['A', 'H', 'B'];
+const MONITOR_CURRENCY_OPTIONS = ['CNY', 'HKD', 'USD'];
+const PUSH_MODULE_LABELS = {
+  ahab: 'AH/AB',
+  subscription: '打新',
+  cbArb: '转债',
+  monitor: '监控',
+  dividend: '分红',
+};
 
 const PREMIUM_SORT_OPTIONS = {
   premium: {
@@ -52,6 +63,12 @@ const state = {
   activeTab: 'cb-arb',
   eventsBound: false,
   savingPush: false,
+  savingMonitor: false,
+  cacheRevalidated: {},
+  monitorEditor: {
+    mode: 'create',
+    draft: createMonitorDraft(),
+  },
   expandedRows: {
     cbArb: {},
     ah: {},
@@ -109,11 +126,34 @@ function createTableState(key) {
   return { ...TABLE_DEFAULTS[key] };
 }
 
+function createMonitorDraft(source = {}) {
+  return {
+    id: source.id || '',
+    name: source.name || '',
+    acquirerName: source.acquirerName || '',
+    acquirerCode: source.acquirerCode || '',
+    acquirerMarket: source.acquirerMarket || 'A',
+    acquirerCurrency: source.acquirerCurrency || 'CNY',
+    targetName: source.targetName || '',
+    targetCode: source.targetCode || '',
+    targetMarket: source.targetMarket || 'A',
+    targetCurrency: source.targetCurrency || 'CNY',
+    stockRatio: source.stockRatio ?? '',
+    safetyFactor: source.safetyFactor ?? 1,
+    cashDistribution: source.cashDistribution ?? '',
+    cashDistributionCurrency: source.cashDistributionCurrency || 'CNY',
+    cashOptionPrice: source.cashOptionPrice ?? '',
+    cashOptionCurrency: source.cashOptionCurrency || 'CNY',
+    note: source.note || '',
+  };
+}
+
 function resourceState() {
   return {
     status: 'idle',
     data: null,
     error: null,
+    refreshing: false,
   };
 }
 
@@ -157,6 +197,23 @@ function readResourceArray(key) {
 
 function readResourceObject(key) {
   return readObject(state.resources[key].data);
+}
+
+function readResourcePayload(key) {
+  return readResourceObject(key);
+}
+
+function resourceServedFromCache(key) {
+  return Boolean(readResourcePayload(key).servedFromCache);
+}
+
+function resourceRefreshing(key) {
+  return Boolean(state.resources[key]?.refreshing);
+}
+
+function buildEndpointUrl(endpoint, options = {}) {
+  if (!options.force) return endpoint;
+  return `${endpoint}${endpoint.includes('?') ? '&' : '?'}force=1`;
 }
 
 function toNumber(value) {
@@ -274,6 +331,17 @@ function statusClass(value) {
   return '';
 }
 
+function readFreshnessText(keys) {
+  const targetKeys = Array.isArray(keys) ? keys : [keys];
+  if (targetKeys.some((key) => resourceRefreshing(key))) {
+    return '缓存快照校准中';
+  }
+  if (targetKeys.some((key) => resourceServedFromCache(key))) {
+    return '当前显示缓存值';
+  }
+  return '实时快照';
+}
+
 function showToast(message, isError = false) {
   if (!dom.toast) return;
   dom.toast.textContent = String(message || (isError ? '操作失败' : '操作成功'));
@@ -309,20 +377,27 @@ async function fetchJson(url, options = {}) {
   return payload;
 }
 
-async function loadResource(key, endpoint, onRender) {
-  state.resources[key].status = 'loading';
+async function loadResource(key, endpoint, onRender, options = {}) {
+  const previousData = state.resources[key].data;
+  const keepVisibleData = Boolean(options.background && previousData);
+  state.resources[key].refreshing = keepVisibleData;
+  state.resources[key].status = keepVisibleData ? 'ready' : 'loading';
   state.resources[key].error = null;
   onRender();
 
   try {
-    const payload = await fetchJson(endpoint);
+    const payload = await fetchJson(buildEndpointUrl(endpoint, options));
     state.resources[key].status = 'ready';
     state.resources[key].data = payload;
     state.resources[key].error = null;
   } catch (error) {
-    state.resources[key].status = 'error';
+    state.resources[key].status = keepVisibleData ? 'ready' : 'error';
     state.resources[key].error = error;
-    state.resources[key].data = null;
+    if (!keepVisibleData) {
+      state.resources[key].data = null;
+    }
+  } finally {
+    state.resources[key].refreshing = false;
   }
 
   onRender();
@@ -350,7 +425,34 @@ function bindEvents() {
     await savePushConfig();
   });
 
+  document.addEventListener('submit', (event) => {
+    const monitorForm = event.target.closest('#monitor-editor-form');
+    if (!monitorForm) return;
+    event.preventDefault();
+    void saveMonitorFromForm(monitorForm);
+  });
+
   document.addEventListener('click', (event) => {
+    const monitorAction = event.target.closest('[data-monitor-action]');
+    if (monitorAction) {
+      const action = monitorAction.dataset.monitorAction;
+      const monitorId = monitorAction.dataset.monitorId || '';
+      if (action === 'reset') {
+        resetMonitorEditor();
+        renderMonitorPanel();
+        return;
+      }
+      if (action === 'edit') {
+        enterMonitorEditMode(monitorId);
+        renderMonitorPanel();
+        return;
+      }
+      if (action === 'delete') {
+        void deleteMonitorById(monitorId);
+        return;
+      }
+    }
+
     const sortTarget = event.target.closest('.sort-head[data-table-key][data-sort-key]');
     if (sortTarget) {
       handleSortClick(sortTarget.dataset.tableKey, sortTarget.dataset.sortKey);
@@ -379,42 +481,69 @@ function bindEvents() {
   state.eventsBound = true;
 }
 
-async function bootstrap() {
+function renderHeaderOnly() {
+  renderStatusLine();
+  renderSubscriptionSummary();
+  renderPushSettings();
+}
+
+function renderEverything() {
+  renderHeaderOnly();
+  renderActivePanel();
+}
+
+function renderCallbackForResource(key) {
+  if (['exchangeRate', 'ipo', 'bonds', 'pushConfig'].includes(key)) {
+    return key === 'pushConfig' ? renderPushSettings : renderHeaderOnly;
+  }
+  return renderEverything;
+}
+
+async function revalidateCriticalResourcesOnce() {
+  const tasks = CRITICAL_CACHE_REVALIDATION_KEYS
+    .filter((key) => resourceServedFromCache(key))
+    .filter((key) => !state.cacheRevalidated[key])
+    .map((key) => {
+      state.cacheRevalidated[key] = true;
+      return loadResource(key, ENDPOINTS[key], renderCallbackForResource(key), { force: true, background: true });
+    });
+
+  if (tasks.length) {
+    await Promise.allSettled(tasks);
+  }
+}
+
+async function bootstrap(options = {}) {
   bindEvents();
   renderAll();
-
-  const renderHeaderOnly = () => {
-    renderStatusLine();
-    renderSubscriptionSummary();
-    renderPushSettings();
-  };
-
-  const renderEverything = () => {
-    renderHeaderOnly();
-    renderActivePanel();
-  };
+  const forceMarket = Boolean(options.forceMarket);
+  const skipCacheRevalidation = Boolean(options.skipCacheRevalidation);
 
   const tasks = [
-    loadResource('exchangeRate', ENDPOINTS.exchangeRate, renderHeaderOnly),
-    loadResource('ipo', ENDPOINTS.ipo, renderHeaderOnly),
-    loadResource('bonds', ENDPOINTS.bonds, renderHeaderOnly),
+    loadResource('exchangeRate', ENDPOINTS.exchangeRate, renderHeaderOnly, { force: forceMarket }),
+    loadResource('ipo', ENDPOINTS.ipo, renderHeaderOnly, { force: forceMarket }),
+    loadResource('bonds', ENDPOINTS.bonds, renderHeaderOnly, { force: forceMarket }),
     loadResource('pushConfig', ENDPOINTS.pushConfig, renderPushSettings),
-    loadResource('cbArb', ENDPOINTS.cbArb, renderEverything),
-    loadResource('ah', ENDPOINTS.ah, renderEverything),
-    loadResource('ab', ENDPOINTS.ab, renderEverything),
+    loadResource('cbArb', ENDPOINTS.cbArb, renderEverything, { force: forceMarket }),
+    loadResource('ah', ENDPOINTS.ah, renderEverything, { force: forceMarket }),
+    loadResource('ab', ENDPOINTS.ab, renderEverything, { force: forceMarket }),
     loadResource('monitor', ENDPOINTS.monitor, renderEverything),
     loadResource('dividend', ENDPOINTS.dividend, renderEverything),
-    loadResource('merger', ENDPOINTS.merger, renderEverything),
+    loadResource('merger', ENDPOINTS.merger, renderEverything, { force: forceMarket }),
   ];
 
   await Promise.allSettled(tasks);
   renderAll();
+
+  if (!forceMarket && !skipCacheRevalidation) {
+    await revalidateCriticalResourcesOnce();
+  }
 }
 
 async function reloadAllData() {
-  showToast('正在刷新页面数据');
-  await bootstrap();
-  showToast('页面数据已刷新');
+  showToast('正在强制刷新实时数据');
+  await bootstrap({ forceMarket: true, skipCacheRevalidation: true });
+  showToast('实时数据已刷新');
 }
 
 function renderAll() {
@@ -489,6 +618,14 @@ function renderStatusLine() {
       : '',
   ].filter(Boolean);
   dom.statusLine.innerHTML = statusItems.join('<span class="status-separator">/</span>');
+  if (resourceRefreshing('exchangeRate') || resourceRefreshing('cbArb')) {
+    dom.statusUpdateText.textContent = '当前先显示缓存快照，后台正在校准实时值';
+    return;
+  }
+  if (resourceServedFromCache('exchangeRate') || resourceServedFromCache('cbArb')) {
+    dom.statusUpdateText.textContent = '当前显示缓存快照，可点击“刷新”强制拉取实时值';
+    return;
+  }
   dom.statusUpdateText.textContent = updateTime ? '实时数据已连接' : '等待更多数据返回';
 }
 
@@ -526,9 +663,10 @@ function buildTodaySubscriptionRows(ipoRows, bondRows) {
 
   const pushRow = (records, typeLabel, recordType) => {
     records.forEach((row) => {
+      const paymentDisplayDate = row.lotteryDate || row.paymentDate;
       const stages = [];
       if (normalizeDateKey(row.subscribeDate) === today) stages.push(SUBSCRIPTION_STAGES[0]);
-      if (normalizeDateKey(row.paymentDate) === today) stages.push(SUBSCRIPTION_STAGES[1]);
+      if (normalizeDateKey(paymentDisplayDate) === today) stages.push(SUBSCRIPTION_STAGES[1]);
       if (normalizeDateKey(row.listingDate) === today) stages.push(SUBSCRIPTION_STAGES[2]);
       stages.forEach((stage) => {
         rows.push({
@@ -538,7 +676,7 @@ function buildTodaySubscriptionRows(ipoRows, bondRows) {
           name: row.name || row.bondName || row.stockName || '--',
           code: row.code || row.bondCode || row.stockCode || '--',
           subscribeDate: row.subscribeDate,
-          paymentDisplayDate: row.lotteryDate || row.paymentDate,
+          paymentDisplayDate,
           listingDate: row.listingDate,
           subscribeLimit: row.subscribeLimit,
           issueOrConvertLabel: recordType === 'ipo' ? '发行价' : '转股价',
@@ -674,19 +812,38 @@ function applyPushConfigToInputs(config = {}) {
   if (dom.pushTime3) dom.pushTime3.value = next.mergerTime;
 }
 
+function readEnabledPushModules(config = {}) {
+  const modules = (config.modules && typeof config.modules === 'object') ? config.modules : {};
+  return Object.entries(modules)
+    .filter(([, enabled]) => Boolean(enabled))
+    .map(([key]) => PUSH_MODULE_LABELS[key] || key);
+}
+
+function shortErrorText(value) {
+  return String(value || '').replace(/\s+/g, ' ').slice(0, 48);
+}
+
 function buildPushStateText(config = {}) {
   const next = resolvePushConfigTimes(config);
+  const delivery = config.deliveryStatus || {};
+  const moduleText = readEnabledPushModules(config).join(' / ') || '--';
   const mainText = config.enabled === false
     ? "主推送已关闭"
     : `主推送 ${[next.mainTime1, next.mainTime2].filter(Boolean).join(" / ") || "--"}`;
   const mergerText = config?.mergerSchedule?.enabled === false
     ? "收购私有专报已关闭"
     : `收购私有 ${next.mergerTime || "--"}`;
-  const lastParts = [
-    config.lastMainPushDate ? `最近主推送 ${config.lastMainPushDate}` : "",
-    config.lastMergerReportDate ? `最近专报 ${config.lastMergerReportDate}` : "",
+  const runtimeParts = [
+    `模块 ${moduleText}`,
+    `调度 ${delivery.calendarMode || '--'}`,
+    delivery.schedulerEnabled === false ? '服务端调度已关闭' : '',
+    delivery.webhookConfigured === false ? '企业微信 Webhook 未配置' : '企业微信 Webhook 已配置',
+    delivery.lastMainPushSuccessAt ? `主推送成功 ${formatDate(delivery.lastMainPushSuccessAt)}` : '',
+    delivery.lastMainPushError ? `主推送失败 ${shortErrorText(delivery.lastMainPushError)}` : '',
+    delivery.lastMergerPushSuccessAt ? `专报成功 ${formatDate(delivery.lastMergerPushSuccessAt)}` : '',
+    delivery.lastMergerPushError ? `专报失败 ${shortErrorText(delivery.lastMergerPushError)}` : '',
   ].filter(Boolean);
-  return [mainText, mergerText, ...lastParts].join(" / ");
+  return [mainText, mergerText, ...runtimeParts].join(" / ");
 }
 
 function renderPushSettings() {
@@ -772,6 +929,113 @@ async function savePushConfig() {
   } finally {
     state.savingPush = false;
     renderPushSettings();
+  }
+}
+
+function readMonitorEditorDraft() {
+  return state.monitorEditor?.draft || createMonitorDraft();
+}
+
+function setMonitorEditorDraft(draft, mode = 'create') {
+  state.monitorEditor = {
+    mode,
+    draft: createMonitorDraft(draft),
+  };
+}
+
+function resetMonitorEditor() {
+  setMonitorEditorDraft(createMonitorDraft(), 'create');
+}
+
+function findMonitorById(monitorId) {
+  return readResourceArray('monitor').find((item) => String(item.id) === String(monitorId)) || null;
+}
+
+function enterMonitorEditMode(monitorId) {
+  const target = findMonitorById(monitorId);
+  if (!target) {
+    showToast('未找到要编辑的监控项目', true);
+    return;
+  }
+  setMonitorEditorDraft(target, 'edit');
+}
+
+function readMonitorFormPayload(form) {
+  const formData = new FormData(form);
+  const currentDraft = readMonitorEditorDraft();
+  return {
+    id: String(formData.get('id') || '').trim() || currentDraft.id || undefined,
+    name: String(formData.get('name') || '').trim(),
+    acquirerName: String(formData.get('acquirerName') || '').trim(),
+    acquirerCode: String(formData.get('acquirerCode') || '').trim(),
+    acquirerMarket: String(formData.get('acquirerMarket') || 'A').trim(),
+    acquirerCurrency: String(formData.get('acquirerCurrency') || 'CNY').trim(),
+    targetName: String(formData.get('targetName') || '').trim(),
+    targetCode: String(formData.get('targetCode') || '').trim(),
+    targetMarket: String(formData.get('targetMarket') || 'A').trim(),
+    targetCurrency: String(formData.get('targetCurrency') || 'CNY').trim(),
+    stockRatio: String(formData.get('stockRatio') || '').trim(),
+    safetyFactor: String(formData.get('safetyFactor') || '').trim(),
+    cashDistribution: String(formData.get('cashDistribution') || '').trim(),
+    cashDistributionCurrency: String(formData.get('cashDistributionCurrency') || 'CNY').trim(),
+    cashOptionPrice: String(formData.get('cashOptionPrice') || '').trim(),
+    cashOptionCurrency: String(formData.get('cashOptionCurrency') || 'CNY').trim(),
+    note: String(formData.get('note') || '').trim(),
+  };
+}
+
+async function refreshMonitorResource() {
+  await loadResource('monitor', ENDPOINTS.monitor, renderEverything, { force: true, background: false });
+}
+
+async function saveMonitorFromForm(form) {
+  const payload = readMonitorFormPayload(form);
+  if (!payload.acquirerCode || !payload.targetCode) {
+    showToast('收购方代码和目标方代码都需要填写', true);
+    return;
+  }
+
+  state.savingMonitor = true;
+  renderMonitorPanel();
+
+  try {
+    await fetchJson(ENDPOINTS.monitor, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    await refreshMonitorResource();
+    resetMonitorEditor();
+    renderMonitorPanel();
+    showToast(payload.id ? '监控参数已更新' : '监控项目已新增');
+  } catch (error) {
+    showToast(error.message || '监控项目保存失败', true);
+  } finally {
+    state.savingMonitor = false;
+    renderMonitorPanel();
+  }
+}
+
+async function deleteMonitorById(monitorId) {
+  if (!monitorId) return;
+  if (typeof window !== 'undefined' && !window.confirm('确认删除这个监控项目吗？')) {
+    return;
+  }
+
+  state.savingMonitor = true;
+  renderMonitorPanel();
+
+  try {
+    await fetchJson(`${ENDPOINTS.monitor}/${encodeURIComponent(monitorId)}`, { method: 'DELETE' });
+    await refreshMonitorResource();
+    if (String(readMonitorEditorDraft().id || '') === String(monitorId)) {
+      resetMonitorEditor();
+    }
+    showToast('监控项目已删除');
+  } catch (error) {
+    showToast(error.message || '监控项目删除失败', true);
+  } finally {
+    state.savingMonitor = false;
+    renderMonitorPanel();
   }
 }
 
@@ -957,7 +1221,7 @@ function renderTableHeader(columns, tableKey, options = {}) {
     })
     .join('');
 
-  const detailHead = includeDetails ? '<th>详情</th>' : '';
+  const detailHead = includeDetails ? '<th aria-label="展开控制"></th>' : '';
   return `<tr>${cells}${detailHead}</tr>`;
 }
 
@@ -1012,7 +1276,7 @@ function renderPagination(tableKey, model) {
 }
 
 function renderPaginatedTable(options) {
-  const { tableKey, tableKind, columns, rows, emptyMessage, rowClassName, detailRenderer } = options;
+  const { tableKey, tableKind, columns, rows, emptyMessage, rowClassName, detailRenderer, detailMode = 'toggle' } = options;
   if (!rows.length) {
     return `
       <div class="empty-state">
@@ -1023,26 +1287,29 @@ function renderPaginatedTable(options) {
 
   const model = getProcessedTableRows(tableKey, rows, columns);
   const hasDetails = typeof detailRenderer === 'function';
+  const inlineDetails = hasDetails && detailMode === 'always';
+  const toggleDetails = hasDetails && !inlineDetails;
   const body = model.rows
     .map((row, index) => {
       const rowNumber = model.startIndex + index + 1;
       const rowId = resolveRowId(tableKey, row, rowNumber);
       const className = typeof rowClassName === 'function' ? rowClassName(row) : '';
       const cells = columns.map((column) => renderTableCell(column, row, rowNumber)).join('');
-      const detailsCell = hasDetails
+      const detailsCell = toggleDetails
         ? `<td><button type="button" class="expand-button" data-table-key="${escapeHtml(tableKey)}" data-row-id="${escapeHtml(rowId)}">${readExpandedState(tableKey, rowId) ? '收起' : '展开'}</button></td>`
         : '';
       const mainRow = `<tr${className ? ` class="${escapeHtml(className)}"` : ''}>${cells}${detailsCell}</tr>`;
-      if (!hasDetails || !readExpandedState(tableKey, rowId)) return mainRow;
+      const shouldRenderDetail = inlineDetails || (toggleDetails && readExpandedState(tableKey, rowId));
+      if (!shouldRenderDetail) return mainRow;
       const detailHtml = detailRenderer(row, rowNumber);
-      return `${mainRow}<tr class="detail-row"><td colspan="${columns.length + 1}">${detailHtml}</td></tr>`;
+      return `${mainRow}<tr class="detail-row"><td colspan="${columns.length + (toggleDetails ? 1 : 0)}">${detailHtml}</td></tr>`;
     })
     .join('');
 
   return `
     <div class="table-wrap">
       <table data-table-kind="${escapeHtml(tableKind)}">
-        <thead>${renderTableHeader(columns, tableKey, { includeDetails: hasDetails })}</thead>
+        <thead>${renderTableHeader(columns, tableKey, { includeDetails: toggleDetails })}</thead>
         <tbody>${body}</tbody>
       </table>
     </div>
@@ -1065,7 +1332,7 @@ function renderSimpleTable(options) {
     <div class="table-wrap">
       <table data-table-kind="${escapeHtml(tableKind)}">
         <thead>
-          <tr>${columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')}${hasDetails ? '<th>详情</th>' : ''}</tr>
+          <tr>${columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')}${hasDetails ? '<th aria-label="展开控制"></th>' : ''}</tr>
         </thead>
         <tbody>
           ${rows
@@ -1134,11 +1401,76 @@ function buildConvertibleColumns() {
         <div class="muted mono-text">${escapeHtml(row.stockCode || '--')}</div>
       `,
     },
-    { key: 'price', label: '转债现价', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.price), render: (row) => formatNumber(row.price, 2) },
-    { key: 'stockPrice', label: '正股现价', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.stockPrice), render: (row) => formatNumber(row.stockPrice, 2) },
+    {
+      key: 'price',
+      label: '转债现价 / 涨跌',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.price),
+      render: (row) => `
+        <div>${escapeHtml(formatNumber(row.price, 2))}</div>
+        <div class="muted ${escapeHtml(statusClass(row.changePercent))}">${escapeHtml(formatPercent(row.changePercent, 2))}</div>
+      `,
+    },
+    {
+      key: 'stockPrice',
+      label: '正股现价 / 涨跌',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.stockPrice),
+      render: (row) => `
+        <div>${escapeHtml(formatNumber(row.stockPrice, 2))}</div>
+        <div class="muted ${escapeHtml(statusClass(row.stockChangePercent))}">${escapeHtml(formatPercent(row.stockChangePercent, 2))}</div>
+      `,
+    },
+    {
+      key: 'convertMetrics',
+      label: '转股价 / 转股价值',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.convertValue),
+      render: (row) => `
+        <div>转股价 ${escapeHtml(formatNumber(row.convertPrice, 2))}</div>
+        <div class="muted">转股值 ${escapeHtml(formatNumber(row.convertValue, 2))}</div>
+      `,
+    },
     { key: 'premiumRate', label: '转股溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premiumRate), className: (row) => statusClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate, 2) },
     { key: 'doubleLow', label: '双低', sortable: true, sortType: 'number', defaultDir: 'asc', sortValue: (row) => toNumber(row.doubleLow), render: (row) => formatNumber(row.doubleLow, 2) },
+    {
+      key: 'volatility60',
+      label: '60日波动率',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.volatility60 ?? row.annualizedVolatility),
+      render: (row) => formatPercent(row.volatility60 ?? row.annualizedVolatility, 2),
+    },
+    {
+      key: 'theoreticalMetrics',
+      label: '纯债 / 理论价',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.theoreticalPrice),
+      render: (row) => `
+        <div>纯债 ${escapeHtml(formatNumber(row.pureBondValue, 2))}</div>
+        <div class="muted">理论 ${escapeHtml(formatNumber(row.theoreticalPrice, 2))}</div>
+      `,
+    },
     { key: 'theoreticalPremiumRate', label: '理论溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.theoreticalPremiumRate), className: (row) => statusClass(row.theoreticalPremiumRate), render: (row) => formatPercent(row.theoreticalPremiumRate, 2) },
+    {
+      key: 'yieldToMaturityPretax',
+      label: '到期收益率',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.yieldToMaturityPretax),
+      className: (row) => statusClass(row.yieldToMaturityPretax),
+      render: (row) => formatPercent(row.yieldToMaturityPretax, 2),
+    },
   ];
 }
 
@@ -1171,10 +1503,37 @@ function buildPremiumColumns(type) {
       `,
     },
     { key: 'aPrice', label: 'A股价', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.aPrice), render: (row) => formatNumber(row.aPrice, 2) },
+    {
+      key: config.peerMarketPriceKey,
+      label: '对手市场价',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row[config.peerMarketPriceKey]),
+      render: (row) => formatNumber(row[config.peerMarketPriceKey], 2),
+    },
     { key: config.peerPriceKey, label: '对手人民币价', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row[config.peerPriceKey]), render: (row) => formatNumber(row[config.peerPriceKey], 2) },
+    {
+      key: 'priceGap',
+      label: '价差',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => computePremiumGap(row, config.peerPriceKey),
+      className: (row) => statusClass(computePremiumGap(row, config.peerPriceKey)),
+      render: (row) => formatSignedNumber(computePremiumGap(row, config.peerPriceKey), 2),
+    },
     { key: 'premium', label: '溢价率', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premium), className: (row) => statusClass(row.premium), render: (row) => formatPercent(row.premium, 2) },
     { key: 'percentile', label: '近三年分位', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.percentile), render: (row) => formatPercent(row.percentile, 2) },
-    { key: 'sampleRange', label: '样本区间', sortable: false, render: (row) => escapeHtml(formatHistoryRange(row)) },
+    {
+      key: 'sampleInfo',
+      label: '样本信息',
+      sortable: false,
+      render: (row) => `
+        <div>样本 ${escapeHtml(formatInt(row.historyCount))}</div>
+        <div class="muted mono-text">${escapeHtml(formatHistoryRange(row))}</div>
+      `,
+    },
   ];
 }
 
@@ -1256,24 +1615,24 @@ function renderConvertibleBondPanel() {
       <div class="module-toolbar">
         <div>
           <div class="tab-title">转债套利</div>
-          <div class="section-note">主表默认仅展示关键列；补充字段统一放到行内展开，桌面端不依赖横向滚动查看核心信息。</div>
+          <div class="section-note">主表直接展示价格、涨跌、波动率、理论参数与到期收益率，避免再把核心信息藏进详情里。</div>
         </div>
         <div class="panel-meta">
           <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
           <span>最近更新 ${escapeHtml(formatDate(readUpdateTime("cbArb")))}</span>
+          <span>${escapeHtml(readFreshnessText('cbArb'))}</span>
         </div>
       </div>
       <div class="summary-grid summary-grid-three">${summaryCards}</div>
       <div class="list-card">
         <h3>转债套利主表</h3>
-        <div class="section-note">保持现有计算口径不变，只优化摘要密度、表格可读性与桌面端阅读体验。</div>
+        <div class="section-note">保持现有计算口径不变，只把关键参数前移到主表，提高桌面端信息密度。</div>
         ${renderPaginatedTable({
           tableKey: "cbArb",
           tableKind: "convertible",
           columns: buildConvertibleColumns(),
           rows,
           emptyMessage: "转债套利暂时没有返回数据",
-          detailRenderer: (row) => renderDetailGrid(buildConvertibleDetailItems(row)),
         })}
       </div>
     </div>
@@ -1315,11 +1674,12 @@ function renderPremiumPanel(type) {
       <div class="premium-toolbar">
         <div>
           <div class="tab-title">${config.title}</div>
-          <div class="section-note">主表按关键列紧凑展示，默认 50 条分页；补充字段通过“展开”查看，不再依赖模块内滚动。</div>
+          <div class="section-note">主表按关键列紧凑展示，样本数和样本区间直接放进默认行，不再依赖详情列。</div>
         </div>
         <div class="panel-meta">
           <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
           <span>最近更新 ${escapeHtml(formatDate(readUpdateTime(type)))}</span>
+          <span>${escapeHtml(readFreshnessText(type))}</span>
         </div>
       </div>
       <div class="summary-grid">
@@ -1335,14 +1695,13 @@ function renderPremiumPanel(type) {
       </div>
       <div class="list-card">
         <h3>${config.title}主表</h3>
-        <div class="section-note">样本区间采用压缩格式显示，例如 250520-260321；样本数放入说明区，不在主表单独占列。</div>
+        <div class="section-note">样本信息直接放在主表默认行；样本区间采用压缩格式显示，例如 250520-260321。</div>
         ${renderPaginatedTable({
           tableKey: type,
           tableKind: 'premium',
           columns,
           rows,
           emptyMessage: `${config.title} 暂无数据`,
-          detailRenderer: (row) => renderDetailGrid(buildPremiumDetailItems(type, row)),
         })}
         <div class="slim-note">${buildPremiumExplainText(type, rows)}</div>
       </div>
@@ -1463,6 +1822,15 @@ function renderMonitorPanel() {
         <div class="panel-meta">
           <span>总样本 ${escapeHtml(formatInt(rows.length))}</span>
           <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('monitor')))}</span>
+        </div>
+      </div>
+      <div class="formula-box">
+        <h3>公式说明</h3>
+        <div class="formula-lines">
+          <div class="formula-line">股票腿理论对价 = 收购方股价 × 换股比例 × 安全系数 + 现金分派</div>
+          <div class="formula-line">股票腿收益率 = (股票腿理论对价 - 目标现价) / 目标现价 × 100</div>
+          <div class="formula-line">现金腿收益率 = (现金对价 - 目标现价) / 目标现价 × 100</div>
+          <div class="formula-line">纯现金模式继续保留；主表展示关键收益字段，详细参数可通过“展开”查看。</div>
         </div>
       </div>
       ${renderPaginatedTable({
