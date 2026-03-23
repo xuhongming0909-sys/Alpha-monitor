@@ -2307,3 +2307,18 @@ GitHub 自动部署正式链路固定为：
   - `债底 + 看涨期权`
   - or `债底 + 看涨期权 - 看跌期权`
 - The displayed numbers must come from the same row payload already shown in the table.
+
+## 35. Convertible Volatility Percent Display Spec (2026-03-24)
+
+### 35.1 Payload unit rule
+- `volatility60` and `annualizedVolatility` remain ratio-form numeric fields in the payload.
+- Example: `0.3491101749` represents `34.91101749%`.
+
+### 35.2 Front-end display rule
+- The dashboard front end must multiply the ratio by `100` when rendering human-readable volatility percentages.
+- The display helper used for this rule must not change the underlying numeric sort value.
+
+### 35.3 Coverage rule
+- This rule applies to:
+  - the convertible-bond `60日波动率` table column
+  - the bottom real-example note built from the same row payload

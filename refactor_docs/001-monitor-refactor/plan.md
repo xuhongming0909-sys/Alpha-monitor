@@ -1268,3 +1268,25 @@ Acceptance:
 - Full HFQ stock-history sync is executed for convertible-bond underlyings.
 - Convertible theoretical metrics are refreshed after the history sync.
 - The page note shows one real current example instead of only abstract wording.
+
+## 39. Phase AK: Convertible Volatility Percent Display Alignment (2026-03-24)
+
+Goal: keep the newly added real-example note accurate by aligning the convertible-bond volatility display with the actual data unit used by the API payload.
+
+Plan:
+1. Keep this round presentation-only:
+   - no route change
+   - no data recalculation change
+   - no unrelated layout refactor
+2. Treat `volatility60` / `annualizedVolatility` as ratio values in the front end:
+   - payload example `0.3491` must display as `34.91%`
+   - do not keep the current direct-percent formatting that renders `0.35%`
+3. Apply the same display rule consistently in:
+   - the main `60日波动率` column
+   - the real example note at the bottom of the convertible-bond page
+4. Re-verify the public page payload after deploy with one real row example.
+
+Acceptance:
+- The convertible-bond table no longer shows ratio-form volatility as `0.xx%`.
+- The bottom real example note uses the correct human-readable volatility percentage.
+- Existing volatility sort order and theoretical-price calculation remain unchanged.

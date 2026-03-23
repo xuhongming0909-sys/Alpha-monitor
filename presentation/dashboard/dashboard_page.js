@@ -432,6 +432,13 @@ function formatPercent(value, digits = 2) {
   return `${sign}${formatNumber(parsed, digits)}%`;
 }
 
+function formatRatioPercent(value, digits = 2) {
+  const parsed = toNumber(value);
+  if (parsed === null) return '--';
+  // 可转债波动率字段返回的是 0.x 比例值，展示时需要转成 100 倍百分数
+  return `${formatNumber(parsed * 100, digits)}%`;
+}
+
 function formatInt(value) {
   const parsed = toNumber(value);
   if (parsed === null) return '--';
@@ -2108,7 +2115,7 @@ function buildConvertibleColumns() {
       sortType: 'number',
       defaultDir: 'desc',
       sortValue: (row) => toNumber(row.volatility60 ?? row.annualizedVolatility),
-      render: (row) => formatPercent(row.volatility60 ?? row.annualizedVolatility, 2),
+      render: (row) => formatRatioPercent(row.volatility60 ?? row.annualizedVolatility, 2),
     },
     {
       key: 'rating',
@@ -2415,7 +2422,7 @@ function buildConvertibleExplainText(rows) {
     `正股 ${exampleRow.stockName || '--'} ${exampleRow.stockCode || ''}`.trim(),
     `现价 ${formatNumber(exampleRow.stockPrice, 2)}`,
     `转股价 ${formatNumber(exampleRow.convertPrice, 2)}`,
-    `60日波动率 ${formatPercent(exampleRow.volatility60 ?? exampleRow.annualizedVolatility, 2)}`,
+    `60日波动率 ${formatRatioPercent(exampleRow.volatility60 ?? exampleRow.annualizedVolatility, 2)}`,
     `债底 ${formatNumber(bondBase, 2)}`,
     pricingFormula === 'bond+call-put'
       ? `理论价按“债底 + 看涨期权 - 看跌期权”口径参考计算：${formulaText}`

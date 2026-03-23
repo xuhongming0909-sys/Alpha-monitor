@@ -1251,3 +1251,14 @@
 - The convertible-bond page note must include one real current example drawn from the live dataset.
 - The example must show the actual bond code/name and the actual numeric formula branch used for the displayed theoretical-price reference field.
 - The example must not use fabricated placeholder values.
+
+## 45. Convertible Volatility Percent Display Contract (2026-03-24)
+- The convertible-bond API continues exposing `volatility60` / `annualizedVolatility` as ratio values such as `0.3491`.
+- The dashboard display layer must convert those ratio values into human-readable percentages such as `34.91%`.
+- The same display rule must be used consistently in:
+  - the main `60日波动率` column
+  - the bottom real-example explanatory note
+- This round does not change:
+  - volatility sorting basis
+  - volatility calculation logic
+  - theoretical-price formulas
