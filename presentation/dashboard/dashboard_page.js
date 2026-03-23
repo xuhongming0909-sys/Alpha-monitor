@@ -30,6 +30,7 @@ const PUSH_MODULE_LABELS = {
   monitor: '监控',
   dividend: '分红',
 };
+const MONITOR_LOOKUP_DEBOUNCE_MS = 280;
 
 const PREMIUM_SORT_OPTIONS = {
   premium: {
@@ -72,11 +73,7 @@ const state = {
   savingPush: false,
   savingMonitor: false,
   cacheRevalidated: {},
-  monitorEditor: {
-    mode: 'create',
-    open: false,
-    draft: createMonitorDraft(),
-  },
+  monitorEditor: createMonitorEditorState(),
   expandedRows: {
     cbArb: {},
     ah: {},
@@ -161,6 +158,43 @@ function createMonitorDraft(source = {}) {
     cashOptionPrice: source.cashOptionPrice ?? '',
     cashOptionCurrency: source.cashOptionCurrency || 'CNY',
     note: source.note || '',
+  };
+}
+
+function createMonitorResolvedCandidate(source = {}, role = 'acquirer') {
+  const isAcquirer = role === 'acquirer';
+  const name = String(isAcquirer ? source.acquirerName : source.targetName || '').trim();
+  const code = String(isAcquirer ? source.acquirerCode : source.targetCode || '').trim();
+  if (!code) return null;
+  return {
+    name: name || code,
+    code,
+    market: String(isAcquirer ? source.acquirerMarket : source.targetMarket || 'A').trim().toUpperCase() || 'A',
+    currency: String(isAcquirer ? source.acquirerCurrency : source.targetCurrency || 'CNY').trim().toUpperCase() || 'CNY',
+  };
+}
+
+function createMonitorLookupSlot(source = {}, role = 'acquirer') {
+  return {
+    loading: false,
+    error: '',
+    items: [],
+    timer: null,
+    requestToken: 0,
+    resolved: createMonitorResolvedCandidate(source, role),
+  };
+}
+
+function createMonitorEditorState(source = {}, mode = 'create', open = false) {
+  const draft = createMonitorDraft(source);
+  return {
+    mode,
+    open,
+    draft,
+    lookup: {
+      acquirer: createMonitorLookupSlot(draft, 'acquirer'),
+      target: createMonitorLookupSlot(draft, 'target'),
+    },
   };
 }
 
@@ -448,13 +482,29 @@ function bindEvents() {
     void saveMonitorFromForm(monitorForm);
   });
 
-  document.addEventListener('click', (event) => {
-    if (event.target.matches('[data-monitor-overlay="1"]')) {
-      closeMonitorEditor();
-      renderMonitorPanel();
+  document.addEventListener('input', (event) => {
+    const monitorField = event.target.closest('#monitor-editor-form [name]');
+    if (!monitorField) return;
+    const fieldName = String(monitorField.name || '').trim();
+    const fieldValue = String(monitorField.value || '');
+    syncMonitorDraftField(fieldName, fieldValue);
+
+    if (fieldName === 'acquirerName') {
+      queueMonitorLookup('acquirer', fieldValue);
       return;
     }
+    if (fieldName === 'targetName') {
+      queueMonitorLookup('target', fieldValue);
+    }
+  });
 
+  document.addEventListener('change', (event) => {
+    const monitorField = event.target.closest('#monitor-editor-form [name]');
+    if (!monitorField) return;
+    syncMonitorDraftField(String(monitorField.name || '').trim(), String(monitorField.value || ''));
+  });
+
+  document.addEventListener('click', (event) => {
     const monitorAction = event.target.closest('[data-monitor-action]');
     if (monitorAction) {
       const action = monitorAction.dataset.monitorAction;
@@ -478,6 +528,15 @@ function bindEvents() {
         void deleteMonitorById(monitorId);
         return;
       }
+    }
+
+    const monitorLookupSelect = event.target.closest('[data-monitor-lookup-role][data-monitor-lookup-index]');
+    if (monitorLookupSelect) {
+      applyMonitorLookupCandidate(
+        String(monitorLookupSelect.dataset.monitorLookupRole || '').trim(),
+        Number(monitorLookupSelect.dataset.monitorLookupIndex || -1)
+      );
+      return;
     }
 
     const sortTarget = event.target.closest('.sort-head[data-table-key][data-sort-key]');
@@ -971,12 +1030,19 @@ function readMonitorEditorDraft() {
   return state.monitorEditor?.draft || createMonitorDraft();
 }
 
+function clearMonitorLookupTimers() {
+  ['acquirer', 'target'].forEach((role) => {
+    const timer = state.monitorEditor?.lookup?.[role]?.timer;
+    if (timer) {
+      window.clearTimeout(timer);
+      state.monitorEditor.lookup[role].timer = null;
+    }
+  });
+}
+
 function setMonitorEditorDraft(draft, mode = 'create', open = false) {
-  state.monitorEditor = {
-    mode,
-    open,
-    draft: createMonitorDraft(draft),
-  };
+  clearMonitorLookupTimers();
+  state.monitorEditor = createMonitorEditorState(draft, mode, open);
 }
 
 function openMonitorCreateMode() {
@@ -1007,6 +1073,7 @@ function readMonitorFormPayload(form) {
     id: String(formData.get('id') || '').trim() || currentDraft.id || undefined,
     acquirerName: String(formData.get('acquirerName') || '').trim(),
     targetName: String(formData.get('targetName') || '').trim(),
+    stockRatio: String(formData.get('stockRatio') || '').trim(),
     safetyFactor: String(formData.get('safetyFactor') || '').trim(),
     cashDistribution: String(formData.get('cashDistribution') || '').trim(),
     cashDistributionCurrency: String(formData.get('cashDistributionCurrency') || 'CNY').trim(),
@@ -1019,9 +1086,33 @@ function readMonitorFormPayload(form) {
     targetCode: currentDraft.targetCode || '',
     targetMarket: currentDraft.targetMarket || 'A',
     targetCurrency: currentDraft.targetCurrency || 'CNY',
-    stockRatio: currentDraft.stockRatio ?? '',
     note: currentDraft.note || '',
   };
+}
+
+function getMonitorLookupConfig(role) {
+  return role === 'target'
+    ? {
+      fieldName: 'targetName',
+      codeField: 'targetCode',
+      marketField: 'targetMarket',
+      currencyField: 'targetCurrency',
+    }
+    : {
+      fieldName: 'acquirerName',
+      codeField: 'acquirerCode',
+      marketField: 'acquirerMarket',
+      currencyField: 'acquirerCurrency',
+    };
+}
+
+function getMonitorLookupSlot(role) {
+  return state.monitorEditor?.lookup?.[role] || null;
+}
+
+function syncMonitorDraftField(fieldName, fieldValue) {
+  if (!fieldName || !state.monitorEditor?.draft) return;
+  state.monitorEditor.draft[fieldName] = fieldValue;
 }
 
 function normalizeMonitorEntityText(value) {
@@ -1046,6 +1137,176 @@ function scoreMonitorSearchMatch(item, keyword) {
   if (text && pinyin === text) score += 40;
   if (text && pinyin.startsWith(text)) score += 20;
   return score;
+}
+
+function isExactMonitorSearchMatch(item, keyword) {
+  const text = normalizeMonitorEntityText(keyword);
+  if (!text) return false;
+  return (
+    normalizeMonitorEntityText(item?.code) === text ||
+    normalizeMonitorEntityText(item?.name) === text
+  );
+}
+
+function renderMonitorLookupMarkup(role) {
+  const slot = getMonitorLookupSlot(role);
+  if (!slot) return '';
+
+  const parts = [];
+  if (slot.resolved) {
+    parts.push(
+      `<div class="monitor-lookup-hint monitor-lookup-resolved">已识别：${escapeHtml(slot.resolved.name || '--')} (${escapeHtml(slot.resolved.code || '--')}) · ${escapeHtml(slot.resolved.market || '--')} · ${escapeHtml(slot.resolved.currency || '--')}</div>`
+    );
+  }
+  if (slot.loading) {
+    parts.push('<div class="monitor-lookup-hint">正在检索候选股票…</div>');
+  } else if (slot.error) {
+    parts.push(`<div class="monitor-lookup-hint monitor-lookup-error">${escapeHtml(slot.error)}</div>`);
+  }
+  if (Array.isArray(slot.items) && slot.items.length) {
+    parts.push(`
+      <div class="monitor-lookup-list">
+        ${slot.items.map((item, index) => `
+          <button type="button" class="monitor-lookup-chip" data-monitor-lookup-role="${escapeHtml(role)}" data-monitor-lookup-index="${index}">
+            ${escapeHtml(item.name || '--')} (${escapeHtml(item.code || '--')}) · ${escapeHtml(item.market || '--')} · ${escapeHtml(item.currency || '--')}
+          </button>
+        `).join('')}
+      </div>
+    `);
+  }
+  return parts.join('');
+}
+
+function updateMonitorLookupUi(role) {
+  const container = document.getElementById(`monitor-${role}-lookup`);
+  if (!container) return;
+  container.innerHTML = renderMonitorLookupMarkup(role);
+}
+
+function clearMonitorLookupResults(role) {
+  const slot = getMonitorLookupSlot(role);
+  if (!slot) return;
+  if (slot.timer) {
+    window.clearTimeout(slot.timer);
+    slot.timer = null;
+  }
+  slot.loading = false;
+  slot.error = '';
+  slot.items = [];
+}
+
+function clearMonitorResolvedEntity(role) {
+  const cfg = getMonitorLookupConfig(role);
+  const slot = getMonitorLookupSlot(role);
+  if (!state.monitorEditor?.draft || !slot) return;
+  slot.resolved = null;
+  state.monitorEditor.draft[cfg.codeField] = '';
+  state.monitorEditor.draft[cfg.marketField] = '';
+  state.monitorEditor.draft[cfg.currencyField] = '';
+}
+
+function applyMonitorResolvedEntity(role, candidate) {
+  const cfg = getMonitorLookupConfig(role);
+  const slot = getMonitorLookupSlot(role);
+  if (!candidate || !state.monitorEditor?.draft || !slot) return;
+  state.monitorEditor.draft[cfg.fieldName] = candidate.name || candidate.code || '';
+  state.monitorEditor.draft[cfg.codeField] = candidate.code || '';
+  state.monitorEditor.draft[cfg.marketField] = candidate.market || 'A';
+  state.monitorEditor.draft[cfg.currencyField] = candidate.currency || 'CNY';
+  slot.resolved = {
+    name: candidate.name || candidate.code || '',
+    code: candidate.code || '',
+    market: candidate.market || 'A',
+    currency: candidate.currency || 'CNY',
+  };
+  slot.loading = false;
+  slot.error = '';
+  slot.items = [];
+  const input = document.querySelector(`#monitor-editor-form [name="${cfg.fieldName}"]`);
+  if (input) {
+    input.value = candidate.name || candidate.code || '';
+  }
+  updateMonitorLookupUi(role);
+}
+
+function applyMonitorLookupCandidate(role, index) {
+  const slot = getMonitorLookupSlot(role);
+  if (!slot || !Array.isArray(slot.items)) return;
+  const candidate = slot.items[index];
+  if (!candidate) return;
+  applyMonitorResolvedEntity(role, candidate);
+}
+
+async function runMonitorLookup(role, keyword) {
+  const slot = getMonitorLookupSlot(role);
+  const query = String(keyword || '').trim();
+  if (!slot || !query) return;
+
+  const token = (slot.requestToken || 0) + 1;
+  slot.requestToken = token;
+  slot.loading = true;
+  slot.error = '';
+  updateMonitorLookupUi(role);
+
+  try {
+    const endpoint = `${ENDPOINTS.stockSearch}?keyword=${encodeURIComponent(query)}&limit=6`;
+    const payload = await fetchJson(endpoint);
+    if (slot.requestToken !== token) return;
+    const rows = Array.isArray(payload?.data) ? payload.data : [];
+    const ranked = [...rows]
+      .sort((a, b) => scoreMonitorSearchMatch(b, query) - scoreMonitorSearchMatch(a, query))
+      .slice(0, 5)
+      .map((item) => ({
+        name: String(item.name || '').trim(),
+        code: String(item.code || '').trim(),
+        market: String(item.marketType || '').trim().toUpperCase() || 'A',
+        currency: String(item.currency || '').trim().toUpperCase() || 'CNY',
+      }))
+      .filter((item) => item.code);
+
+    slot.loading = false;
+    slot.items = ranked;
+    slot.error = ranked.length ? '' : '未找到明确候选，请继续输入更准确的名称或代码';
+
+    const exact = ranked.find((item) => isExactMonitorSearchMatch(item, query));
+    if (exact) {
+      applyMonitorResolvedEntity(role, exact);
+      return;
+    }
+
+    updateMonitorLookupUi(role);
+  } catch (error) {
+    if (slot.requestToken !== token) return;
+    slot.loading = false;
+    slot.items = [];
+    slot.error = error?.message || '股票检索失败';
+    updateMonitorLookupUi(role);
+  }
+}
+
+function queueMonitorLookup(role, keyword) {
+  const slot = getMonitorLookupSlot(role);
+  if (!slot) return;
+  const query = String(keyword || '').trim();
+  clearMonitorLookupResults(role);
+
+  if (!query) {
+    clearMonitorResolvedEntity(role);
+    updateMonitorLookupUi(role);
+    return;
+  }
+
+  if (slot.resolved && !isSameMonitorEntityInput(query, slot.resolved.name, slot.resolved.code)) {
+    clearMonitorResolvedEntity(role);
+  }
+
+  updateMonitorLookupUi(role);
+  if (query.length < 2 && !/^\d{4,}$/.test(query)) return;
+
+  slot.timer = window.setTimeout(() => {
+    slot.timer = null;
+    void runMonitorLookup(role, query);
+  }, MONITOR_LOOKUP_DEBOUNCE_MS);
 }
 
 async function resolveMonitorEntity(keyword, draft = {}) {
@@ -1959,7 +2220,7 @@ function renderMonitorPanel() {
       <div class="module-toolbar">
         <div>
           <div class="tab-title">监控套利</div>
-          <div class="section-note">新增/编辑表单默认收起，只在需要时弹出；代码、市场、币种等隐藏字段优先自动判断。</div>
+          <div class="section-note">新增/编辑表单默认收起，点击后直接在当前页内向下展开；代码、市场、币种等由股票检索自动判断并显示确认。</div>
         </div>
         <div class="button-row inline">
           <span class="meta-chip">总样本 ${escapeHtml(formatInt(rows.length))}</span>
@@ -1989,62 +2250,80 @@ function renderMonitorEditor() {
   if (!isOpen) return '';
 
   return `
-    <div class="monitor-editor-modal" data-monitor-overlay="1">
-      <div class="list-card monitor-editor-card monitor-editor-dialog">
-        <div class="monitor-editor-head">
-          <div>
-            <h3>${isEditMode ? '编辑监控项目' : '新增监控项目'}</h3>
-            <div class="section-note">只填写核心业务字段；证券代码、市场和币种优先自动识别，已有隐藏参数会在编辑时自动保留。</div>
-          </div>
-          <div class="button-row">
-            <button type="button" class="btn-secondary" data-monitor-action="close-editor" ${state.savingMonitor ? 'disabled' : ''}>关闭</button>
-          </div>
+    <div class="list-card monitor-editor-card monitor-editor-inline" data-monitor-inline-editor="1">
+      <div class="monitor-editor-head">
+        <div>
+          <h3>${isEditMode ? '编辑监控项目' : '新增监控项目'}</h3>
+          <div class="section-note">表单直接在当前页内展开。输入股票简称或代码后会自动检索，并明确显示系统识别到的证券；保存后自动收起。</div>
         </div>
-        <div class="formula-box formula-box-compact">
-          <h3>计算口径</h3>
-          <div class="formula-lines">
-            <div class="formula-line">股票腿理论对价 = 收购方股价 × 已存换股比例 × 安全系数 + 现金对价</div>
-            <div class="formula-line">现金腿收益率 = (现金选择权 - 目标现价) / 目标现价 × 100</div>
-          </div>
+        <div class="button-row">
+          <button type="button" class="btn-secondary" data-monitor-action="close-editor" ${state.savingMonitor ? 'disabled' : ''}>收起</button>
         </div>
-        <form id="monitor-editor-form" class="monitor-editor-form">
-          <input type="hidden" name="id" value="${escapeHtml(draft.id)}" />
-          <div class="monitor-form-grid monitor-form-grid-simple">
-            <div class="input-group">
-              <label for="monitor-acquirer-name">收购方</label>
-              <input id="monitor-acquirer-name" name="acquirerName" type="text" value="${escapeHtml(draft.acquirerName)}" placeholder="例如 中金公司 / 601995" />
-            </div>
-            <div class="input-group">
-              <label for="monitor-target-name">目标方</label>
-              <input id="monitor-target-name" name="targetName" type="text" value="${escapeHtml(draft.targetName)}" placeholder="例如 东兴证券 / 601198 / 02688" />
-            </div>
-            <div class="input-group">
-              <label for="monitor-safety-factor">安全系数</label>
-              <input id="monitor-safety-factor" name="safetyFactor" type="number" min="0" max="1" step="0.0001" value="${escapeHtml(String(draft.safetyFactor ?? 1))}" />
-            </div>
-            <div class="input-group">
-              <label for="monitor-cash-distribution">现金对价</label>
-              <input id="monitor-cash-distribution" name="cashDistribution" type="number" step="0.0001" value="${escapeHtml(String(draft.cashDistribution ?? ''))}" />
-            </div>
-            <div class="input-group">
-              <label for="monitor-cash-distribution-currency">现金对价币种</label>
-              <select id="monitor-cash-distribution-currency" name="cashDistributionCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.cashDistributionCurrency)}</select>
-            </div>
-            <div class="input-group">
-              <label for="monitor-cash-option-price">现金选择权</label>
-              <input id="monitor-cash-option-price" name="cashOptionPrice" type="number" step="0.0001" value="${escapeHtml(String(draft.cashOptionPrice ?? ''))}" />
-            </div>
-            <div class="input-group">
-              <label for="monitor-cash-option-currency">现金选择权币种</label>
-              <select id="monitor-cash-option-currency" name="cashOptionCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.cashOptionCurrency)}</select>
-            </div>
-          </div>
-          <div class="button-row">
-            <button type="submit" class="btn-primary" ${state.savingMonitor ? 'disabled' : ''}>${submitLabel}</button>
-            <button type="button" class="btn-secondary" data-monitor-action="close-editor" ${state.savingMonitor ? 'disabled' : ''}>取消</button>
-          </div>
-        </form>
       </div>
+      <div class="formula-box formula-box-compact">
+        <h3>计算口径</h3>
+        <div class="formula-lines">
+          <div class="formula-line">股票腿理论对价 = 收购方股价 × 换股比例 × 安全系数 + 现金对价</div>
+          <div class="formula-line">现金腿收益率 = (现金选择权 - 目标现价) / 目标现价 × 100</div>
+        </div>
+      </div>
+      <form id="monitor-editor-form" class="monitor-editor-form">
+        <input type="hidden" name="id" value="${escapeHtml(draft.id)}" />
+        <div class="monitor-form-grid monitor-form-grid-simple">
+          <div class="input-group">
+            <label for="monitor-acquirer-name">收购方</label>
+            <input
+              id="monitor-acquirer-name"
+              name="acquirerName"
+              type="text"
+              value="${escapeHtml(draft.acquirerName)}"
+              placeholder="例如 中金公司 / 601995"
+              autocomplete="off"
+            />
+            <div id="monitor-acquirer-lookup" class="monitor-lookup-zone" aria-live="polite">${renderMonitorLookupMarkup('acquirer')}</div>
+          </div>
+          <div class="input-group">
+            <label for="monitor-target-name">目标方</label>
+            <input
+              id="monitor-target-name"
+              name="targetName"
+              type="text"
+              value="${escapeHtml(draft.targetName)}"
+              placeholder="例如 东兴证券 / 601198 / 02688"
+              autocomplete="off"
+            />
+            <div id="monitor-target-lookup" class="monitor-lookup-zone" aria-live="polite">${renderMonitorLookupMarkup('target')}</div>
+          </div>
+          <div class="input-group">
+            <label for="monitor-stock-ratio">换股比例</label>
+            <input id="monitor-stock-ratio" name="stockRatio" type="number" step="0.0001" value="${escapeHtml(String(draft.stockRatio ?? ''))}" placeholder="例如 0.4373" />
+          </div>
+          <div class="input-group">
+            <label for="monitor-safety-factor">安全系数</label>
+            <input id="monitor-safety-factor" name="safetyFactor" type="number" min="0" max="1" step="0.0001" value="${escapeHtml(String(draft.safetyFactor ?? 1))}" />
+          </div>
+          <div class="input-group">
+            <label for="monitor-cash-distribution">现金对价</label>
+            <input id="monitor-cash-distribution" name="cashDistribution" type="number" step="0.0001" value="${escapeHtml(String(draft.cashDistribution ?? ''))}" />
+          </div>
+          <div class="input-group">
+            <label for="monitor-cash-distribution-currency">现金对价币种</label>
+            <select id="monitor-cash-distribution-currency" name="cashDistributionCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.cashDistributionCurrency)}</select>
+          </div>
+          <div class="input-group">
+            <label for="monitor-cash-option-price">现金选择权</label>
+            <input id="monitor-cash-option-price" name="cashOptionPrice" type="number" step="0.0001" value="${escapeHtml(String(draft.cashOptionPrice ?? ''))}" />
+          </div>
+          <div class="input-group">
+            <label for="monitor-cash-option-currency">现金选择权币种</label>
+            <select id="monitor-cash-option-currency" name="cashOptionCurrency">${renderSelectOptions(MONITOR_CURRENCY_OPTIONS, draft.cashOptionCurrency)}</select>
+          </div>
+        </div>
+        <div class="button-row">
+          <button type="submit" class="btn-primary" ${state.savingMonitor ? 'disabled' : ''}>${submitLabel}</button>
+          <button type="button" class="btn-secondary" data-monitor-action="close-editor" ${state.savingMonitor ? 'disabled' : ''}>取消</button>
+        </div>
+      </form>
     </div>
   `;
 }
