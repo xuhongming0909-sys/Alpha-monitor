@@ -208,6 +208,10 @@ data_fetch:
         - 20
         - 60
         - 120
+      atr_window: 20
+      turnover_avg_windows:
+        - 5
+        - 20
       primary_vol_window: 60
       history_lookback_days: 420
       max_vol_sync_workers: 8
@@ -279,7 +283,7 @@ presentation:
     tablet_font_px: 15
     min_width_by_kind:
       subscription: 1180
-      convertible: 2080
+      convertible: 2360
       premium: 1440
       monitor: 1320
       dividend: 1100

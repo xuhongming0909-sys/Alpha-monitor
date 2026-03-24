@@ -1289,3 +1289,15 @@
   - webhook contract
   - summary content selection
   - dashboard push settings fields
+
+## 47. Convertible Underlying ATR + Liquidity Contract (2026-03-25)
+- `转债套利` 主表必须新增以下可见字段：
+  - `正股ATR(近20日)`
+  - `剩余规模(亿)`
+  - `正股近20日平均成交额(亿)`
+  - `正股近5日平均成交额(亿)`
+- 以上字段必须使用真实数据，不允许静态占位值。
+- `remainingSizeYi` 延续现有真实字段语义，但本轮要求进入主表可见区。
+- `stockAtr20` 必须基于正股历史行情真实计算，口径固定为近 `20` 个交易日的 ATR。
+- `stockAvgTurnoverAmount20Yi` 与 `stockAvgTurnoverAmount5Yi` 必须基于正股历史日成交额真实均值计算，并以 `亿` 为展示口径。
+- 新字段仅影响 `cbArb` 数据链路与页面展示，不得牵动 AH / AB / 打新 / 推送功能。

@@ -92,3 +92,14 @@ creating new dashboard-only APIs.
   presentation-layer mappings.
 - If an endpoint payload must change, the change must preserve ownership:
   strategy/data-fetch produce business meaning, presentation only shapes display.
+
+### `GET /api/market/convertible-bond-arbitrage` field additions (2026-03-25)
+
+- The public row contract now additionally allows:
+  - `stockAtr20`
+  - `remainingSizeYi`
+  - `stockAvgTurnoverAmount20Yi`
+  - `stockAvgTurnoverAmount5Yi`
+- Required dashboard behavior:
+  - render these as visible main-table columns for the convertible-bond list
+  - preserve `亿` as the turnover/remaining-size display unit

@@ -36,6 +36,17 @@ def connect() -> sqlite3.Connection:
     return conn
 
 
+def _ensure_column(conn: sqlite3.Connection, table_name: str, column_name: str, column_sql: str) -> None:
+    # 历史库采用增量迁移，避免已有云端数据库因新增字段被重建或丢数。
+    existing = {
+        str(row["name"])
+        for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    }
+    if column_name in existing:
+        return
+    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_sql}")
+
+
 def init_db() -> None:
     with connect() as conn:
         conn.executescript(
@@ -47,6 +58,9 @@ def init_db() -> None:
                 symbol TEXT NOT NULL,
                 trade_date TEXT NOT NULL,
                 close_hfq REAL NOT NULL,
+                high_hfq REAL,
+                low_hfq REAL,
+                amount_yuan REAL,
                 source TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -71,6 +85,9 @@ def init_db() -> None:
             );
             """
         )
+        _ensure_column(conn, "stock_price_history", "high_hfq", "REAL")
+        _ensure_column(conn, "stock_price_history", "low_hfq", "REAL")
+        _ensure_column(conn, "stock_price_history", "amount_yuan", "REAL")
 
 
 def upsert_price_rows(symbol: str, rows: Iterable[Dict], source: str) -> int:
@@ -90,7 +107,38 @@ def upsert_price_rows(symbol: str, rows: Iterable[Dict], source: str) -> int:
             continue
         if close_hfq <= 0:
             continue
-        prepared.append({"date": trade_date, "close": close_hfq})
+        high_hfq = row.get("high")
+        low_hfq = row.get("low")
+        amount_yuan = row.get("amount")
+
+        try:
+            high_hfq = float(high_hfq) if high_hfq is not None else None
+        except (TypeError, ValueError):
+            high_hfq = None
+        if high_hfq is not None and high_hfq <= 0:
+            high_hfq = None
+
+        try:
+            low_hfq = float(low_hfq) if low_hfq is not None else None
+        except (TypeError, ValueError):
+            low_hfq = None
+        if low_hfq is not None and low_hfq <= 0:
+            low_hfq = None
+
+        try:
+            amount_yuan = float(amount_yuan) if amount_yuan is not None else None
+        except (TypeError, ValueError):
+            amount_yuan = None
+        if amount_yuan is not None and amount_yuan < 0:
+            amount_yuan = None
+
+        prepared.append({
+            "date": trade_date,
+            "close": close_hfq,
+            "high": high_hfq,
+            "low": low_hfq,
+            "amount": amount_yuan,
+        })
 
     if not prepared:
         return 0
@@ -101,14 +149,27 @@ def upsert_price_rows(symbol: str, rows: Iterable[Dict], source: str) -> int:
         for item in prepared:
             conn.execute(
                 """
-                INSERT INTO stock_price_history(symbol, trade_date, close_hfq, source, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO stock_price_history(symbol, trade_date, close_hfq, high_hfq, low_hfq, amount_yuan, source, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(symbol, trade_date) DO UPDATE SET
                     close_hfq = excluded.close_hfq,
+                    high_hfq = COALESCE(excluded.high_hfq, stock_price_history.high_hfq),
+                    low_hfq = COALESCE(excluded.low_hfq, stock_price_history.low_hfq),
+                    amount_yuan = COALESCE(excluded.amount_yuan, stock_price_history.amount_yuan),
                     source = excluded.source,
                     updated_at = excluded.updated_at
                 """,
-                (normalized_symbol, item["date"], float(item["close"]), source, ts, ts),
+                (
+                    normalized_symbol,
+                    item["date"],
+                    float(item["close"]),
+                    item["high"],
+                    item["low"],
+                    item["amount"],
+                    source,
+                    ts,
+                    ts,
+                ),
             )
         conn.execute(
             """
@@ -142,6 +203,35 @@ def load_recent_closes(symbol: str, min_rows: int = 121) -> List[float]:
     values = [float(row["close_hfq"]) for row in rows]
     values.reverse()
     return values
+
+
+def load_recent_bars(symbol: str, min_rows: int = 121) -> List[Dict[str, Optional[float]]]:
+    normalized_symbol = str(symbol or "").strip()
+    if not normalized_symbol:
+        return []
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT trade_date, close_hfq, high_hfq, low_hfq, amount_yuan
+            FROM stock_price_history
+            WHERE symbol = ?
+            ORDER BY trade_date DESC
+            LIMIT ?
+            """,
+            (normalized_symbol, max(1, int(min_rows))),
+        ).fetchall()
+    items = [
+        {
+            "date": str(row["trade_date"]),
+            "close": float(row["close_hfq"]) if row["close_hfq"] is not None else None,
+            "high": float(row["high_hfq"]) if row["high_hfq"] is not None else None,
+            "low": float(row["low_hfq"]) if row["low_hfq"] is not None else None,
+            "amount": float(row["amount_yuan"]) if row["amount_yuan"] is not None else None,
+        }
+        for row in rows
+    ]
+    items.reverse()
+    return items
 
 
 def get_last_trade_date(symbol: str) -> Optional[str]:

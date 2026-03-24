@@ -1323,3 +1323,30 @@ Acceptance:
 - Future scheduled times accidentally present in runtime state are pruned instead of being trusted.
 - Scheduler logs clearly show slot attempt / success / failure context in `journalctl -u alpha-monitor`.
 - Manual push remains available and does not falsely mark scheduled slots as already delivered.
+
+## 41. Phase AM: Convertible Underlying ATR + Liquidity Fields (2026-03-25)
+
+Goal: add four real-data fields to the convertible-bond main list so the user can directly judge underlying volatility and liquidity without opening other pages: `正股ATR(近20日)`、`剩余规模(亿)`、`正股近20日平均成交额(亿)`、`正股近5日平均成交额(亿)`.
+
+Plan:
+1. Keep this round narrow and cb-arb-only:
+   - no push behavior change
+   - no AH / AB / subscription route change
+   - no theoretical-price formula change
+2. Extend the underlying-stock history authority so the local history store can hold the real fields needed for ATR and turnover averages:
+   - HFQ close
+   - HFQ high
+   - HFQ low
+   - daily成交额
+3. Use the same underlying-stock history chain to calculate:
+   - `stockAtr20`
+   - `stockAvgTurnoverAmount20Yi`
+   - `stockAvgTurnoverAmount5Yi`
+4. Keep `remainingSizeYi` as the existing real-data field, but move it into the visible convertible main table instead of leaving it only in the secondary info area.
+5. Extend the public cb-arb payload contract and dashboard columns together.
+6. Verify with a live sample row that the new fields appear in `/api/market/convertible-bond-arbitrage` and on the page.
+
+Acceptance:
+- The convertible-bond main table visibly adds `正股ATR(近20日)`、`剩余规模(亿)`、`正股近20日平均成交额(亿)`、`正股近5日平均成交额(亿)`.
+- New ATR / average-turnover fields come from real underlying-stock history data rather than placeholders.
+- Existing volatility / premium / theoretical-price fields remain unchanged.

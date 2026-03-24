@@ -2358,3 +2358,37 @@ GitHub 自动部署正式链路固定为：
   - each slot success
   - each slot failure with error message
 - Log lines must include enough context to identify date and slot from `journalctl -u alpha-monitor`.
+
+## 37. Convertible Underlying ATR + Liquidity Spec (2026-03-25)
+
+### 37.1 Scope
+- This round changes only the convertible-bond history-support fields, cb-arb payload shaping, and cb-arb table rendering.
+- No push rule, AH/AB payload, or theoretical-pricing formula change is included.
+
+### 37.2 History-store rule
+- The local `stock_price_history.db` authority for convertible underlyings must support at least:
+  - `close_hfq`
+  - `high_hfq`
+  - `low_hfq`
+  - `amount_yuan`
+- Existing rows without the new columns are allowed and must be forward-compatible through additive schema migration.
+
+### 37.3 ATR rule
+- `stockAtr20` uses the latest `20` true-range samples.
+- True range for each day is:
+  - `max(high-low, abs(high-prev_close), abs(low-prev_close))`
+- Therefore ATR20 requires at least `21` sequential bars with valid close/high/low values.
+- Output unit remains the underlying-stock price unit, not a percentage.
+
+### 37.4 Turnover-average rule
+- `stockAvgTurnoverAmount20Yi` uses the latest `20` valid daily成交额 samples.
+- `stockAvgTurnoverAmount5Yi` uses the latest `5` valid daily成交额 samples.
+- Stored source unit is yuan; outward payload unit is `亿`.
+
+### 37.5 Public payload rule
+- Public `cbArb` rows must additionally preserve:
+  - `stockAtr20`
+  - `stockAvgTurnoverAmount20Yi`
+  - `stockAvgTurnoverAmount5Yi`
+  - `remainingSizeYi`
+- Dashboard column rendering must expose the same fields in the main table.

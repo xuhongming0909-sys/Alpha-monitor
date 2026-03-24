@@ -1012,6 +1012,9 @@ const CB_ARB_PUBLIC_ROW_KEYS = [
   'changePercent',
   'stockPrice',
   'stockChangePercent',
+  'stockAtr20',
+  'stockAvgTurnoverAmount20Yi',
+  'stockAvgTurnoverAmount5Yi',
   'stockAvgRoe3Y',
   'stockDebtRatio',
   'convertPrice',
@@ -1146,7 +1149,11 @@ function isCbArbSchemaReady(result) {
 
   const volatilityCount = rows.filter((item) => Number.isFinite(Number(item?.volatility60))).length;
   const volatilityCoverage = volatilityCount / rows.length;
-  return volatilityCoverage >= 0.55;
+  if (volatilityCoverage < 0.55) return false;
+
+  const atrCount = rows.filter((item) => Number.isFinite(Number(item?.stockAtr20))).length;
+  const turnoverCount = rows.filter((item) => Number.isFinite(Number(item?.stockAvgTurnoverAmount20Yi))).length;
+  return (atrCount / rows.length) >= 0.45 && (turnoverCount / rows.length) >= 0.45;
 }
 
 function normalizeComparableName(value) {

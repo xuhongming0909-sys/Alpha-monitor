@@ -20,16 +20,25 @@ import numpy as np
 import pandas as pd
 import requests
 import stock_price_history_db as price_db
+from shared.config.script_config import get_config
 
-VOL_WINDOWS = (20, 60, 120)
-TRADING_DAYS_PER_YEAR = 252
-PRIMARY_VOL_WINDOW = 60
-HISTORY_LOOKBACK_DAYS = 420
-MAX_VOL_SYNC_WORKERS = 8
-REQUIRED_CLOSE_ROWS = max(VOL_WINDOWS) + 1
-MAX_FINANCIAL_WORKERS = 10
-INLINE_HISTORY_HYDRATE_LIMIT = 24
 ROOT = Path(__file__).resolve().parents[2]
+_CONFIG = get_config()
+_CB_FETCH_CONFIG = (((_CONFIG.get("data_fetch") or {}).get("plugins") or {}).get("convertible_bond") or {})
+
+VOL_WINDOWS = tuple(_CB_FETCH_CONFIG.get("volatility_windows") or (20, 60, 120))
+TRADING_DAYS_PER_YEAR = max(1, int(_CB_FETCH_CONFIG.get("trading_days_per_year") or 252))
+PRIMARY_VOL_WINDOW = max(1, int(_CB_FETCH_CONFIG.get("primary_vol_window") or 60))
+ATR_WINDOW = max(1, int(_CB_FETCH_CONFIG.get("atr_window") or 20))
+TURNOVER_AVG_WINDOWS = tuple(
+    sorted({max(1, int(item)) for item in (_CB_FETCH_CONFIG.get("turnover_avg_windows") or [5, 20])})
+) or (5, 20)
+HISTORY_LOOKBACK_DAYS = max(120, int(_CB_FETCH_CONFIG.get("history_lookback_days") or 420))
+MAX_VOL_SYNC_WORKERS = max(1, int(_CB_FETCH_CONFIG.get("max_vol_sync_workers") or 8))
+REQUIRED_CLOSE_ROWS = max(VOL_WINDOWS) + 1
+REQUIRED_HISTORY_BAR_ROWS = max(REQUIRED_CLOSE_ROWS, ATR_WINDOW + 1, max(TURNOVER_AVG_WINDOWS))
+MAX_FINANCIAL_WORKERS = max(1, int(_CB_FETCH_CONFIG.get("max_financial_workers") or 10))
+INLINE_HISTORY_HYDRATE_LIMIT = max(1, int(_CB_FETCH_CONFIG.get("inline_history_hydrate_limit") or 24))
 
 
 def _is_null(value: Any) -> bool:
@@ -142,12 +151,15 @@ def _to_tx_symbol(stock_code: str) -> str:
     return f"{market}{code}"
 
 
-def _extract_hfq_rows(frame: pd.DataFrame) -> list[Dict[str, Any]]:
+def _extract_hfq_rows(frame: pd.DataFrame, *, include_amount: bool) -> list[Dict[str, Any]]:
     if frame is None or frame.empty:
         return []
 
     date_col = next((name for name in ("\u65e5\u671f", "date") if name in frame.columns), None)
     close_col = next((name for name in ("\u6536\u76d8", "close") if name in frame.columns), None)
+    high_col = next((name for name in ("\u6700\u9ad8", "high") if name in frame.columns), None)
+    low_col = next((name for name in ("\u6700\u4f4e", "low") if name in frame.columns), None)
+    amount_col = next((name for name in ("\u6210\u4ea4\u989d", "amount") if name in frame.columns), None)
     if not date_col or not close_col:
         return []
 
@@ -157,11 +169,33 @@ def _extract_hfq_rows(frame: pd.DataFrame) -> list[Dict[str, Any]]:
         close = _to_float(record.get(close_col))
         if pd.isna(trade_date) or close is None or close <= 0:
             continue
-        rows.append({"date": trade_date.date().isoformat(), "close": close})
+        high = _to_positive_float(record.get(high_col)) if high_col else None
+        low = _to_positive_float(record.get(low_col)) if low_col else None
+        amount = _to_float(record.get(amount_col)) if amount_col and include_amount else None
+        rows.append({
+            "date": trade_date.date().isoformat(),
+            "close": close,
+            "high": high,
+            "low": low,
+            "amount": amount if amount is not None and amount >= 0 else None,
+        })
     return rows
 
 
 def _fetch_stock_hfq_rows(symbol: str, start_date: str, end_date: str) -> list[Dict[str, Any]]:
+    try:
+        frame = ak.stock_zh_a_daily(
+            symbol=_to_tx_symbol(symbol),
+            start_date=start_date,
+            end_date=end_date,
+            adjust="hfq",
+        )
+        rows = _extract_hfq_rows(frame, include_amount=True)
+        if rows:
+            return rows
+    except Exception:
+        pass
+
     try:
         frame = ak.stock_zh_a_hist_tx(
             symbol=_to_tx_symbol(symbol),
@@ -169,7 +203,7 @@ def _fetch_stock_hfq_rows(symbol: str, start_date: str, end_date: str) -> list[D
             end_date=end_date,
             adjust="hfq",
         )
-        rows = _extract_hfq_rows(frame)
+        rows = _extract_hfq_rows(frame, include_amount=False)
         if rows:
             return rows
     except Exception:
@@ -183,7 +217,7 @@ def _fetch_stock_hfq_rows(symbol: str, start_date: str, end_date: str) -> list[D
             end_date=end_date,
             adjust="hfq",
         )
-        return _extract_hfq_rows(frame)
+        return _extract_hfq_rows(frame, include_amount=True)
     except Exception:
         return []
 
@@ -193,8 +227,8 @@ def _sync_stock_history_if_needed(symbol: str) -> Dict[str, Any]:
     if not code:
         return {"symbol": code, "synced": False, "rows": 0}
 
-    existing = price_db.load_recent_closes(code, REQUIRED_CLOSE_ROWS)
-    if len(existing) >= REQUIRED_CLOSE_ROWS:
+    existing_metrics = _calc_stock_history_metrics(code)
+    if _metrics_ready(existing_metrics):
         return {"symbol": code, "synced": False, "rows": 0}
 
     end_date = datetime.now().strftime("%Y%m%d")
@@ -910,6 +944,85 @@ def _metrics_ready(metrics: Dict[str, Any]) -> bool:
     return _to_float(metrics.get(f"volatility{PRIMARY_VOL_WINDOW}")) is not None
 
 
+def _calc_stock_history_metrics(stock_code: str) -> Dict[str, Optional[float]]:
+    # 统一从正股历史库读取波动率 / ATR / 均成交额，避免页面字段各走各的临时口径。
+    symbol = str(stock_code or "").strip()
+    metrics: Dict[str, Optional[float]] = {
+        "stockAtr20": None,
+        "stockAvgTurnoverAmount20Yi": None,
+        "stockAvgTurnoverAmount5Yi": None,
+    }
+    for window in VOL_WINDOWS:
+        metrics[f"volatility{window}"] = None
+
+    if not symbol:
+        return metrics
+
+    bars = price_db.load_recent_bars(symbol, REQUIRED_HISTORY_BAR_ROWS)
+    close_series = pd.Series(
+        [item.get("close") for item in bars if _to_float(item.get("close")) is not None],
+        dtype="float64",
+    )
+
+    if len(close_series) >= 2:
+        returns = np.log(close_series / close_series.shift(1)).dropna()
+        for window in VOL_WINDOWS:
+            key = f"volatility{window}"
+            required_returns = max(2, window)
+            if len(returns) < required_returns:
+                continue
+            sample = returns.tail(required_returns)
+            std = float(sample.std(ddof=1)) if len(sample) > 1 else 0.0
+            metrics[key] = std * math.sqrt(TRADING_DAYS_PER_YEAR)
+
+    rich_bars = [
+        {
+            "close": _to_float(item.get("close")),
+            "high": _to_float(item.get("high")),
+            "low": _to_float(item.get("low")),
+            "amount": _to_float(item.get("amount")),
+        }
+        for item in bars
+        if _to_float(item.get("close")) is not None
+    ]
+
+    true_ranges: list[float] = []
+    prev_close: Optional[float] = None
+    for item in rich_bars:
+        close = item["close"]
+        high = item["high"]
+        low = item["low"]
+        if high is not None and low is not None:
+            if prev_close is None:
+                true_ranges.append(high - low)
+            else:
+                true_ranges.append(max(high - low, abs(high - prev_close), abs(low - prev_close)))
+        prev_close = close
+    if len(true_ranges) >= ATR_WINDOW:
+        metrics["stockAtr20"] = float(sum(true_ranges[-ATR_WINDOW:]) / ATR_WINDOW)
+
+    valid_amounts = [item["amount"] for item in rich_bars if item["amount"] is not None]
+    if len(valid_amounts) >= 20:
+        metrics["stockAvgTurnoverAmount20Yi"] = float(sum(valid_amounts[-20:]) / 20 / 1e8)
+    if len(valid_amounts) >= 5:
+        metrics["stockAvgTurnoverAmount5Yi"] = float(sum(valid_amounts[-5:]) / 5 / 1e8)
+    return metrics
+
+
+def _metrics_ready(metrics: Dict[str, Any]) -> bool:
+    if not isinstance(metrics, dict):
+        return False
+    if _to_float(metrics.get(f"volatility{PRIMARY_VOL_WINDOW}")) is None:
+        return False
+    if _to_float(metrics.get("stockAtr20")) is None:
+        return False
+    if _to_float(metrics.get("stockAvgTurnoverAmount20Yi")) is None:
+        return False
+    if _to_float(metrics.get("stockAvgTurnoverAmount5Yi")) is None:
+        return False
+    return True
+
+
 def _get_risk_free_rate() -> Dict[str, Any]:
     df = ak.bond_gb_zh_sina()
     if df is None or df.empty:
@@ -1146,6 +1259,9 @@ def get_bond_cb_data() -> Dict[str, Any]:
             "remainingSizeYi": remaining_size_from_quote,
             "turnoverAmountYi": turnover_amount_yi,
             "turnoverRate": None,
+            "stockAtr20": None,
+            "stockAvgTurnoverAmount20Yi": None,
+            "stockAvgTurnoverAmount5Yi": None,
             "yieldToMaturityPretax": None,
             "doubleLow": double_low,
             "stockAvgRoe3Y": None,
@@ -1398,7 +1514,7 @@ def get_bond_cb_data() -> Dict[str, Any]:
             _hydrate_stock_history_for_symbols(unique_missing_stocks)
         with ThreadPoolExecutor(max_workers=min(MAX_VOL_SYNC_WORKERS, max(1, len(unique_missing_stocks)))) as executor:
             future_map = {
-                executor.submit(_calc_volatility_metrics, code): code
+                executor.submit(_calc_stock_history_metrics, code): code
                 for code in unique_missing_stocks
             }
             for future in as_completed(future_map):
@@ -1406,7 +1522,14 @@ def get_bond_cb_data() -> Dict[str, Any]:
                 try:
                     metrics = future.result()
                 except Exception:
-                    metrics = {"volatility20": None, "volatility60": None, "volatility120": None}
+                    metrics = {
+                        "volatility20": None,
+                        "volatility60": None,
+                        "volatility120": None,
+                        "stockAtr20": None,
+                        "stockAvgTurnoverAmount20Yi": None,
+                        "stockAvgTurnoverAmount5Yi": None,
+                    }
                 vol_cache_items[code] = metrics
 
         for row in rows:
