@@ -7,6 +7,7 @@
 function createPushRuntimeStore(options = {}) {
   const state = options.state || {};
   const save = typeof options.save === "function" ? options.save : () => state;
+  const SHANGHAI_TIME_ZONE = "Asia/Shanghai";
   const parsePushMinutes = options.parsePushMinutes || ((value) => {
     const [h, m] = String(value || "").split(":").map((item) => Number(item));
     if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
@@ -14,6 +15,15 @@ function createPushRuntimeStore(options = {}) {
     return h * 60 + m;
   });
   const nowIso = typeof options.nowIso === "function" ? options.nowIso : () => new Date().toISOString();
+  const shanghaiFormatter = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: SHANGHAI_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 
   function normalizePushTimes(items) {
     return Array.from(new Set(
@@ -42,6 +52,60 @@ function createPushRuntimeStore(options = {}) {
     state.mainPushRecords = Object.fromEntries(
       keepDates.map((item) => [item, records[item]])
     );
+  }
+
+  function getPushSuccessIso(recordType) {
+    if (recordType === "event_alert") {
+      return state.lastEventAlertSuccessAt || null;
+    }
+    return state.lastMainPushSuccessAt || null;
+  }
+
+  function getShanghaiPartsFromIso(isoText) {
+    const timestamp = Date.parse(String(isoText || "").trim());
+    if (!Number.isFinite(timestamp)) return null;
+    const parts = Object.fromEntries(
+      shanghaiFormatter
+        .formatToParts(new Date(timestamp))
+        .filter((item) => item.type !== "literal")
+        .map((item) => [item.type, item.value])
+    );
+    const hour = Number(parts.hour);
+    const minute = Number(parts.minute);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    return {
+      date: `${parts.year}-${parts.month}-${parts.day}`,
+      hour,
+      minute,
+      minutes: hour * 60 + minute,
+    };
+  }
+
+  function sanitizeScheduledPushRecord(recordType, dateText, scheduleTimes) {
+    const date = String(dateText || "").trim();
+    if (!date) {
+      return { times: [], changed: false };
+    }
+
+    const existing = getPushRecord(recordType, date);
+    const allowedTimes = new Set(normalizePushTimes(scheduleTimes));
+    let next = existing.filter((item) => allowedTimes.has(item));
+
+    const today = getShanghaiPartsFromIso(nowIso())?.date || null;
+    const latestSuccess = getShanghaiPartsFromIso(getPushSuccessIso(recordType));
+    if (today && date === today) {
+      if (latestSuccess?.date === today) {
+        next = next.filter((item) => (parsePushMinutes(item) ?? Number.POSITIVE_INFINITY) <= latestSuccess.minutes);
+      } else {
+        next = [];
+      }
+    }
+
+    const changed = next.length !== existing.length || next.some((item, index) => item !== existing[index]);
+    if (changed) {
+      setPushRecord(recordType, date, next);
+    }
+    return { times: next, changed };
   }
 
   function setPushAttempt(recordType, isoText) {
@@ -216,6 +280,9 @@ function createPushRuntimeStore(options = {}) {
     getPushRecordMap,
     getPushRecord,
     setPushRecord,
+    getPushSuccessIso,
+    getShanghaiPartsFromIso,
+    sanitizeScheduledPushRecord,
     setPushAttempt,
     setPushSuccess,
     setPushError,

@@ -1262,3 +1262,30 @@
   - volatility sorting basis
   - volatility calculation logic
   - theoretical-price formulas
+
+## 46. Scheduled Push Truth Recovery Contract (2026-03-24)
+- Cloud scheduled push must not treat persisted slot text alone as authoritative proof of delivery.
+- For the current Shanghai date, a scheduled slot may suppress re-send only when both conditions are true:
+  - the slot exists in the active configured schedule
+  - the latest same-day scheduled-push success time proves that this slot is not later than the latest successful delivery point
+- Dirty persisted records that point to:
+  - future slots
+  - removed schedule slots
+  - same-day slots later than the latest successful delivery time
+  must be pruned before scheduled due-slot judgment.
+- Scheduled push success semantics remain strict:
+  - downstream WeCom success is still required before a slot is recorded as sent
+  - failed slots must remain retryable on later scheduler ticks
+- The scheduler must emit live server logs that make scheduled-push diagnosis possible, including:
+  - schedule date
+  - evaluated slot
+  - attempt start
+  - success
+  - failure reason
+- Manual push and scheduled push remain separate:
+  - manual push may update the latest push success metadata
+  - manual push must not automatically mark configured scheduled slots as delivered
+- This round does not change:
+  - webhook contract
+  - summary content selection
+  - dashboard push settings fields

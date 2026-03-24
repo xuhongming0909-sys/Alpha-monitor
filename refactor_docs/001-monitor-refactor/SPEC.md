@@ -2322,3 +2322,39 @@ GitHub 自动部署正式链路固定为：
 - This rule applies to:
   - the convertible-bond `60日波动率` table column
   - the bottom real-example note built from the same row payload
+
+## 36. Scheduled Push Truth Recovery Spec (2026-03-24)
+
+### 36.1 Scope
+- This round only changes push-scheduler runtime-state trust and scheduler observability.
+- No summary module composition, route shape, or notification channel contract changes are included.
+
+### 36.2 Current-day slot trust rule
+- `mainPushRecords[date]` remains a persisted helper record, not the sole source of truth.
+- During scheduled evaluation for the current Shanghai date:
+  - the runtime layer must first intersect persisted slots with the active configured schedule
+  - then prune any slot whose scheduled minute is later than the latest same-day scheduled-push success minute
+- If no latest same-day success timestamp exists, current-day persisted scheduled slots are treated as untrusted and must not suppress due sends.
+
+### 36.3 Self-healing persistence rule
+- When the runtime layer prunes dirty scheduled slots for the current date, it must persist the cleaned record back into `push_runtime_state.json`.
+- Self-healing only affects the scheduler's own scheduled-slot record storage.
+- Event-alert cooldown records and event-arbitrage seen caches are not touched.
+
+### 36.4 Success / retry rule
+- `setPushAttempt('main', ...)` may run before downstream delivery.
+- `setPushRecord('main', date, [slot...])` and `setPushSuccess('main', ...)` still run only after `pushByModulesToWeCom()` resolves successfully.
+- On downstream failure:
+  - `lastMainPushError` is updated
+  - the scheduled slot stays absent from the sent-slot record
+  - the next scheduler tick may retry the same slot
+
+### 36.5 Scheduler logging rule
+- The scheduler must log at least:
+  - normalized schedule list for the current tick
+  - each slot that is skipped because it is not due yet
+  - each slot skipped because it is already truthfully sent
+  - each slot attempt
+  - each slot success
+  - each slot failure with error message
+- Log lines must include enough context to identify date and slot from `journalctl -u alpha-monitor`.

@@ -1290,3 +1290,36 @@ Acceptance:
 - The convertible-bond table no longer shows ratio-form volatility as `0.xx%`.
 - The bottom real example note uses the correct human-readable volatility percentage.
 - Existing volatility sort order and theoretical-price calculation remain unchanged.
+
+## 40. Phase AL: Scheduled Push Truth Recovery (2026-03-24)
+
+Goal: repair the scheduled WeCom push chain so a dirty runtime-state record cannot suppress a due cloud push, and make future diagnosis possible through truthful runtime status and explicit scheduler logs.
+
+Plan:
+1. Keep this round narrow and push-only:
+   - no summary module content change
+   - no dashboard route shape change
+   - no market-data formula change
+2. Harden the scheduled-slot trust rule:
+   - scheduled push must no longer trust raw `mainPushRecords` blindly
+   - for the current Shanghai date, recorded scheduled slots are only trusted when they are part of the active schedule and are backed by the latest same-day success timestamp
+   - stale or impossible future slots in runtime state must be pruned before due-slot judgment
+3. Preserve the existing success boundary:
+   - a slot is marked sent only after downstream WeCom delivery succeeds
+   - failed sends remain retryable on later scheduler ticks
+4. Add explicit scheduler observability:
+   - log when a scheduled slot is evaluated, skipped because it is not due yet, skipped because it is already truthfully sent, attempted, succeeded, or failed
+   - log enough slot/date context to diagnose future `08:00`-style misses from `journalctl`
+5. Keep the repair cloud-safe:
+   - runtime-state self-healing may rewrite only the push scheduler's own persisted state
+   - no reset of unrelated event-alert or dataset caches
+6. After implementation:
+   - verify locally with a dirty-state example where `mainPushRecords` already contains `08:00` but the latest success time is before `08:00`
+   - deploy to the cloud server
+   - verify health and push config status from the live public API
+
+Acceptance:
+- A current-day stale `mainPushRecords` entry such as `08:00` no longer suppresses the real `08:00` scheduled push when the latest same-day success time is earlier than `08:00`.
+- Future scheduled times accidentally present in runtime state are pruned instead of being trusted.
+- Scheduler logs clearly show slot attempt / success / failure context in `journalctl -u alpha-monitor`.
+- Manual push remains available and does not falsely mark scheduled slots as already delivered.

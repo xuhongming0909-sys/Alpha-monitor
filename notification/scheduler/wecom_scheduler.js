@@ -17,6 +17,7 @@ function createWeComScheduler(options = {}) {
     ? options.isTradingSession
     : () => true;
   const logError = options.logError || ((scope, error) => console.error(scope, error));
+  const logInfo = options.logInfo || ((message) => console.info(message));
   const nowIso = typeof options.nowIso === "function"
     ? options.nowIso
     : () => new Date().toISOString();
@@ -41,17 +42,34 @@ function createWeComScheduler(options = {}) {
     )).sort((a, b) => (parsePushMinutes(a) ?? 0) - (parsePushMinutes(b) ?? 0));
     if (!scheduleTimes.length) return;
 
-    const sentTimes = runtimeStore.getPushRecord("main", sh.date);
+    const sanitized = runtimeStore.sanitizeScheduledPushRecord("main", sh.date, scheduleTimes);
+    const sentTimes = sanitized.times.slice();
     const nowMinutes = sh.hour * 60 + sh.minute;
     let updated = false;
+
+    if (sanitized.changed) {
+      runtimeStore.save();
+      logInfo(`[push][main] sanitized dirty scheduled records date=${sh.date} kept=${sentTimes.join(",") || "none"}`);
+    }
+
+    logInfo(
+      `[push][main] evaluating date=${sh.date} now=${String(sh.hour).padStart(2, "0")}:${String(sh.minute).padStart(2, "0")} schedule=${scheduleTimes.join(",") || "none"} sent=${sentTimes.join(",") || "none"}`
+    );
 
     for (const timeText of scheduleTimes) {
       const targetMinutes = parsePushMinutes(timeText);
       if (targetMinutes === null) continue;
-      if (nowMinutes < targetMinutes) continue;
-      if (sentTimes.includes(timeText)) continue;
+      if (nowMinutes < targetMinutes) {
+        logInfo(`[push][main] slot=${timeText} date=${sh.date} skipped=not_due_yet`);
+        continue;
+      }
+      if (sentTimes.includes(timeText)) {
+        logInfo(`[push][main] slot=${timeText} date=${sh.date} skipped=already_sent`);
+        continue;
+      }
       const attemptAt = nowIso();
       runtimeStore.setPushAttempt("main", attemptAt);
+      logInfo(`[push][main] slot=${timeText} date=${sh.date} action=attempt at=${attemptAt}`);
       try {
         await pushByModulesToWeCom({ modules: config.modules });
         sentTimes.push(timeText);
@@ -59,9 +77,11 @@ function createWeComScheduler(options = {}) {
         runtimeStore.setPushRecord("main", sh.date, sentTimes);
         runtimeStore.setPushSuccess("main", attemptAt, sh.date);
         runtimeStore.save();
+        logInfo(`[push][main] slot=${timeText} date=${sh.date} action=success at=${attemptAt}`);
       } catch (error) {
         runtimeStore.setPushError("main", error?.message || error);
         runtimeStore.save();
+        logInfo(`[push][main] slot=${timeText} date=${sh.date} action=failed at=${attemptAt} error=${error?.message || error}`);
         logError("[push] main schedule failed:", error?.message || error);
       }
     }
