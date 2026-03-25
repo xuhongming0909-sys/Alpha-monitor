@@ -6,6 +6,10 @@ function topN(rows, count, compareFn) {
   return [...rows].sort(compareFn).slice(0, count);
 }
 
+function toNum(value) {
+  return Number.isFinite(Number(value)) ? Number(value) : null;
+}
+
 function pctText(value, digits = 2) {
   const num = Number(value);
   if (!Number.isFinite(num)) return "--";
@@ -65,6 +69,311 @@ function normalizeComparableDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
 }
 
+const DEFAULT_ATR_ANCHORS = [
+  { x: 0, y: 0 },
+  { x: 0.25, y: 0.5 },
+  { x: 0.5, y: 0.8 },
+  { x: 1, y: 1 },
+];
+
+const DEFAULT_SELL_PRESSURE_ANCHORS = [
+  { x: 0.5, y: 1 },
+  { x: 1, y: 0.8 },
+  { x: 5, y: 0.5 },
+  { x: 20, y: 0 },
+];
+
+const DEFAULT_BOARD_COEFFICIENTS = {
+  科创板: 1,
+  创业板: 0.85,
+  主板: 0.8,
+};
+
+/**
+ * 折价策略的锚点必须来自明确数值，避免页面、推送、调度各自兜底。
+ */
+function normalizeAnchorPoints(points, fallback) {
+  const source = Array.isArray(points) && points.length ? points : fallback;
+  const normalized = source
+    .map((item) => ({
+      x: toNum(item?.x),
+      y: toNum(item?.y),
+    }))
+    .filter((item) => item.x !== null && item.y !== null)
+    .sort((a, b) => a.x - b.x);
+  return normalized.length >= 2 ? normalized : fallback;
+}
+
+function interpolateByAnchors(value, points, fallbackPoints) {
+  const num = toNum(value);
+  const anchors = normalizeAnchorPoints(points, fallbackPoints);
+  if (num === null) return null;
+  if (num <= anchors[0].x) return anchors[0].y;
+
+  for (let index = 1; index < anchors.length; index += 1) {
+    const left = anchors[index - 1];
+    const right = anchors[index];
+    if (num <= right.x) {
+      if (right.x === left.x) return right.y;
+      const ratio = (num - left.x) / (right.x - left.x);
+      return left.y + ((right.y - left.y) * ratio);
+    }
+  }
+
+  return anchors[anchors.length - 1].y;
+}
+
+function normalizeBoardCoefficients(input = {}) {
+  return {
+    科创板: toNum(input.科创板) ?? DEFAULT_BOARD_COEFFICIENTS.科创板,
+    创业板: toNum(input.创业板) ?? DEFAULT_BOARD_COEFFICIENTS.创业板,
+    主板: toNum(input.主板) ?? DEFAULT_BOARD_COEFFICIENTS.主板,
+  };
+}
+
+function normalizeBoardType(stockCode) {
+  const code = String(stockCode || "").trim();
+  if (code.startsWith("688")) return "科创板";
+  if (code.startsWith("300") || code.startsWith("301")) return "创业板";
+  return "主板";
+}
+
+function hasPassedConvertStart(row) {
+  const text = String(row?.convertStartDate || row?.convertStartDateTime || "").trim();
+  if (!text) return false;
+  const timestamp = Date.parse(text);
+  return Number.isFinite(timestamp) ? timestamp <= Date.now() : false;
+}
+
+function compareDiscountMonitorRows(a, b) {
+  const compareDesc = (left, right) => {
+    const aValue = toNum(left);
+    const bValue = toNum(right);
+    if (aValue === null && bValue === null) return 0;
+    if (aValue === null) return 1;
+    if (bValue === null) return -1;
+    return bValue - aValue;
+  };
+
+  const weightedDiff = compareDesc(a?.weightedDiscountRate, b?.weightedDiscountRate);
+  if (weightedDiff !== 0) return weightedDiff;
+
+  const discountDiff = compareDesc(a?.discountRate, b?.discountRate);
+  if (discountDiff !== 0) return discountDiff;
+
+  const atrDiff = compareDesc(a?.atrCoefficient, b?.atrCoefficient);
+  if (atrDiff !== 0) return atrDiff;
+
+  return String(a?.code || "").localeCompare(String(b?.code || ""), "zh-CN");
+}
+
+function buildDiscountStrategyOptions(options = {}) {
+  return {
+    buyThreshold: toNum(options.buyThreshold) ?? 2,
+    sellThreshold: toNum(options.sellThreshold) ?? 0.5,
+    atrAnchors: normalizeAnchorPoints(options.atrAnchors, DEFAULT_ATR_ANCHORS),
+    sellPressureAnchors: normalizeAnchorPoints(options.sellPressureAnchors, DEFAULT_SELL_PRESSURE_ANCHORS),
+    boardCoefficients: normalizeBoardCoefficients(options.boardCoefficients),
+    nowIsoText: String(options.nowIsoText || new Date().toISOString()),
+    todayDate: String(options.todayDate || todayShanghaiDate()),
+  };
+}
+
+/**
+ * 折价策略只做真实字段派生，不负责推送和持久化。
+ */
+function enrichDiscountStrategyRow(row, options = {}) {
+  const config = buildDiscountStrategyOptions(options);
+  const premiumRate = toNum(row?.premiumRate);
+  const stockPrice = toNum(row?.stockPrice);
+  const stockAtr20 = toNum(row?.stockAtr20);
+  const remainingSizeYi = toNum(row?.remainingSizeYi);
+  const stockAvgTurnoverAmount20Yi = toNum(row?.stockAvgTurnoverAmount20Yi);
+  const discountRate = premiumRate === null ? null : -premiumRate;
+  const stockAtr20Pct = (discountRate !== null && stockPrice !== null && stockPrice > 0 && stockAtr20 !== null)
+    ? (stockAtr20 / stockPrice) * 100
+    : null;
+  const atrRatio = (discountRate !== null && stockAtr20Pct !== null && stockAtr20Pct > 0)
+    ? discountRate / stockAtr20Pct
+    : null;
+  const atrCoefficient = interpolateByAnchors(atrRatio, config.atrAnchors, DEFAULT_ATR_ANCHORS);
+  const sellPressureRatio = (
+    remainingSizeYi !== null &&
+    stockAvgTurnoverAmount20Yi !== null &&
+    stockAvgTurnoverAmount20Yi > 0
+  )
+    ? remainingSizeYi / stockAvgTurnoverAmount20Yi
+    : null;
+  const sellPressureCoefficient = interpolateByAnchors(
+    sellPressureRatio,
+    config.sellPressureAnchors,
+    DEFAULT_SELL_PRESSURE_ANCHORS
+  );
+  const boardType = normalizeBoardType(row?.stockCode);
+  const boardCoefficient = toNum(config.boardCoefficients[boardType]);
+  const weightedDiscountRate = (
+    discountRate !== null &&
+    atrCoefficient !== null &&
+    sellPressureCoefficient !== null &&
+    boardCoefficient !== null
+  )
+    ? discountRate * atrCoefficient * sellPressureCoefficient * boardCoefficient
+    : null;
+  const buyZoneActive = Boolean(
+    discountRate !== null &&
+    discountRate > config.buyThreshold &&
+    hasPassedConvertStart(row)
+  );
+  const sellZoneActive = Boolean(discountRate !== null && discountRate < config.sellThreshold);
+
+  return {
+    ...row,
+    discountRate,
+    stockAtr20Pct,
+    atrRatio,
+    atrCoefficient,
+    sellPressureRatio,
+    sellPressureCoefficient,
+    boardType,
+    boardCoefficient,
+    weightedDiscountRate,
+    buyZoneActive,
+    sellZoneActive,
+  };
+}
+
+function normalizeDiscountStrategyState(input = {}) {
+  return {
+    initializedDate: String(input?.initializedDate || "").trim() || null,
+    lastBootstrapDate: String(input?.lastBootstrapDate || "").trim() || null,
+    monitorMap: (input?.monitorMap && typeof input.monitorMap === "object") ? { ...input.monitorMap } : {},
+    signalStateMap: (input?.signalStateMap && typeof input.signalStateMap === "object") ? { ...input.signalStateMap } : {},
+  };
+}
+
+function buildDiscountMonitorSummaryItems(rows) {
+  return [...rows]
+    .sort(compareDiscountMonitorRows)
+    .map((row) => ({
+      code: pickText(row.code),
+      bondName: pickText(row.bondName),
+      stockCode: pickText(row.stockCode),
+      stockName: pickText(row.stockName),
+      discountRate: row.discountRate,
+      weightedDiscountRate: row.weightedDiscountRate,
+      atrCoefficient: row.atrCoefficient,
+      sellPressureCoefficient: row.sellPressureCoefficient,
+      boardType: row.boardType,
+      boardCoefficient: row.boardCoefficient,
+    }));
+}
+
+function buildDiscountSignal(row, signalType) {
+  return {
+    signalType,
+    code: pickText(row.code),
+    bondName: pickText(row.bondName),
+    stockCode: pickText(row.stockCode),
+    stockName: pickText(row.stockName),
+    price: row.price,
+    stockPrice: row.stockPrice,
+    stockChangePercent: row.stockChangePercent,
+    discountRate: row.discountRate,
+    weightedDiscountRate: row.weightedDiscountRate,
+    atrCoefficient: row.atrCoefficient,
+    sellPressureCoefficient: row.sellPressureCoefficient,
+    boardType: row.boardType,
+    reason: signalType === "buy"
+      ? "折价率进入买入区"
+      : "折价率进入卖出区",
+  };
+}
+
+/**
+ * 这里统一产出折价策略快照：
+ * 1. enrichedRows 给页面与接口使用
+ * 2. buySignals / sellSignals 给推送服务使用
+ * 3. nextState 只描述下一状态，不在这里直接写文件
+ */
+function buildConvertibleBondDiscountSnapshot(rows, runtimeState = {}, options = {}) {
+  const config = buildDiscountStrategyOptions(options);
+  const cleanRows = sanitizeCbArbRows(rows).map((row) => enrichDiscountStrategyRow(row, config));
+  const previousState = normalizeDiscountStrategyState(runtimeState);
+  const previousMonitorMap = { ...previousState.monitorMap };
+  const previousSignalStateMap = { ...previousState.signalStateMap };
+  const rowMap = new Map(cleanRows.map((row) => [pickText(row.code), row]));
+  const nextMonitorMap = { ...previousMonitorMap };
+  const nextSignalStateMap = {};
+  const buySignals = [];
+  const sellSignals = [];
+  const isBootstrap = !previousState.initializedDate;
+
+  cleanRows.forEach((row) => {
+    const code = pickText(row.code);
+    if (!code) return;
+    const previousSignalState = previousSignalStateMap[code] || {};
+    const buyZoneActive = Boolean(row.buyZoneActive);
+    const sellZoneActive = Boolean(row.sellZoneActive);
+
+    nextSignalStateMap[code] = {
+      buyZoneActive,
+      sellZoneActive,
+    };
+
+    if (isBootstrap) {
+      if (buyZoneActive) {
+        nextMonitorMap[code] = {
+          code,
+          enteredAt: previousMonitorMap[code]?.enteredAt || config.nowIsoText,
+        };
+      }
+      return;
+    }
+
+    if (!previousSignalState.buyZoneActive && buyZoneActive) {
+      nextMonitorMap[code] = {
+        code,
+        enteredAt: previousMonitorMap[code]?.enteredAt || config.nowIsoText,
+      };
+      buySignals.push(buildDiscountSignal(row, "buy"));
+    }
+
+    if (nextMonitorMap[code] && !previousSignalState.sellZoneActive && sellZoneActive) {
+      sellSignals.push(buildDiscountSignal(row, "sell"));
+      delete nextMonitorMap[code];
+    }
+  });
+
+  Object.keys(nextMonitorMap).forEach((code) => {
+    if (!rowMap.has(code)) delete nextMonitorMap[code];
+  });
+
+  const activeCodes = new Set(Object.keys(nextMonitorMap));
+  const enrichedRows = cleanRows.map((row) => ({
+    ...row,
+    isDiscountMonitorActive: activeCodes.has(pickText(row.code)),
+  }));
+  const monitorRows = enrichedRows.filter((row) => activeCodes.has(pickText(row.code)));
+  const monitorItems = buildDiscountMonitorSummaryItems(monitorRows);
+
+  return {
+    rows: enrichedRows,
+    buySignals,
+    sellSignals,
+    isBootstrap,
+    discountMonitorSummary: {
+      count: monitorItems.length,
+      items: monitorItems,
+    },
+    nextState: {
+      initializedDate: previousState.initializedDate || config.todayDate,
+      lastBootstrapDate: isBootstrap ? config.todayDate : previousState.lastBootstrapDate,
+      monitorMap: nextMonitorMap,
+      signalStateMap: nextSignalStateMap,
+    },
+  };
+}
+
 function isTerminalZeroTurnoverRow(row) {
   if (!row || typeof row !== "object") return false;
   const turnover = Number(row.turnoverAmountYi);
@@ -116,7 +425,6 @@ function sanitizeCbArbRows(rows) {
 
 function cbArbOpportunitySets(rows) {
   const cleanRows = sanitizeCbArbRows(rows);
-  const toNum = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
   const formatDate = (value) => String(value || "").trim();
   const hasPassedConvertStart = (row) => {
     const text = formatDate(row.convertStartDate || row.convertStartDateTime);
@@ -248,6 +556,7 @@ function buildConvertibleBondAlertCandidates(rows, options = {}) {
 module.exports = {
   sanitizeCbArbRows,
   cbArbOpportunitySets,
-  buildConvertibleBondAlertCandidates,
+  buildConvertibleBondDiscountSnapshot,
+  enrichDiscountStrategyRow,
 };
 

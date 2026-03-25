@@ -1,6 +1,6 @@
 "use strict";
 
-function buildPushConfigResponse(config, runtimeState = {}, deliveryStatus = {}) {
+function buildPushConfigResponse(config, runtimeState = {}, deliveryStatus = {}, discountStrategyStatus = {}) {
   const modules = (config?.modules && typeof config.modules === "object") ? config.modules : {};
   const selectedModules = Object.entries(modules)
     .filter(([, enabled]) => Boolean(enabled))
@@ -9,8 +9,8 @@ function buildPushConfigResponse(config, runtimeState = {}, deliveryStatus = {})
   return {
     ...config,
     times: config?.times,
-    eventAlert: config?.eventAlert,
     lastMainPushDate: runtimeState?.lastMainPushDate || null,
+    discountStrategyStatus,
     deliveryStatus: {
       webhookConfigured: Boolean(deliveryStatus?.webhookConfigured),
       pushHtmlUrlConfigured: Boolean(deliveryStatus?.pushHtmlUrlConfigured),
@@ -21,9 +21,6 @@ function buildPushConfigResponse(config, runtimeState = {}, deliveryStatus = {})
       lastMainPushAttemptAt: runtimeState?.lastMainPushAttemptAt || null,
       lastMainPushSuccessAt: runtimeState?.lastMainPushSuccessAt || null,
       lastMainPushError: runtimeState?.lastMainPushError || null,
-      lastEventAlertAttemptAt: runtimeState?.lastEventAlertAttemptAt || null,
-      lastEventAlertSuccessAt: runtimeState?.lastEventAlertSuccessAt || null,
-      lastEventAlertError: runtimeState?.lastEventAlertError || null,
     },
   };
 }

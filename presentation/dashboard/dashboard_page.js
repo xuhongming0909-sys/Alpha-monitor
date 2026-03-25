@@ -165,7 +165,6 @@ const dom = {
   pushForm: document.getElementById('push-form'),
   pushTime1: document.getElementById('push-time-1'),
   pushTime2: document.getElementById('push-time-2'),
-  pushAlertCooldown: document.getElementById('push-alert-cooldown'),
   savePushButton: document.getElementById('save-push-button'),
   reloadDataButton: document.getElementById('reload-data-button'),
   toast: document.getElementById('toast'),
@@ -1104,12 +1103,10 @@ function readPushConfigViewModel() {
 
 function resolvePushConfigTimes(config = {}) {
   const times = Array.isArray(config.times) ? config.times : [];
-  const eventAlert = (config.eventAlert && typeof config.eventAlert === 'object') ? config.eventAlert : {};
   return {
     times,
     mainTime1: times[0] || config.time || "",
     mainTime2: times[1] || "",
-    cooldownMinutes: String(eventAlert.cooldownMinutes ?? ""),
   };
 }
 
@@ -1117,7 +1114,6 @@ function applyPushConfigToInputs(config = {}) {
   const next = resolvePushConfigTimes(config);
   if (dom.pushTime1) dom.pushTime1.value = next.mainTime1;
   if (dom.pushTime2) dom.pushTime2.value = next.mainTime2;
-  if (dom.pushAlertCooldown) dom.pushAlertCooldown.value = next.cooldownMinutes;
 }
 
 function readEnabledPushModules(config = {}) {
@@ -1134,11 +1130,10 @@ function shortErrorText(value) {
 function buildPushStateText(config = {}) {
   const next = resolvePushConfigTimes(config);
   const delivery = config.deliveryStatus || {};
+  const discountStrategyStatus = (config.discountStrategyStatus && typeof config.discountStrategyStatus === 'object')
+    ? config.discountStrategyStatus
+    : {};
   const moduleText = readEnabledPushModules(config).join(' / ') || '--';
-  const eventAlert = (config.eventAlert && typeof config.eventAlert === 'object') ? config.eventAlert : {};
-  const threshold = eventAlert.convertibleBond && typeof eventAlert.convertibleBond === 'object'
-    ? eventAlert.convertibleBond.convertPremiumLt
-    : null;
 
   const summaryLine = [
     config.enabled === false
@@ -1156,11 +1151,16 @@ function buildPushStateText(config = {}) {
   ].filter(Boolean).join(' / ');
 
   const alertLine = [
-    eventAlert.enabled === false ? '异动推送已关闭' : '异动推送开启',
-    threshold === null ? '规则 --' : `规则 转股溢价率 < ${formatPercent(threshold, 2)}`,
-    `冷却 ${next.cooldownMinutes || '--'} 分钟`,
-    delivery.lastEventAlertSuccessAt ? `最近成功 ${formatDate(delivery.lastEventAlertSuccessAt)}` : '',
-    delivery.lastEventAlertError ? `最近失败 ${shortErrorText(delivery.lastEventAlertError)}` : '',
+    discountStrategyStatus.enabled === false ? '折价策略推送已关闭' : '折价策略推送开启',
+    `买入阈值 ${formatPercent(discountStrategyStatus.buyThreshold, 2)}`,
+    `卖出阈值 ${formatPercent(discountStrategyStatus.sellThreshold, 2)}`,
+    `监控频率 ${discountStrategyStatus.monitorIntervalMinutes || '--'} 分钟`,
+    discountStrategyStatus.lastBuySignalSuccessAt ? `买入最近成功 ${formatDate(discountStrategyStatus.lastBuySignalSuccessAt)}` : '',
+    discountStrategyStatus.lastBuySignalError ? `买入最近失败 ${shortErrorText(discountStrategyStatus.lastBuySignalError)}` : '',
+    discountStrategyStatus.lastSellSignalSuccessAt ? `卖出最近成功 ${formatDate(discountStrategyStatus.lastSellSignalSuccessAt)}` : '',
+    discountStrategyStatus.lastSellSignalError ? `卖出最近失败 ${shortErrorText(discountStrategyStatus.lastSellSignalError)}` : '',
+    discountStrategyStatus.lastMonitorPushSuccessAt ? `监控最近成功 ${formatDate(discountStrategyStatus.lastMonitorPushSuccessAt)}` : '',
+    discountStrategyStatus.lastMonitorPushError ? `监控最近失败 ${shortErrorText(discountStrategyStatus.lastMonitorPushError)}` : '',
   ].filter(Boolean).join(' / ');
 
   return { summaryLine, alertLine };
@@ -1177,7 +1177,7 @@ function renderPushSettings() {
 
   if (resource.status === "loading" && !resource.data) {
     dom.pushStateText.textContent = "正在读取定时推送状态";
-    dom.pushAlertStateText.textContent = "正在读取异动推送状态";
+    dom.pushAlertStateText.textContent = "正在读取折价策略推送状态";
     return;
   }
 
@@ -1190,19 +1190,19 @@ function renderPushSettings() {
 
   if (resource.status === "error" && !hasConfig) {
     dom.pushStateText.textContent = "推送配置读取失败";
-    dom.pushAlertStateText.textContent = "异动推送配置读取失败";
+    dom.pushAlertStateText.textContent = "折价策略推送状态读取失败";
     return;
   }
 
   if (state.savingPush) {
     dom.pushStateText.textContent = "正在保存推送设置";
-    dom.pushAlertStateText.textContent = "正在同步异动推送设置";
+    dom.pushAlertStateText.textContent = "正在同步折价策略推送状态";
     return;
   }
 
   if (resource.status === "error") {
     dom.pushStateText.textContent = "推送配置读取失败，保留当前输入";
-    dom.pushAlertStateText.textContent = "异动推送配置读取失败，保留当前输入";
+    dom.pushAlertStateText.textContent = "折价策略推送状态读取失败，保留当前输入";
     return;
   }
 
@@ -1215,16 +1215,10 @@ async function savePushConfig() {
   const config = readPushConfigViewModel();
   const time1 = dom.pushTime1?.value.trim();
   const time2 = dom.pushTime2?.value.trim();
-  const cooldownText = dom.pushAlertCooldown?.value.trim();
   const validTimes = [time1, time2].filter(Boolean);
-  const cooldownMinutes = Number(cooldownText);
 
-  if (!time1 || !time2 || !cooldownText) {
-    showToast("两个定时推送时间和异动冷却都需要填写", true);
-    return;
-  }
-  if (!Number.isFinite(cooldownMinutes) || cooldownMinutes < 1 || cooldownMinutes > 1440) {
-    showToast("异动冷却分钟数必须在 1 到 1440 之间", true);
+  if (!time1 || !time2) {
+    showToast("两个定时推送时间都需要填写", true);
     return;
   }
 
@@ -1238,13 +1232,6 @@ async function savePushConfig() {
         enabled: config.enabled !== false,
         modules: config.modules || {},
         times: validTimes,
-        eventAlert: {
-          enabled: config?.eventAlert?.enabled !== false,
-          cooldownMinutes,
-          convertibleBond: {
-            convertPremiumLt: config?.eventAlert?.convertibleBond?.convertPremiumLt,
-          },
-        },
       }),
     });
 
@@ -2135,6 +2122,8 @@ function buildConvertibleColumns() {
       render: (row) => formatNumber(row.convertValue, 2),
     },
     { key: 'premiumRate', label: '转股溢价率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premiumRate), className: (row) => statusClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate, 2) },
+    { key: 'discountRate', label: '折价率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.discountRate), className: (row) => statusClass(row.discountRate), render: (row) => formatPercent(row.discountRate, 2) },
+    { key: 'weightedDiscountRate', label: '加权折价率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.weightedDiscountRate), className: (row) => statusClass(row.weightedDiscountRate), render: (row) => formatPercent(row.weightedDiscountRate, 2) },
     { key: 'doubleLow', label: '双低', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'asc', sortValue: (row) => toNumber(row.doubleLow), render: (row) => formatNumber(row.doubleLow, 2) },
     {
       key: 'remainingSizeYi',
@@ -2356,6 +2345,7 @@ function renderConvertibleBondPanel() {
   }
 
   const rows = readResourceArray("cbArb");
+  const cbPayload = readResourceObject("cbArb");
   if (!rows.length) {
     panel.innerHTML = moduleEmpty("转债套利暂时没有返回数据");
     return;
@@ -2367,10 +2357,10 @@ function renderConvertibleBondPanel() {
   const sortedByTheory = [...rows].sort(
     (a, b) => (toNumber(b.theoreticalPremiumRate) ?? Number.NEGATIVE_INFINITY) - (toNumber(a.theoreticalPremiumRate) ?? Number.NEGATIVE_INFINITY)
   );
-  const convertRows = [...rows]
-    .map((row) => ({ ...row, convertSpread: computeConvertSpread(row) }))
-    .filter((row) => row.convertSpread !== null && row.convertSpread > 2)
-    .sort((a, b) => (toNumber(b.convertSpread) ?? Number.NEGATIVE_INFINITY) - (toNumber(a.convertSpread) ?? Number.NEGATIVE_INFINITY));
+  const discountMonitorSummary = cbPayload.discountMonitorSummary && typeof cbPayload.discountMonitorSummary === 'object'
+    ? cbPayload.discountMonitorSummary
+    : { items: [] };
+  const discountMonitorItems = Array.isArray(discountMonitorSummary.items) ? discountMonitorSummary.items : [];
 
   const summaryCards = [
     renderSummaryCard(
@@ -2393,13 +2383,15 @@ function renderConvertibleBondPanel() {
       "compact-card"
     ),
     renderSummaryCard(
-      "转股套利候选",
-      convertRows.slice(0, 3).map((row) => ({
-        title: `${row.bondName || "--"} ${row.code || ""}`.trim(),
-        subtitle: `转股价值 ${formatNumber(row.convertValue, 2)} / 转股价 ${formatNumber(row.convertPrice, 2)}`,
-        value: formatPercent(row.convertSpread, 2),
-        valueClass: statusClass(row.convertSpread),
-      })),
+      "折价监控",
+      discountMonitorItems.length
+        ? discountMonitorItems.map((row) => ({
+          title: `${row.bondName || "--"} ${row.code || ""}`.trim(),
+          subtitle: `折价率 ${formatPercent(row.discountRate, 2)}`,
+          value: formatPercent(row.weightedDiscountRate, 2),
+          valueClass: statusClass(row.weightedDiscountRate),
+        }))
+        : [{ title: '暂无监控名单', subtitle: '', value: '--', valueClass: '' }],
       "compact-card"
     ),
   ].join("");

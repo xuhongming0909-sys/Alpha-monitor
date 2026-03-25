@@ -20,7 +20,7 @@ const { createPushConfigStore } = require('./notification/scheduler/push_config_
 const { createPushRuntimeStore } = require('./notification/scheduler/push_runtime_store');
 const { createWeComClient } = require('./notification/wecom/client');
 const { buildSummaryMarkdown: buildNotificationSummaryMarkdown } = require('./notification/styles/markdown_style');
-const { buildConvertibleBondAlertMarkdown } = require('./notification/styles/event_alert_markdown');
+const { buildConvertibleBondDiscountMarkdown } = require('./notification/styles/discount_strategy_markdown');
 const { createMainSummaryService } = require('./notification/summary/main_summary');
 const { createEventAlertService } = require('./notification/alerts/event_alert_service');
 const { createMergerReportService } = require('./notification/merger_report/service');
@@ -31,8 +31,9 @@ const {
 } = require('./strategy/subscription/service');
 const {
   sanitizeCbArbRows: strategySanitizeCbArbRows,
-  buildConvertibleBondAlertCandidates: strategyBuildConvertibleBondAlertCandidates,
+  buildConvertibleBondDiscountSnapshot: strategyBuildConvertibleBondDiscountSnapshot,
 } = require('./strategy/convertible_bond/service');
+const { createConvertibleBondDiscountRuntimeStore } = require('./strategy/convertible_bond/discount_runtime_store');
 const {
   round: monitorRound,
   toFiniteNumber: monitorToFiniteNumber,
@@ -72,6 +73,9 @@ const PRESENTATION_HISTORICAL_PREMIUM_CONFIG = PRESENTATION_CONFIG?.historical_p
 const PRESENTATION_DASHBOARD_TABLE_UI_CONFIG = PRESENTATION_CONFIG?.dashboard_table_ui || {};
 const PRESENTATION_DASHBOARD_MODULE_NOTES_CONFIG = PRESENTATION_CONFIG?.dashboard_module_notes || {};
 const EVENT_ARB_STRATEGY_CONFIG = STRATEGY_CONFIG?.event_arbitrage || {};
+const CONVERTIBLE_BOND_STRATEGY_CONFIG = (STRATEGY_CONFIG?.convertible_bond && typeof STRATEGY_CONFIG.convertible_bond === 'object')
+  ? STRATEGY_CONFIG.convertible_bond
+  : {};
 const INDEX_FILE = path.resolve(ROOT, PRESENTATION_CONFIG.dashboard_entry || './index.html');
 const STATIC_DATA_DIR = PATH_POLICY.dataRootDir;
 const SHARED_DATA_DIR = PATH_POLICY.sharedDataDir;
@@ -87,6 +91,11 @@ function toIntConfig(value, fallback) {
 function toPositiveNumberConfig(value, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function toNumConfigOrFallback(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function toBooleanConfig(value, fallback = false) {
@@ -125,6 +134,26 @@ function normalizeTimeListConfig(values, fallback) {
       .filter(Boolean)
   )).sort();
   return items.length ? items : [fallback];
+}
+
+function normalizeAnchorConfig(values, fallback) {
+  const normalized = (Array.isArray(values) ? values : [])
+    .map((item) => ({
+      x: Number(item?.x),
+      y: Number(item?.y),
+    }))
+    .filter((item) => Number.isFinite(item.x) && Number.isFinite(item.y))
+    .sort((a, b) => a.x - b.x);
+  return normalized.length >= 2 ? normalized : fallback;
+}
+
+function normalizeBoardCoefficientsConfig(values, fallback) {
+  const source = values && typeof values === 'object' ? values : {};
+  return {
+    科创板: toPositiveNumberConfig(source.科创板, fallback.科创板),
+    创业板: toPositiveNumberConfig(source.创业板, fallback.创业板),
+    主板: toPositiveNumberConfig(source.主板, fallback.主板),
+  };
 }
 
 function isLoopbackHost(hostname) {
@@ -218,21 +247,58 @@ const PUSH_SCHEDULER_DISABLED_REASON = PUSH_SCHEDULER_RUNTIME_ENABLED
   ? ''
   : (Boolean(NOTIFICATION_CONFIG?.scheduler?.enabled) ? 'loopback_public_base_url' : 'scheduler_config_disabled');
 const DEFAULT_NOTIFICATION_MODULES = buildNotificationModuleDefaults();
-const EVENT_ALERT_CONFIG = (NOTIFICATION_CONFIG?.event_alert && typeof NOTIFICATION_CONFIG.event_alert === 'object')
-  ? NOTIFICATION_CONFIG.event_alert
-  : {};
+const DEFAULT_DISCOUNT_STRATEGY_MONITOR_TIMES = [
+  '09:30', '09:40', '09:50', '10:00', '10:10', '10:20', '10:30', '10:40', '10:50', '11:00', '11:10', '11:20', '11:30',
+  '13:00', '13:10', '13:20', '13:30', '13:40', '13:50', '14:00', '14:10', '14:20', '14:30', '14:40', '14:50',
+];
+const DEFAULT_DISCOUNT_STRATEGY_CONFIG = {
+  buyThreshold: 2,
+  sellThreshold: 0.5,
+  monitorIntervalMinutes: 10,
+  monitorSessionTimes: DEFAULT_DISCOUNT_STRATEGY_MONITOR_TIMES,
+  atrAnchors: [
+    { x: 0, y: 0 },
+    { x: 0.25, y: 0.5 },
+    { x: 0.5, y: 0.8 },
+    { x: 1, y: 1 },
+  ],
+  sellPressureAnchors: [
+    { x: 0.5, y: 1 },
+    { x: 1, y: 0.8 },
+    { x: 5, y: 0.5 },
+    { x: 20, y: 0 },
+  ],
+  boardCoefficients: {
+    科创板: 1,
+    创业板: 0.85,
+    主板: 0.8,
+  },
+};
+const DISCOUNT_STRATEGY_CONFIG = {
+  buyThreshold: toPositiveNumberConfig(CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.buy_threshold, DEFAULT_DISCOUNT_STRATEGY_CONFIG.buyThreshold),
+  sellThreshold: toNumConfigOrFallback(CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.sell_threshold, DEFAULT_DISCOUNT_STRATEGY_CONFIG.sellThreshold),
+  monitorIntervalMinutes: toIntConfig(CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.monitor_interval_minutes, DEFAULT_DISCOUNT_STRATEGY_CONFIG.monitorIntervalMinutes),
+  monitorSessionTimes: Array.isArray(CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.monitor_session_times)
+    ? normalizeTimeListConfig(
+      CONVERTIBLE_BOND_STRATEGY_CONFIG.discount_strategy.monitor_session_times,
+      DEFAULT_DISCOUNT_STRATEGY_MONITOR_TIMES[0]
+    )
+    : DEFAULT_DISCOUNT_STRATEGY_MONITOR_TIMES,
+  atrAnchors: normalizeAnchorConfig(CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.atr_anchor_points, DEFAULT_DISCOUNT_STRATEGY_CONFIG.atrAnchors),
+  sellPressureAnchors: normalizeAnchorConfig(
+    CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.sell_pressure_anchor_points,
+    DEFAULT_DISCOUNT_STRATEGY_CONFIG.sellPressureAnchors
+  ),
+  boardCoefficients: normalizeBoardCoefficientsConfig(
+    CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.board_coefficients,
+    DEFAULT_DISCOUNT_STRATEGY_CONFIG.boardCoefficients
+  ),
+};
 const DEFAULT_PUSH_CONFIG = {
   enabled: Boolean(NOTIFICATION_CONFIG?.scheduler?.enabled),
   time: DEFAULT_MAIN_PUSH_TIMES[0],
   times: DEFAULT_MAIN_PUSH_TIMES.slice(0, 2),
   modules: DEFAULT_NOTIFICATION_MODULES,
-  eventAlert: {
-    enabled: EVENT_ALERT_CONFIG.enabled !== false,
-    cooldownMinutes: toIntConfig(EVENT_ALERT_CONFIG.cooldown_minutes, 30),
-    convertibleBond: {
-      convertPremiumLt: Number(EVENT_ALERT_CONFIG?.convertible_bond?.convert_premium_lt ?? -3),
-    },
-  },
 };
 
 function buildDashboardTableUiConfig(config = {}) {
@@ -573,6 +639,22 @@ const pushRuntimeState = STATE_REGISTRY.read('push_runtime_state', 'push_runtime
   eventArbSeenItems: {},
   eventArbDailyNewItems: {},
 });
+const cbDiscountStrategyState = STATE_REGISTRY.read('cb_discount_strategy_state', 'cb_discount_strategy_state.json', {
+  initializedDate: null,
+  lastBootstrapDate: null,
+  monitorMap: {},
+  signalStateMap: {},
+  monitorPushRecords: {},
+  lastBuySignalAttemptAt: null,
+  lastBuySignalSuccessAt: null,
+  lastBuySignalError: null,
+  lastSellSignalAttemptAt: null,
+  lastSellSignalSuccessAt: null,
+  lastSellSignalError: null,
+  lastMonitorPushAttemptAt: null,
+  lastMonitorPushSuccessAt: null,
+  lastMonitorPushError: null,
+});
 const mergerReportStore = STATE_REGISTRY.read('merger_company_reports', 'merger_company_reports.json', { reports: {} });
 const refreshLocks = new Map();
 const intradayLastRun = new Map();
@@ -597,6 +679,10 @@ function savePushConfigStore() {
 
 function savePushRuntimeState() {
   STATE_REGISTRY.write('push_runtime_state', 'push_runtime_state.json', pushRuntimeState);
+}
+
+function saveCbDiscountStrategyState() {
+  STATE_REGISTRY.write('cb_discount_strategy_state', 'cb_discount_strategy_state.json', cbDiscountStrategyState);
 }
 
 function saveMergerReportStore() {
@@ -812,6 +898,11 @@ const pushRuntimeDomain = createPushRuntimeStore({
   parsePushMinutes: (value) => pushConfigDomain.parsePushMinutes(value),
   nowIso,
 });
+const cbDiscountStrategyDomain = createConvertibleBondDiscountRuntimeStore({
+  state: cbDiscountStrategyState,
+  save: saveCbDiscountStrategyState,
+  parsePushMinutes: (value) => pushConfigDomain.parsePushMinutes(value),
+});
 const weComClient = createWeComClient({
   webhookUrl: WECOM_WEBHOOK_URL,
   pushHtmlUrl: PUSH_HTML_URL,
@@ -828,11 +919,15 @@ const mainSummaryService = createMainSummaryService({
 });
 const eventAlertService = createEventAlertService({
   collectAlertDatasets,
-  buildConvertibleBondAlertCandidates,
-  buildConvertibleBondAlertMarkdown,
+  buildDiscountSnapshot: buildConvertibleBondDiscountSnapshot,
+  buildDiscountMarkdown: buildConvertibleBondDiscountMarkdown,
   sendMarkdown: (markdown) => weComClient.sendMarkdown(markdown),
-  getPushConfig,
-  runtimeStore: pushRuntimeDomain,
+  getDiscountStrategyConfig,
+  pushRuntimeStore: pushRuntimeDomain,
+  discountRuntimeStore: cbDiscountStrategyDomain,
+  parsePushMinutes: (value) => pushConfigDomain.parsePushMinutes(value),
+  getShanghaiParts,
+  isTradingSession,
   nowIso,
 });
 const mergerReportService = createMergerReportService({
@@ -877,8 +972,33 @@ function getPushDeliveryStatus() {
   };
 }
 
+function getDiscountStrategyConfig() {
+  return {
+    ...DISCOUNT_STRATEGY_CONFIG,
+    monitorSessionTimes: [...DISCOUNT_STRATEGY_CONFIG.monitorSessionTimes],
+    atrAnchors: DISCOUNT_STRATEGY_CONFIG.atrAnchors.map((item) => ({ ...item })),
+    sellPressureAnchors: DISCOUNT_STRATEGY_CONFIG.sellPressureAnchors.map((item) => ({ ...item })),
+    boardCoefficients: { ...DISCOUNT_STRATEGY_CONFIG.boardCoefficients },
+  };
+}
+
+function buildDiscountStrategyStatus() {
+  return {
+    enabled: true,
+    buyThreshold: DISCOUNT_STRATEGY_CONFIG.buyThreshold,
+    sellThreshold: DISCOUNT_STRATEGY_CONFIG.sellThreshold,
+    monitorIntervalMinutes: DISCOUNT_STRATEGY_CONFIG.monitorIntervalMinutes,
+    lastBuySignalSuccessAt: cbDiscountStrategyState.lastBuySignalSuccessAt || null,
+    lastBuySignalError: cbDiscountStrategyState.lastBuySignalError || null,
+    lastSellSignalSuccessAt: cbDiscountStrategyState.lastSellSignalSuccessAt || null,
+    lastSellSignalError: cbDiscountStrategyState.lastSellSignalError || null,
+    lastMonitorPushSuccessAt: cbDiscountStrategyState.lastMonitorPushSuccessAt || null,
+    lastMonitorPushError: cbDiscountStrategyState.lastMonitorPushError || null,
+  };
+}
+
 function buildPushConfigViewModel(config) {
-  return buildPushConfigResponse(config, pushRuntimeState, getPushDeliveryStatus());
+  return buildPushConfigResponse(config, pushRuntimeState, getPushDeliveryStatus(), buildDiscountStrategyStatus());
 }
 
 function getStateDate(key) {
@@ -1020,8 +1140,18 @@ const CB_ARB_PUBLIC_ROW_KEYS = [
   'convertPrice',
   'convertValue',
   'premiumRate',
+  'discountRate',
   'bondValue',
   'doubleLow',
+  'stockAtr20Pct',
+  'atrRatio',
+  'atrCoefficient',
+  'sellPressureRatio',
+  'sellPressureCoefficient',
+  'boardType',
+  'boardCoefficient',
+  'weightedDiscountRate',
+  'isDiscountMonitorActive',
   'redeemTriggerPrice',
   'putbackPrice',
   'volatility60',
@@ -1060,11 +1190,17 @@ function normalizeDatasetPayload(key, result) {
   if (key === 'ipo') return sanitizeSubscriptionResult(result, 'ipo');
   if (key === 'bonds') return sanitizeSubscriptionResult(result, 'bond');
   if (key === 'cbArb') {
-    const rows = shapeCbArbPublicRows(sanitizeCbArbRows(result.data));
+    const snapshot = buildConvertibleBondDiscountSnapshot(result.data, cbDiscountStrategyDomain.getState(), {
+      ...getDiscountStrategyConfig(),
+      nowIsoText: nowIso(),
+      todayDate: getShanghaiParts().date,
+    });
+    const rows = shapeCbArbPublicRows(snapshot.rows);
     const { data: _rawData, list: _legacyList, rows: _legacyRows, ...rest } = result;
     return {
       ...rest,
       data: rows,
+      discountMonitorSummary: snapshot.discountMonitorSummary,
     };
   }
   return result;
@@ -1967,8 +2103,8 @@ async function sendWeComMarkdown(markdown) {
   return weComClient.sendMarkdown(markdown);
 }
 
-function buildConvertibleBondAlertCandidates(rows, options = {}) {
-  return strategyBuildConvertibleBondAlertCandidates(rows, options);
+function buildConvertibleBondDiscountSnapshot(rows, runtimeState = {}, options = {}) {
+  return strategyBuildConvertibleBondDiscountSnapshot(rows, runtimeState, options);
 }
 
 function shiftShanghaiDate(dateText, days) {

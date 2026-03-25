@@ -239,6 +239,50 @@ strategy:
       - "limit_up_arbitrage"
       - "conversion_arbitrage"
       - "delisting_game"
+    discount_strategy:
+      buy_threshold: 2
+      sell_threshold: 0.5
+      monitor_interval_minutes: 10
+      monitor_session_times:
+        - "09:30"
+        - "09:40"
+        - "09:50"
+        - "10:00"
+        - "10:10"
+        - "10:20"
+        - "10:30"
+        - "10:40"
+        - "10:50"
+        - "11:00"
+        - "11:10"
+        - "11:20"
+        - "11:30"
+        - "13:00"
+        - "13:10"
+        - "13:20"
+        - "13:30"
+        - "13:40"
+        - "13:50"
+        - "14:00"
+        - "14:10"
+        - "14:20"
+        - "14:30"
+        - "14:40"
+        - "14:50"
+      atr_anchor_points:
+        - { x: 0, y: 0 }
+        - { x: 0.25, y: 0.5 }
+        - { x: 0.5, y: 0.8 }
+        - { x: 1, y: 1 }
+      sell_pressure_anchor_points:
+        - { x: 0.5, y: 1 }
+        - { x: 1, y: 0.8 }
+        - { x: 5, y: 0.5 }
+        - { x: 20, y: 0 }
+      board_coefficients:
+        科创板: 1
+        创业板: 0.85
+        主板: 0.8
   merger:
     same_day_only: true
     ai_provider: "deepseek"
@@ -395,11 +439,6 @@ notification:
     default_times:
       - "08:00"
       - "20:18"
-  event_alert:
-    enabled: true
-    cooldown_minutes: 30
-    convertible_bond:
-      convert_premium_lt: -3
   wecom:
     webhook_url: "${WECOM_WEBHOOK_URL}"
     push_html_url: "${PUSH_HTML_URL}"

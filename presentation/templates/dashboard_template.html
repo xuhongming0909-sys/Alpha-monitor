@@ -1442,7 +1442,7 @@
           <h2 class="push-strip-title">推送设置</h2>
           <div class="push-strip-status">
             <div id="push-state-text" class="push-strip-note">正在读取定时推送状态</div>
-            <div id="push-alert-state-text" class="push-strip-note">正在读取异动推送状态</div>
+            <div id="push-alert-state-text" class="push-strip-note">正在读取折价策略推送状态</div>
           </div>
         </div>
         <form id="push-form" class="push-form">
@@ -1454,10 +1454,6 @@
             <label for="push-time-2">定时推送 2</label>
             <input id="push-time-2" type="time" />
           </div>
-          <div class="input-group">
-            <label for="push-alert-cooldown">异动冷却(分钟)</label>
-            <input id="push-alert-cooldown" type="number" min="1" max="1440" step="1" />
-          </div>
           <div class="button-row inline">
             <button id="save-push-button" type="submit" class="btn-primary">保存</button>
             <button id="reload-data-button" type="button" class="btn-secondary">刷新</button>
@@ -1468,6 +1464,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <script src="/presentation/dashboard/dashboard_page.js?v=20260324-release-visibility-1"></script>
+    <script src="/presentation/dashboard/dashboard_page.js?v=20260325-cb-discount-strategy-1"></script>
   </body>
 </html>

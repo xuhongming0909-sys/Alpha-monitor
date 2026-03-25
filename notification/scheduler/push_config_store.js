@@ -2,7 +2,7 @@
 
 /**
  * 推送配置存储。
- * 负责规范化 UI 写入的时间与冷却参数，不参与真正的推送判断。
+ * 页面只允许修改定时摘要时间与模块开关，旧可转债冷却规则已退役。
  */
 function createPushConfigStore(options = {}) {
   const state = options.state || {};
@@ -10,16 +10,10 @@ function createPushConfigStore(options = {}) {
   const save = typeof options.save === "function" ? options.save : () => state;
 
   function parsePushMinutes(timeText) {
-    const [h, m] = String(timeText || "").split(":").map((item) => Number(item));
-    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-    if (h < 0 || h > 23 || m < 0 || m > 59) return null;
-    return h * 60 + m;
-  }
-
-  function normalizeCooldownMinutes(value, fallback) {
-    const num = Number(value);
-    if (!Number.isFinite(num)) return fallback;
-    return Math.max(1, Math.min(1440, Math.round(num)));
+    const [hour, minute] = String(timeText || "").split(":").map((item) => Number(item));
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return (hour * 60) + minute;
   }
 
   function normalizePushConfig(input = {}) {
@@ -41,42 +35,16 @@ function createPushConfigStore(options = {}) {
     ))
       .sort((a, b) => (parsePushMinutes(a) ?? 0) - (parsePushMinutes(b) ?? 0))
       .slice(0, 2);
+
     while (times.length < 2) {
       times.push(times[0] || defaultTime);
     }
-
-    const defaultEventAlert = (defaultConfig.eventAlert && typeof defaultConfig.eventAlert === "object")
-      ? defaultConfig.eventAlert
-      : {};
-    const rawEventAlert = (input.eventAlert && typeof input.eventAlert === "object")
-      ? input.eventAlert
-      : {};
-    const defaultCbAlert = (defaultEventAlert.convertibleBond && typeof defaultEventAlert.convertibleBond === "object")
-      ? defaultEventAlert.convertibleBond
-      : {};
-    const rawCbAlert = (rawEventAlert.convertibleBond && typeof rawEventAlert.convertibleBond === "object")
-      ? rawEventAlert.convertibleBond
-      : {};
 
     return {
       enabled: typeof input.enabled === "boolean" ? input.enabled : Boolean(defaultConfig.enabled),
       time: times[0],
       times,
       modules,
-      eventAlert: {
-        enabled: typeof rawEventAlert.enabled === "boolean"
-          ? rawEventAlert.enabled
-          : Boolean(defaultEventAlert.enabled),
-        cooldownMinutes: normalizeCooldownMinutes(
-          rawEventAlert.cooldownMinutes,
-          normalizeCooldownMinutes(defaultEventAlert.cooldownMinutes, 30)
-        ),
-        convertibleBond: {
-          convertPremiumLt: Number.isFinite(Number(rawCbAlert.convertPremiumLt))
-            ? Number(rawCbAlert.convertPremiumLt)
-            : Number(defaultCbAlert.convertPremiumLt ?? -3),
-        },
-      },
     };
   }
 
@@ -86,7 +54,6 @@ function createPushConfigStore(options = {}) {
     state.time = normalized.time;
     state.times = normalized.times;
     state.modules = normalized.modules;
-    state.eventAlert = normalized.eventAlert;
     return normalized;
   }
 
@@ -96,7 +63,6 @@ function createPushConfigStore(options = {}) {
     state.time = normalized.time;
     state.times = normalized.times;
     state.modules = normalized.modules;
-    state.eventAlert = normalized.eventAlert;
     save();
     return normalized;
   }
