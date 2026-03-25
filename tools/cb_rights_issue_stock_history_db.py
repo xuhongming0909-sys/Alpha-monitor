@@ -180,6 +180,35 @@ def upsert_symbol_universe(symbol: str, status: str = "active", note: str = "") 
         )
 
 
+def prune_to_recent_rows(max_rows_per_symbol: int = 90) -> int:
+    max_rows = max(1, int(max_rows_per_symbol))
+    with connect() as conn:
+        removed_rows = conn.execute(
+            """
+            DELETE FROM stock_price_history
+            WHERE rowid IN (
+                SELECT rowid FROM (
+                    SELECT
+                        rowid,
+                        ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY trade_date DESC) AS rn
+                    FROM stock_price_history
+                ) ranked
+                WHERE ranked.rn > ?
+            )
+            """,
+            (max_rows,),
+        ).rowcount
+        conn.execute(
+            """
+            DELETE FROM stock_price_sync_state
+            WHERE NOT EXISTS (
+                SELECT 1 FROM stock_price_history h WHERE h.symbol = stock_price_sync_state.symbol
+            )
+            """
+        )
+    return int(removed_rows or 0)
+
+
 def purge_symbols_not_in_universe(active_symbols: Sequence[str]) -> Dict[str, int]:
     normalized = sorted({str(symbol or "").strip() for symbol in active_symbols if str(symbol or "").strip()})
     if not normalized:

@@ -167,6 +167,7 @@ data_fetch:
       intraday: true
       refresh_interval_ms: 900000
       daily_incremental_sync: true
+      history_retention_days: 1095
       supported_kinds:
         - "ipo"
         - "bond"
@@ -223,6 +224,7 @@ data_fetch:
         - 20
       primary_vol_window: 60
       history_lookback_days: 420
+      stock_history_retention_rows: 160
       max_vol_sync_workers: 8
       max_financial_workers: 10
       inline_history_hydrate_limit: 24
@@ -238,6 +240,7 @@ data_fetch:
       sync_stock_history_before_strategy: true
       request_timeout_ms: 20000
       history_lookback_days: 420
+      stock_history_retention_rows: 90
       max_history_sync_workers: 8
       inline_history_hydrate_limit: 12
       source_page_url: "https://www.jisilu.cn/web/data/cb/pre"

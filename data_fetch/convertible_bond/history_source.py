@@ -32,11 +32,19 @@ _CB_FETCH_CONFIG = (((_CONFIG.get("data_fetch") or {}).get("plugins") or {}).get
 
 MAX_WORKERS = max(1, int(_CB_FETCH_CONFIG.get("max_vol_sync_workers") or 8))
 LOOKBACK_DAYS = max(120, int(_CB_FETCH_CONFIG.get("history_lookback_days") or 420))
+VOL_WINDOWS = tuple(
+    sorted({max(1, int(item)) for item in (_CB_FETCH_CONFIG.get("volatility_windows") or [20, 60, 120])})
+) or (20, 60, 120)
 ATR_WINDOW = max(1, int(_CB_FETCH_CONFIG.get("atr_window") or 20))
 TURNOVER_AVG_WINDOWS = tuple(
     sorted({max(1, int(item)) for item in (_CB_FETCH_CONFIG.get("turnover_avg_windows") or [5, 20])})
 ) or (5, 20)
+REQUIRED_CLOSE_ROWS = max(VOL_WINDOWS) + 1
 REQUIRED_RICH_BAR_ROWS = max(ATR_WINDOW + 1, max(TURNOVER_AVG_WINDOWS))
+STOCK_HISTORY_RETENTION_ROWS = max(
+    max(REQUIRED_CLOSE_ROWS, REQUIRED_RICH_BAR_ROWS) + 30,
+    int(_CB_FETCH_CONFIG.get("stock_history_retention_rows") or 160),
+)
 
 
 def _load_jisilu_cookie() -> str:
@@ -275,6 +283,7 @@ def sync_cb_stock_history(force_full: bool = False) -> Dict[str, Any]:
     ok = [item for item in results if item.get("success") and not item.get("skipped")]
     skipped = [item for item in results if item.get("skipped")]
     failed = [item for item in results if not item.get("success")]
+    pruned_rows = db.prune_to_recent_rows(STOCK_HISTORY_RETENTION_ROWS)
 
     return {
         "success": len(failed) == 0,
@@ -284,7 +293,8 @@ def sync_cb_stock_history(force_full: bool = False) -> Dict[str, Any]:
         "failedSymbols": len(failed),
         "writtenRows": sum(int(item.get("rows") or 0) for item in ok),
         # 历史 K 线库作为波动率权威来源，不再在同步后把每个股票裁成短滚动窗口。
-        "prunedRows": 0,
+        "prunedRows": int(pruned_rows or 0),
+        "prunedRows": int(pruned_rows or 0),
         "removedStaleSymbols": int(cleanup.get("removedSymbols") or 0),
         "removedStalePriceRows": int(cleanup.get("removedPriceRows") or 0),
         "failed": failed[:30],

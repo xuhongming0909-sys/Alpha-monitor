@@ -2510,4 +2510,157 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - keyword input
   - clear action
   - short hint text indicating searchable fields
+- Search input must preserve focus across in-panel re-render.
+- IME composition text is not committed until `compositionend`; during composition the table must not force a re-render that breaks Chinese input.
 - Clearing the keyword resets the current page to page 1 of the full result set.
+
+## 35. Convertible Pure-bond Truth + Search Focus Spec (2026-03-25)
+
+### 35.1 Scope
+- This round changes:
+  - convertible-bond pure-bond-value hydration
+  - convertible theoretical-pricing base selection
+  - shared search-input interaction stability for `cbArb / ah / ab`
+- This round does not change:
+  - route paths
+  - AH / AB business formulas
+  - table search field scope
+
+### 35.2 Pure-bond source rule
+- `pureBondValue` must prefer a real upstream value from the Eastmoney convertible value-analysis source for the same bond code.
+- The fetch path may call the latest-row endpoint shape of:
+  - `https://datacenter-web.eastmoney.com/api/data/get`
+  - `type=RPTA_WEB_KZZ_LS`
+  - filtered by `zcode="<bondCode>"`
+- The implementation must read the latest available row and extract at least:
+  - `PUREBONDVALUE`
+  - `DATE`
+- If the latest row is blank, the read path may walk backward to the latest valid `PUREBONDVALUE`.
+
+### 35.3 Pricing base rule
+- `_build_theoretical_metrics(...)` must use:
+  - `pureBondValue` when available
+  - otherwise fallback to the existing discount-floor `bondValue`
+- Truth boundary:
+  - `pureBondValue` stays `null` when the real source is unavailable
+  - the fallback discount-floor value may still populate `bondValue`
+  - the fallback value must not overwrite `pureBondValue`
+
+### 35.4 Outward payload rule
+- Public convertible rows continue exposing:
+  - `pureBondValue`
+  - `bondValue`
+- The row may additionally preserve:
+  - `pureBondValueDate`
+  - `pureBondValueSource`
+- Existing front-end rendering remains compatible through:
+  - pure-bond-base display prefers `pureBondValue`
+  - fallback remains `bondValue`
+
+### 35.5 Search focus rule
+- Shared search-state updates for `cbArb / ah / ab` must preserve:
+  - active input focus
+  - caret selection range when practical
+- The re-render path must restore focus to the same search input after panel redraw.
+- Clicking the search `清空` button must return focus to the corresponding input.
+
+### 35.6 IME composition rule
+- During `compositionstart -> compositionend`:
+  - query text may update in state
+  - table filtering must not trigger panel re-render
+- On `compositionend`, the final committed text must trigger the normal filter render exactly once.
+
+## 36. Convertible Strike-price Simplification Spec (2026-03-25)
+
+### 36.1 Scope
+- This round changes only the strike-price rule inside convertible theoretical pricing.
+- This round does not change:
+  - route shape
+  - pure-bond source truth rule
+  - branch rule for redeem-trigger handling
+
+### 36.2 Call-strike rule
+- In `_build_theoretical_metrics(...)`, when `convertPrice > 0`:
+  - `optionQty = 100 / convertPrice`
+  - `callStrike = convertPrice`
+- The old derived-strike rule is removed:
+  - `max(bondValue / optionQty, convertPrice)` is no longer allowed
+
+### 36.3 Pricing branch rule
+- Keep the existing branch:
+  - if `stockPrice < redeemTriggerPrice`, theoretical price = `bondValue + call`
+  - else theoretical price = `bondValue + call - put`
+- Only the strike-price input to the call-option leg changes in this round.
+
+### 36.4 Outward payload rule
+- `callStrike20 / callStrike60 / callStrike120` must equal the same row's `convertPrice` when `convertPrice` is valid.
+
+## 36. Shared DB Auto-update + Rolling Retention Spec (2026-03-25)
+
+### 36.1 Scope
+- This round changes only the database-maintenance path for shared SQLite stores.
+- No dashboard route shape, pricing formula, or push template change is included.
+
+### 36.2 DB classification rule
+- `premium_history.db`
+  - already keeps incremental historical writes plus old-row pruning
+  - no new behavior is added in this round
+- `market_pairs.db`
+  - remains a pair-master database rather than a growing time-series store
+  - no new retention behavior is required in this round
+- The following databases must support auto-prune immediately after sync:
+  - `subscription_history.db`
+  - `stock_price_history.db`
+  - `cb_rights_issue_stock_history.db`
+
+### 36.3 Subscription-history retention rule
+- `data_fetch/subscription/ipo_source.py` and `data_fetch/subscription/bond_source.py` continue to:
+  - fetch live rows
+  - upsert into `subscription_history.db`
+- After each successful sync write, the same chain must prune rows older than the configured retention days.
+- Retention cutoff is date-based and applies to `subscribe_date`.
+- The retention parameter is read from `config.yaml` and must not be hardcoded in the fetch modules.
+
+### 36.4 Convertible underlying-history retention rule
+- `data_fetch/convertible_bond/history_source.py` remains the official incremental sync path for `stock_price_history.db`.
+- Sync continues to append or backfill only the needed recent window based on:
+  - missing rich-bar coverage
+  - latest stored trade date
+- After the sync batch finishes, the same path must call a rolling per-symbol prune.
+- Rolling prune rule:
+  - keep only the most recent configured row count for each symbol
+  - delete older rows beyond that limit
+  - delete orphaned sync-state rows when a symbol no longer has price rows
+- The configured kept row count must stay safely above the live calculation floor for:
+  - `120日波动率` requiring `121` closes
+  - `ATR20` requiring `21` rich bars
+  - `20日/5日平均成交额`
+
+### 36.5 Rights-issue underlying-history retention rule
+- `data_fetch/cb_rights_issue/history_source.py` remains the official incremental sync path for `cb_rights_issue_stock_history.db`.
+- After the sync batch finishes, the same path must call a rolling per-symbol prune.
+- Rolling prune rule:
+  - keep only the most recent configured row count for each symbol
+  - delete older rows beyond that limit
+  - delete orphaned sync-state rows when a symbol no longer has price rows
+- The configured kept row count must stay safely above the live calculation floor for `60日波动率` requiring `61` closes.
+
+### 36.6 Config contract
+- `config.yaml` adds the formal retention controls:
+  - `data_fetch.plugins.subscription.history_retention_days`
+  - `data_fetch.plugins.convertible_bond.stock_history_retention_rows`
+  - `data_fetch.plugins.cb_rights_issue.stock_history_retention_rows`
+- These values are consumed directly by the corresponding sync / DB modules.
+
+### 36.7 Truthful sync-result rule
+- Sync result payloads for the affected history jobs must expose the real prune count returned by the DB layer.
+- A fixed placeholder such as `prunedRows: 0` is no longer allowed once prune logic has actually run.
+
+### 36.8 Simplicity rule
+- The implementation must keep the shortest path:
+  - daily incremental append/update
+  - immediate prune of excess history
+- This round does not introduce:
+  - cold archive tables
+  - monthly partitions
+  - multi-tier storage

@@ -13,6 +13,11 @@ import akshare as ak
 import pandas as pd
 
 import subscription_history_db as db
+from shared.config.script_config import get_config
+
+_CONFIG = get_config()
+_SUBSCRIPTION_CONFIG = (((_CONFIG.get("data_fetch") or {}).get("plugins") or {}).get("subscription") or {})
+HISTORY_RETENTION_DAYS = max(30, int(_SUBSCRIPTION_CONFIG.get("history_retention_days") or 1095))
 
 
 def _is_null(value: Any) -> bool:
@@ -110,6 +115,7 @@ def get_bond_data() -> Dict[str, Any]:
     fetched_rows = []
     sync_source = "subscription_db"
     fetch_error = None
+    prune_stats = {"removedRows": 0, "removedSyncLogs": 0, "cutoffDate": ""}
 
     try:
         df = ak.bond_zh_cov()
@@ -148,6 +154,7 @@ def get_bond_data() -> Dict[str, Any]:
             )
 
         db.upsert_rows("bond", fetched_rows, "akshare")
+        prune_stats = db.prune_old_rows(HISTORY_RETENTION_DAYS)
         db.record_sync("bond", len(fetched_rows), True, "akshare")
         sync_source = "akshare+sqlite"
     except Exception as exc:
@@ -193,6 +200,8 @@ def get_bond_data() -> Dict[str, Any]:
         "updateTime": now.isoformat(),
         "source": sync_source,
         "historyCount": len(stored_rows),
+        "prunedRows": int(prune_stats.get("removedRows") or 0),
+        "prunedSyncLogs": int(prune_stats.get("removedSyncLogs") or 0),
     }
 
 

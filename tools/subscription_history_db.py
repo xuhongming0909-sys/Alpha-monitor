@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Iterable, List
 
@@ -31,6 +31,10 @@ def connect() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def cutoff_date(days: int) -> str:
+    return (datetime.now() - timedelta(days=max(1, int(days)))).strftime("%Y-%m-%d")
 
 
 def normalize_kind(kind: str) -> str:
@@ -180,4 +184,22 @@ def record_sync(kind: str, total_rows: int, success: bool, source: str, error: s
                 now_iso(),
             ),
         )
+
+
+def prune_old_rows(retention_days: int) -> Dict[str, int]:
+    cutoff = cutoff_date(retention_days)
+    with connect() as conn:
+        removed_rows = conn.execute(
+            "DELETE FROM subscription_history WHERE subscribe_date < ?",
+            (cutoff,),
+        ).rowcount
+        removed_logs = conn.execute(
+            "DELETE FROM subscription_sync_log WHERE sync_date < ?",
+            (cutoff,),
+        ).rowcount
+    return {
+        "removedRows": int(removed_rows or 0),
+        "removedSyncLogs": int(removed_logs or 0),
+        "cutoffDate": cutoff,
+    }
 

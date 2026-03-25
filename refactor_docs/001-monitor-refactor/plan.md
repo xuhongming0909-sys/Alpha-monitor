@@ -1382,3 +1382,97 @@ Acceptance:
 - Typing a code or name filters the current table immediately.
 - Clearing the keyword restores the full table.
 - Sorting and 50-row pagination still work on the filtered result set.
+
+## 45. Phase AQ: Real Pure-bond Value Truth Fix + Search IME Stability (2026-03-25)
+
+Goal: repair the convertible-bond page so pure-bond-related fields use a real upstream pure-bond value instead of silently falling back to the discount-floor estimate, and make the new table search stable for multi-character and Chinese IME input.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the corrected truthfulness contract.
+2. Keep this round minimal and scoped:
+   - no new page
+   - no route shape change
+   - no AH / AB business formula change
+   - no monitor business change
+3. In the convertible-bond fetch chain:
+   - fetch the latest real pure-bond value from the Eastmoney value-analysis source for active bonds
+   - write it into `pureBondValue`
+   - let theoretical pricing prefer this real value
+   - keep the discount-floor result only as a fallback when the real source is unavailable
+4. In the dashboard search interaction:
+   - preserve focus and caret after in-panel re-render
+   - do not re-render during IME composition
+   - commit the final filter only on normal input or `compositionend`
+   - after clearing, automatically return focus to the same search box
+
+Acceptance:
+- `永22转债(113653)` no longer shows the fallback `99.x` pure-bond base when the real upstream pure-bond value is available.
+- Convertible theoretical-price calculation uses the real `pureBondValue` when available.
+- Search boxes in `转债套利 / AH溢价 / AB溢价` no longer lose focus after the first character.
+- Chinese input methods can type continuously without requiring a second click.
+
+## 46. Phase AR: Convertible Strike-price Simplification (2026-03-25)
+
+Goal: simplify the convertible-bond theoretical-pricing rule so the option strike price is fixed to the bond's conversion price, without any extra comparison or derived-strike adjustment.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round strictly inside the convertible theoretical-pricing rule:
+   - no route change
+   - no data-source change
+   - no AH / AB / monitor / rights-issue behavior change
+3. Replace the current derived strike rule in the cb-arb model:
+   - stop using `max(bondValue / optionQty, convertPrice)`
+   - use `callStrike = convertPrice`
+4. Keep the rest of the pricing chain unchanged:
+   - real `pureBondValue` still preferred
+   - `bond+call` / `bond+call-put` branch rule unchanged
+   - volatility / remaining years / treasury-yield inputs unchanged
+
+Acceptance:
+- Convertible theoretical pricing no longer performs extra strike-price judgment.
+- For rows with valid `convertPrice`, the visible `callStrike*` fields equal `convertPrice`.
+- `永22转债(113653)` recalculation reflects the new strike rule directly.
+
+## 46. Phase AR: Database Auto-update Gap Fill + Rolling Retention (2026-03-25)
+
+Goal: finish one focused database-maintenance round so every active history DB either already has automatic daily upkeep or gets the missing minimal update/prune path, while keeping only the rows actually needed by current features.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the database-maintenance contract.
+2. Keep this round narrow and data-maintenance-only:
+   - no dashboard layout change
+   - no push wording change
+   - no AH / AB / convertible pricing formula change
+3. Classify the current shared databases into three groups:
+   - already auto-updated and already self-pruned: `premium_history.db`
+   - already auto-updated and not a growing time-series store: `market_pairs.db`
+   - auto-updated but missing rolling retention or missing prune invocation:
+     - `subscription_history.db`
+     - `stock_price_history.db`
+     - `cb_rights_issue_stock_history.db`
+4. Implement the simplest retention model for the missing cases:
+   - `subscription_history.db`
+     - keep daily append/upsert as-is
+     - after each IPO / bond sync, prune rows older than the configured retention window
+   - `stock_price_history.db`
+     - keep incremental append/update as-is
+     - after each convertible-underlying history sync, prune each symbol to the configured rolling max row count
+     - the kept row count must stay safely above the current max need for `120日波动率 + ATR20 + 20日/5日平均成交额`
+   - `cb_rights_issue_stock_history.db`
+     - keep incremental append/update as-is
+     - after each rights-issue stock-history sync, prune each symbol to the configured rolling max row count
+     - the kept row count must stay safely above the current max need for `60日波动率`
+5. Put all new retention parameters into `config.yaml` instead of hardcoding them.
+6. Make the sync results report truthful prune counts so later diagnosis can see whether retention actually ran.
+
+Acceptance:
+- `subscription_history.db` no longer grows forever; the active sync path prunes rows older than the configured retention days.
+- `stock_price_history.db` no longer depends on an unused prune helper; the daily sync path really executes rolling per-symbol retention after successful sync.
+- `cb_rights_issue_stock_history.db` gains the same rolling retention behavior after sync.
+- `premium_history.db` and `market_pairs.db` remain unchanged because they already satisfy the current upkeep contract.
+- Current feature calculations still have enough history after pruning:
+  - convertible-bond `20/60/120日波动率`
+  - convertible-bond `ATR20`
+  - convertible-bond `5日/20日平均成交额`
+  - rights-issue `60日波动率`

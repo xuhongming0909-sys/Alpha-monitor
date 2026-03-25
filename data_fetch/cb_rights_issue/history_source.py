@@ -34,6 +34,10 @@ LOOKBACK_DAYS = max(120, int(_FETCH_CONFIG.get("history_lookback_days") or 420))
 MAX_WORKERS = max(1, int(_FETCH_CONFIG.get("max_history_sync_workers") or 8))
 VOL_WINDOW = max(1, int((((_CONFIG.get("strategy") or {}).get("cb_rights_issue") or {}).get("volatility_window") or 60)))
 REQUIRED_CLOSE_ROWS = VOL_WINDOW + 1
+STOCK_HISTORY_RETENTION_ROWS = max(
+    REQUIRED_CLOSE_ROWS + 20,
+    int(_FETCH_CONFIG.get("stock_history_retention_rows") or 90),
+)
 
 
 def _to_tx_symbol(stock_code: str) -> str:
@@ -184,12 +188,14 @@ def sync_cb_rights_issue_stock_history(*, force_full: bool = False, target_symbo
 
     failed = [item for item in results if not item.get("success")]
     succeeded = [item for item in results if item.get("success")]
+    pruned_rows = history_db.prune_to_recent_rows(STOCK_HISTORY_RETENTION_ROWS)
     return {
         "success": len(failed) == 0,
         "totalSymbols": len(symbols),
         "syncedSymbols": len(succeeded),
         "failedSymbols": len(failed),
         "writtenRows": sum(int(item.get("rows") or 0) for item in succeeded),
+        "prunedRows": int(pruned_rows or 0),
         "removedStaleSymbols": int(cleanup.get("removedSymbols") or 0),
         "removedStalePriceRows": int(cleanup.get("removedPriceRows") or 0),
         "failed": failed[:20],
