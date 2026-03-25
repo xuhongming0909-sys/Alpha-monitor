@@ -781,6 +781,79 @@ def _build_cb_jsl_map(cookie: str = "") -> Dict[str, Dict[str, Any]]:
     return result
 
 
+def _fetch_eastmoney_pure_bond_rows(filter_expr: str = "", page_size: int = 5000) -> list[Dict[str, Any]]:
+    params = {
+        "sty": "ALL",
+        "token": "894050c76af8597a853f5b408b759f5d",
+        "st": "DATE",
+        "sr": "-1",
+        "source": "WEB",
+        "type": "RPTA_WEB_KZZ_LS",
+        "p": "1",
+        "ps": str(page_size),
+    }
+    if filter_expr:
+        params["filter"] = filter_expr
+
+    response = requests.get(
+        "https://datacenter-web.eastmoney.com/api/data/get",
+        params=params,
+        timeout=20,
+    )
+    payload = response.json()
+    result = (payload or {}).get("result") or {}
+    pages = max(1, int(result.get("pages") or 1))
+    rows = list(result.get("data") or [])
+    if pages <= 1:
+        return rows
+
+    for page in range(2, pages + 1):
+        params["p"] = str(page)
+        response = requests.get(
+            "https://datacenter-web.eastmoney.com/api/data/get",
+            params=params,
+            timeout=20,
+        )
+        payload = response.json()
+        rows.extend((((payload or {}).get("result") or {}).get("data")) or [])
+    return rows
+
+
+@lru_cache(maxsize=4)
+def _build_latest_pure_bond_map() -> Dict[str, Dict[str, Any]]:
+    try:
+        head_rows = _fetch_eastmoney_pure_bond_rows(page_size=1)
+    except Exception:
+        return {}
+    if not head_rows:
+        return {}
+
+    latest_date = _to_date_str(head_rows[0].get("DATE"))
+    if not latest_date:
+        return {}
+
+    try:
+        lookback_date = (datetime.fromisoformat(latest_date).date() - timedelta(days=7)).isoformat()
+        rows = _fetch_eastmoney_pure_bond_rows(filter_expr=f"(DATE>='{lookback_date}')", page_size=8000)
+    except Exception:
+        return {}
+
+    result: Dict[str, Dict[str, Any]] = {}
+    for item in rows:
+        code = _to_code6(item.get("ZCODE"))
+        if not code or code in result:
+            continue
+        pure_bond_value = _to_positive_float(item.get("PUREBONDVALUE"))
+        if pure_bond_value is None:
+            continue
+        result[code] = {
+            "pureBondValue": round(pure_bond_value, 6),
+            "pureBondValueDate": _to_date_str(item.get("DATE")),
+            "pureBondValueSource": "eastmoney_value_analysis_latest",
+        }
+    return result
+
+
 def _build_ths_cov_info_map() -> Dict[str, Dict[str, Any]]:
     try:
         df = ak.bond_zh_cov_info_ths()
@@ -1091,7 +1164,8 @@ def _build_theoretical_metrics(row: Dict[str, Any], risk_free_rate: float) -> Di
         premium_rate = None
 
         if option_qty and option_qty > 0 and convert_price and convert_price > 0:
-            call_strike = max(bond_value / option_qty, convert_price)
+            # 用户确认理论定价口径：行权价固定等于转股价，不再做额外抬高判定。
+            call_strike = convert_price
             put_strike = redeem_trigger_price if redeem_trigger_price and redeem_trigger_price > 0 else None
             if spot is not None and vol is not None and remaining_years is not None:
                 call_unit = _american_option_binomial(spot, call_strike, remaining_years, risk_free_rate, vol, "call")
@@ -1267,6 +1341,8 @@ def get_bond_cb_data() -> Dict[str, Any]:
             "stockAvgRoe3Y": None,
             "stockDebtRatio": None,
             "pureBondValue": None,
+            "pureBondValueDate": None,
+            "pureBondValueSource": None,
             "couponRate": None,
             "resaleClause": None,
             "redeemClause": None,
@@ -1537,7 +1613,15 @@ def get_bond_cb_data() -> Dict[str, Any]:
             if stock_code and stock_code in vol_cache_items:
                 row.update(vol_cache_items[stock_code])
     as_of_date = now.date()
+    # 纯债价值必须优先使用真实上游值；只有缺失时才允许理论定价退回债底折现兜底。
+    pure_bond_value_items = _build_latest_pure_bond_map()
     for row in rows:
+        pure_bond_snapshot = pure_bond_value_items.get(_to_code6(row.get("code")) or "")
+        if pure_bond_snapshot:
+            row["pureBondValue"] = pure_bond_snapshot.get("pureBondValue")
+            row["pureBondValueDate"] = pure_bond_snapshot.get("pureBondValueDate")
+            row["pureBondValueSource"] = pure_bond_snapshot.get("pureBondValueSource")
+
         listing_date = _to_date_str(row.get("listingDate"))
         row["listingDate"] = listing_date
         if listing_date:
@@ -1653,7 +1737,7 @@ def get_bond_cb_data() -> Dict[str, Any]:
         "treasuryYield10yDate": risk_free["date"],
         "treasuryYield10ySource": risk_free["source"],
         "assumptions": {
-            "bondValue": "pure_bond_value_from_bond_zh_cov_value_analysis_or_discount_floor",
+            "bondValue": "pure_bond_value_from_eastmoney_value_analysis_latest_or_discount_floor_fallback",
             "issuePrice": 100,
             "volatilityWindows": list(VOL_WINDOWS),
             "primaryWindow": 60,

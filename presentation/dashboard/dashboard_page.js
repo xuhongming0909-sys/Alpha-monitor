@@ -128,6 +128,11 @@ const state = {
   savingCbRightsIssuePush: false,
   savingMonitor: false,
   cacheRevalidated: {},
+  searchComposition: {
+    cbArb: false,
+    ah: false,
+    ab: false,
+  },
   monitorEditor: createMonitorEditorState(),
   expandedRows: {
     cbArb: {},
@@ -559,13 +564,106 @@ function applyTableSearch(tableKey, rows) {
   });
 }
 
-function setTableSearchQuery(tableKey, query) {
+function setTableSearchCompositionState(tableKey, composing) {
+  if (!state.searchComposition || !Object.prototype.hasOwnProperty.call(state.searchComposition, tableKey)) return;
+  state.searchComposition[tableKey] = Boolean(composing);
+}
+
+function buildTableSearchFocusSnapshot(tableKey, element = null, fallbackValue = null) {
+  if (!readTableSearchConfig(tableKey)) return null;
+  const effectiveValue = String(
+    fallbackValue ?? element?.value ?? state.tables?.[tableKey]?.searchQuery ?? ''
+  );
+  const defaultCaret = effectiveValue.length;
+  return {
+    tableKey,
+    selectionStart: typeof element?.selectionStart === 'number' ? element.selectionStart : defaultCaret,
+    selectionEnd: typeof element?.selectionEnd === 'number' ? element.selectionEnd : defaultCaret,
+    selectionDirection: typeof element?.selectionDirection === 'string' ? element.selectionDirection : 'none',
+  };
+}
+
+function restoreTableSearchFocus(snapshot) {
+  if (!snapshot?.tableKey) return;
+  window.requestAnimationFrame(() => {
+    const field = document.querySelector(`[data-table-search-key="${snapshot.tableKey}"]`);
+    if (!(field instanceof HTMLInputElement)) return;
+    field.focus({ preventScroll: true });
+    if (typeof field.setSelectionRange !== 'function') return;
+    const max = field.value.length;
+    const start = Math.max(0, Math.min(snapshot.selectionStart ?? max, max));
+    const end = Math.max(start, Math.min(snapshot.selectionEnd ?? max, max));
+    field.setSelectionRange(start, end, snapshot.selectionDirection || 'none');
+  });
+}
+
+function renderSearchableTablePanel(tableKey) {
+  if (tableKey === 'cbArb') {
+    renderConvertibleBondPanel();
+    return;
+  }
+  if (tableKey === 'ah') {
+    renderPremiumPanel('ah');
+    return;
+  }
+  if (tableKey === 'ab') {
+    renderPremiumPanel('ab');
+  }
+}
+
+function renderSearchableTableHostContent(tableKey) {
+  if (tableKey === 'cbArb') {
+    return renderPaginatedTable({
+      tableKey: 'cbArb',
+      tableKind: 'convertible',
+      columns: buildConvertibleColumns(),
+      rows: readResourceArray('cbArb'),
+      emptyMessage: '转债套利暂时没有返回数据',
+    });
+  }
+  if (tableKey === 'ah' || tableKey === 'ab') {
+    return renderPaginatedTable({
+      tableKey,
+      tableKind: 'premium',
+      columns: buildPremiumColumns(tableKey),
+      rows: readResourceArray(tableKey),
+      emptyMessage: `${getPremiumConfig(tableKey).title} 暂无数据`,
+    });
+  }
+  return '';
+}
+
+function syncSearchBarDomState(tableKey) {
+  const input = document.querySelector(`[data-table-search-key="${tableKey}"]`);
+  const clearButton = document.querySelector(`[data-table-search-clear="${tableKey}"]`);
+  const query = String(state.tables?.[tableKey]?.searchQuery || '');
+  if (input instanceof HTMLInputElement && input.value !== query) {
+    input.value = query;
+  }
+  if (clearButton instanceof HTMLButtonElement) {
+    clearButton.disabled = !query;
+  }
+}
+
+function patchSearchableTableResults(tableKey) {
+  const host = document.querySelector(`[data-table-host="${tableKey}"]`);
+  if (!host) return false;
+  host.innerHTML = renderSearchableTableHostContent(tableKey);
+  syncSearchBarDomState(tableKey);
+  return true;
+}
+
+function setTableSearchQuery(tableKey, query, options = {}) {
   if (!state.tables?.[tableKey]) return;
   state.tables[tableKey].searchQuery = String(query || '');
   state.tables[tableKey].page = 1;
-  if (tableKey === 'cbArb') return renderConvertibleBondPanel();
-  if (tableKey === 'ah') return renderPremiumPanel('ah');
-  if (tableKey === 'ab') return renderPremiumPanel('ab');
+  if (options.render === false) return;
+  if (patchSearchableTableResults(tableKey)) {
+    restoreTableSearchFocus(options.focusSnapshot);
+    return;
+  }
+  renderSearchableTablePanel(tableKey);
+  restoreTableSearchFocus(options.focusSnapshot);
 }
 
 function todayKey() {
@@ -746,9 +844,15 @@ function bindEvents() {
   document.addEventListener('input', (event) => {
     const tableSearchField = event.target.closest('[data-table-search-key]');
     if (tableSearchField) {
+      const tableKey = String(tableSearchField.dataset.tableSearchKey || '').trim();
+      const focusSnapshot = buildTableSearchFocusSnapshot(tableKey, tableSearchField, tableSearchField.value);
       setTableSearchQuery(
-        String(tableSearchField.dataset.tableSearchKey || '').trim(),
-        String(tableSearchField.value || '')
+        tableKey,
+        String(tableSearchField.value || ''),
+        {
+          render: !(event.isComposing || state.searchComposition?.[tableKey]),
+          focusSnapshot,
+        }
       );
       return;
     }
@@ -772,6 +876,22 @@ function bindEvents() {
     const monitorField = event.target.closest('#monitor-editor-form [name]');
     if (!monitorField) return;
     syncMonitorDraftField(String(monitorField.name || '').trim(), String(monitorField.value || ''));
+  });
+
+  document.addEventListener('compositionstart', (event) => {
+    const tableSearchField = event.target.closest('[data-table-search-key]');
+    if (!tableSearchField) return;
+    setTableSearchCompositionState(String(tableSearchField.dataset.tableSearchKey || '').trim(), true);
+  });
+
+  document.addEventListener('compositionend', (event) => {
+    const tableSearchField = event.target.closest('[data-table-search-key]');
+    if (!tableSearchField) return;
+    const tableKey = String(tableSearchField.dataset.tableSearchKey || '').trim();
+    setTableSearchCompositionState(tableKey, false);
+    setTableSearchQuery(tableKey, String(tableSearchField.value || ''), {
+      focusSnapshot: buildTableSearchFocusSnapshot(tableKey, tableSearchField, tableSearchField.value),
+    });
   });
 
   document.addEventListener('click', (event) => {
@@ -823,7 +943,10 @@ function bindEvents() {
 
     const clearSearchTarget = event.target.closest('[data-table-search-clear]');
     if (clearSearchTarget) {
-      setTableSearchQuery(String(clearSearchTarget.dataset.tableSearchClear || '').trim(), '');
+      const tableKey = String(clearSearchTarget.dataset.tableSearchClear || '').trim();
+      setTableSearchQuery(tableKey, '', {
+        focusSnapshot: buildTableSearchFocusSnapshot(tableKey, null, ''),
+      });
       return;
     }
 
@@ -2206,9 +2329,9 @@ function renderTableSearchBar(tableKey) {
 
 function buildConvertibleColumns() {
   return [
-    { key: 'index', label: '序号' },
+    { key: 'bondName', label: '转债名称', columnClassName: 'col-name col-bond-sticky', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.bondName || ''), render: (row) => escapeHtml(row.bondName || '--') },
     { key: 'code', label: '转债代码', columnClassName: 'col-code', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.code || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.code || '--')}</span>` },
-    { key: 'bondName', label: '转债名称', columnClassName: 'col-name', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.bondName || ''), render: (row) => escapeHtml(row.bondName || '--') },
+    { key: 'index', label: '序号' },
     {
       key: 'price',
       label: '转债现价',
@@ -2613,13 +2736,15 @@ function renderConvertibleBondPanel() {
       <div class="list-card">
         <h3>主表</h3>
         ${renderTableSearchBar('cbArb')}
-        ${renderPaginatedTable({
-          tableKey: "cbArb",
-          tableKind: "convertible",
-          columns: buildConvertibleColumns(),
-          rows,
-          emptyMessage: "转债套利暂时没有返回数据",
-        })}
+        <div data-table-host="cbArb">
+          ${renderPaginatedTable({
+            tableKey: "cbArb",
+            tableKind: "convertible",
+            columns: buildConvertibleColumns(),
+            rows,
+            emptyMessage: "转债套利暂时没有返回数据",
+          })}
+        </div>
         <div class="slim-note">${buildConvertibleExplainText(rows)}</div>
       </div>
       ${renderModuleFootnote('cbArb')}
@@ -2923,13 +3048,15 @@ function renderPremiumPanel(type) {
       <div class="list-card">
         <h3>主表</h3>
         ${renderTableSearchBar(type)}
-        ${renderPaginatedTable({
-          tableKey: type,
-          tableKind: 'premium',
-          columns,
-          rows,
-          emptyMessage: `${config.title} 暂无数据`,
-        })}
+        <div data-table-host="${escapeHtml(type)}">
+          ${renderPaginatedTable({
+            tableKey: type,
+            tableKind: 'premium',
+            columns,
+            rows,
+            emptyMessage: `${config.title} 暂无数据`,
+          })}
+        </div>
         <div class="slim-note">${buildPremiumExplainText(type, rows)}</div>
       </div>
       ${renderModuleFootnote(type)}

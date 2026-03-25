@@ -1434,6 +1434,26 @@ Acceptance:
 - For rows with valid `convertPrice`, the visible `callStrike*` fields equal `convertPrice`.
 - `永22转债(113653)` recalculation reflects the new strike rule directly.
 
+## 47. Phase AS: Convertible Sticky Bond-name Column (2026-03-25)
+
+Goal: make the convertible-bond main table easier to track during horizontal scrolling by keeping the bond name fixed as the leftmost visible column.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round presentation-only and cb-arb-only:
+   - no API field change
+   - no pricing/formula change
+   - no AH / AB / monitor page change
+3. Adjust the convertible main-table column order so `转债名称` becomes the first visible column.
+4. Add sticky-column presentation only for the convertible main table:
+   - `转债名称` header and cells stay fixed on the left while horizontal scrolling
+   - sticky styling must remain readable on desktop and not break mobile horizontal viewing
+
+Acceptance:
+- 转债套利主表横向滚动时，`转债名称` 始终固定在最左侧可见位置。
+- 用户看到后续价格/指标列时，仍能直接知道当前是哪只转债。
+- 现有转债字段、排序、分页和计算结果不变。
+
 ## 46. Phase AR: Database Auto-update Gap Fill + Rolling Retention (2026-03-25)
 
 Goal: finish one focused database-maintenance round so every active history DB either already has automatic daily upkeep or gets the missing minimal update/prune path, while keeping only the rows actually needed by current features.

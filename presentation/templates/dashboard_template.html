@@ -954,6 +954,31 @@
         min-width: 108px;
       }
 
+      table[data-table-kind="convertible"] th.col-bond-sticky {
+        left: 0;
+        z-index: 5;
+        background:
+          linear-gradient(180deg, rgba(30, 33, 44, 0.98), rgba(22, 25, 34, 0.98)),
+          rgba(18, 18, 22, 0.98);
+        box-shadow: 10px 0 18px rgba(0, 0, 0, 0.18);
+      }
+
+      table[data-table-kind="convertible"] td.col-bond-sticky {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background:
+          linear-gradient(180deg, rgba(22, 25, 34, 0.98), rgba(18, 18, 22, 0.98)),
+          rgba(18, 18, 22, 0.98);
+        box-shadow: 10px 0 18px rgba(0, 0, 0, 0.12);
+      }
+
+      table[data-table-kind="convertible"] tbody tr:not(.detail-row):not(.subscription-row):not(.merger-row-today):nth-child(even) td.col-bond-sticky {
+        background:
+          linear-gradient(180deg, rgba(28, 31, 40, 0.98), rgba(23, 25, 33, 0.98)),
+          rgba(23, 25, 33, 0.98);
+      }
+
       th.col-num,
       td.col-num {
         width: 80px;

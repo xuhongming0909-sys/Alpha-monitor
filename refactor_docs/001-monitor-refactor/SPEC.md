@@ -2595,6 +2595,35 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 ### 36.4 Outward payload rule
 - `callStrike20 / callStrike60 / callStrike120` must equal the same row's `convertPrice` when `convertPrice` is valid.
 
+## 37. Convertible Sticky Bond-name Column Spec (2026-03-25)
+
+### 37.1 Scope
+- This round changes only the convertible main-table presentation.
+- No payload, route, or strategy change is included.
+
+### 37.2 Column-order rule
+- In `buildConvertibleColumns()`, `转债名称` becomes the first visible business column of the convertible main table.
+- The round may reorder nearby helper columns such as:
+  - `序号`
+  - `转债代码`
+- Remaining field coverage stays unchanged.
+
+### 37.3 Sticky-column rule
+- Only the convertible main table receives a sticky left column in this round.
+- The sticky target is the `转债名称` column header and data cells.
+- Required behavior:
+  - keep the bond-name column fixed while the table scrolls horizontally
+  - preserve sticky header behavior at the top
+  - keep text readable through an explicit background and stacking order
+
+### 37.4 Style boundary
+- Implementation may add a dedicated convertible-only column class such as:
+  - `col-bond-sticky`
+- Sticky styling must not accidentally affect:
+  - premium tables
+  - monitor tables
+  - rights-issue tables
+
 ## 36. Shared DB Auto-update + Rolling Retention Spec (2026-03-25)
 
 ### 36.1 Scope
