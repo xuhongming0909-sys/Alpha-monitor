@@ -1651,7 +1651,7 @@ Acceptance:
 - `暂停申购` rows remain visible in the LOF main table but disappear from both monitor pools and the related push-entry path.
 - Existing `LOF` API shape, dashboard tab, and independent push runtime remain available.
 
-## 58. Phase AX: LOF Europe/US External Market API Enrichment (2026-03-25)
+## 59. Phase AX: LOF Europe/US External Market API Enrichment (2026-03-25)
 
 Goal: add one minimal external market-data fallback for `LOF套利 > QDII欧美` so the
 module no longer depends only on Jisilu `cal_tips` plus the small Tencent index map

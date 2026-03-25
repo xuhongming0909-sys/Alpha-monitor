@@ -264,10 +264,12 @@ data_fetch:
       source_page_urls:
         index: "https://www.jisilu.cn/data/lof/#index"
         europe_us: "https://www.jisilu.cn/data/qdii/#qdiie"
+        commodity: "https://www.jisilu.cn/data/qdii/#qdiic"
         asia: "https://www.jisilu.cn/data/qdii/#qdiia"
       source_api_urls:
         index: "https://www.jisilu.cn/data/lof/index_lof_list/"
         europe_us: "https://www.jisilu.cn/data/qdii/qdii_list/E"
+        commodity: "https://www.jisilu.cn/data/qdii/qdii_list/C"
         asia: "https://www.jisilu.cn/data/qdii/qdii_list/A"
       source_referer: "https://www.jisilu.cn/"
       request_timeout_ms: 20000
@@ -287,8 +289,9 @@ data_fetch:
             "SPX.GI": "^SPX"
             "NDX.GI": "^NDQ"
             "DJI.GI": "^DJI"
-            "IXIC.GI": "^NDQ"
             "AGG": "AGG.US"
+            "HSI.GI": "^HSI"
+            "HSI": "^HSI"
           index_name:
             "恒生指数": "^HSI"
         fx_symbol_map:

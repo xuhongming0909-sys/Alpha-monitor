@@ -3016,7 +3016,7 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - source `nav_discount_rt` normalized for strategy use
 - These fields may stay internal helper fields and do not need to become required visible columns.
 
-## 42. LOF Europe/US External Market API Enrichment Spec (2026-03-25)
+## 42A. LOF Europe/US External Market API Enrichment Spec (2026-03-25)
 
 ### 42.1 Scope
 - This round changes only the LOF fetch/helper path for `QDII欧美`.
