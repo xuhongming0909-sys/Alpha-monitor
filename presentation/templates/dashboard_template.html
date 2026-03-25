@@ -477,7 +477,7 @@
       .tab-nav {
         /* 主导航压缩为更像信息切换条，而不是大卡片按钮组 */
         display: grid;
-        grid-template-columns: repeat(7, minmax(0, 1fr));
+        grid-template-columns: repeat(8, minmax(0, 1fr));
         gap: 6px;
         margin: 8px 0 6px;
       }
@@ -839,6 +839,25 @@
         text-align: right;
         font-size: 14px;
         font-weight: 700;
+      }
+
+      .lof-monitor-card .stack-list {
+        gap: 8px;
+      }
+
+      .lof-monitor-row {
+        align-items: flex-start;
+        padding: 9px 10px;
+      }
+
+      .lof-monitor-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+        margin-top: 5px;
+        color: var(--text-soft);
+        font-size: 12px;
+        line-height: 1.5;
       }
 
       .module-grid {
@@ -1515,6 +1534,7 @@
         <button class="tab-button active" data-tab="cb-arb" type="button">转债套利</button>
         <button class="tab-button" data-tab="ah" type="button">AH溢价</button>
         <button class="tab-button" data-tab="ab" type="button">AB溢价</button>
+        <button class="tab-button" data-tab="lof-arb" type="button">LOF套利</button>
         <button class="tab-button" data-tab="monitor" type="button">监控套利</button>
         <button class="tab-button" data-tab="dividend" type="button">分红提醒</button>
         <button class="tab-button" data-tab="merger" type="button">事件套利</button>
@@ -1525,6 +1545,7 @@
         <section id="panel-cb-arb" class="panel-surface tab-panel active"></section>
         <section id="panel-ah" class="panel-surface tab-panel"></section>
         <section id="panel-ab" class="panel-surface tab-panel"></section>
+        <section id="panel-lof-arb" class="panel-surface tab-panel"></section>
         <section id="panel-monitor" class="panel-surface tab-panel"></section>
         <section id="panel-dividend" class="panel-surface tab-panel"></section>
         <section id="panel-merger" class="panel-surface tab-panel"></section>

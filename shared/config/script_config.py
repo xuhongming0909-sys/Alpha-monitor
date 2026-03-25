@@ -25,6 +25,9 @@ SECRET_ENV_PATHS = [
     (("strategy", "merger", "deepseek_api_key"), "DEEPSEEK_API_KEY"),
     (("strategy", "merger", "deepseek_base_url"), "DEEPSEEK_BASE_URL"),
     (("data_fetch", "plugins", "convertible_bond", "jisilu_cookie"), "JISILU_COOKIE"),
+    (("data_fetch", "plugins", "lof_arbitrage", "jisilu_cookie"), "JISILU_COOKIE"),
+    (("data_fetch", "plugins", "lof_arbitrage", "firecrawl_api_url"), "FIRECRAWL_API_URL"),
+    (("data_fetch", "plugins", "lof_arbitrage", "firecrawl_api_key"), "FIRECRAWL_API_KEY"),
 ]
 
 

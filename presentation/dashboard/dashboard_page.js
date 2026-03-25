@@ -48,6 +48,7 @@ const ENDPOINTS = {
   bonds: '/api/market/convertible-bonds',
   cbArb: '/api/market/convertible-bond-arbitrage',
   cbRightsIssue: '/api/market/cb-rights-issue',
+  lofArb: '/api/market/lof-arbitrage',
   ah: '/api/market/ah',
   ab: '/api/market/ab',
   monitor: '/api/monitors',
@@ -57,20 +58,22 @@ const ENDPOINTS = {
   merger: '/api/market/event-arbitrage',
   pushConfig: '/api/push/config',
   cbRightsIssuePushConfig: '/api/push/cb-rights-issue-config',
+  lofArbPushConfig: '/api/push/lof-arbitrage-config',
 };
 
-const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'monitor', 'dividend', 'merger', 'cb-rights-issue'];
+const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'lof-arb', 'monitor', 'dividend', 'merger', 'cb-rights-issue'];
 const EVENT_ARB_SUBTAB_SEQUENCE = ['a_event', 'hk_private', 'cn_private', 'rights_issue', 'announcement_pool'];
 const TAB_PRIMARY_RESOURCE_KEYS = Object.freeze({
   'cb-arb': ['cbArb'],
   ah: ['ah'],
   ab: ['ab'],
+  'lof-arb': ['lofArb', 'lofArbPushConfig'],
   monitor: ['monitor'],
   dividend: ['dividend'],
   merger: ['merger'],
   'cb-rights-issue': ['cbRightsIssue', 'cbRightsIssuePushConfig'],
 });
-const DATASET_STATUS_RESOURCE_KEYS = Object.freeze(['exchangeRate', 'ipo', 'bonds', 'cbArb', 'ah', 'ab', 'merger', 'cbRightsIssue']);
+const DATASET_STATUS_RESOURCE_KEYS = Object.freeze(['exchangeRate', 'ipo', 'bonds', 'cbArb', 'ah', 'ab', 'lofArb', 'merger', 'cbRightsIssue']);
 const MONITOR_MARKET_OPTIONS = ['A', 'H', 'B'];
 const MONITOR_CURRENCY_OPTIONS = ['CNY', 'HKD', 'USD'];
 const PUSH_MODULE_LABELS = {
@@ -111,6 +114,7 @@ const TABLE_DEFAULTS = {
   monitor: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   dividend: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   merger: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  lofArb: { sortKey: 'premiumRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   cbRightsIssueMonitor: { sortKey: 'expectedReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   cbRightsIssueSource: { sortKey: 'expectedReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   eventArbHk: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
@@ -135,14 +139,21 @@ const TABLE_SEARCH_CONFIG = Object.freeze({
     hint: '可按A股代码、A股名称、B股代码、B股名称搜索',
     fields: ['aCode', 'aName', 'bCode', 'bName'],
   },
+  lofArb: {
+    placeholder: '搜索LOF代码、名称或相关指数',
+    hint: '可按LOF代码、LOF名称、相关指数搜索',
+    fields: ['code', 'name', 'indexName'],
+  },
 });
 
 const state = {
   activeTab: 'cb-arb',
+  lofSubview: 'europe_us',
   mergerSubview: 'a_event',
   eventsBound: false,
   savingPush: false,
   savingCbRightsIssuePush: false,
+  savingLofArbPush: false,
   savingMonitor: false,
   cacheRevalidated: {},
   resourceMeta: {},
@@ -152,6 +163,7 @@ const state = {
     cbArb: false,
     ah: false,
     ab: false,
+    lofArb: false,
   },
   monitorEditor: createMonitorEditorState(),
   expandedRows: {
@@ -172,6 +184,7 @@ const state = {
     monitor: createTableState('monitor'),
     dividend: createTableState('dividend'),
     merger: createTableState('merger'),
+    lofArb: createTableState('lofArb'),
     cbRightsIssueMonitor: createTableState('cbRightsIssueMonitor'),
     cbRightsIssueSource: createTableState('cbRightsIssueSource'),
     eventArbHk: createTableState('eventArbHk'),
@@ -187,6 +200,7 @@ const state = {
     bonds: resourceState(),
     cbArb: resourceState(),
     cbRightsIssue: resourceState(),
+    lofArb: resourceState(),
     ah: resourceState(),
     ab: resourceState(),
     monitor: resourceState(),
@@ -194,6 +208,7 @@ const state = {
     merger: resourceState(),
     pushConfig: resourceState(),
     cbRightsIssuePushConfig: resourceState(),
+    lofArbPushConfig: resourceState(),
   },
 };
 
@@ -203,6 +218,7 @@ const dom = {
     'cb-arb': document.getElementById('panel-cb-arb'),
     ah: document.getElementById('panel-ah'),
     ab: document.getElementById('panel-ab'),
+    'lof-arb': document.getElementById('panel-lof-arb'),
     monitor: document.getElementById('panel-monitor'),
     dividend: document.getElementById('panel-dividend'),
     merger: document.getElementById('panel-merger'),
@@ -677,6 +693,10 @@ function renderSearchableTablePanel(tableKey) {
   }
   if (tableKey === 'ab') {
     renderPremiumPanel('ab');
+    return;
+  }
+  if (tableKey === 'lofArb') {
+    renderLofArbPanel();
   }
 }
 
@@ -697,6 +717,17 @@ function renderSearchableTableHostContent(tableKey) {
       columns: buildPremiumColumns(tableKey),
       rows: readResourceArray(tableKey),
       emptyMessage: `${getPremiumConfig(tableKey).title} 暂无数据`,
+    });
+  }
+  if (tableKey === 'lofArb') {
+    return renderPaginatedTable({
+      tableKey: 'lofArb',
+      tableKind: 'lof',
+      columns: buildLofArbColumns(),
+      rows: readLofArbVisibleRows(),
+      emptyMessage: '当前分组没有符合条件的 LOF 套利数据',
+      detailRenderer: (row) => renderDetailGrid(buildLofArbDetailItems(row)),
+      detailMode: 'always',
     });
   }
   return '';
@@ -802,6 +833,70 @@ function readCbRightsIssueRebuildStatus() {
 
 function readCbRightsIssuePushConfigViewModel() {
   const payload = readResourceObject('cbRightsIssuePushConfig');
+  return payload?.data && typeof payload.data === 'object' ? payload.data : {};
+}
+
+function readLofArbDataset() {
+  const payload = readResourceObject('lofArb');
+  return payload?.data && typeof payload.data === 'object' ? payload.data : {};
+}
+
+function readLofArbRows() {
+  const dataset = readLofArbDataset();
+  return Array.isArray(dataset.rows) ? dataset.rows : [];
+}
+
+function readLofArbGroups() {
+  const dataset = readLofArbDataset();
+  const groups = Array.isArray(dataset.groups) ? dataset.groups : [];
+  return groups.length ? groups : [
+    { key: 'index', label: '指数LOF' },
+    { key: 'europe_us', label: 'QDII欧美' },
+    { key: 'asia', label: 'QDII亚洲' },
+  ];
+}
+
+function ensureLofSubview() {
+  const groups = readLofArbGroups();
+  const allowed = groups.map((item) => String(item?.key || '').trim()).filter(Boolean);
+  const fallback = String(readLofArbDataset().defaultGroup || 'europe_us').trim() || 'europe_us';
+  if (!allowed.length) {
+    state.lofSubview = fallback;
+    return fallback;
+  }
+  if (!allowed.includes(state.lofSubview)) {
+    state.lofSubview = allowed.includes(fallback) ? fallback : allowed[0];
+  }
+  return state.lofSubview;
+}
+
+function readLofArbVisibleRows() {
+  const activeGroup = ensureLofSubview();
+  return readLofArbRows().filter((row) => String(row.marketGroup || '').trim() === activeGroup);
+}
+
+function readLofArbSummary() {
+  const dataset = readLofArbDataset();
+  return dataset?.sourceSummary && typeof dataset.sourceSummary === 'object' ? dataset.sourceSummary : {};
+}
+
+function readLofArbRebuildStatus() {
+  const dataset = readLofArbDataset();
+  return dataset?.rebuildStatus && typeof dataset.rebuildStatus === 'object' ? dataset.rebuildStatus : {};
+}
+
+function readLofArbLimitedRows() {
+  const dataset = readLofArbDataset();
+  return Array.isArray(dataset.limitedMonitorRows) ? dataset.limitedMonitorRows : [];
+}
+
+function readLofArbUnlimitedRows() {
+  const dataset = readLofArbDataset();
+  return Array.isArray(dataset.unlimitedMonitorRows) ? dataset.unlimitedMonitorRows : [];
+}
+
+function readLofArbPushConfigViewModel() {
+  const payload = readResourceObject('lofArbPushConfig');
   return payload?.data && typeof payload.data === 'object' ? payload.data : {};
 }
 
@@ -919,6 +1014,13 @@ function bindEvents() {
   });
 
   document.addEventListener('submit', (event) => {
+    const lofArbPushForm = event.target.closest('#lof-arb-push-form');
+    if (lofArbPushForm) {
+      event.preventDefault();
+      void saveLofArbPushConfig(lofArbPushForm);
+      return;
+    }
+
     const cbRightsIssuePushForm = event.target.closest('#cb-rights-issue-push-form');
     if (cbRightsIssuePushForm) {
       event.preventDefault();
@@ -1049,8 +1151,20 @@ function bindEvents() {
       if (tableKey === 'cbArb') return renderConvertibleBondPanel();
       if (tableKey === 'ah') return renderPremiumPanel('ah');
       if (tableKey === 'ab') return renderPremiumPanel('ab');
+      if (tableKey === 'lofArb') return renderLofArbPanel();
       if (tableKey === 'monitor') return renderMonitorPanel();
       if (tableKey === 'merger' || tableKey.startsWith('eventArb')) return renderMergerPanel();
+    }
+
+    const lofSubviewTarget = event.target.closest('[data-lof-subview]');
+    if (lofSubviewTarget) {
+      const subview = String(lofSubviewTarget.dataset.lofSubview || '').trim();
+      const allowed = readLofArbGroups().map((item) => String(item.key || '').trim());
+      if (!allowed.includes(subview)) return;
+      state.lofSubview = subview;
+      state.tables.lofArb.page = 1;
+      renderLofArbPanel();
+      return;
     }
 
     const eventArbSubtab = event.target.closest('[data-event-arb-subtab]');
@@ -1117,6 +1231,12 @@ function buildActiveTabLoadTasks(options = {}) {
   }
   if (state.activeTab === 'ab') {
     return [loadResource('ab', ENDPOINTS.ab, renderEverything, { force: forceMarket, background })];
+  }
+  if (state.activeTab === 'lof-arb') {
+    return [
+      loadResource('lofArb', ENDPOINTS.lofArb, renderEverything, { force: forceMarket, background }),
+      loadResource('lofArbPushConfig', ENDPOINTS.lofArbPushConfig, renderEverything, { background }),
+    ];
   }
   if (state.activeTab === 'monitor') {
     return [loadResource('monitor', ENDPOINTS.monitor, renderEverything, { background })];
@@ -1747,6 +1867,44 @@ async function saveCbRightsIssuePushConfig(form) {
   }
 }
 
+async function saveLofArbPushConfig(form) {
+  const config = readLofArbPushConfigViewModel();
+  const formData = new FormData(form);
+  const times = [
+    String(formData.get('time1') || '').trim(),
+    String(formData.get('time2') || '').trim(),
+    String(formData.get('time3') || '').trim(),
+  ].filter(Boolean);
+
+  if (times.length !== 3) {
+    showToast('LOF 套利推送时间需要完整填写 3 个时点', true);
+    return;
+  }
+
+  state.savingLofArbPush = true;
+  renderLofArbPanel();
+  try {
+    const payload = await fetchJson(ENDPOINTS.lofArbPushConfig, {
+      method: 'POST',
+      body: JSON.stringify({
+        enabled: config.enabled !== false,
+        times,
+      }),
+    });
+    state.resources.lofArbPushConfig.status = 'ready';
+    state.resources.lofArbPushConfig.data = payload;
+    state.resources.lofArbPushConfig.error = null;
+    showToast('LOF 套利推送时间已保存');
+  } catch (error) {
+    state.resources.lofArbPushConfig.status = 'error';
+    state.resources.lofArbPushConfig.error = error;
+    showToast(error.message || 'LOF 套利推送时间保存失败', true);
+  } finally {
+    state.savingLofArbPush = false;
+    renderLofArbPanel();
+  }
+}
+
 function readMonitorEditorDraft() {
   return state.monitorEditor?.draft || createMonitorDraft();
 }
@@ -2174,6 +2332,7 @@ function handleSortClick(tableKey, sortKey) {
   if (tableKey === 'cbArb') renderConvertibleBondPanel();
   if (tableKey === 'ah') renderPremiumPanel('ah');
   if (tableKey === 'ab') renderPremiumPanel('ab');
+  if (tableKey === 'lofArb') renderLofArbPanel();
   if (tableKey === 'cbRightsIssueMonitor' || tableKey === 'cbRightsIssueSource') renderCbRightsIssuePanel();
 }
 
@@ -2192,6 +2351,7 @@ function handlePageClick(tableKey, action) {
   if (tableKey === 'cbArb') renderConvertibleBondPanel();
   if (tableKey === 'ah') renderPremiumPanel('ah');
   if (tableKey === 'ab') renderPremiumPanel('ab');
+  if (tableKey === 'lofArb') renderLofArbPanel();
   if (tableKey === 'monitor') renderMonitorPanel();
   if (tableKey === 'dividend') renderDividendPanel();
   if (tableKey === 'cbRightsIssueMonitor' || tableKey === 'cbRightsIssueSource') renderCbRightsIssuePanel();
@@ -2200,6 +2360,7 @@ function handlePageClick(tableKey, action) {
 
 function readTableSourceRows(tableKey) {
   if (tableKey === 'cbArb') return readResourceArray('cbArb');
+  if (tableKey === 'lofArb') return readLofArbVisibleRows();
   if (tableKey === 'cbRightsIssueMonitor') return readCbRightsIssueMonitorRows();
   if (tableKey === 'cbRightsIssueSource') return readCbRightsIssueSourceRows();
   if (tableKey === 'ah') return readResourceArray('ah');
@@ -2215,6 +2376,7 @@ function readTableSourceRows(tableKey) {
 
 function getTableColumns(tableKey) {
   if (tableKey === 'cbArb') return buildConvertibleColumns();
+  if (tableKey === 'lofArb') return buildLofArbColumns();
   if (tableKey === 'cbRightsIssueMonitor') return buildCbRightsIssueMonitorColumns();
   if (tableKey === 'cbRightsIssueSource') return buildCbRightsIssueSourceColumns();
   if (tableKey === 'ah') return buildPremiumColumns('ah');
@@ -2367,6 +2529,7 @@ function resolveRowId(tableKey, row, fallbackIndex) {
   if (tableKey === 'cbArb') return String(row.code || row.bondName || fallbackIndex);
   if (tableKey === 'ah') return `${row.aCode || ''}-${row.hCode || ''}-${fallbackIndex}`;
   if (tableKey === 'ab') return `${row.aCode || ''}-${row.bCode || ''}-${fallbackIndex}`;
+  if (tableKey === 'lofArb') return String(row.code || row.name || fallbackIndex);
   if (tableKey === 'monitor') return String(row.id || row.name || fallbackIndex);
   if (tableKey === 'cbRightsIssueMonitor') return String(row.bondCode || row.stockCode || fallbackIndex);
   if (tableKey === 'cbRightsIssueSource') return String(row.bondCode || row.stockCode || fallbackIndex);
@@ -2857,6 +3020,7 @@ function renderActivePanel() {
   if (state.activeTab === 'cb-arb') return renderConvertibleBondPanel();
   if (state.activeTab === 'ah') return renderPremiumPanel('ah');
   if (state.activeTab === 'ab') return renderPremiumPanel('ab');
+  if (state.activeTab === 'lof-arb') return renderLofArbPanel();
   if (state.activeTab === 'monitor') return renderMonitorPanel();
   if (state.activeTab === 'dividend') return renderDividendPanel();
   if (state.activeTab === 'merger') return renderMergerPanel();
@@ -3001,6 +3165,233 @@ function buildConvertibleExplainText(rows) {
   return escapeHtml(`${baseText} ${detailText}。`);
 }
 
+function buildLofArbPushStateText() {
+  const config = readLofArbPushConfigViewModel();
+  const deliveryStatus = config?.deliveryStatus && typeof config.deliveryStatus === 'object' ? config.deliveryStatus : {};
+  const times = Array.isArray(config?.times) ? config.times.filter(Boolean) : [];
+  const parts = [
+    times.length ? `时间 ${times.join(' / ')}` : '时间 --',
+    deliveryStatus.webhookConfigured ? 'Webhook已配置' : 'Webhook未配置',
+    deliveryStatus.schedulerEnabled === false
+      ? (deliveryStatus.schedulerDisabledReason === 'loopback_public_base_url' ? '本地运行已禁用服务端推送调度' : '服务端调度已关闭')
+      : '',
+    deliveryStatus.lastSuccessAt ? `定时成功 ${formatDate(deliveryStatus.lastSuccessAt)}` : '',
+    deliveryStatus.lastInstantSuccessAt ? `即时成功 ${formatDate(deliveryStatus.lastInstantSuccessAt)}` : '',
+    deliveryStatus.lastError ? `定时失败 ${String(deliveryStatus.lastError).slice(0, 60)}` : '',
+    deliveryStatus.lastInstantError ? `即时失败 ${String(deliveryStatus.lastInstantError).slice(0, 60)}` : '',
+  ].filter(Boolean);
+  return parts.join(' / ');
+}
+
+function renderLofArbPushCard() {
+  const config = readLofArbPushConfigViewModel();
+  const times = Array.isArray(config?.times) ? config.times : ['13:30', '14:00', '14:30'];
+  const loading = state.resources.lofArbPushConfig.status === 'loading' && !state.resources.lofArbPushConfig.data;
+  const disabled = state.savingLofArbPush || loading;
+
+  return `
+    <div class="list-card">
+      <div class="module-toolbar">
+        <div>
+          <h3>独立推送设置</h3>
+          <div class="section-note">新入池即时推送，另在 13:30 / 14:00 / 14:30 推送两个监控池的全量结果。</div>
+        </div>
+        <div class="panel-meta">
+          <span>${escapeHtml(buildLofArbPushStateText() || '正在读取推送状态')}</span>
+        </div>
+      </div>
+      <form id="lof-arb-push-form" class="push-form">
+        <div class="input-group">
+          <label for="lof-arb-push-time-1">推送时间 1</label>
+          <input id="lof-arb-push-time-1" name="time1" type="time" value="${escapeHtml(times[0] || '')}" ${disabled ? 'disabled' : ''} />
+        </div>
+        <div class="input-group">
+          <label for="lof-arb-push-time-2">推送时间 2</label>
+          <input id="lof-arb-push-time-2" name="time2" type="time" value="${escapeHtml(times[1] || '')}" ${disabled ? 'disabled' : ''} />
+        </div>
+        <div class="input-group">
+          <label for="lof-arb-push-time-3">推送时间 3</label>
+          <input id="lof-arb-push-time-3" name="time3" type="time" value="${escapeHtml(times[2] || '')}" ${disabled ? 'disabled' : ''} />
+        </div>
+        <div class="button-row inline">
+          <button type="submit" class="btn-primary" ${disabled ? 'disabled' : ''}>保存</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+function buildLofArbColumns() {
+  return [
+    { key: 'index', label: '序号' },
+    { key: 'code', label: '代码', columnClassName: 'col-code', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.code || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.code || '--')}</span>` },
+    { key: 'name', label: '名称', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.name || ''), render: (row) => escapeHtml(row.name || '--') },
+    { key: 'price', label: '现价', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.price), render: (row) => formatNumber(row.price, 3) },
+    { key: 'changeRate', label: '涨幅', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.changeRate), className: (row) => statusClass(row.changeRate), render: (row) => formatPercent(row.changeRate, 2) },
+    { key: 'turnoverWan', label: '成交额(万)', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.turnoverWan), render: (row) => formatNumber(row.turnoverWan, 2) },
+    { key: 'shareAmountWan', label: '场内份额(万份)', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.shareAmountWan), render: (row) => formatNumber(row.shareAmountWan, 2) },
+    { key: 'shareAmountIncreaseWan', label: '场内新增', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.shareAmountIncreaseWan), render: (row) => formatNumber(row.shareAmountIncreaseWan, 2) },
+    { key: 'nav', label: '净值', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.nav), render: (row) => formatNumber(row.nav, 4) },
+    { key: 'navDate', label: '净值日期', columnClassName: 'col-date', sortable: true, sortType: 'date', defaultDir: 'desc', sortValue: (row) => normalizeDateKey(row.navDate), render: (row) => escapeHtml(formatDateOnly(row.navDate)) },
+    { key: 'indexIncreaseRate', label: '指数涨幅', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.indexIncreaseRate), className: (row) => statusClass(row.indexIncreaseRate), render: (row) => formatPercent(row.indexIncreaseRate, 2) },
+    { key: 'indexName', label: '相关指数', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.indexName || ''), render: (row) => escapeHtml(row.indexName || '--') },
+    { key: 'applyFee', label: '申购费', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'asc', sortValue: (row) => toNumber(row.applyFee), render: (row) => formatPercent(row.applyFee, 2) },
+    { key: 'applyStatusText', label: '申购状态', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.applyStatusText || ''), render: (row) => escapeHtml(row.applyStatusText || '--') },
+    { key: 'redeemFee', label: '赎回费', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'asc', sortValue: (row) => toNumber(row.redeemFee), render: (row) => formatPercent(row.redeemFee, 2) },
+    { key: 'redeemStatus', label: '赎回状态', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.redeemStatus || ''), render: (row) => escapeHtml(row.redeemStatus || '--') },
+    { key: 'custodianFee', label: '托管费', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'asc', sortValue: (row) => toNumber(row.custodianFee), render: (row) => formatPercent(row.custodianFee, 2) },
+    { key: 'iopv', label: 'IOPV', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.iopv), render: (row) => formatNumber(row.iopv, 4) },
+    { key: 'premiumRate', label: '溢价率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premiumRate), className: (row) => statusClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate, 2) },
+  ];
+}
+
+function buildLofArbDetailItems(row) {
+  return [
+    { label: '分组', value: row.groupLabel || '--' },
+    { label: '市场', value: row.marketLabel || '--' },
+    { label: '货币', value: row.currency || '--' },
+    { label: '时间备注', value: row.timeNote || '--' },
+    { label: '限购金额', value: row.applyLimitAmount ? `${formatNumber(row.applyLimitAmount, 0)} 元` : '无限额/未识别' },
+    { label: '计算模式', value: row.calcMode || '--' },
+    { label: '计算状态', value: row.calcStatus || '--' },
+    { label: '当前汇率', value: formatNumber(row.currentFxRate, 4) },
+    { label: '当前指数点位', value: formatNumber(row.currentIndexValue, 4) },
+    { label: '基准指数点位', value: formatNumber(row.baseIndexValue, 4) },
+    { label: '基准汇率', value: formatNumber(row.baseFxValue, 4) },
+    { label: '来源页面', value: buildAnchor(row.sourcePageUrl, '打开') || '--' },
+  ];
+}
+
+function renderLofMonitorSummaryCard(title, rows, emptyText, extraClass = '') {
+  const visibleRows = Array.isArray(rows) ? rows.slice(0, 8) : [];
+  const body = visibleRows.length
+    ? `
+      <div class="stack-list lof-monitor-list">
+        ${visibleRows.map((row) => `
+          <div class="stack-row lof-monitor-row">
+            <div class="item-main">
+              <div class="item-title">
+                ${escapeHtml(row.name || '--')}
+                <span class="item-subtitle mono-text">${escapeHtml(row.code || '--')}</span>
+              </div>
+              <div class="lof-monitor-meta">
+                <span>${escapeHtml(row.marketLabel || '--')}</span>
+                <span>${escapeHtml(row.groupLabel || '--')}</span>
+                <span>申购 ${escapeHtml(row.applyStatusText || row.applyStatus || '--')}</span>
+                <span>现价 ${escapeHtml(formatNumber(row.price, 3))}</span>
+                <span>涨幅 ${escapeHtml(formatPercent(row.changeRate, 2))}</span>
+                <span>成交额 ${escapeHtml(formatNumber(row.turnoverWan, 2))}万</span>
+                <span>申购费 ${escapeHtml(formatPercent(row.applyFee, 2))}</span>
+                <span>赎回费 ${escapeHtml(formatPercent(row.redeemFee, 2))}</span>
+                <span>${escapeHtml(row.timeNote || '--')}</span>
+              </div>
+            </div>
+            <div class="item-value ${escapeHtml(statusClass(row.premiumRate) || '')}">${escapeHtml(formatPercent(row.premiumRate, 2))}</div>
+          </div>
+        `).join('')}
+      </div>
+    `
+    : `<div class="empty-state"><div>${escapeHtml(emptyText)}</div></div>`;
+
+  return `
+    <section class="summary-card lof-monitor-card ${escapeHtml(extraClass)}">
+      <h3>${escapeHtml(title)}</h3>
+      ${body}
+    </section>
+  `;
+}
+
+function renderLofArbGroupTabs() {
+  const active = ensureLofSubview();
+  return `
+    <div class="subtab-nav">
+      ${readLofArbGroups().map((group) => `
+        <button
+          type="button"
+          class="subtab-button ${active === group.key ? 'active' : ''}"
+          data-lof-subview="${escapeHtml(group.key)}"
+        >${escapeHtml(group.label || group.key)}</button>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderLofArbPanel() {
+  const panel = dom.tabPanels['lof-arb'];
+  const resource = state.resources.lofArb;
+  if (!panel) return;
+
+  if (resource.status === 'loading' || resource.status === 'idle') {
+    panel.innerHTML = moduleLoading('LOF 套利正在抓取集思录 LOF / QDII 来源');
+    return;
+  }
+
+  if (resource.status === 'error') {
+    panel.innerHTML = moduleError('LOF 套利加载失败', resource.error?.message);
+    return;
+  }
+
+  ensureLofSubview();
+  const rows = readLofArbRows();
+  const visibleRows = readLofArbVisibleRows();
+  const limitedRows = readLofArbLimitedRows();
+  const unlimitedRows = readLofArbUnlimitedRows();
+  const summary = readLofArbSummary();
+  const rebuildStatus = readLofArbRebuildStatus();
+  const activeGroup = readLofArbGroups().find((item) => item.key === state.lofSubview);
+  const groupSummary = summary.groups && typeof summary.groups === 'object' ? summary.groups[state.lofSubview] : null;
+  const sourceVisibleCount = (() => {
+    const allCount = Number(groupSummary?.allCount || 0);
+    if (Number.isFinite(allCount) && allCount > 0) return allCount;
+    const visibleCount = Number(groupSummary?.visibleCount || 0);
+    if (Number.isFinite(visibleCount) && visibleCount > 0) return visibleCount;
+    return visibleRows.length;
+  })();
+
+  panel.innerHTML = `
+    <div class="module-shell">
+      <div class="module-toolbar">
+        <div>
+          <div class="tab-title">LOF套利</div>
+          <div class="section-note">固定锚定集思录 LOF / QDII 页面家族，顶部只展示限购与非限购两个监控池，主表按分组查看真实 IOPV 与溢价率。</div>
+        </div>
+      </div>
+      <div class="summary-grid">
+        ${renderLofMonitorSummaryCard('限购监控池', limitedRows, '满足限购 + 溢价 + 成交额规则后才会入池')}
+        ${renderLofMonitorSummaryCard('非限购监控池', unlimitedRows, '满足不限购且溢价率绝对值超过阈值后才会入池', 'negative-card')}
+      </div>
+      <div class="list-card">
+        <div class="module-toolbar">
+          <div>
+            <h3>主表</h3>
+            <div class="section-note">${escapeHtml((activeGroup?.label || '当前分组'))} / 当前展示 ${formatInt(visibleRows.length)} 条 / 源侧可见 ${formatInt(sourceVisibleCount)} 条</div>
+          </div>
+          <div class="panel-meta">
+            <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('lofArb') || rebuildStatus.lastRebuildAt))}</span>
+            <span>${escapeHtml(readFreshnessText('lofArb'))}</span>
+            <span>${groupSummary?.guestLimited ? '当前为游客可见范围' : '当前为完整可见范围'}</span>
+          </div>
+        </div>
+        ${renderLofArbGroupTabs()}
+        ${renderTableSearchBar('lofArb')}
+        <div data-table-host="lofArb">
+          ${renderPaginatedTable({
+            tableKey: 'lofArb',
+            tableKind: 'lof',
+            columns: buildLofArbColumns(),
+            rows: visibleRows,
+            emptyMessage: '当前分组没有符合条件的 LOF 套利数据',
+            detailRenderer: (row) => renderDetailGrid(buildLofArbDetailItems(row)),
+            detailMode: 'always',
+          })}
+        </div>
+      </div>
+      ${renderLofArbPushCard()}
+      ${renderModuleFootnote('lofArb')}
+    </div>
+  `;
+}
+
 function buildCbRightsIssuePushStateText() {
   const config = readCbRightsIssuePushConfigViewModel();
   const deliveryStatus = config?.deliveryStatus && typeof config.deliveryStatus === 'object' ? config.deliveryStatus : {};
@@ -3008,6 +3399,9 @@ function buildCbRightsIssuePushStateText() {
   const parts = [
     times.length ? `时间 ${times.join(' / ')}` : '时间 --',
     deliveryStatus.webhookConfigured ? 'Webhook已配置' : 'Webhook未配置',
+    deliveryStatus.schedulerEnabled === false
+      ? (deliveryStatus.schedulerDisabledReason === 'loopback_public_base_url' ? '本地运行已禁用服务端推送调度' : '服务端调度已关闭')
+      : '',
     deliveryStatus.lastSuccessAt ? `最近成功 ${formatDate(deliveryStatus.lastSuccessAt)}` : '',
     deliveryStatus.lastError ? `最近失败 ${String(deliveryStatus.lastError).slice(0, 80)}` : '',
   ].filter(Boolean);

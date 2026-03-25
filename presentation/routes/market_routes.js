@@ -46,6 +46,7 @@ function registerMarketRoutes(options = {}) {
   registerDatasetRoute("/api/market/convertible-bonds", "bonds", [], (_req, force) => ({ force }));
   registerDatasetRoute("/api/market/convertible-bond-arbitrage", "cbArb", [], (_req, force) => ({ force }));
   registerDatasetRoute("/api/market/cb-rights-issue", "cbRightsIssue", { monitorList: [], sourceRows: [], sourceSummary: {}, rebuildStatus: {} }, (_req, force) => ({ force }));
+  registerDatasetRoute("/api/market/lof-arbitrage", "lofArb", { groups: [], defaultGroup: "europe_us", rows: [], limitedMonitorRows: [], unlimitedMonitorRows: [], sourceSummary: {}, rebuildStatus: {} }, (_req, force) => ({ force }));
   registerDatasetRoute("/api/market/merger", "merger", [], (_req, force) => ({ force }));
   registerDatasetRoute("/api/market/event-arbitrage", "eventArb", {}, (_req, force) => ({ force }));
 

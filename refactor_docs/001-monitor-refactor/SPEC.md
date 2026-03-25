@@ -2766,9 +2766,206 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 
 ### 36.8 Simplicity rule
 - The implementation must keep the shortest path:
-  - daily incremental append/update
-  - immediate prune of excess history
+- daily incremental append/update
+- immediate prune of excess history
 - This round does not introduce:
   - cold archive tables
   - monthly partitions
   - multi-tier storage
+
+## 39. LOF Arbitrage Restoration Spec (2026-03-25)
+
+### 39.1 Scope
+- This round restores `LOF套利` as an active homepage module.
+- This round adds:
+  - one new fetch plugin `data_fetch/lof_arbitrage`
+  - one new strategy plugin `strategy/lof_arbitrage`
+  - one new dashboard tab and page
+  - one new market API
+  - one new independent push module
+- This round does not change:
+  - `AH / AB` formula semantics
+  - `转债套利` strategy semantics
+  - `事件套利` route shape
+
+### 39.2 Source-entry rule
+- The authoritative user-facing source-entry URLs are:
+  - `https://www.jisilu.cn/data/lof/#index`
+  - `https://www.jisilu.cn/data/qdii/#qdiie`
+  - `https://www.jisilu.cn/data/qdii/#qdiia`
+- The fetch plugin may resolve the real page-backed JSON list endpoints exposed by those pages:
+  - `GET /data/lof/index_lof_list/`
+  - `GET /data/qdii/qdii_list/E`
+  - `GET /data/qdii/qdii_list/A`
+- The fetch plugin must keep both:
+  - `sourcePageUrl`
+  - `sourceApiUrl`
+  in the outward source summary for diagnosis.
+
+### 39.3 Source access rule
+- Fetch priority is:
+  1. Firecrawl page read when enabled and configured
+  2. direct JSON / direct page fallback
+- Firecrawl configuration is read only from `config.yaml` and env placeholders.
+- Direct fallback remains production-safe and must work without Firecrawl.
+- Any one source-group failure degrades only that group and may not blank the whole page.
+
+### 39.4 Fetch normalization rule
+- `data_fetch/lof_arbitrage/source.py` is responsible for:
+  - reading the three source groups
+  - normalizing source rows into one internal row shape
+  - applying sample filtering
+  - hydrating external index / fx helper inputs when needed
+  - returning group-level source status
+- `data_fetch/lof_arbitrage/normalizer.py` only maps the fetch snapshot into bus records and must not contain strategy formulas.
+- Minimum normalized row fields include:
+  - `code`
+  - `name`
+  - `marketGroup`
+  - `price`
+  - `changeRate`
+  - `turnoverWan`
+  - `shareAmountWan`
+  - `shareAmountIncreaseWan`
+  - `nav`
+  - `navDate`
+  - `indexIncreaseRate`
+  - `indexName`
+  - `applyFee`
+  - `applyStatus`
+  - `redeemFee`
+  - `redeemStatus`
+  - `custodianFee`
+  - `sourcePageUrl`
+  - `sourceApiUrl`
+  - `raw`
+
+### 39.5 Filter rule
+- The fetch layer must keep only LOF rows:
+  - `qdii_list` rows require `lof_type == 'QDII'` or row name contains `LOF`
+  - `index_lof_list` rows are accepted as domestic index LOF candidates
+- The fetch layer must exclude rows whose `名称` contains `ETF`.
+- Rows filtered out by these rules must not enter the strategy layer.
+
+### 39.6 Index / FX helper rule
+- The implementation should prefer a small shared helper set instead of many fragmented APIs.
+- Allowed helper pattern for this round:
+  - Tencent real-time quote family for index points and major FX
+  - source-provided index increase fields for `指数LOF / QDII亚洲`
+- `QDII欧美`:
+  - when an external index point + historical FX path is resolvable, compute the full approved formula
+  - when not resolvable but the source exposes a real estimate-change field, the row may be marked as source-estimate based instead of being dropped
+  - outward row must expose which basis was used via `calcStatus` / `calcMode`
+- The row must never pretend an unresolved external mapping is a full direct-index calculation.
+
+### 39.7 Strategy rule
+- `strategy/lof_arbitrage/service.py` is responsible for:
+  - IOPV calculation
+  - premium-rate calculation
+  - limited / unlimited pool classification
+  - push-facing row shaping
+- Premium formula is fixed:
+  - `premiumRate = (iopv / price) - 1`
+- `QDII欧美` direct calculation path:
+  - `iopv = nav_t2 * (currentIndex / closeIndexT2) * (currentFx / closeFxT2)`
+- `指数LOF / QDII亚洲` calculation path:
+  - `iopv = nav_t1 * (1 + indexIncreaseRate) * (currentFx / closeFxT1)`
+- `currentFx / closeFxT*` defaults to `1` only for RMB-denominated domestic index rows.
+- Strategy must expose at least:
+  - `iopv`
+  - `premiumRate`
+  - `calcStatus`
+  - `calcMode`
+  - `timeNote`
+  - `limitedMonitorEligible`
+  - `unlimitedMonitorEligible`
+
+### 39.8 Pool rule
+- `limitedMonitorEligible` requires:
+  - limited apply status detected
+  - limited amount < `100000`
+  - `premiumRate > 0.01`
+  - `turnoverWan > 100`
+- `unlimitedMonitorEligible` requires:
+  - no limited apply status
+  - `premiumRate > 0.05` or `premiumRate < -0.05`
+  - `turnoverWan > 100`
+- Pool membership is derived each refresh and not manually edited.
+
+### 39.9 Public API rule
+- Add route:
+  - `GET /api/market/lof-arbitrage`
+- Response data shape includes at least:
+  - `groups`
+  - `defaultGroup`
+  - `rows`
+  - `limitedMonitorRows`
+  - `unlimitedMonitorRows`
+  - `sourceSummary`
+  - `rebuildStatus`
+- Add routes:
+  - `GET /api/push/lof-arbitrage-config`
+  - `POST /api/push/lof-arbitrage-config`
+
+### 39.10 Runtime / dataset rule
+- `data_dispatch.py` adds action:
+  - `lof-arbitrage`
+- `start_server.js` adds dataset key:
+  - `lofArb`
+- The dataset keeps its own runtime store for:
+  - source rows
+  - limited pool rows
+  - unlimited pool rows
+  - last rebuild metadata
+  - source summary
+
+### 39.11 Push rule
+- Add independent notification module:
+  - `notification/lof_arbitrage/service.js`
+  - `notification/styles/lof_arbitrage_markdown.js`
+- Push config uses the same module-push-config/runtime infrastructure as `cb_rights_issue`.
+- Default schedule is:
+  - `13:30`
+  - `14:00`
+  - `14:30`
+- Instant push is triggered when a row newly enters either pool compared with the stored seen-map.
+- Scheduled push sends the full current two-pool list.
+
+### 39.12 Dashboard rule
+- `dashboard_template.html` adds one new root tab:
+  - `data-tab="lof-arb"`
+  - one new panel `panel-lof-arb`
+- `dashboard_page.js` adds:
+  - `lofArb` endpoint and resource state
+  - root-tab loading and rendering
+  - one internal LOF view switcher:
+    - `index`
+    - `europe_us`
+    - `asia`
+- The top page area renders only:
+  - limited-monitor card
+  - unlimited-monitor card
+- The main table uses the shared paginated table renderer with `tableKind="lof"`.
+- The main table keeps 50-row pagination and shared search behavior.
+- The page footnote uses the shared module-note renderer with module key `lofArb`.
+
+### 39.13 Config contract
+- `config.yaml` adds:
+  - plugin registration entries for `lof_arbitrage`
+  - source page URLs
+  - direct JSON fallback URLs
+  - Firecrawl config
+  - refresh interval
+  - default group
+  - thresholds for both pools
+  - default push times
+  - dashboard module notes for `lofArb`
+
+### 39.14 Truth / failure rule
+- Missing Firecrawl credentials is not an error if direct fallback succeeds.
+- Missing direct source or missing essential source fields returns a truthful module error.
+- Missing enough real inputs for one row:
+  - the row stays visible when possible
+  - `iopv` / `premiumRate` stay empty
+  - `calcStatus` explains the real reason
+- No fake placeholder result is allowed for missing IOPV rows.

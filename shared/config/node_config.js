@@ -22,6 +22,9 @@ const SECRET_ENV_PATHS = [
   { path: ["strategy", "merger", "deepseek_api_key"], env: "DEEPSEEK_API_KEY" },
   { path: ["strategy", "merger", "deepseek_base_url"], env: "DEEPSEEK_BASE_URL" },
   { path: ["data_fetch", "plugins", "convertible_bond", "jisilu_cookie"], env: "JISILU_COOKIE" },
+  { path: ["data_fetch", "plugins", "lof_arbitrage", "jisilu_cookie"], env: "JISILU_COOKIE" },
+  { path: ["data_fetch", "plugins", "lof_arbitrage", "firecrawl_api_url"], env: "FIRECRAWL_API_URL" },
+  { path: ["data_fetch", "plugins", "lof_arbitrage", "firecrawl_api_key"], env: "FIRECRAWL_API_KEY" },
 ];
 
 function loadEnvFile(filePath = ENV_FILE) {
@@ -142,7 +145,10 @@ function loadConfig(options = {}) {
   if (cachedConfig && !options.reload) return deepClone(cachedConfig);
 
   loadEnvFile();
-  const config = normalizePythonCandidates(applySecretEnv(resolveEnvPlaceholders(readConfigFile())));
+  let config = readConfigFile();
+  config = resolveEnvPlaceholders(config);
+  config = applySecretEnv(config);
+  config = normalizePythonCandidates(config);
   cachedConfig = config;
   return deepClone(config);
 }

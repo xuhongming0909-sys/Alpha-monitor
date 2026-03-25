@@ -1534,3 +1534,52 @@ Acceptance:
 - The page keeps a `60s` auto-refresh loop without forcing large-table reloads when cache metadata is unchanged.
 - Ordinary `GET /api/market/convertible-bond-arbitrage` reads no longer wait for underlying-stock history sync.
 - Server-side push scheduling and dataset refresh cadence remain unchanged.
+
+## 55. Phase AU: LOF Arbitrage Restoration With Real Jisilu URLs (2026-03-25)
+
+Goal: restore `LOF套利` as a new independent homepage module based on the real Jisilu LOF / QDII pages the user provided, keep the chain isolated from other modules, and land a first production version with page, API, and independent push.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the new LOF module contract.
+2. Restore `LOF套利` as a new independent chain instead of reviving the older archived implementation:
+   - `data_fetch/lof_arbitrage` only handles source access, normalization, source fallback, and upstream helper hydration
+   - `strategy/lof_arbitrage` only handles IOPV, premium-rate, pool classification, and push payload semantics
+   - `presentation` only handles route shaping, dashboard rendering, and module footnote
+   - `notification/lof_arbitrage` only handles independent scheduled / instant push
+3. Use the user-provided real Jisilu pages as the authoritative source entry:
+   - `https://www.jisilu.cn/data/lof/#index`
+   - `https://www.jisilu.cn/data/qdii/#qdiie`
+   - `https://www.jisilu.cn/data/qdii/#qdiia`
+4. Implement source access with the shortest truthful path:
+   - Firecrawl first against the provided page URLs when configured
+   - direct JSON fallback to the real page-backed list endpoints discovered from those pages
+   - no fake data, no static sample rows
+5. Restore the homepage root navigation from `7` to `8` tabs by adding `LOF套利`.
+6. Keep the page structure fixed to:
+   - top limited-monitor list
+   - top non-limited-monitor list
+   - one shared main table with internal filters `指数LOF / QDII欧美 / QDII亚洲`
+   - module-local push settings
+   - module footnote
+7. Implement first-round calculation truthfulness:
+   - `溢价率 = (IOPV / 现价) - 1`
+   - `QDII欧美` uses `T-2` NAV with live index/fx correction when resolvable
+   - `指数LOF / QDII亚洲` use `T-1` NAV with source-provided index increase and fx correction
+   - rows missing enough real inputs stay visible but marked non-computable instead of being fabricated
+8. Keep filter and monitoring rules fixed to the approved strategy:
+   - only LOF rows
+   - exclude name containing `ETF`
+   - limited pool: limited apply + cap < `10万` + premium > `1%` + turnover > `100万`
+   - non-limited pool: no limited apply + premium > `5%` or premium < `-5%` + turnover > `100万`
+9. Add independent push:
+   - instant push when a row newly enters either pool
+   - scheduled full-pool push at `13:30`, `14:00`, `14:30`
+   - not merged into existing summary push
+
+Acceptance:
+- Homepage root tabs increase from `7` to `8`, and one visible tab is `LOF套利`.
+- `GET /api/market/lof-arbitrage` returns real data from the approved Jisilu URL chain.
+- The page top area shows only `限购监控池 / 非限监控池` and their core rows.
+- The main table shows the required source fields plus computed `IOPV / 溢价率`, keeps 50-row pagination, and supports internal view switching.
+- Firecrawl may enhance the source path, but a missing Firecrawl key does not block direct truthful fallback.
+- Existing `转债 / AH / AB / 监控 / 分红 / 事件套利 / 可转债抢权配售` behavior does not regress.

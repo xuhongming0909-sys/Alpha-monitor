@@ -52,6 +52,9 @@ storage:
     cb_rights_issue_state: "cb_rights_issue_state.json"
     cb_rights_issue_push_config: "cb_rights_issue_push_config.json"
     cb_rights_issue_push_runtime: "cb_rights_issue_push_runtime.json"
+    lof_arbitrage_state: "lof_arbitrage_state.json"
+    lof_arbitrage_push_config: "lof_arbitrage_push_config.json"
+    lof_arbitrage_push_runtime: "lof_arbitrage_push_runtime.json"
 
 logging:
   # Minimal logging defaults
@@ -111,6 +114,9 @@ plugins:
     cb_rights_issue:
       enabled: true
       folder: "data_fetch/cb_rights_issue"
+    lof_arbitrage:
+      enabled: true
+      folder: "data_fetch/lof_arbitrage"
   strategy:
     ah_premium:
       enabled: true
@@ -139,6 +145,9 @@ plugins:
     cb_rights_issue:
       enabled: true
       folder: "strategy/cb_rights_issue"
+    lof_arbitrage:
+      enabled: true
+      folder: "strategy/lof_arbitrage"
 
 data_fetch:
   # Fetch layer config only controls upstream access and normalization cadence
@@ -247,6 +256,30 @@ data_fetch:
       source_api_url: "https://www.jisilu.cn/webapi/cb/pre/"
       source_title: "集思录可转债预案"
       source_referer: "https://www.jisilu.cn/web/data/cb/pre"
+    lof_arbitrage:
+      intraday: true
+      refresh_interval_ms: 300000
+      daily_incremental_sync: false
+      default_group: "europe_us"
+      source_page_urls:
+        index: "https://www.jisilu.cn/data/lof/#index"
+        europe_us: "https://www.jisilu.cn/data/qdii/#qdiie"
+        asia: "https://www.jisilu.cn/data/qdii/#qdiia"
+      source_api_urls:
+        index: "https://www.jisilu.cn/data/lof/index_lof_list/"
+        europe_us: "https://www.jisilu.cn/data/qdii/qdii_list/E"
+        asia: "https://www.jisilu.cn/data/qdii/qdii_list/A"
+      source_referer: "https://www.jisilu.cn/"
+      request_timeout_ms: 20000
+      jisilu_cookie: "${JISILU_COOKIE}"
+      firecrawl_enabled: false
+      firecrawl_api_url: "${FIRECRAWL_API_URL}"
+      firecrawl_api_key: "${FIRECRAWL_API_KEY}"
+      firecrawl_timeout_ms: 20000
+      limited_apply_cap_amount: 100000
+      limited_premium_rate_threshold: 1
+      unlimited_abs_premium_rate_threshold: 5
+      min_turnover_wan: 100
 
 strategy:
   # Strategy layer reads only normalized records plus config
@@ -349,6 +382,13 @@ strategy:
       - "上市委通过"
       - "同意注册"
       - "注册生效"
+  lof_arbitrage:
+    default_group: "europe_us"
+    ranking_metric: "premium_rate"
+    limited_apply_cap_amount: 100000
+    limited_premium_rate_threshold: 1
+    unlimited_abs_premium_rate_threshold: 5
+    min_turnover_wan: 100
 
 presentation:
   # Presentation layer controls API shaping and dashboard visibility
@@ -457,6 +497,18 @@ presentation:
         - "URL 页面给出的转股价按 20 日均值代理处理，行权价取转股价与当前价的较大值。"
         - "60日波动率严格来自本功能独立历史库，若历史不足则不入池。"
         - "页面展示的是配售期权价值估算口径，不代表实际收益保证。"
+    lofArb:
+      data_sources:
+        - "首期固定锚定集思录 LOF / QDII 页面家族；配置了集思录 Cookie 时优先读取完整列表，否则保持游客可见范围。"
+        - "IOPV 修正优先复用集思录源字段、腾讯实时指数/汇率与少量统一映射，不为单只基金额外接入碎片化 API。"
+      formulas:
+        - "溢价率 = (IOPV / 现价 - 1) × 100%。"
+        - "指数LOF / QDII亚洲：IOPV = T-1 日净值 × (1 + 指数涨幅) × (今日汇率 / 基准汇率)。"
+        - "QDII欧美：优先按 T-2 日净值 × (今日指数 / T-2 指数) × (今日汇率 / T-2 汇率) 估算；无法完整映射时退回源侧真实估算口径。"
+      strategy_notes:
+        - "页面顶部只显示限购监控池和非限购监控池，不再堆放额外状态卡。"
+        - "限购池要求存在限购、限额低于 10 万、溢价率大于 1%、成交额大于 100 万；非限池要求不限购且溢价率绝对值大于 5%、成交额大于 100 万。"
+        - "无法拿到足够真实输入时，行仍然保留，但 IOPV / 溢价率不伪造，直接显示真实计算状态。"
   stock_search:
     default_limit: 10
     max_limit: 100
@@ -501,6 +553,13 @@ notification:
     trading_days_only: true
     default_times:
       - "08:00"
+      - "14:30"
+  lof_arbitrage:
+    enabled: true
+    trading_days_only: true
+    default_times:
+      - "13:30"
+      - "14:00"
       - "14:30"
   wecom:
     webhook_url: "${WECOM_WEBHOOK_URL}"

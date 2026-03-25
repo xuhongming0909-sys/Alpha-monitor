@@ -13,6 +13,7 @@ function createCbRightsIssuePushService(options = {}) {
   const getShanghaiParts = options.getShanghaiParts;
   const parsePushMinutes = options.parsePushMinutes;
   const isTradingWeekday = typeof options.isTradingWeekday === "function" ? options.isTradingWeekday : () => true;
+  const isDeliveryAvailable = typeof options.isDeliveryAvailable === "function" ? options.isDeliveryAvailable : () => true;
   const nowIso = typeof options.nowIso === "function" ? options.nowIso : () => new Date().toISOString();
   const logInfo = options.logInfo || ((message) => console.info(message));
   const logError = options.logError || ((scope, error) => console.error(scope, error));
@@ -37,6 +38,9 @@ function createCbRightsIssuePushService(options = {}) {
     const payload = await readPayload();
     if (!payload.monitorList.length) {
       return { success: false, skipped: true, reason: "empty_monitor_list", total: 0 };
+    }
+    if (!isDeliveryAvailable()) {
+      return { success: true, skipped: true, reason: "delivery_not_configured", total: payload.monitorList.length };
     }
 
     const attemptAt = nowIso();

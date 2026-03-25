@@ -1268,3 +1268,136 @@
 - 本轮新增的前端自动刷新配置必须进入 `config.yaml > presentation.dashboard_auto_refresh`，不得散落硬编码。
 - 同步结果必须真实返回裁剪数量，不能再固定写死 `prunedRows = 0`。
 - 这轮不要求把所有数据库都改成按年归档；只要求用最短链路完成“每日增量 + 超量即删”。
+
+## 55. LOF套利恢复与真实 URL 合同 (2026-03-25)
+- Dashboard must add a new root tab `LOF套利`.
+- Homepage root tabs increase from `7` to `8`.
+- This feature is a new independent module and must not be folded into:
+  - `AH / AB`
+  - `事件套利`
+  - `可转债抢权配售`
+- Phase-1 source scope is fixed to the user-provided real Jisilu page family:
+  - `https://www.jisilu.cn/data/lof/#index`
+  - `https://www.jisilu.cn/data/qdii/#qdiie`
+  - `https://www.jisilu.cn/data/qdii/#qdiia`
+- The implementation may use the corresponding real page-backed JSON list endpoints discovered from those pages, but the outward source contract remains anchored to the above URLs.
+- Source access priority is fixed to:
+  - Firecrawl first when configured
+  - direct source fallback when Firecrawl is unavailable or fails
+- Firecrawl failure must not block the module if the direct source still works.
+- The page structure is fixed to:
+  - `限购监控池`
+  - `非限监控池`
+  - one main LOF table
+  - module-local push settings
+  - page footnote
+- The top area must not render unrelated status-summary cards or generic fetch metadata; it only shows the two monitor pools and their core rows.
+- The main LOF table must support internal view switching for:
+  - `指数LOF`
+  - `QDII欧美`
+  - `QDII亚洲`
+- The default visible internal view is `QDII欧美`.
+- The main LOF table keeps shared table behavior:
+  - 50 rows per page
+  - shared pagination
+  - shared sorting
+  - shared search
+  - shared horizontal scrolling
+- The outward LOF rows must expose at least:
+  - `code`
+  - `name`
+  - `marketGroup`
+  - `price`
+  - `changeRate`
+  - `turnoverWan`
+  - `shareAmountWan`
+  - `shareAmountIncreaseWan`
+  - `nav`
+  - `navDate`
+  - `indexIncreaseRate`
+  - `indexName`
+  - `applyFee`
+  - `applyStatus`
+  - `redeemFee`
+  - `redeemStatus`
+  - `custodianFee`
+  - `iopv`
+  - `premiumRate`
+  - `timeNote`
+  - `calcStatus`
+- Sample filter rule is fixed:
+  - keep only `LOF`
+  - exclude rows whose `名称` contains `ETF`
+- LOF premium formula is fixed to:
+  - `溢价率 = (IOPV / 现价) - 1`
+- `QDII欧美` IOPV contract:
+  - base NAV uses `T-2`
+  - `IOPV = T-2日净值 × (今日指数点位 / T-2日收盘指数点位) × (今日汇率 / T-2日收盘汇率)`
+  - live market data may include pre-market / post-market / overnight data
+  - if a row maps to multiple indices, the feature may calculate weighted composition only when real weights are available
+- `指数LOF / QDII亚洲` IOPV contract:
+  - base NAV uses `T-1`
+  - `IOPV = T-1日净值 × (1 + 指数涨幅) × (今日汇率 / T-1日收盘汇率)`
+  - this round is allowed to use the source-provided same-day index increase field as the official index-increase input
+- FX rule:
+  - FX must be converted into CNY using real currency rates
+  - the implementation should prefer a small shared set of FX / index APIs rather than many fragmented one-off sources
+- Truth boundary:
+  - if enough real inputs are missing, the row must not fabricate `IOPV` or `溢价率`
+  - the row may remain visible with a truthful `calcStatus`
+- Pool rules are fixed:
+  - `限购监控池`
+    - `申购状态` contains a limit
+    - limited amount < `10万`
+    - `溢价率 > 1%`
+    - `成交额 > 100万`
+  - `非限监控池`
+    - `申购状态` has no limit
+    - `溢价率 > 5%` or `溢价率 < -5%`
+    - `成交额 > 100万`
+- Both pools are dynamic:
+  - rows enter when they satisfy the rule
+  - rows leave when they no longer satisfy the rule
+- New public API contract:
+  - `GET /api/market/lof-arbitrage`
+    - returns `groups`
+    - returns `defaultGroup`
+    - returns `rows`
+    - returns `limitedMonitorRows`
+    - returns `unlimitedMonitorRows`
+    - returns `updateTime`
+    - returns `sourceSummary`
+    - returns `rebuildStatus`
+  - `GET /api/push/lof-arbitrage-config`
+  - `POST /api/push/lof-arbitrage-config`
+- The feature must keep an independent runtime state for:
+  - latest LOF source snapshot
+  - latest limited-monitor rows
+  - latest unlimited-monitor rows
+  - monitor-entry seen map for instant push
+  - module-local push runtime
+- Push rules are fixed:
+  - instant push when a row newly enters either monitor pool
+  - scheduled full-pool push at `13:30`, `14:00`, `14:30`
+  - push content must include:
+    - `代码`
+    - `名称`
+    - `溢价率`
+    - `市场（沪市 or 深市）`
+    - `涨跌幅`
+    - `成交额`
+    - `申购状态`
+    - `申购费`
+    - `赎回费`
+    - `时间`
+- Time-note outward rule:
+  - `QDLL` rows show `T+3`
+  - domestic `LOF` rows show `T+2`
+- The page footnote must explain:
+  - data source
+  - IOPV formula
+  - monitor strategy
+  - push rule
+  - boundary / risk note
+- Regression boundary:
+  - `转债 / AH / AB / 监控 / 分红 / 事件套利 / 可转债抢权配售` existing behavior remains unchanged in this round

@@ -18,6 +18,9 @@ function registerPushRoutes(options = {}) {
     getCbRightsIssuePushConfig,
     updateCbRightsIssuePushConfig,
     buildCbRightsIssuePushConfigResponse,
+    getLofArbPushConfig,
+    updateLofArbPushConfig,
+    buildLofArbPushConfigResponse,
   } = options;
 
   app.get("/api/push/config", (_req, res) => {
@@ -46,6 +49,23 @@ function registerPushRoutes(options = {}) {
     try {
       const next = updateCbRightsIssuePushConfig(req.body || {});
       return sendSuccess(res, buildCbRightsIssuePushConfigResponse(next));
+    } catch (error) {
+      return sendError(res, error, 400, null);
+    }
+  });
+
+  app.get("/api/push/lof-arbitrage-config", (_req, res) => {
+    try {
+      return sendSuccess(res, buildLofArbPushConfigResponse(getLofArbPushConfig()));
+    } catch (error) {
+      return sendError(res, error, 500, null);
+    }
+  });
+
+  app.post("/api/push/lof-arbitrage-config", (req, res) => {
+    try {
+      const next = updateLofArbPushConfig(req.body || {});
+      return sendSuccess(res, buildLofArbPushConfigResponse(next));
     } catch (error) {
       return sendError(res, error, 400, null);
     }

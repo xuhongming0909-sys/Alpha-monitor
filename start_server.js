@@ -24,10 +24,12 @@ const { createModulePushRuntimeStore } = require('./notification/scheduler/modul
 const { createWeComClient } = require('./notification/wecom/client');
 const { buildSummaryMarkdown: buildNotificationSummaryMarkdown } = require('./notification/styles/markdown_style');
 const { buildCbRightsIssueMarkdown } = require('./notification/styles/cb_rights_issue_markdown');
+const { buildLofArbitrageMarkdown } = require('./notification/styles/lof_arbitrage_markdown');
 const { buildConvertibleBondDiscountMarkdown } = require('./notification/styles/discount_strategy_markdown');
 const { createMainSummaryService } = require('./notification/summary/main_summary');
 const { createEventAlertService } = require('./notification/alerts/event_alert_service');
 const { createCbRightsIssuePushService } = require('./notification/cb_rights_issue/service');
+const { createLofArbitragePushService } = require('./notification/lof_arbitrage/service');
 const { createMergerReportService } = require('./notification/merger_report/service');
 const { createWeComScheduler } = require('./notification/scheduler/wecom_scheduler');
 const {
@@ -87,6 +89,9 @@ const CB_RIGHTS_ISSUE_STRATEGY_CONFIG = (STRATEGY_CONFIG?.cb_rights_issue && typ
   : {};
 const CB_RIGHTS_ISSUE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.cb_rights_issue && typeof NOTIFICATION_CONFIG.cb_rights_issue === 'object')
   ? NOTIFICATION_CONFIG.cb_rights_issue
+  : {};
+const LOF_ARBITRAGE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.lof_arbitrage && typeof NOTIFICATION_CONFIG.lof_arbitrage === 'object')
+  ? NOTIFICATION_CONFIG.lof_arbitrage
   : {};
 const INDEX_FILE = path.resolve(ROOT, PRESENTATION_CONFIG.dashboard_entry || './index.html');
 const STATIC_DATA_DIR = PATH_POLICY.dataRootDir;
@@ -320,6 +325,14 @@ const DEFAULT_CB_RIGHTS_ISSUE_PUSH_CONFIG = {
   ).slice(0, 2),
   tradingDaysOnly: CB_RIGHTS_ISSUE_NOTIFICATION_CONFIG?.trading_days_only !== false,
 };
+const DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG = {
+  enabled: Boolean(LOF_ARBITRAGE_NOTIFICATION_CONFIG?.enabled),
+  times: normalizeTimeListConfig(
+    LOF_ARBITRAGE_NOTIFICATION_CONFIG?.default_times,
+    '13:30'
+  ).slice(0, 3),
+  tradingDaysOnly: LOF_ARBITRAGE_NOTIFICATION_CONFIG?.trading_days_only !== false,
+};
 
 function buildDashboardTableUiConfig(config = {}) {
   const minWidthSource = config && typeof config.min_width_by_kind === 'object' ? config.min_width_by_kind : {};
@@ -374,6 +387,7 @@ function buildDashboardModuleNotesConfig(config = {}) {
     cbArb: buildModuleNote('cbArb'),
     ah: buildModuleNote('ah'),
     ab: buildModuleNote('ab'),
+    lofArb: buildModuleNote('lofArb'),
     monitor: buildModuleNote('monitor'),
     dividend: buildModuleNote('dividend'),
     merger: buildModuleNote('merger'),
@@ -662,6 +676,12 @@ const DATASETS = {
       return callDataCore(['cb-rights-issue'], { timeout: 300000, maxBuffer: 1024 * 1024 * 50 });
     },
   },
+  lofArb: {
+    intraday: pluginFetchConfig('lof_arbitrage').intraday !== false,
+    refreshIntervalMs: toIntConfig(pluginFetchConfig('lof_arbitrage').refresh_interval_ms, 5 * 60 * 1000),
+    dbDailySync: Boolean(pluginFetchConfig('lof_arbitrage').daily_incremental_sync),
+    fetch: () => callDataCore(['lof-arbitrage'], { timeout: 300000, maxBuffer: 1024 * 1024 * 50 }),
+  },
   merger: {
     intraday: Boolean(pluginFetchConfig('merger').intraday),
     dbDailySync: Boolean(pluginFetchConfig('merger').daily_incremental_sync),
@@ -710,6 +730,32 @@ const cbRightsIssuePushConfigStore = STATE_REGISTRY.read('cb_rights_issue_push_c
   tradingDaysOnly: DEFAULT_CB_RIGHTS_ISSUE_PUSH_CONFIG.tradingDaysOnly,
 });
 const cbRightsIssuePushRuntimeState = STATE_REGISTRY.read('cb_rights_issue_push_runtime', 'cb_rights_issue_push_runtime.json', {
+  pushRecords: {},
+  lastAttemptAt: null,
+  lastSuccessAt: null,
+  lastError: null,
+});
+const lofArbStateStore = STATE_REGISTRY.read('lof_arbitrage_state', 'lof_arbitrage_state.json', {
+  rows: [],
+  limitedMonitorRows: [],
+  unlimitedMonitorRows: [],
+  sourceSummary: {},
+  lastRebuildAt: null,
+  lastRebuildDate: null,
+  lastRebuildError: null,
+  updateTime: null,
+  source: null,
+  seenEntryMap: {},
+  lastInstantAttemptAt: null,
+  lastInstantSuccessAt: null,
+  lastInstantError: null,
+});
+const lofArbPushConfigStore = STATE_REGISTRY.read('lof_arbitrage_push_config', 'lof_arbitrage_push_config.json', {
+  enabled: DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG.enabled,
+  times: [...DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG.times],
+  tradingDaysOnly: DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG.tradingDaysOnly,
+});
+const lofArbPushRuntimeState = STATE_REGISTRY.read('lof_arbitrage_push_runtime', 'lof_arbitrage_push_runtime.json', {
   pushRecords: {},
   lastAttemptAt: null,
   lastSuccessAt: null,
@@ -767,6 +813,18 @@ function saveCbRightsIssuePushConfigStore() {
 
 function saveCbRightsIssuePushRuntimeState() {
   STATE_REGISTRY.write('cb_rights_issue_push_runtime', 'cb_rights_issue_push_runtime.json', cbRightsIssuePushRuntimeState);
+}
+
+function saveLofArbStateStore() {
+  STATE_REGISTRY.write('lof_arbitrage_state', 'lof_arbitrage_state.json', lofArbStateStore);
+}
+
+function saveLofArbPushConfigStore() {
+  STATE_REGISTRY.write('lof_arbitrage_push_config', 'lof_arbitrage_push_config.json', lofArbPushConfigStore);
+}
+
+function saveLofArbPushRuntimeState() {
+  STATE_REGISTRY.write('lof_arbitrage_push_runtime', 'lof_arbitrage_push_runtime.json', lofArbPushRuntimeState);
 }
 
 function saveCbDiscountStrategyState() {
@@ -975,6 +1033,7 @@ const DASHBOARD_RESOURCE_STATUS_DATASET_KEYS = Object.freeze({
   cbArb: 'cbArb',
   ah: 'ah',
   ab: 'ab',
+  lofArb: 'lofArb',
   merger: 'eventArb',
   cbRightsIssue: 'cbRightsIssue',
   eventArb: 'eventArb',
@@ -1039,6 +1098,17 @@ const cbRightsIssuePushRuntimeDomain = createModulePushRuntimeStore({
   save: saveCbRightsIssuePushRuntimeState,
   parsePushMinutes: (value) => cbRightsIssuePushConfigDomain.parsePushMinutes(value),
 });
+const lofArbPushConfigDomain = createModulePushConfigStore({
+  state: lofArbPushConfigStore,
+  defaultConfig: DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG,
+  save: saveLofArbPushConfigStore,
+  maxTimes: 3,
+});
+const lofArbPushRuntimeDomain = createModulePushRuntimeStore({
+  state: lofArbPushRuntimeState,
+  save: saveLofArbPushRuntimeState,
+  parsePushMinutes: (value) => lofArbPushConfigDomain.parsePushMinutes(value),
+});
 const cbDiscountStrategyDomain = createConvertibleBondDiscountRuntimeStore({
   state: cbDiscountStrategyState,
   save: saveCbDiscountStrategyState,
@@ -1080,6 +1150,23 @@ const cbRightsIssuePushService = createCbRightsIssuePushService({
   getShanghaiParts,
   parsePushMinutes: (value) => cbRightsIssuePushConfigDomain.parsePushMinutes(value),
   isTradingWeekday,
+  isDeliveryAvailable: () => Boolean(WECOM_WEBHOOK_URL),
+  nowIso,
+  logInfo: (message) => console.info(message),
+  logError: (scope, error) => console.error(scope, error?.message || error),
+});
+const lofArbPushService = createLofArbitragePushService({
+  getConfig: () => lofArbPushConfigDomain.getConfig(),
+  runtimeStore: lofArbPushRuntimeDomain,
+  stateStore: lofArbStateStore,
+  saveStateStore: saveLofArbStateStore,
+  getDataset,
+  sendMarkdown: (markdown) => weComClient.sendMarkdown(markdown),
+  buildMarkdown: buildLofArbitrageMarkdown,
+  getShanghaiParts,
+  parsePushMinutes: (value) => lofArbPushConfigDomain.parsePushMinutes(value),
+  isTradingWeekday,
+  isDeliveryAvailable: () => Boolean(WECOM_WEBHOOK_URL),
   nowIso,
   logInfo: (message) => console.info(message),
   logError: (scope, error) => console.error(scope, error?.message || error),
@@ -1131,10 +1218,27 @@ function getCbRightsIssuePushDeliveryStatus() {
   return {
     webhookConfigured: Boolean(WECOM_WEBHOOK_URL),
     schedulerEnabled: PUSH_SCHEDULER_RUNTIME_ENABLED,
+    schedulerDisabledReason: PUSH_SCHEDULER_DISABLED_REASON || null,
     tradingDaysOnly: config.tradingDaysOnly !== false,
     lastAttemptAt: cbRightsIssuePushRuntimeState.lastAttemptAt || null,
     lastSuccessAt: cbRightsIssuePushRuntimeState.lastSuccessAt || null,
     lastError: cbRightsIssuePushRuntimeState.lastError || null,
+  };
+}
+
+function getLofArbPushDeliveryStatus() {
+  const config = lofArbPushConfigDomain.getConfig();
+  return {
+    webhookConfigured: Boolean(WECOM_WEBHOOK_URL),
+    schedulerEnabled: PUSH_SCHEDULER_RUNTIME_ENABLED,
+    schedulerDisabledReason: PUSH_SCHEDULER_DISABLED_REASON || null,
+    tradingDaysOnly: config.tradingDaysOnly !== false,
+    lastAttemptAt: lofArbPushRuntimeState.lastAttemptAt || null,
+    lastSuccessAt: lofArbPushRuntimeState.lastSuccessAt || null,
+    lastError: lofArbPushRuntimeState.lastError || null,
+    lastInstantAttemptAt: lofArbStateStore.lastInstantAttemptAt || null,
+    lastInstantSuccessAt: lofArbStateStore.lastInstantSuccessAt || null,
+    lastInstantError: lofArbStateStore.lastInstantError || null,
   };
 }
 
@@ -1173,6 +1277,15 @@ function buildCbRightsIssuePushConfigViewModel(config) {
     times: Array.isArray(config?.times) ? config.times : [...DEFAULT_CB_RIGHTS_ISSUE_PUSH_CONFIG.times],
     tradingDaysOnly: config?.tradingDaysOnly !== false,
     deliveryStatus: getCbRightsIssuePushDeliveryStatus(),
+  };
+}
+
+function buildLofArbPushConfigViewModel(config) {
+  return {
+    enabled: config?.enabled !== false,
+    times: Array.isArray(config?.times) ? config.times : [...DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG.times],
+    tradingDaysOnly: config?.tradingDaysOnly !== false,
+    deliveryStatus: getLofArbPushDeliveryStatus(),
   };
 }
 
@@ -1435,6 +1548,29 @@ function persistCbRightsIssueStateFromResult(result) {
   saveCbRightsIssueStateStore();
 }
 
+function persistLofArbStateFromResult(result) {
+  if (!result || typeof result !== 'object') return;
+  if (result.success === false) {
+    lofArbStateStore.lastRebuildAt = nowIso();
+    lofArbStateStore.lastRebuildDate = getShanghaiParts().date;
+    lofArbStateStore.lastRebuildError = normalizeError(result.error || 'lof_arbitrage_refresh_failed');
+    saveLofArbStateStore();
+    return;
+  }
+
+  const payload = result.data && typeof result.data === 'object' ? result.data : {};
+  lofArbStateStore.rows = Array.isArray(payload.rows) ? payload.rows : [];
+  lofArbStateStore.limitedMonitorRows = Array.isArray(payload.limitedMonitorRows) ? payload.limitedMonitorRows : [];
+  lofArbStateStore.unlimitedMonitorRows = Array.isArray(payload.unlimitedMonitorRows) ? payload.unlimitedMonitorRows : [];
+  lofArbStateStore.sourceSummary = payload.sourceSummary && typeof payload.sourceSummary === 'object' ? payload.sourceSummary : {};
+  lofArbStateStore.lastRebuildAt = payload.rebuildStatus?.lastRebuildAt || result.updateTime || nowIso();
+  lofArbStateStore.lastRebuildDate = getShanghaiParts().date;
+  lofArbStateStore.lastRebuildError = payload.rebuildStatus?.lastRebuildError || null;
+  lofArbStateStore.updateTime = result.updateTime || null;
+  lofArbStateStore.source = result.source || null;
+  saveLofArbStateStore();
+}
+
 function shouldRetryDatasetBySchema(key, result) {
   if (!result || typeof result !== 'object' || result.success === false) return false;
   if (key === 'cbArb') return !isCbArbSchemaReady(result);
@@ -1468,6 +1604,16 @@ async function refreshDataset(key, options = {}) {
     }
     if (key === 'cbRightsIssue') {
       persistCbRightsIssueStateFromResult(finalResult);
+    }
+    if (key === 'lofArb') {
+      persistLofArbStateFromResult(finalResult);
+      if (finalResult && finalResult.success !== false) {
+        try {
+          await lofArbPushService.pushInstantIfNeeded();
+        } catch (error) {
+          console.error('[push][lof_arbitrage] instant failed:', error?.message || error);
+        }
+      }
     }
     if (finalResult && typeof finalResult === 'object' && finalResult.success !== false) {
       writeDatasetCache(key, finalResult);
@@ -1630,7 +1776,7 @@ async function runDataJobsCycle(context = 'tick', options = {}) {
 
   try {
     if (options.preloadDatasets) {
-      const preloadKeys = ['exchangeRate', 'ah', 'ab', 'cbArb', 'cbRightsIssue', 'merger', 'eventArb', 'ipo', 'bonds'];
+      const preloadKeys = ['exchangeRate', 'ah', 'ab', 'cbArb', 'lofArb', 'cbRightsIssue', 'merger', 'eventArb', 'ipo', 'bonds'];
       await Promise.allSettled(preloadKeys.map((key) => getDataset(key)));
       details.preloadedDatasets = preloadKeys;
     }
@@ -1663,6 +1809,7 @@ async function runPushSchedulerCycle(context = 'tick') {
   try {
     await weComScheduler.runTick();
     await cbRightsIssuePushService.runIfNeeded();
+    await lofArbPushService.runIfNeeded();
     updateHealthSection('push_scheduler', 'ok', 'Push scheduler is healthy', details);
   } catch (error) {
     updateHealthSection('push_scheduler', 'warn', `Push scheduler degraded: ${error?.message || error}`, {
@@ -2617,6 +2764,9 @@ registerPushRoutes({
   getCbRightsIssuePushConfig: () => cbRightsIssuePushConfigDomain.getConfig(),
   updateCbRightsIssuePushConfig: (payload) => cbRightsIssuePushConfigDomain.updateConfig(payload),
   buildCbRightsIssuePushConfigResponse: buildCbRightsIssuePushConfigViewModel,
+  getLofArbPushConfig: () => lofArbPushConfigDomain.getConfig(),
+  updateLofArbPushConfig: (payload) => lofArbPushConfigDomain.updateConfig(payload),
+  buildLofArbPushConfigResponse: buildLofArbPushConfigViewModel,
 });
 
 registerDashboardRoutes({
