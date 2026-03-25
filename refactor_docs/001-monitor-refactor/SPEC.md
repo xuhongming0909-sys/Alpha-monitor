@@ -3178,6 +3178,25 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 - `presentation/dashboard/dashboard_page.js` does not need a new LOF subtab for this round.
 - Existing `strategy/lof_arbitrage/service.py` logic continues to consume the normalized outward rows without any non-LOF side effects.
 
+## 44. LOF Premium Price-over-IOPV Spec (2026-03-26)
+
+### 44.1 Outward premium rule
+- `strategy/lof_arbitrage/service.py` must calculate:
+  - `premiumRate = (price / iopv - 1) * 100`
+- If `price` or `iopv` is missing or non-positive:
+  - `premiumRate = None`
+
+### 44.2 Boundary rule
+- This round does not change any `iopv` derivation branch.
+- The switch applies only after `iopv` is determined.
+- `limitedMonitorEligible` and `unlimitedMonitorEligible` continue to read the single outward `premiumRate` field after this formula update.
+
+### 44.3 Note synchronization rule
+- LOF explanatory text in:
+  - `LOF套利策略.md`
+  - `config.yaml`
+  must describe the same `现价 / IOPV - 1` rule as the runtime implementation.
+
 ### 39.11 Push rule
 - Add independent notification module:
   - `notification/lof_arbitrage/service.js`

@@ -44,10 +44,10 @@ def _normalize_date_text(value: Any) -> str:
 
 
 def _calc_premium_rate(iopv: Optional[float], price: Optional[float]) -> Optional[float]:
-    # 正式口径：溢价率 = (IOPV / 现价 - 1) × 100%
+    # 正式口径：溢价率 = (现价 / IOPV - 1) × 100%
     if iopv is None or iopv <= 0 or price is None or price <= 0:
         return None
-    return (iopv / price - 1.0) * 100.0
+    return (price / iopv - 1.0) * 100.0
 
 
 def _resolve_time_note(group_key: str) -> str:

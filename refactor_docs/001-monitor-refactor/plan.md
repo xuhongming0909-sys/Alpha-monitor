@@ -1758,3 +1758,28 @@ Acceptance:
 - No new public LOF subtab is added for commodity-only viewing.
 - `QDII欧美` source-visible counts reflect the merged Europe/US + commodity source total.
 - Existing `指数LOF / QDII亚洲` data and LOF push/runtime behavior do not regress.
+
+## 60. Phase AZ: LOF Premium Formula Re-align To Price Over IOPV (2026-03-26)
+
+Goal: restore the live `LOF套利` premium field to the user-confirmed reading rule
+`现价 / IOPV - 1`, because the current runtime and notes drifted back to the older
+`IOPV / 现价 - 1` meaning.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, `LOF套利策略.md`, and the LOF note
+   inside `config.yaml` first.
+2. Keep this round isolated to the LOF chain:
+   - no source URL change
+   - no new API route
+   - no dashboard structure change
+3. Revise only the outward premium semantics:
+   - `premiumRate = (price / iopv - 1) * 100`
+   - `iopv` calculation paths themselves remain unchanged
+4. Keep monitor-pool logic attached to the same outward `premiumRate` field after the
+   formula switch, so page and push keep one definition.
+5. Ensure visible notes and strategy docs stop describing the old formula.
+
+Acceptance:
+- `strategy/lof_arbitrage/service.py` computes `premiumRate` as `现价 / IOPV - 1`.
+- LOF page notes and strategy docs no longer claim `IOPV / 现价 - 1`.
+- Returned rows show positive values when `现价 > IOPV`, and negative values when `现价 < IOPV`.
