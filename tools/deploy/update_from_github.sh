@@ -537,15 +537,6 @@ restore_preserved_runtime_files "$RUNTIME_PRESERVE_DIR"
 cleanup_preserved_runtime_files "$RUNTIME_PRESERVE_DIR"
 RUNTIME_PRESERVE_DIR=""
 
-validate_config_yaml
-RESOLVED_APP_PORT="$(detect_app_port)"
-PYTHON_BIN="$(detect_python_bin || true)"
-if [[ -n "$PYTHON_BIN" ]]; then
-  log "detected python runtime: ${PYTHON_BIN}"
-else
-  warn "python runtime not found in candidates: ${PYTHON_BIN_CANDIDATES}"
-fi
-
 if [[ "$INSTALL_NODE_MODULES" == "1" ]]; then
   if [[ -f package-lock.json ]]; then
     log "installing Node dependencies with npm ci"
@@ -556,6 +547,15 @@ if [[ "$INSTALL_NODE_MODULES" == "1" ]]; then
   fi
 else
   log "skip Node dependency install because INSTALL_NODE_MODULES=${INSTALL_NODE_MODULES}"
+fi
+
+validate_config_yaml
+RESOLVED_APP_PORT="$(detect_app_port)"
+PYTHON_BIN="$(detect_python_bin || true)"
+if [[ -n "$PYTHON_BIN" ]]; then
+  log "detected python runtime: ${PYTHON_BIN}"
+else
+  warn "python runtime not found in candidates: ${PYTHON_BIN_CANDIDATES}"
 fi
 
 install_python_requirements "$PYTHON_BIN"
