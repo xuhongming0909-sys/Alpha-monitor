@@ -39,9 +39,10 @@ def _round(value: Optional[float], digits: int = 4) -> Optional[float]:
 
 
 def _calc_premium_rate(iopv: Optional[float], price: Optional[float]) -> Optional[float]:
-    if iopv is None or price is None or price <= 0:
+    # 溢价率口径按页面正式合同执行：现价 / IOPV - 1，IOPV 无效时不返回伪结果。
+    if iopv is None or iopv <= 0 or price is None or price <= 0:
         return None
-    return (iopv / price - 1.0) * 100.0
+    return (price / iopv - 1.0) * 100.0
 
 
 def _resolve_time_note(group_key: str) -> str:

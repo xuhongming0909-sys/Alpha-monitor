@@ -2919,6 +2919,103 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - last rebuild metadata
   - source summary
 
+## 40. LOF Premium Formula And Dense Table Spec (2026-03-25)
+
+### 40.1 Strategy formula revision
+- `strategy/lof_arbitrage/service.py` must revise the outward premium calculation to:
+  - `premiumRate = (price / iopv - 1) * 100`
+- The helper still returns `None` when:
+  - `iopv` is missing
+  - `price` is missing
+  - `iopv <= 0`
+- The strategy must continue to calculate `iopv` first and only then derive `premiumRate`.
+- `limitedMonitorEligible` and `unlimitedMonitorEligible` keep evaluating the outward `premiumRate` field after the formula change.
+
+### 40.2 Dashboard table revision
+- `presentation/dashboard/dashboard_page.js` must stop attaching an LOF detail-row renderer to `renderPaginatedTable()`.
+- The LOF main table remains the only primary row-reading surface.
+- The LOF main table may merge paired fields into compact multi-line cells, but must still visibly expose:
+  - `code`
+  - `name`
+  - `price`
+  - `changeRate`
+  - `turnoverWan`
+  - `shareAmountWan`
+  - `shareAmountIncreaseWan`
+  - `nav`
+  - `navDate`
+  - `indexIncreaseRate`
+  - `indexName`
+  - `applyFee`
+  - `applyStatus`
+  - `redeemFee`
+  - `redeemStatus`
+  - `custodianFee`
+  - `iopv`
+  - `premiumRate`
+- The compact table still uses shared:
+  - search
+  - sorting
+  - pagination
+  - horizontal overflow container
+
+### 40.3 Presentation-density rule
+- The LOF table may use a smaller module-specific minimum width than the generic premium tables if needed for page fit.
+- Module-specific compact styling must stay local to the LOF table kind and must not globally shrink unrelated tables.
+
+## 41. LOF NAV-date Priority And Post-close Fix Spec (2026-03-25)
+
+### 41.1 Strategy truth correction
+- `strategy/lof_arbitrage/service.py` must treat the currently deployed LOF premium meaning as:
+  - `premiumRate = (iopv / price - 1) * 100`
+- The previous `price / iopv - 1` document text is superseded in this round and must not drive any active code path.
+
+### 41.2 Same-day NAV shortcut
+- The strategy layer must add a same-day NAV branch before the old T-1 / T-2 extrapolation branches:
+  - input condition:
+    - `navDate == priceDate`
+    - `nav > 0`
+    - source `nav_discount_rt` is present
+  - output rule:
+    - outward `iopv` uses the same-day `nav`
+    - outward `premiumRate` is derived from the source `nav_discount_rt` with the sign converted into the module’s outward premium meaning
+    - outward `calcMode` identifies same-day NAV direct-read mode
+    - outward `calcStatus` explains that same-day NAV already exists and no longer needs extrapolation
+- This same-day NAV branch applies to:
+  - `index`
+  - `asia`
+  - `europe_us`
+
+### 41.3 Europe/US NAV-date aligned extrapolation
+- When `marketGroup == europe_us` and the row still needs extrapolation:
+  - the strategy must determine which stored index / FX anchor matches `navDate`
+  - preferred order:
+    - anchor whose date exactly equals `navDate`
+    - otherwise keep the existing truthful fallback order
+- The implementation may use:
+  - `baseIndexDate / baseIndexValue`
+  - `midIndexDate / midIndexValue`
+  - `baseFxDate / baseFxValue`
+  - `midFxDate / midFxValue`
+  - any other already-fetched real field already present in the normalized row
+- The implementation must not invent a missing `T-1` or `T-2` anchor.
+
+### 41.4 Pool exclusion rule
+- Add helper-level pool exclusion for paused subscription rows:
+  - if `applyStatus` expresses `暂停申购`
+  - then `limitedMonitorEligible = false`
+  - and `unlimitedMonitorEligible = false`
+- The row still remains in:
+  - `rows`
+  - active market subtab table rendering
+- Because the row cannot enter either pool, the existing LOF push service will naturally stop treating it as a new pool-entry candidate.
+
+### 41.5 Data contract additions
+- The normalized LOF row should expose enough truthful source context for the new strategy branch, including at least:
+  - `priceDate`
+  - source `nav_discount_rt` normalized for strategy use
+- These fields may stay internal helper fields and do not need to become required visible columns.
+
 ### 39.11 Push rule
 - Add independent notification module:
   - `notification/lof_arbitrage/service.js`

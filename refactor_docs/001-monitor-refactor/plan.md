@@ -1583,3 +1583,70 @@ Acceptance:
 - The main table shows the required source fields plus computed `IOPV / 溢价率`, keeps 50-row pagination, and supports internal view switching.
 - Firecrawl may enhance the source path, but a missing Firecrawl key does not block direct truthful fallback.
 - Existing `转债 / AH / AB / 监控 / 分红 / 事件套利 / 可转债抢权配售` behavior does not regress.
+
+## 56. Phase AV: LOF Premium Formula + Dense Table Adjustment (2026-03-25)
+
+Goal: align the live `LOF套利` page with the latest user rule by switching premium-rate semantics to `现价 / IOPV - 1`, removing per-row detail expansion, and making the LOF main table denser so the list fits the page better.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the revised LOF formula and table contract.
+2. Keep this round isolated to the LOF module:
+   - no source URL change
+   - no new APIs
+   - no push schedule change
+3. Revise the strategy-layer premium output only:
+   - `溢价率 = (现价 / IOPV - 1) × 100%`
+   - keep the same truthful `IOPV` calculation paths
+   - continue deriving monitor-pool eligibility from the outward `premiumRate` field after the formula switch
+4. Simplify the LOF main table:
+   - remove the per-row detail area entirely
+   - keep business fields directly visible in the main table
+   - merge naturally paired fields into compact multi-line cells where helpful
+5. Preserve shared table mechanics:
+   - 50-row pagination
+   - sorting
+   - search
+   - horizontal overflow fallback
+
+Acceptance:
+- `LOF套利` rows now compute `premiumRate` with `现价 / IOPV - 1` instead of `IOPV / 现价 - 1`.
+- The LOF main table no longer renders row-level detail expansion.
+- The LOF table remains searchable, sortable, and paginated, while fitting common desktop widths better than before.
+- Existing LOF fetch, API, and push routes remain unchanged.
+
+## 57. Phase AW: LOF NAV-date Priority + Post-close Premium Fix (2026-03-25)
+
+Goal: keep the live `LOF套利` chain truthful to the latest Jisilu snapshot by making
+the strategy respect the actual `净值日期`, stop re-estimating rows that already have
+same-day NAV, and exclude `暂停申购` samples from both monitor pools.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, and `LOF套利策略.md` first with the revised LOF post-close and monitor contracts.
+2. Correct the live LOF premium contract back to the currently deployed business meaning:
+   - outward `premiumRate` uses the existing live reading path `溢价率 = (IOPV / 现价 - 1) × 100%`
+   - the older `现价 / IOPV - 1` text is treated as superseded document drift, not as the true production contract
+3. Add a same-day NAV priority rule for `指数LOF / QDII亚洲 / QDII欧美`:
+   - when `navDate == priceDate` and Jisilu already returns `nav_discount_rt`
+   - stop doing T-1 / T-2 extrapolation for that row
+   - reuse the source-provided same-day NAV premium reading instead
+   - outward `iopv` falls back to the same-day `nav` reference so the visible table remains internally consistent
+4. Refine the `QDII欧美` extrapolation path so it follows the real NAV anchor date:
+   - when extrapolation is still needed, choose the index / FX base values whose dates actually match `navDate`
+   - do not blindly anchor every row to a hardcoded `T-2` base if the latest NAV has already advanced to `T-1`
+   - if no exact NAV-date match is available, keep the existing truthful fallback order instead of fabricating a new anchor
+5. Tighten monitor-pool eligibility:
+   - rows with `申购状态 = 暂停申购` must stay visible in the main table
+   - but they must not enter `limitedMonitorRows`
+   - and must not enter `unlimitedMonitorRows`
+   - therefore they also stop participating in LOF instant-push entry detection
+6. Keep this round isolated to the LOF module:
+   - no new source URL
+   - no dashboard tab structure change
+   - no non-LOF formula change
+   - no push-schedule change
+
+Acceptance:
+- Same-day NAV rows no longer show stale extrapolated LOF premiums after the source has already published today’s NAV.
+- `QDII欧美` rows extrapolate from the NAV-aligned base date when such a base is available, so the result tracks the latest NAV snapshot more closely.
+- `暂停申购` rows remain visible in the LOF main table but disappear from both monitor pools and the related push-entry path.
+- Existing `LOF` API shape, dashboard tab, and independent push runtime remain available.

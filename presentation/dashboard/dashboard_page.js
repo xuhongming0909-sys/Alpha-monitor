@@ -726,8 +726,6 @@ function renderSearchableTableHostContent(tableKey) {
       columns: buildLofArbColumns(),
       rows: readLofArbVisibleRows(),
       emptyMessage: '当前分组没有符合条件的 LOF 套利数据',
-      detailRenderer: (row) => renderDetailGrid(buildLofArbDetailItems(row)),
-      detailMode: 'always',
     });
   }
   return '';
@@ -2674,6 +2672,19 @@ function renderSummaryCard(title, rows, extraClass = "") {
   `;
 }
 
+function renderCompactCell(primaryHtml, secondaryHtmlList = [], extraClass = '') {
+  const secondary = (Array.isArray(secondaryHtmlList) ? secondaryHtmlList : [])
+    .filter(Boolean)
+    .map((line) => `<div class="table-cell-subtle">${line}</div>`)
+    .join('');
+  return `
+    <div class="table-cell-stack ${escapeHtml(extraClass)}">
+      <div class="table-cell-primary">${primaryHtml || '--'}</div>
+      ${secondary}
+    </div>
+  `;
+}
+
 function renderTableSearchBar(tableKey) {
   const config = readTableSearchConfig(tableKey);
   if (!config) return '';
@@ -3224,41 +3235,115 @@ function renderLofArbPushCard() {
 function buildLofArbColumns() {
   return [
     { key: 'index', label: '序号' },
-    { key: 'code', label: '代码', columnClassName: 'col-code', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.code || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.code || '--')}</span>` },
-    { key: 'name', label: '名称', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.name || ''), render: (row) => escapeHtml(row.name || '--') },
-    { key: 'price', label: '现价', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.price), render: (row) => formatNumber(row.price, 3) },
-    { key: 'changeRate', label: '涨幅', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.changeRate), className: (row) => statusClass(row.changeRate), render: (row) => formatPercent(row.changeRate, 2) },
-    { key: 'turnoverWan', label: '成交额(万)', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.turnoverWan), render: (row) => formatNumber(row.turnoverWan, 2) },
-    { key: 'shareAmountWan', label: '场内份额(万份)', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.shareAmountWan), render: (row) => formatNumber(row.shareAmountWan, 2) },
-    { key: 'shareAmountIncreaseWan', label: '场内新增', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.shareAmountIncreaseWan), render: (row) => formatNumber(row.shareAmountIncreaseWan, 2) },
-    { key: 'nav', label: '净值', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.nav), render: (row) => formatNumber(row.nav, 4) },
-    { key: 'navDate', label: '净值日期', columnClassName: 'col-date', sortable: true, sortType: 'date', defaultDir: 'desc', sortValue: (row) => normalizeDateKey(row.navDate), render: (row) => escapeHtml(formatDateOnly(row.navDate)) },
-    { key: 'indexIncreaseRate', label: '指数涨幅', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.indexIncreaseRate), className: (row) => statusClass(row.indexIncreaseRate), render: (row) => formatPercent(row.indexIncreaseRate, 2) },
-    { key: 'indexName', label: '相关指数', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.indexName || ''), render: (row) => escapeHtml(row.indexName || '--') },
-    { key: 'applyFee', label: '申购费', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'asc', sortValue: (row) => toNumber(row.applyFee), render: (row) => formatPercent(row.applyFee, 2) },
-    { key: 'applyStatusText', label: '申购状态', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.applyStatusText || ''), render: (row) => escapeHtml(row.applyStatusText || '--') },
-    { key: 'redeemFee', label: '赎回费', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'asc', sortValue: (row) => toNumber(row.redeemFee), render: (row) => formatPercent(row.redeemFee, 2) },
-    { key: 'redeemStatus', label: '赎回状态', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.redeemStatus || ''), render: (row) => escapeHtml(row.redeemStatus || '--') },
-    { key: 'custodianFee', label: '托管费', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'asc', sortValue: (row) => toNumber(row.custodianFee), render: (row) => formatPercent(row.custodianFee, 2) },
+    {
+      key: 'identity',
+      label: '名称/代码',
+      columnClassName: 'col-lof-identity',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'asc',
+      sortValue: (row) => `${row.name || ''} ${row.code || ''}`.trim(),
+      render: (row) => renderCompactCell(
+        escapeHtml(row.name || '--'),
+        [
+          `<span class="mono-text">${escapeHtml(row.code || '--')}</span>`,
+          `${escapeHtml(row.marketLabel || '--')} / ${escapeHtml(row.timeNote || '--')}`,
+        ],
+      ),
+    },
+    {
+      key: 'quote',
+      label: '现价/涨幅',
+      columnClassName: 'col-lof-quote',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.price),
+      render: (row) => renderCompactCell(
+        escapeHtml(formatNumber(row.price, 3)),
+        [
+          `<span class="${escapeHtml(statusClass(row.changeRate) || '')}">${escapeHtml(formatPercent(row.changeRate, 2))}</span>`,
+        ],
+      ),
+    },
+    {
+      key: 'turnoverWan',
+      label: '成交额/份额',
+      columnClassName: 'col-lof-volume',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.turnoverWan),
+      render: (row) => renderCompactCell(
+        `${escapeHtml(formatNumber(row.turnoverWan, 2))}万`,
+        [
+          `份额 ${escapeHtml(formatNumber(row.shareAmountWan, 2))}万 / 新增 ${escapeHtml(formatNumber(row.shareAmountIncreaseWan, 2))}`,
+        ],
+      ),
+    },
+    {
+      key: 'navDate',
+      label: '净值/日期',
+      columnClassName: 'col-lof-nav',
+      sortable: true,
+      sortType: 'date',
+      defaultDir: 'desc',
+      sortValue: (row) => normalizeDateKey(row.navDate),
+      render: (row) => renderCompactCell(
+        escapeHtml(formatNumber(row.nav, 4)),
+        [
+          escapeHtml(formatDateOnly(row.navDate)),
+        ],
+      ),
+    },
+    {
+      key: 'indexInfo',
+      label: '相关指数/涨幅',
+      columnClassName: 'col-lof-index',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.indexIncreaseRate),
+      render: (row) => renderCompactCell(
+        escapeHtml(row.indexName || '--'),
+        [
+          `<span class="${escapeHtml(statusClass(row.indexIncreaseRate) || '')}">${escapeHtml(formatPercent(row.indexIncreaseRate, 2))}</span>`,
+        ],
+      ),
+    },
+    {
+      key: 'applyInfo',
+      label: '申购',
+      columnClassName: 'col-lof-fee',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'asc',
+      sortValue: (row) => `${row.applyStatusText || row.applyStatus || ''} ${row.applyFee || ''}`.trim(),
+      render: (row) => renderCompactCell(
+        escapeHtml(row.applyStatusText || row.applyStatus || '--'),
+        [
+          `申购费 ${escapeHtml(formatPercent(row.applyFee, 2))}`,
+        ],
+      ),
+    },
+    {
+      key: 'redeemInfo',
+      label: '赎回/托管',
+      columnClassName: 'col-lof-fee',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'asc',
+      sortValue: (row) => `${row.redeemStatus || ''} ${row.redeemFee || ''} ${row.custodianFee || ''}`.trim(),
+      render: (row) => renderCompactCell(
+        escapeHtml(row.redeemStatus || '--'),
+        [
+          `赎回费 ${escapeHtml(formatPercent(row.redeemFee, 2))}`,
+          `托管费 ${escapeHtml(formatPercent(row.custodianFee, 2))}`,
+        ],
+      ),
+    },
     { key: 'iopv', label: 'IOPV', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.iopv), render: (row) => formatNumber(row.iopv, 4) },
     { key: 'premiumRate', label: '溢价率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.premiumRate), className: (row) => statusClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate, 2) },
-  ];
-}
-
-function buildLofArbDetailItems(row) {
-  return [
-    { label: '分组', value: row.groupLabel || '--' },
-    { label: '市场', value: row.marketLabel || '--' },
-    { label: '货币', value: row.currency || '--' },
-    { label: '时间备注', value: row.timeNote || '--' },
-    { label: '限购金额', value: row.applyLimitAmount ? `${formatNumber(row.applyLimitAmount, 0)} 元` : '无限额/未识别' },
-    { label: '计算模式', value: row.calcMode || '--' },
-    { label: '计算状态', value: row.calcStatus || '--' },
-    { label: '当前汇率', value: formatNumber(row.currentFxRate, 4) },
-    { label: '当前指数点位', value: formatNumber(row.currentIndexValue, 4) },
-    { label: '基准指数点位', value: formatNumber(row.baseIndexValue, 4) },
-    { label: '基准汇率', value: formatNumber(row.baseFxValue, 4) },
-    { label: '来源页面', value: buildAnchor(row.sourcePageUrl, '打开') || '--' },
   ];
 }
 
@@ -3381,8 +3466,6 @@ function renderLofArbPanel() {
             columns: buildLofArbColumns(),
             rows: visibleRows,
             emptyMessage: '当前分组没有符合条件的 LOF 套利数据',
-            detailRenderer: (row) => renderDetailGrid(buildLofArbDetailItems(row)),
-            detailMode: 'always',
           })}
         </div>
       </div>

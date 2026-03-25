@@ -860,6 +860,25 @@
         line-height: 1.5;
       }
 
+      .table-cell-stack {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .table-cell-primary {
+        font-size: 13px;
+        line-height: 1.35;
+        font-weight: 600;
+        color: var(--text-main);
+      }
+
+      .table-cell-subtle {
+        font-size: 11px;
+        line-height: 1.35;
+        color: var(--text-soft);
+      }
+
       .module-grid {
         display: grid;
         grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
@@ -927,6 +946,47 @@
 
       table[data-table-kind="lof"] {
         min-width: var(--table-min-width-lof);
+      }
+
+      table[data-table-kind="lof"] th,
+      table[data-table-kind="lof"] td {
+        padding: 8px 10px;
+      }
+
+      table[data-table-kind="lof"] th.col-lof-identity,
+      table[data-table-kind="lof"] td.col-lof-identity {
+        min-width: 150px;
+        width: 150px;
+      }
+
+      table[data-table-kind="lof"] th.col-lof-quote,
+      table[data-table-kind="lof"] td.col-lof-quote {
+        min-width: 86px;
+        width: 86px;
+      }
+
+      table[data-table-kind="lof"] th.col-lof-volume,
+      table[data-table-kind="lof"] td.col-lof-volume {
+        min-width: 126px;
+        width: 126px;
+      }
+
+      table[data-table-kind="lof"] th.col-lof-nav,
+      table[data-table-kind="lof"] td.col-lof-nav {
+        min-width: 96px;
+        width: 96px;
+      }
+
+      table[data-table-kind="lof"] th.col-lof-index,
+      table[data-table-kind="lof"] td.col-lof-index {
+        min-width: 144px;
+        width: 144px;
+      }
+
+      table[data-table-kind="lof"] th.col-lof-fee,
+      table[data-table-kind="lof"] td.col-lof-fee {
+        min-width: 118px;
+        width: 118px;
       }
 
       th,
