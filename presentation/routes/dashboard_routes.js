@@ -10,6 +10,7 @@ function registerDashboardRoutes(options = {}) {
     nowIso,
     getHealthSnapshot,
     getDashboardUiConfig,
+    getDashboardResourceStatus,
     getShanghaiParts,
     normalizeDateText,
     pickText,
@@ -66,6 +67,23 @@ function registerDashboardRoutes(options = {}) {
           environment: "",
         }
   ));
+
+  app.get("/api/dashboard/resource-status", (req, res) => {
+    try {
+      const keys = String(req.query.keys || "")
+        .split(",")
+        .map((item) => String(item || "").trim())
+        .filter(Boolean);
+      return sendSuccess(
+        res,
+        typeof getDashboardResourceStatus === "function"
+          ? getDashboardResourceStatus(keys)
+          : {}
+      );
+    } catch (error) {
+      return sendError(res, error, 500, {});
+    }
+  });
 
   app.get("/api/merger/reports/today", async (_req, res) => {
     try {

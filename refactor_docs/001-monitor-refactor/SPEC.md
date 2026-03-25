@@ -2602,22 +2602,27 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 - No payload, route, or strategy change is included.
 
 ### 37.2 Column-order rule
-- In `buildConvertibleColumns()`, `转债名称` becomes the first visible business column of the convertible main table.
-- The round may reorder nearby helper columns such as:
+- In `buildConvertibleColumns()`, the leading identifier order for the convertible main table is:
   - `序号`
   - `转债代码`
+  - `转债名称`
 - Remaining field coverage stays unchanged.
 
 ### 37.3 Sticky-column rule
 - Only the convertible main table receives a sticky left column in this round.
-- The sticky target is the `转债名称` column header and data cells.
+- The sticky target is the convertible identifier zone:
+  - `序号`
+  - `转债代码`
+  - `转债名称`
 - Required behavior:
-  - keep the bond-name column fixed while the table scrolls horizontally
+  - keep the left identifier zone fixed while the table scrolls horizontally
   - preserve sticky header behavior at the top
   - keep text readable through an explicit background and stacking order
 
 ### 37.4 Style boundary
 - Implementation may add a dedicated convertible-only column class such as:
+  - `col-index-sticky`
+  - `col-code-sticky`
   - `col-bond-sticky`
 - Sticky styling must not accidentally affect:
   - premium tables
@@ -2679,6 +2684,80 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - `data_fetch.plugins.subscription.history_retention_days`
   - `data_fetch.plugins.convertible_bond.stock_history_retention_rows`
   - `data_fetch.plugins.cb_rights_issue.stock_history_retention_rows`
+
+## 38. Server-authoritative Refresh + Status-first Dashboard Polling Spec (2026-03-25)
+
+### 38.1 Refresh ownership
+- The active refresh model for this round is:
+  - server scheduler = authoritative refresh owner
+  - dashboard = cache/state reader
+- The existing scheduler tick remains `60s`.
+- The dashboard auto-refresh loop is also `60s`, but it is status-first and must
+  not redefine source freshness.
+
+### 38.2 Config contract
+- `config.yaml` adds `presentation.dashboard_auto_refresh` with at least:
+  - `enabled`
+  - `interval_ms`
+  - `mode=status`
+  - `current_tab_only=true`
+  - `reload_data_on_cache_change=true`
+- `GET /api/dashboard/ui-config` returns these values under a presentation-safe
+  `autoRefresh` object for the static page.
+
+### 38.3 Resource-status API
+- Add a lightweight dashboard endpoint:
+  - `GET /api/dashboard/resource-status`
+- Query parameter:
+  - `keys` = comma-separated logical resource keys
+- Supported keys for this round include at least:
+  - `exchangeRate`
+  - `ipo`
+  - `bonds`
+  - `cbArb`
+  - `ah`
+  - `ab`
+  - `merger`
+  - `cbRightsIssue`
+- Each returned item exposes at least:
+  - `updateTime`
+  - `cacheTime`
+  - `servedFromCache`
+  - `refreshing`
+- `merger` may be implemented as a stable alias to the current event-arbitrage dataset owner.
+
+### 38.4 Convertible read-path rule
+- Ordinary `GET /api/market/convertible-bond-arbitrage` reads must not wait for
+  `sync-cb-stock-history`.
+- Allowed places for `sync-cb-stock-history` in this round:
+  - daily sync path
+  - explicit maintenance path
+  - other background-maintenance orchestration when deliberately invoked
+- The outward cb-arb payload remains backward compatible and may additionally
+  carry:
+  - `cacheTime`
+  - `servedFromCache`
+  - `refreshing`
+
+### 38.5 Frontend bootstrap and polling rule
+- Initial dashboard bootstrap loads:
+  - `ui-config`
+  - `health`
+  - `push-config`
+  - shared header datasets actually used by the visible header
+  - the current active tab dataset(s)
+- Hidden tabs must not be loaded during bootstrap unless they are header dependencies.
+- The minute polling loop:
+  - polls `GET /api/dashboard/resource-status`
+  - updates local status/freshness text immediately
+  - reloads full data only when metadata changed
+  - for non-dataset tabs such as runtime-state pages, may keep active-tab-only lightweight full reload behavior
+
+### 38.6 Dead-path cleanup rule
+- Stale LOF dashboard interaction branches must not remain active in
+  `dashboard_page.js`.
+- Current dashboard code must not require undefined LOF constants or renderers
+  during click handling.
 - These values are consumed directly by the corresponding sync / DB modules.
 
 ### 36.7 Truthful sync-result rule

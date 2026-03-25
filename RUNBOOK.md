@@ -27,6 +27,20 @@ Rule:
 - If `web = ok`, the site should still be considered reachable.
 - `data_jobs = warn` or `push_scheduler = warn` means background work degraded, not that the homepage is down.
 
+## 3A. Refresh responsibility rule
+
+- Server-side refresh remains authoritative.
+- The scheduler tick still runs every `60s`, but each dataset only refreshes when
+  its own configured interval is reached.
+- Current effective intervals remain:
+  - `AH / AB / 汇率 / 转债套利 / 事件套利`: `5 分钟`
+  - `IPO / 转债申购 / 可转债抢权配售`: `15 分钟`
+  - daily sync cutoff: `16:10` after-market
+- Dashboard auto refresh is presentation-only:
+  - the page polls lightweight status every `60s`
+  - the page reloads full data only when the server cache metadata changed
+  - page polling must not trigger heavy maintenance jobs such as `sync-cb-stock-history`
+
 ## 4. Official cloud-server target
 
 Formal public deployment target:
@@ -131,6 +145,18 @@ The following files are runtime state, not source-of-truth code artifacts:
 - `runtime_data/shared/*.json`
 
 Deployment must preserve these files on the server. They should stay local to the runtime environment and must not be relied on as Git-tracked release content.
+
+## 5.2A Viewing vs refresh vs maintenance
+
+- Opening the webpage:
+  - reads the latest available cache and renders it
+  - does not own heavy background sync
+- Dashboard auto refresh:
+  - updates status every `60s`
+  - reloads full module payloads only when cache metadata changed
+- Background maintenance:
+  - belongs to scheduler ticks, daily sync, or explicit maintenance commands
+  - may include heavier tasks such as underlying-stock history sync
 
 ## 5.3 Core env sync
 

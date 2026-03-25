@@ -1444,13 +1444,16 @@ Plan:
    - no API field change
    - no pricing/formula change
    - no AH / AB / monitor page change
-3. Adjust the convertible main-table column order so `转债名称` becomes the first visible column.
-4. Add sticky-column presentation only for the convertible main table:
-   - `转债名称` header and cells stay fixed on the left while horizontal scrolling
+3. Restore the natural identifier order on the convertible main table:
+   - `序号`
+   - `转债代码`
+   - `转债名称`
+4. Add a left frozen identifier zone only for the convertible main table:
+   - `序号 / 转债代码 / 转债名称` stay fixed on the left while horizontal scrolling
    - sticky styling must remain readable on desktop and not break mobile horizontal viewing
 
 Acceptance:
-- 转债套利主表横向滚动时，`转债名称` 始终固定在最左侧可见位置。
+- 转债套利主表横向滚动时，左侧始终保留 `序号 / 转债代码 / 转债名称`。
 - 用户看到后续价格/指标列时，仍能直接知道当前是哪只转债。
 - 现有转债字段、排序、分页和计算结果不变。
 
@@ -1496,3 +1499,38 @@ Acceptance:
   - convertible-bond `ATR20`
   - convertible-bond `5日/20日平均成交额`
   - rights-issue `60日波动率`
+
+## 48. Phase AT: Server-authoritative Refresh + Status-first Dashboard Polling (2026-03-25)
+
+Goal: keep all current features and push behavior unchanged while making the
+dashboard faster, especially for the convertible page, by making the server the
+only active refresher and turning the frontend minute loop into status-first polling.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, `contracts/dashboard-api-contract.md`, `RUNBOOK.md`, and `quickstart.md` first.
+2. Keep this round behavior-preserving:
+   - no business-formula change
+   - no tab removal
+   - no push-capability removal
+   - no public route deletion
+3. Clarify refresh ownership:
+   - the server scheduler remains the only active refresh owner
+   - the dashboard only reads cache/state and does not own heavy sync
+   - the page still auto-refreshes every `60s`, but only for status and cache-change detection
+4. Improve server/runtime paths:
+   - keep the existing `60s` scheduler tick
+   - keep dataset refresh intervals unchanged
+   - prevent ordinary `cbArb` page reads from waiting on `sync-cb-stock-history`
+   - expose a lightweight dashboard resource-status API for cache metadata polling
+5. Improve frontend loading:
+   - initial bootstrap loads header dependencies plus the current visible tab
+   - hidden tabs load on first activation
+   - minute polling reloads full data only after `updateTime/cacheTime` changed
+   - non-dataset tabs may keep lightweight full reload behavior when active
+6. Remove stale dashboard dead paths such as leftover LOF click handling if still present.
+
+Acceptance:
+- The dashboard opens with the current tab and header resources first instead of loading every module at startup.
+- The page keeps a `60s` auto-refresh loop without forcing large-table reloads when cache metadata is unchanged.
+- Ordinary `GET /api/market/convertible-bond-arbitrage` reads no longer wait for underlying-stock history sync.
+- Server-side push scheduling and dataset refresh cadence remain unchanged.

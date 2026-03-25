@@ -356,6 +356,12 @@ presentation:
   dashboard_entry: "./presentation/templates/dashboard_template.html"
   show_empty_modules: true
   show_failure_state: true
+  dashboard_auto_refresh:
+    enabled: true
+    interval_ms: 60000
+    mode: "status"
+    current_tab_only: true
+    reload_data_on_cache_change: true
   dashboard_table_ui:
     desktop_font_px: 16
     desktop_header_font_px: 15

@@ -2,36 +2,73 @@
 
 ## Scope
 
-This contract records the existing endpoints the dashboard is allowed to use for
-the 001 monitor refactor feature. The feature should prefer shaping these
-responses in `presentation/routes/` and `presentation/view_models/` rather than
-creating new dashboard-only APIs.
+This contract records the active dashboard-facing endpoints for the
+`001-monitor-refactor` feature. The dashboard should prefer reusing these
+interfaces and lightweight presentation shaping instead of adding heavy
+dashboard-only data paths.
 
 ## Endpoints
+
+### `GET /api/health`
+
+- Purpose: Provide layered runtime health for the header status area.
+
+### `GET /api/dashboard/ui-config`
+
+- Purpose: Provide shared dashboard presentation config.
+- Required dashboard behavior:
+  - apply table typography and min-width settings through CSS variables
+  - read dashboard auto-refresh config from the same payload
+  - fall back to built-in defaults when temporarily unavailable
+
+### `GET /api/dashboard/resource-status`
+
+- Purpose: Provide lightweight cache/status metadata for minute polling without
+  forcing a full table reload.
+- Query:
+  - `keys=exchangeRate,ipo,bonds,cbArb,ah,ab,merger,cbRightsIssue`
+- Required item fields:
+  - `updateTime`
+  - `cacheTime`
+  - `servedFromCache`
+  - `refreshing`
+- Required dashboard behavior:
+  - poll this endpoint on the `60s` dashboard loop
+  - reload full table data only when metadata changed
+  - allow non-dataset tabs to keep normal active-tab-only reload behavior
 
 ### `GET /api/market/exchange-rate`
 
 - Purpose: Provide `HKD/CNY` and `USD/CNY` values for the status line.
-- Required dashboard behavior:
-  - Render currency values when present.
-  - Keep a visible fallback when values are temporarily unavailable.
-
-### `GET /api/market/convertible-bond-arbitrage`
-
-- Purpose: Provide convertible bond arbitrage rows plus status-line treasury
-  yield context.
-- Required dashboard behavior:
-  - Render long-table rows with sortable numeric columns.
-  - Preserve fallback text when treasury yield is absent.
 
 ### `GET /api/market/ipo`
 
-- Purpose: Provide IPO subscription items for the today agenda strip.
+- Purpose: Provide IPO subscription items for the header agenda strip.
 
 ### `GET /api/market/convertible-bonds`
 
-- Purpose: Provide convertible bond subscription items for the today agenda
-  strip.
+- Purpose: Provide convertible-bond subscription items for the header agenda strip.
+
+### `GET /api/market/convertible-bond-arbitrage`
+
+- Purpose: Provide convertible-bond arbitrage rows plus treasury-yield context.
+- Required dashboard behavior:
+  - render long-table rows with sortable numeric columns
+  - preserve fallback text when treasury yield is absent
+- The outward payload may additionally expose:
+  - `updateTime`
+  - `cacheTime`
+  - `servedFromCache`
+  - `refreshing`
+- Convertible-specific field additions already used by the page include:
+  - `stockAtr20`
+  - `remainingSizeYi`
+  - `stockAvgTurnoverAmount20Yi`
+  - `stockAvgTurnoverAmount5Yi`
+- Required dashboard behavior for this round:
+  - open directly from the latest available cache payload when present
+  - not wait for `sync-cb-stock-history` during ordinary page reads
+  - use metadata changes to decide whether a full reload is necessary
 
 ### `GET /api/market/ah`
 
@@ -41,22 +78,30 @@ creating new dashboard-only APIs.
 
 - Purpose: Provide AB premium table data and summary candidates.
 
+### `GET /api/market/event-arbitrage`
+
+- Purpose: Provide event-arbitrage grouped data for the event module.
+
+### `GET /api/market/cb-rights-issue`
+
+- Purpose: Provide the rights-issue module dataset and rebuild status.
+
 ### `GET /api/monitors`
 
 - Purpose: Provide custom monitor arbitrage rows.
 
+### `GET /api/dividend?action=portfolio`
+
+- Purpose: Provide the current dividend watchlist payload.
+
 ### `GET /api/dividend?action=refresh`
 
-- Purpose: Provide dividend reminder rows for today's highlights and full list.
-
-### `GET /api/market/merger`
-
-- Purpose: Provide merger/private announcement rows.
+- Purpose: Provide refreshed dividend reminder rows for highlights and the full list.
 
 ### `GET /api/push/config`
 
 - Purpose: Load current push configuration into the dashboard form.
-- Required response contract for the current push round:
+- Required response fields include at least:
   - `data.times`
   - `data.eventAlert.cooldownMinutes`
   - `data.eventAlert.convertibleBond.convertPremiumLt`
@@ -66,40 +111,15 @@ creating new dashboard-only APIs.
   - `data.deliveryStatus.lastEventAlertError`
   - `data.deliveryStatus.webhookConfigured`
   - `data.deliveryStatus.pushHtmlUrlConfigured`
-- The dashboard must not depend on merger-report push fields in this round.
-
-### `GET /api/dashboard/ui-config`
-
-- Purpose: Load shared dashboard table readability config for the static page.
-- Required dashboard behavior:
-  - Apply returned table typography and min-width settings through shared CSS variables.
-  - Fall back to built-in defaults when the endpoint is temporarily unavailable.
 
 ### `POST /api/push/config`
 
 - Purpose: Save push configuration changes from the dashboard form.
-- Required dashboard behavior:
-  - Submit normalized form data.
-  - Render save success and failure feedback clearly.
-- Current writable fields are limited to:
-  - two fixed-time summary push values
-  - event-alert cooldown minutes
 
 ## Contract rules
 
 - The dashboard must not depend on hidden local mock data.
-- New dashboard requirements should first try to reuse existing fields or
-  presentation-layer mappings.
-- If an endpoint payload must change, the change must preserve ownership:
-  strategy/data-fetch produce business meaning, presentation only shapes display.
-
-### `GET /api/market/convertible-bond-arbitrage` field additions (2026-03-25)
-
-- The public row contract now additionally allows:
-  - `stockAtr20`
-  - `remainingSizeYi`
-  - `stockAvgTurnoverAmount20Yi`
-  - `stockAvgTurnoverAmount5Yi`
-- Required dashboard behavior:
-  - render these as visible main-table columns for the convertible-bond list
-  - preserve `亿` as the turnover/remaining-size display unit
+- New dashboard behavior should first try to reuse existing routes and metadata.
+- If an endpoint payload changes, ownership stays split:
+  - strategy/data-fetch defines business meaning
+  - presentation only shapes display

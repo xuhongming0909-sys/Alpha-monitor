@@ -13,8 +13,14 @@ function resolveApiBase() {
 
 const API_BASE = resolveApiBase();
 const PAGE_SIZE = 50;
-const FORCE_REFRESH_RESOURCE_KEYS = ['exchangeRate', 'ipo', 'bonds', 'cbArb', 'ah', 'ab', 'merger', 'cbRightsIssue'];
 const CRITICAL_CACHE_REVALIDATION_KEYS = ['exchangeRate', 'cbArb', 'ah', 'ab'];
+const DEFAULT_AUTO_REFRESH_CONFIG = Object.freeze({
+  enabled: true,
+  intervalMs: 60 * 1000,
+  mode: 'status',
+  currentTabOnly: true,
+  reloadDataOnCacheChange: true,
+});
 const DEFAULT_TABLE_UI_CONFIG = Object.freeze({
   desktopFontPx: 14,
   desktopHeaderFontPx: 14,
@@ -35,6 +41,7 @@ const DEFAULT_TABLE_UI_CONFIG = Object.freeze({
 
 const ENDPOINTS = {
   uiConfig: '/api/dashboard/ui-config',
+  resourceStatus: '/api/dashboard/resource-status',
   health: '/api/health',
   exchangeRate: '/api/market/exchange-rate',
   ipo: '/api/market/ipo',
@@ -54,6 +61,16 @@ const ENDPOINTS = {
 
 const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'monitor', 'dividend', 'merger', 'cb-rights-issue'];
 const EVENT_ARB_SUBTAB_SEQUENCE = ['a_event', 'hk_private', 'cn_private', 'rights_issue', 'announcement_pool'];
+const TAB_PRIMARY_RESOURCE_KEYS = Object.freeze({
+  'cb-arb': ['cbArb'],
+  ah: ['ah'],
+  ab: ['ab'],
+  monitor: ['monitor'],
+  dividend: ['dividend'],
+  merger: ['merger'],
+  'cb-rights-issue': ['cbRightsIssue', 'cbRightsIssuePushConfig'],
+});
+const DATASET_STATUS_RESOURCE_KEYS = Object.freeze(['exchangeRate', 'ipo', 'bonds', 'cbArb', 'ah', 'ab', 'merger', 'cbRightsIssue']);
 const MONITOR_MARKET_OPTIONS = ['A', 'H', 'B'];
 const MONITOR_CURRENCY_OPTIONS = ['CNY', 'HKD', 'USD'];
 const PUSH_MODULE_LABELS = {
@@ -128,6 +145,9 @@ const state = {
   savingCbRightsIssuePush: false,
   savingMonitor: false,
   cacheRevalidated: {},
+  resourceMeta: {},
+  autoRefreshTimer: null,
+  autoRefreshTickRunning: false,
   searchComposition: {
     cbArb: false,
     ah: false,
@@ -233,6 +253,19 @@ function normalizeTableUiConfig(payload) {
   };
 }
 
+function normalizeAutoRefreshConfig(payload) {
+  const root = payload && typeof payload === 'object' ? payload : {};
+  const config = root.autoRefresh && typeof root.autoRefresh === 'object' ? root.autoRefresh : root;
+  const intervalMs = normalizePositiveNumber(config.intervalMs ?? config.interval_ms, DEFAULT_AUTO_REFRESH_CONFIG.intervalMs);
+  return {
+    enabled: config.enabled !== false,
+    intervalMs,
+    mode: String(config.mode || DEFAULT_AUTO_REFRESH_CONFIG.mode).trim() || DEFAULT_AUTO_REFRESH_CONFIG.mode,
+    currentTabOnly: config.currentTabOnly !== false && config.current_tab_only !== false,
+    reloadDataOnCacheChange: config.reloadDataOnCacheChange !== false && config.reload_data_on_cache_change !== false,
+  };
+}
+
 function applyTableUiConfig(rawPayload) {
   const tableUi = normalizeTableUiConfig(rawPayload);
   const root = document.documentElement;
@@ -254,6 +287,11 @@ function applyTableUiConfig(rawPayload) {
 function applyTableUiConfigFromState() {
   const payload = state.resources.uiConfig?.data?.data || null;
   applyTableUiConfig(payload);
+}
+
+function readDashboardAutoRefreshConfig() {
+  const payload = state.resources.uiConfig?.data?.data || {};
+  return normalizeAutoRefreshConfig(payload.autoRefresh || payload);
 }
 
 function readDashboardModuleNotes() {
@@ -302,6 +340,7 @@ function renderModuleFootnote(moduleKey) {
 
 function renderDashboardUiState() {
   applyTableUiConfigFromState();
+  restartAutoRefreshLoop();
   renderEverything();
 }
 
@@ -423,17 +462,47 @@ function readResourcePayload(key) {
   return readResourceObject(key);
 }
 
+function readResourceStatusMeta(key) {
+  const payload = readResourcePayload(key);
+  const meta = state.resourceMeta && typeof state.resourceMeta[key] === 'object' ? state.resourceMeta[key] : null;
+  return meta ? { ...payload, ...meta } : payload;
+}
+
 function resourceServedFromCache(key) {
-  return Boolean(readResourcePayload(key).servedFromCache);
+  return Boolean(readResourceStatusMeta(key).servedFromCache);
 }
 
 function resourceRefreshing(key) {
-  return Boolean(state.resources[key]?.refreshing);
+  return Boolean(state.resources[key]?.refreshing || readResourceStatusMeta(key).refreshing);
 }
 
 function buildEndpointUrl(endpoint, options = {}) {
   if (!options.force) return endpoint;
   return `${endpoint}${endpoint.includes('?') ? '&' : '?'}force=1`;
+}
+
+function buildDashboardStatusUrl(keys) {
+  const list = (Array.isArray(keys) ? keys : [])
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  const query = encodeURIComponent(list.join(','));
+  return `${ENDPOINTS.resourceStatus}?keys=${query}`;
+}
+
+function readTabResourceKeys(tabKey = state.activeTab) {
+  return [...(TAB_PRIMARY_RESOURCE_KEYS[tabKey] || [])];
+}
+
+function readActiveTabDatasetStatusKeys() {
+  return readTabResourceKeys()
+    .filter((key) => DATASET_STATUS_RESOURCE_KEYS.includes(key));
+}
+
+function readAutoRefreshDatasetStatusKeys(config = readDashboardAutoRefreshConfig()) {
+  if (!config.currentTabOnly) {
+    return [...new Set(DATASET_STATUS_RESOURCE_KEYS)];
+  }
+  return [...new Set(['exchangeRate', 'ipo', 'bonds', ...readActiveTabDatasetStatusKeys()])];
 }
 
 function toNumber(value) {
@@ -675,7 +744,7 @@ function todayKey() {
 }
 
 function readUpdateTime(key) {
-  const payload = readObject(state.resources[key].data);
+  const payload = readResourceStatusMeta(key);
   return payload.updateTime || null;
 }
 
@@ -771,6 +840,27 @@ async function fetchJson(url, options = {}) {
   return payload;
 }
 
+async function fetchResourceStatus(keys) {
+  const payload = await fetchJson(buildDashboardStatusUrl(keys), { cache: 'no-store' });
+  return readObject(payload?.data || payload);
+}
+
+function resourceStatusSignature(payload) {
+  const meta = readObject(payload);
+  return [
+    String(meta.updateTime || ''),
+    String(meta.cacheTime || ''),
+    meta.servedFromCache ? '1' : '0',
+  ].join('|');
+}
+
+function shouldReloadResourceByMeta(key, nextMeta) {
+  if (!nextMeta || typeof nextMeta !== 'object') return false;
+  const resource = state.resources[key];
+  if (!resource || resource.status === 'idle' || resource.status === 'error' || !resource.data) return true;
+  return resourceStatusSignature(readResourceStatusMeta(key)) !== resourceStatusSignature(nextMeta);
+}
+
 async function loadResource(key, endpoint, onRender, options = {}) {
   const previousData = state.resources[key].data;
   const keepVisibleData = Boolean(options.background && previousData);
@@ -815,6 +905,7 @@ function bindEvents() {
       state.activeTab = nextTab;
       renderTabs();
       renderActivePanel();
+      void ensureActiveTabResourcesLoaded({ background: false });
     });
   });
 
@@ -971,13 +1062,11 @@ function bindEvents() {
       return;
     }
 
-    const lofSubtab = event.target.closest('[data-lof-subtab]');
-    if (lofSubtab) {
-      const subtab = String(lofSubtab.dataset.lofSubtab || '').trim();
-      if (!LOF_SUBTAB_SEQUENCE.includes(subtab)) return;
-      state.lofSubview = subtab;
-      renderLofArbitragePanel();
-    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    void runAutoRefreshTick('visibility');
   });
 
   state.eventsBound = true;
@@ -1002,8 +1091,72 @@ function renderCallbackForResource(key) {
   return renderEverything;
 }
 
+function buildHeaderLoadTasks(options = {}) {
+  const forceMarket = Boolean(options.forceMarket);
+  const background = Boolean(options.background);
+  const tasks = [];
+  if (options.includeUiConfig) {
+    tasks.push(loadResource('uiConfig', ENDPOINTS.uiConfig, renderDashboardUiState, { background }));
+  }
+  tasks.push(loadResource('health', ENDPOINTS.health, renderHeaderOnly, { background }));
+  tasks.push(loadResource('pushConfig', ENDPOINTS.pushConfig, renderPushSettings, { background }));
+  tasks.push(loadResource('exchangeRate', ENDPOINTS.exchangeRate, renderHeaderOnly, { force: forceMarket, background }));
+  tasks.push(loadResource('ipo', ENDPOINTS.ipo, renderHeaderOnly, { force: forceMarket, background }));
+  tasks.push(loadResource('bonds', ENDPOINTS.bonds, renderHeaderOnly, { force: forceMarket, background }));
+  return tasks;
+}
+
+function buildActiveTabLoadTasks(options = {}) {
+  const forceMarket = Boolean(options.forceMarket);
+  const background = Boolean(options.background);
+  if (state.activeTab === 'cb-arb') {
+    return [loadResource('cbArb', ENDPOINTS.cbArb, renderEverything, { force: forceMarket, background })];
+  }
+  if (state.activeTab === 'ah') {
+    return [loadResource('ah', ENDPOINTS.ah, renderEverything, { force: forceMarket, background })];
+  }
+  if (state.activeTab === 'ab') {
+    return [loadResource('ab', ENDPOINTS.ab, renderEverything, { force: forceMarket, background })];
+  }
+  if (state.activeTab === 'monitor') {
+    return [loadResource('monitor', ENDPOINTS.monitor, renderEverything, { background })];
+  }
+  if (state.activeTab === 'dividend') {
+    return [loadResource('dividend', ENDPOINTS.dividend, renderEverything, { background })];
+  }
+  if (state.activeTab === 'merger') {
+    return [loadResource('merger', ENDPOINTS.merger, renderEverything, { force: forceMarket, background })];
+  }
+  if (state.activeTab === 'cb-rights-issue') {
+    return [
+      loadResource('cbRightsIssue', ENDPOINTS.cbRightsIssue, renderEverything, { force: forceMarket, background }),
+      loadResource('cbRightsIssuePushConfig', ENDPOINTS.cbRightsIssuePushConfig, renderEverything, { background }),
+    ];
+  }
+  return [];
+}
+
+async function ensureActiveTabResourcesLoaded(options = {}) {
+  const resourceKeys = readTabResourceKeys();
+  if (!resourceKeys.length) return;
+  const needsLoad = Boolean(options.force)
+    || resourceKeys.some((key) => {
+      const resource = state.resources[key];
+      return !resource || resource.status === 'idle' || !resource.data;
+    });
+  if (!needsLoad) return;
+  await Promise.allSettled(buildActiveTabLoadTasks({
+    forceMarket: Boolean(options.force),
+    background: Boolean(options.background),
+  }));
+  if (state.activeTab === 'dividend') {
+    void refreshDividendResource({ background: true, force: Boolean(options.force) });
+  }
+}
+
 async function revalidateCriticalResourcesOnce() {
-  const tasks = CRITICAL_CACHE_REVALIDATION_KEYS
+  const currentTabDatasetKeys = readActiveTabDatasetStatusKeys().filter((key) => CRITICAL_CACHE_REVALIDATION_KEYS.includes(key));
+  const tasks = [...new Set(['exchangeRate', ...currentTabDatasetKeys])]
     .filter((key) => resourceServedFromCache(key))
     .filter((key) => !state.cacheRevalidated[key])
     .map((key) => {
@@ -1024,26 +1177,14 @@ async function bootstrap(options = {}) {
   const skipCacheRevalidation = Boolean(options.skipCacheRevalidation);
 
   const tasks = [
-    loadResource('uiConfig', ENDPOINTS.uiConfig, renderDashboardUiState),
-    loadResource('health', ENDPOINTS.health, renderHeaderOnly),
-    loadResource('exchangeRate', ENDPOINTS.exchangeRate, renderHeaderOnly, { force: forceMarket }),
-    loadResource('ipo', ENDPOINTS.ipo, renderHeaderOnly, { force: forceMarket }),
-    loadResource('bonds', ENDPOINTS.bonds, renderHeaderOnly, { force: forceMarket }),
-    loadResource('pushConfig', ENDPOINTS.pushConfig, renderPushSettings),
-    loadResource('cbArb', ENDPOINTS.cbArb, renderEverything, { force: forceMarket }),
-    loadResource('cbRightsIssue', ENDPOINTS.cbRightsIssue, renderEverything, { force: forceMarket }),
-    loadResource('cbRightsIssuePushConfig', ENDPOINTS.cbRightsIssuePushConfig, renderEverything),
-    loadResource('ah', ENDPOINTS.ah, renderEverything, { force: forceMarket }),
-    loadResource('ab', ENDPOINTS.ab, renderEverything, { force: forceMarket }),
-    loadResource('monitor', ENDPOINTS.monitor, renderEverything),
-    loadResource('dividend', ENDPOINTS.dividend, renderEverything),
-    loadResource('merger', ENDPOINTS.merger, renderEverything, { force: forceMarket }),
+    ...buildHeaderLoadTasks({ includeUiConfig: true, forceMarket }),
+    ...buildActiveTabLoadTasks({ forceMarket }),
   ];
 
   await Promise.allSettled(tasks);
   renderAll();
 
-  if (!forceMarket) {
+  if (state.activeTab === 'dividend' && !forceMarket) {
     void refreshDividendResource({ background: true });
   }
 
@@ -1052,10 +1193,79 @@ async function bootstrap(options = {}) {
   }
 }
 
+async function runAutoRefreshTick(_reason = 'interval') {
+  const config = readDashboardAutoRefreshConfig();
+  if (!config.enabled || state.autoRefreshTickRunning) return;
+  if (document.hidden) return;
+  state.autoRefreshTickRunning = true;
+  try {
+    const statusKeys = readAutoRefreshDatasetStatusKeys(config);
+    const changedDatasetKeys = [];
+    if (statusKeys.length) {
+      try {
+        const statusMap = await fetchResourceStatus(statusKeys);
+        for (const key of Object.keys(statusMap)) {
+          if (shouldReloadResourceByMeta(key, statusMap[key])) {
+            changedDatasetKeys.push(key);
+          }
+        }
+        state.resourceMeta = {
+          ...state.resourceMeta,
+          ...statusMap,
+        };
+        renderHeaderOnly();
+        renderActivePanel();
+      } catch (_error) {
+        // 状态轮询失败时不打断现有页面，只保留旧快照。
+      }
+    }
+
+    const tasks = [
+      loadResource('health', ENDPOINTS.health, renderHeaderOnly, { background: true }),
+      loadResource('pushConfig', ENDPOINTS.pushConfig, renderPushSettings, { background: true }),
+    ];
+
+    if (changedDatasetKeys.includes('exchangeRate')) {
+      tasks.push(loadResource('exchangeRate', ENDPOINTS.exchangeRate, renderHeaderOnly, { background: true }));
+    }
+    if (changedDatasetKeys.includes('ipo')) {
+      tasks.push(loadResource('ipo', ENDPOINTS.ipo, renderHeaderOnly, { background: true }));
+    }
+    if (changedDatasetKeys.includes('bonds')) {
+      tasks.push(loadResource('bonds', ENDPOINTS.bonds, renderHeaderOnly, { background: true }));
+    }
+
+    const activeDatasetKeys = readActiveTabDatasetStatusKeys();
+    if (config.reloadDataOnCacheChange && activeDatasetKeys.some((key) => changedDatasetKeys.includes(key))) {
+      tasks.push(...buildActiveTabLoadTasks({ background: true }));
+    } else if (!activeDatasetKeys.length) {
+      tasks.push(...buildActiveTabLoadTasks({ background: true }));
+    }
+
+    if (tasks.length) {
+      await Promise.allSettled(tasks);
+    }
+  } finally {
+    state.autoRefreshTickRunning = false;
+  }
+}
+
+function restartAutoRefreshLoop() {
+  if (state.autoRefreshTimer) {
+    window.clearInterval(state.autoRefreshTimer);
+    state.autoRefreshTimer = null;
+  }
+  const config = readDashboardAutoRefreshConfig();
+  if (!config.enabled) return;
+  state.autoRefreshTimer = window.setInterval(() => {
+    void runAutoRefreshTick('interval');
+  }, config.intervalMs);
+}
+
 async function reloadAllData() {
-  showToast('正在强制刷新实时数据');
+  showToast('正在强制刷新当前页相关数据');
   await bootstrap({ forceMarket: true, skipCacheRevalidation: true });
-  showToast('实时数据已刷新');
+  showToast('当前页相关数据已刷新');
 }
 
 function renderAll() {
@@ -2329,9 +2539,9 @@ function renderTableSearchBar(tableKey) {
 
 function buildConvertibleColumns() {
   return [
+    { key: 'index', label: '序号', columnClassName: 'col-index col-index-sticky' },
+    { key: 'code', label: '转债代码', columnClassName: 'col-code col-code-sticky', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.code || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.code || '--')}</span>` },
     { key: 'bondName', label: '转债名称', columnClassName: 'col-name col-bond-sticky', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.bondName || ''), render: (row) => escapeHtml(row.bondName || '--') },
-    { key: 'code', label: '转债代码', columnClassName: 'col-code', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.code || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.code || '--')}</span>` },
-    { key: 'index', label: '序号' },
     {
       key: 'price',
       label: '转债现价',

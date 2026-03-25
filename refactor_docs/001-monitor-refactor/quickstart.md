@@ -39,6 +39,17 @@ python data_dispatch.py merger
 npm run check:boundaries
 ```
 
+## Refresh model
+
+- Server-side background refresh remains the source of truth.
+- Dashboard auto refresh is fixed at `60s`, but it is status-first:
+  - poll status metadata every minute
+  - reload full table data only when the corresponding cache changed
+- The dashboard must not turn `5 分钟 / 15 分钟` server data into fake `1 分钟`
+  source truth.
+- Ordinary page opening and minute polling must not trigger heavy maintenance
+  such as convertible underlying history sync.
+
 ## Manual verification checklist
 
 1. Homepage shows title, single-line status text, today subscription table, and

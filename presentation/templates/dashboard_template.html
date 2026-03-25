@@ -954,8 +954,46 @@
         min-width: 108px;
       }
 
-      table[data-table-kind="convertible"] th.col-bond-sticky {
+      table[data-table-kind="convertible"] th.col-index-sticky {
         left: 0;
+        z-index: 7;
+        background:
+          linear-gradient(180deg, rgba(30, 33, 44, 0.99), rgba(22, 25, 34, 0.99)),
+          rgba(18, 18, 22, 0.99);
+        box-shadow: 6px 0 14px rgba(0, 0, 0, 0.12);
+      }
+
+      table[data-table-kind="convertible"] td.col-index-sticky {
+        position: sticky;
+        left: 0;
+        z-index: 4;
+        background:
+          linear-gradient(180deg, rgba(22, 25, 34, 0.99), rgba(18, 18, 22, 0.99)),
+          rgba(18, 18, 22, 0.99);
+        box-shadow: 6px 0 14px rgba(0, 0, 0, 0.08);
+      }
+
+      table[data-table-kind="convertible"] th.col-code-sticky {
+        left: 46px;
+        z-index: 6;
+        background:
+          linear-gradient(180deg, rgba(30, 33, 44, 0.985), rgba(22, 25, 34, 0.985)),
+          rgba(18, 18, 22, 0.985);
+        box-shadow: 8px 0 16px rgba(0, 0, 0, 0.15);
+      }
+
+      table[data-table-kind="convertible"] td.col-code-sticky {
+        position: sticky;
+        left: 46px;
+        z-index: 3;
+        background:
+          linear-gradient(180deg, rgba(22, 25, 34, 0.985), rgba(18, 18, 22, 0.985)),
+          rgba(18, 18, 22, 0.985);
+        box-shadow: 8px 0 16px rgba(0, 0, 0, 0.1);
+      }
+
+      table[data-table-kind="convertible"] th.col-bond-sticky {
+        left: 130px;
         z-index: 5;
         background:
           linear-gradient(180deg, rgba(30, 33, 44, 0.98), rgba(22, 25, 34, 0.98)),
@@ -965,7 +1003,7 @@
 
       table[data-table-kind="convertible"] td.col-bond-sticky {
         position: sticky;
-        left: 0;
+        left: 130px;
         z-index: 2;
         background:
           linear-gradient(180deg, rgba(22, 25, 34, 0.98), rgba(18, 18, 22, 0.98)),
@@ -973,6 +1011,8 @@
         box-shadow: 10px 0 18px rgba(0, 0, 0, 0.12);
       }
 
+      table[data-table-kind="convertible"] tbody tr:not(.detail-row):not(.subscription-row):not(.merger-row-today):nth-child(even) td.col-index-sticky,
+      table[data-table-kind="convertible"] tbody tr:not(.detail-row):not(.subscription-row):not(.merger-row-today):nth-child(even) td.col-code-sticky,
       table[data-table-kind="convertible"] tbody tr:not(.detail-row):not(.subscription-row):not(.merger-row-today):nth-child(even) td.col-bond-sticky {
         background:
           linear-gradient(180deg, rgba(28, 31, 40, 0.98), rgba(23, 25, 33, 0.98)),
@@ -1518,6 +1558,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <script src="/presentation/dashboard/dashboard_page.js?v=20260325-cb-discount-strategy-1"></script>
+    <script src="/presentation/dashboard/dashboard_page.js?v=20260325-status-refresh-1"></script>
   </body>
 </html>

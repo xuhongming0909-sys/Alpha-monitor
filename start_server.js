@@ -77,6 +77,7 @@ const PRESENTATION_DIVIDEND_CONFIG = PRESENTATION_CONFIG?.dividend || {};
 const PRESENTATION_HISTORICAL_PREMIUM_CONFIG = PRESENTATION_CONFIG?.historical_premium || {};
 const PRESENTATION_DASHBOARD_TABLE_UI_CONFIG = PRESENTATION_CONFIG?.dashboard_table_ui || {};
 const PRESENTATION_DASHBOARD_MODULE_NOTES_CONFIG = PRESENTATION_CONFIG?.dashboard_module_notes || {};
+const PRESENTATION_DASHBOARD_AUTO_REFRESH_CONFIG = PRESENTATION_CONFIG?.dashboard_auto_refresh || {};
 const EVENT_ARB_STRATEGY_CONFIG = STRATEGY_CONFIG?.event_arbitrage || {};
 const CONVERTIBLE_BOND_STRATEGY_CONFIG = (STRATEGY_CONFIG?.convertible_bond && typeof STRATEGY_CONFIG.convertible_bond === 'object')
   ? STRATEGY_CONFIG.convertible_bond
@@ -341,6 +342,16 @@ function buildDashboardTableUiConfig(config = {}) {
   };
 }
 
+function buildDashboardAutoRefreshConfig(config = {}) {
+  return {
+    enabled: toBooleanConfig(config.enabled, true),
+    intervalMs: toPositiveNumberConfig(config.interval_ms, 60 * 1000),
+    mode: String(config.mode || 'status').trim() || 'status',
+    currentTabOnly: config.current_tab_only !== false,
+    reloadDataOnCacheChange: config.reload_data_on_cache_change !== false,
+  };
+}
+
 function normalizeStringListConfig(values) {
   return (Array.isArray(values) ? values : [])
     .map((item) => String(item || '').trim())
@@ -372,6 +383,7 @@ function buildDashboardModuleNotesConfig(config = {}) {
 
 const DASHBOARD_TABLE_UI = buildDashboardTableUiConfig(PRESENTATION_DASHBOARD_TABLE_UI_CONFIG);
 const DASHBOARD_MODULE_NOTES = buildDashboardModuleNotesConfig(PRESENTATION_DASHBOARD_MODULE_NOTES_CONFIG);
+const DASHBOARD_AUTO_REFRESH = buildDashboardAutoRefreshConfig(PRESENTATION_DASHBOARD_AUTO_REFRESH_CONFIG);
 const PROCESS_STARTED_AT = sharedNowIso();
 const APP_PACKAGE_VERSION = (() => {
   try {
@@ -623,7 +635,7 @@ const DATASETS = {
     refreshIntervalMs: toIntConfig(pluginFetchConfig('convertible_bond').refresh_interval_ms, 5 * 60 * 1000),
     dbDailySync: pluginFetchConfig('convertible_bond').daily_incremental_sync !== false,
     fetch: async (options = {}) => {
-      if (options.force || options.syncUniverse) {
+      if (options.syncUniverse) {
         await callDataCore(['sync-cb-stock-history'], { timeout: 900000, maxBuffer: 1024 * 1024 * 50 });
       }
       return callDataCore(['cb-arb'], { timeout: 300000, maxBuffer: 1024 * 1024 * 50 });
@@ -954,6 +966,49 @@ function withCachedDatasetMeta(cached, extra = {}) {
     cacheTime: cached?.cacheTime || nowIso(),
     ...extra,
   };
+}
+
+const DASHBOARD_RESOURCE_STATUS_DATASET_KEYS = Object.freeze({
+  exchangeRate: 'exchangeRate',
+  ipo: 'ipo',
+  bonds: 'bonds',
+  cbArb: 'cbArb',
+  ah: 'ah',
+  ab: 'ab',
+  merger: 'eventArb',
+  cbRightsIssue: 'cbRightsIssue',
+  eventArb: 'eventArb',
+});
+
+function readCachedDatasetStatus(resourceKey) {
+  const datasetKey = DASHBOARD_RESOURCE_STATUS_DATASET_KEYS[resourceKey];
+  if (!datasetKey || !DATASETS[datasetKey]) return null;
+  const cached = readDatasetCache(datasetKey);
+  const updateTime = String(cached?.updateTime || cached?.data?.updateTime || '').trim() || null;
+  const cacheTime = String(cached?.cacheTime || '').trim() || null;
+  return {
+    resourceKey,
+    datasetKey,
+    updateTime,
+    cacheTime,
+    servedFromCache: Boolean(cached),
+    refreshing: refreshLocks.has(`${datasetKey}:normal`) || refreshLocks.has(`${datasetKey}:daily`),
+    intraday: Boolean(DATASETS[datasetKey]?.intraday),
+    refreshIntervalMs: Number(DATASETS[datasetKey]?.refreshIntervalMs) || null,
+  };
+}
+
+function getDashboardResourceStatus(keys = []) {
+  const requested = (Array.isArray(keys) ? keys : [])
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  const uniqueKeys = requested.length ? [...new Set(requested)] : Object.keys(DASHBOARD_RESOURCE_STATUS_DATASET_KEYS);
+  const result = {};
+  for (const key of uniqueKeys) {
+    const snapshot = readCachedDatasetStatus(key);
+    if (snapshot) result[key] = snapshot;
+  }
+  return result;
 }
 
 function scheduleDatasetRefresh(key, options = {}) {
@@ -1316,11 +1371,21 @@ function normalizeDatasetPayload(key, result) {
       todayDate: getShanghaiParts().date,
     });
     const rows = shapeCbArbPublicRows(snapshot.rows);
+    const sortedByDoubleLow = [...rows].sort(
+      (a, b) => (Number(a?.doubleLow) || Number.POSITIVE_INFINITY) - (Number(b?.doubleLow) || Number.POSITIVE_INFINITY)
+    );
+    const sortedByTheory = [...rows].sort(
+      (a, b) => (Number(b?.theoreticalPremiumRate) || Number.NEGATIVE_INFINITY) - (Number(a?.theoreticalPremiumRate) || Number.NEGATIVE_INFINITY)
+    );
     const { data: _rawData, list: _legacyList, rows: _legacyRows, ...rest } = result;
     return {
       ...rest,
       data: rows,
       discountMonitorSummary: snapshot.discountMonitorSummary,
+      summary: {
+        topDoubleLow: sortedByDoubleLow.slice(0, 3),
+        topTheoreticalPremiumRate: sortedByTheory.slice(0, 3),
+      },
     };
   }
   if (key === 'cbRightsIssue') {
@@ -1378,7 +1443,7 @@ function shouldRetryDatasetBySchema(key, result) {
 }
 
 function normalizeDatasetRetryOptions(key, options = {}) {
-  if (key === 'cbArb') return { ...options, force: true, syncUniverse: true };
+  if (key === 'cbArb') return { ...options, force: true };
   if (key === 'ah') return { ...options, forcePairs: true };
   return options;
 }
@@ -2568,8 +2633,16 @@ registerDashboardRoutes({
       tabletFontPx: DASHBOARD_TABLE_UI.tabletFontPx,
       minWidthByKind: { ...DASHBOARD_TABLE_UI.minWidthByKind },
     },
+    autoRefresh: {
+      enabled: DASHBOARD_AUTO_REFRESH.enabled,
+      intervalMs: DASHBOARD_AUTO_REFRESH.intervalMs,
+      mode: DASHBOARD_AUTO_REFRESH.mode,
+      currentTabOnly: DASHBOARD_AUTO_REFRESH.currentTabOnly,
+      reloadDataOnCacheChange: DASHBOARD_AUTO_REFRESH.reloadDataOnCacheChange,
+    },
     moduleNotes: { ...DASHBOARD_MODULE_NOTES },
   }),
+  getDashboardResourceStatus,
   getAccessInfo: () => ({
     serverBaseUrl: SERVER_BASE_URL,
     publicBaseUrl: PUBLIC_BASE_URL,
