@@ -276,6 +276,29 @@ data_fetch:
       firecrawl_api_url: "${FIRECRAWL_API_URL}"
       firecrawl_api_key: "${FIRECRAWL_API_KEY}"
       firecrawl_timeout_ms: 20000
+      external_market_api:
+        enabled: true
+        provider: "stooq"
+        request_timeout_ms: 12000
+        current_quote_url: "https://stooq.com/q/l/"
+        history_quote_url: "https://stooq.com/q/d/l/"
+        index_symbol_map:
+          cal_index_id:
+            "SPX.GI": "^SPX"
+            "NDX.GI": "^NDQ"
+            "DJI.GI": "^DJI"
+            "IXIC.GI": "^NDQ"
+            "AGG": "AGG.US"
+          index_name:
+            "恒生指数": "^HSI"
+        fx_symbol_map:
+          "USD": "usdcny"
+          "HKD": "hkdcny"
+          "EUR": "eurcny"
+          "GBP": "gbpcny"
+          "AUD": "audcny"
+          "SGD": "sgdcny"
+          "CAD": "cadcny"
       limited_apply_cap_amount: 100000
       limited_premium_rate_threshold: 1
       unlimited_abs_premium_rate_threshold: 5
@@ -503,11 +526,11 @@ presentation:
         - "IOPV 修正优先复用集思录源字段、腾讯实时指数/汇率与少量统一映射，不为单只基金额外接入碎片化 API。"
       formulas:
         - "溢价率 = (IOPV / 现价 - 1) × 100%。"
-        - "指数LOF / QDII亚洲：IOPV = T-1 日净值 × (1 + 指数涨幅) × (今日汇率 / 基准汇率)。"
-        - "QDII欧美：优先按 T-2 日净值 × (今日指数 / T-2 指数) × (今日汇率 / T-2 汇率) 估算；无法完整映射时退回源侧真实估算口径。"
+        - "指数LOF / QDII亚洲：净值日期为 T-1 时，IOPV = T-1 日净值 × (1 + 指数涨幅) × (今日汇率 / 基准汇率)；净值日期为当日时，IOPV = 当日净值。"
+        - "QDII欧美：按最新已发布净值日期对齐锚点；净值为 T-2 时按 T-2 锚点估算，净值为 T-1 时按 T-1 锚点估算，今日指数与今日汇率优先走外部实时 API。"
       strategy_notes:
         - "页面顶部只显示限购监控池和非限购监控池，不再堆放额外状态卡。"
-        - "限购池要求存在限购、限额低于 10 万、溢价率大于 1%、成交额大于 100 万；非限池要求不限购且溢价率绝对值大于 5%、成交额大于 100 万。"
+        - "限购池要求存在限购、限额低于 10 万、溢价率大于 1%、成交额大于 100 万，且暂停申购样本不得入池；非限池要求不限购、未暂停申购且溢价率绝对值大于 5%、成交额大于 100 万。"
         - "无法拿到足够真实输入时，行仍然保留，但 IOPV / 溢价率不伪造，直接显示真实计算状态。"
   stock_search:
     default_limit: 10

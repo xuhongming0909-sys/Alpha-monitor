@@ -1453,3 +1453,78 @@
 - 监控池其余阈值保持不变：
   - 限购池仍要求 `限额 < 10万`、`溢价率 > 1%`、`成交额 > 100万`
   - 非限池仍要求 `|溢价率| > 5%`、`成交额 > 100万`
+
+## 58. LOF欧美外部市场 API 补数合同 (2026-03-25)
+- 本轮只增强 `LOF套利 > QDII欧美` 的辅助行情输入，不改主列表来源。
+- LOF 主列表来源仍固定为集思录 LOF / QDII 页面家族；外部 API 只负责补 `指数 / 汇率` 行情输入。
+- 新增一条正式外部补数链路：
+  - phase-1 provider 固定为 `Stooq`
+  - 仅用于补 `currentIndexValue`、`baseIndexValue`、`currentFxRate`、`baseFxValue`
+  - 不接管集思录主列表抓取
+- 外部补数只允许用于“已配置 exact symbol 映射”的样本：
+  - 可按 `calIndexId`
+  - 或按 `indexName`
+  - 或按币种映射到真实 FX symbol
+- 不得把未验证的代理 ETF、模糊搜索结果、猜测代码伪装成“精确指数”。
+- `QDII欧美` 外推时，若集思录缺少净值日期对应的指数/汇率基准值，允许用外部 API 补齐：
+  - `baseIndexValue = navDate` 对齐的真实收盘值
+  - `baseFxValue = navDate` 对齐的真实汇率收盘值
+- 若集思录缺少实时指数值，允许用外部 API 补齐：
+  - `currentIndexValue = provider` 最新可得值
+- 外部 FX 补数同样遵循真实日期对齐：
+  - 当 `baseFxValue` 缺失时，用 `navDate` 对齐的真实汇率收盘值补齐
+  - 当 `currentFxRate` 缺失时，用 provider 最新可得汇率补齐
+- 映射、URL、超时和开关必须进入 `config.yaml`，不得把 provider 细节散落硬编码在多个文件。
+- 本轮最低验收目标：
+  - `恒生指数` 这类原本 `calIndexId` 为空、且源侧未给出完整基准的样本，外部 exact 映射存在时必须恢复 IOPV 计算
+  - 已能算出的 SPX / NDX / DJI 等样本不得回退
+- 真值边界保持不变：
+  - exact 映射不存在时，行仍保留
+  - 有真实源侧估算口径时继续按真实回退路径输出
+  - 连真实回退都不足时，继续显示 `真实输入不足，未计算 IOPV`
+
+## 58. LOF净值日期分支与欧美实时锚点合同 (2026-03-25)
+- `LOF套利` 当前正式溢价率口径保持为：
+  - `溢价率 = (IOPV / 现价 - 1) × 100%`
+- `指数LOF / QDII亚洲` 公式必须按 `净值日期` 分支：
+  - 当 `navDate` 为 `T-1日`：
+    - `IOPV = T-1 日净值 × (1 + 指数涨幅) × (今日汇率 / 基准汇率)`
+  - 当 `navDate` 为 `当日`：
+    - `IOPV = T 日净值`
+- `指数LOF / QDII亚洲` 的 `指数涨跌幅` 输入必须直接使用集思录源侧字段，不得为了这一轮再接入新的指数涨跌幅来源替代它。
+- `QDII欧美` 必须围绕“最新已发布净值 + 当前外部实时行情”估算：
+  - 当 `navDate` 为 `T-2日`：
+    - `IOPV = T-2 日净值 × (今日指数 / T-2 指数) × (今日汇率 / T-2 汇率)`
+  - 当 `navDate` 为 `T-1日`：
+    - `IOPV = T-1 日净值 × (今日指数 / T-1 指数) × (今日汇率 / T-1 汇率)`
+- 上述 `QDII欧美` 的 `今日指数` 与 `今日汇率` 必须优先来自外部实时 API 抓取。
+- 若外部实时 API 缺失某只 `QDII欧美` 所需的当前指数或汇率：
+  - 该行不得伪造 `今日指数`
+  - 允许 truthfully 回退到现有源侧估算口径
+  - `calcStatus` 必须反映真实降级原因
+- `暂停申购` 规则继续有效：
+  - 行继续保留在主表
+  - 不得进入 `limitedMonitorRows`
+  - 不得进入 `unlimitedMonitorRows`
+  - 不得触发即时入池推送
+
+## 59. LOF商品源并入欧美视图合同 (2026-03-25)
+- `LOF套利` 当前可见内部视图仍固定为：
+  - `指数LOF`
+  - `QDII欧美`
+  - `QDII亚洲`
+- 本轮不得新增单独的 `商品LOF` 可见子标签。
+- 但 `QDII欧美` 的真实来源范围必须补全为：
+  - `https://www.jisilu.cn/data/qdii/#qdiie`
+  - `https://www.jisilu.cn/data/qdii/#qdiic`
+- 对应真实列表接口必须补全为：
+  - `https://www.jisilu.cn/data/qdii/qdii_list/E`
+  - `https://www.jisilu.cn/data/qdii/qdii_list/C`
+- `商品LOF` 行必须并入 `QDII欧美` 视图展示，而不是被静默丢弃。
+- 并入时必须保持真实来源可追溯：
+  - 行级 `sourcePageUrl` / `sourceApiUrl` 仍返回商品源自身 URL
+  - 但 outward `marketGroup` 归属 `europe_us`
+- 原有 LOF 样本过滤规则不变：
+  - 保留 `LOF`
+  - 剔除名称含 `ETF` 的样本
+- `QDII欧美` 页面上的源侧计数必须反映合并后的真实可见样本数，不得继续只显示 `E` 接口数量。

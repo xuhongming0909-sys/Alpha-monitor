@@ -1650,3 +1650,111 @@ Acceptance:
 - `QDII欧美` rows extrapolate from the NAV-aligned base date when such a base is available, so the result tracks the latest NAV snapshot more closely.
 - `暂停申购` rows remain visible in the LOF main table but disappear from both monitor pools and the related push-entry path.
 - Existing `LOF` API shape, dashboard tab, and independent push runtime remain available.
+
+## 58. Phase AX: LOF Europe/US External Market API Enrichment (2026-03-25)
+
+Goal: add one minimal external market-data fallback for `LOF套利 > QDII欧美` so the
+module no longer depends only on Jisilu `cal_tips` plus the small Tencent index map
+when building IOPV inputs.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, and `LOF套利策略.md` first with the new external-helper contract.
+2. Keep this round isolated to the LOF fetch chain:
+   - no new dashboard tab
+   - no LOF push schedule change
+   - no AH / AB / convertible behavior change
+3. Add one external helper provider for exact mapped `QDII欧美` indices and FX:
+   - phase-1 provider is `Stooq`
+   - it is used only as a fallback /补数链路, not as the main source list
+4. The fetch layer must support two external补数场景:
+   - fill missing `currentIndexValue`
+   - fill missing nav-date-aligned `baseIndexValue / baseFxValue` when Jisilu did not provide them
+5. Mapping must stay config-driven in `config.yaml`:
+   - provider enable switch
+   - provider URLs / timeout
+   - exact index symbol map
+   - exact FX symbol map
+6. Truth boundary:
+   - only exact configured symbols may enter the full external calculation path
+   - unresolved custom indices keep the existing truthful fallback order
+   - no proxy ETF / guessed symbol may be silently treated as an exact index
+7. First-round target:
+   - recover at least the `恒生指数` row that currently lacks enough helper inputs to compute IOPV
+   - improve other exact-mapped欧美 rows without forcing fake coverage for all custom indices
+
+Acceptance:
+- `QDII欧美` rows may use external exact index / FX data when Jisilu helper fields are incomplete.
+- `南方香港LOF` no longer remains stuck in `真实输入不足，未计算 IOPV` when the external HSI + HKD/CNY path is available.
+- Existing rows that already have enough truthful helper inputs continue to work without regression.
+- Rows whose exact external mapping still does not exist remain visible and truthfully fall back to source-estimate or missing-input status.
+
+## 58. Phase AX: LOF T-1/T Formula Split + Europe Real-time Anchor Revision (2026-03-25)
+
+Goal: align the live `LOF套利` implementation with the latest user rule by splitting
+the formula strictly by `净值日期`, keeping `指数LOF / QDII亚洲` on a same-day direct-NAV
+path, and making `QDII欧美` continue to estimate off the latest published NAV plus
+real-time external index / FX inputs.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, `LOF套利策略.md`, and the LOF module notes in `config.yaml` first.
+2. Keep the outward premium meaning fixed to the current production contract:
+   - `溢价率 = (IOPV / 现价 - 1) × 100%`
+3. Revise `指数LOF / QDII亚洲` by NAV-date branch:
+   - when `navDate` is `T-1` relative to the current trading day:
+     - `IOPV = T-1日净值 × (1 + 指数涨幅) × (今日汇率 / 基准汇率)`
+   - when `navDate` is the current trading day:
+     - `IOPV = T日净值`
+   - the index change input in both branches remains the source-side Jisilu index-change field
+4. Revise `QDII欧美` so it always estimates off the latest published NAV plus real-time anchors:
+   - when the published NAV is `T-2`, estimate from the `T-2` NAV anchor
+   - when the published NAV has advanced to `T-1`, estimate from the `T-1` NAV anchor
+   - in both cases the strategy must use real-time external market data for:
+     - current index value
+     - current FX value
+   - if a current external quote is unavailable, degrade truthfully to the existing source-estimate fallback instead of fabricating an anchor
+5. Preserve the current monitor constraint:
+   - `暂停申购` rows remain visible in the main table
+   - but remain excluded from both monitor pools and instant-push entry logic
+6. Keep this round isolated to the LOF chain:
+   - no dashboard structure change
+   - no route path change
+   - no non-LOF business change
+
+Acceptance:
+- `指数LOF / QDII亚洲` same-day NAV rows now output `IOPV = 当日净值` directly.
+- `指数LOF / QDII亚洲` T-1 NAV rows still use the source Jisilu index-change field and FX adjustment path.
+- `QDII欧美` rows with published `T-1` NAV no longer stay stuck on an older `T-2` reading path.
+- `QDII欧美` rows keep using real-time external current index / FX inputs when available.
+- `暂停申购` rows still stay outside both monitor pools.
+
+## 59. Phase AY: LOF Commodity Source Recovery Into Europe/US View (2026-03-25)
+
+Goal: restore the missing `商品LOF` rows on the live `LOF套利 > QDII欧美` page by
+truthfully reading Jisilu's separate commodity source and merging it into the existing
+Europe/US view without adding a new visible subtab.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the source-recovery contract.
+2. Keep this round isolated to the LOF fetch chain:
+   - no dashboard tab change
+   - no new visible LOF subview
+   - no AH / AB / convertible / monitor behavior change
+3. Extend `data_fetch.plugins.lof_arbitrage` source config with the real commodity source:
+   - page `https://www.jisilu.cn/data/qdii/#qdiic`
+   - api `https://www.jisilu.cn/data/qdii/qdii_list/C`
+4. Fetch `commodity` as an internal source only, then merge its rows into the outward
+   `europe_us` group:
+   - outward page still shows only `指数LOF / QDII欧美 / QDII亚洲`
+   - commodity rows remain tagged with their real source URL for traceability
+5. Aggregate source summary counts truthfully so the `QDII欧美` view count reflects:
+   - original Europe/US rows
+   - plus commodity LOF rows
+6. Keep the existing LOF sample filter unchanged:
+   - still only `LOF`
+   - still exclude `ETF`
+
+Acceptance:
+- Codes shown on Jisilu `商品(刷新)` such as `160216 / 162719 / 162411` appear in the dashboard `QDII欧美` view.
+- No new public LOF subtab is added for commodity-only viewing.
+- `QDII欧美` source-visible counts reflect the merged Europe/US + commodity source total.
+- Existing `指数LOF / QDII亚洲` data and LOF push/runtime behavior do not regress.

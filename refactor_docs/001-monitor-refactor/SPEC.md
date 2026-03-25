@@ -3016,6 +3016,168 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - source `nav_discount_rt` normalized for strategy use
 - These fields may stay internal helper fields and do not need to become required visible columns.
 
+## 42. LOF Europe/US External Market API Enrichment Spec (2026-03-25)
+
+### 42.1 Scope
+- This round changes only the LOF fetch/helper path for `QDII欧美`.
+- This round does not change:
+  - LOF source list URLs
+  - LOF dashboard layout
+  - LOF push schedule
+  - AH / AB / convertible logic
+
+### 42.2 Config contract
+- `config.yaml > data_fetch.plugins.lof_arbitrage.external_market_api` adds:
+  - `enabled`
+  - `provider`
+  - `request_timeout_ms`
+  - `current_quote_url`
+  - `history_quote_url`
+  - `index_symbol_map.cal_index_id`
+  - `index_symbol_map.index_name`
+  - `fx_symbol_map`
+- Phase-1 provider is `stooq`.
+
+### 42.3 Fetch-helper responsibility
+- `data_fetch/lof_arbitrage/source.py` remains the only place that may talk to the external helper API in this round.
+- The helper layer may enrich only helper inputs, not strategy outputs:
+  - `currentIndexValue`
+  - `baseIndexValue`
+  - `currentFxRate`
+  - `baseFxValue`
+  - matching `*Date / *Source / *Symbol` diagnosis fields when useful
+
+### 42.4 Mapping rule
+- Exact external symbol resolution priority is:
+  1. `calIndexId`
+  2. `indexName`
+  3. existing live token field only when an explicit config mapping exists
+- FX symbol resolution is currency-based.
+- If no exact configured mapping exists, the row must skip the external exact path instead of guessing.
+
+### 42.5 Provider rule
+- For `stooq` current quote:
+  - use `current_quote_url` with one symbol per request
+  - parse the returned latest price
+- For `stooq` nav-date-aligned history:
+  - use `history_quote_url`
+  - request `d1 = d2 = navDate`
+  - use the returned `Close` as the aligned base value
+- The helper must tolerate provider miss / timeout per row and degrade without taking down the whole LOF dataset.
+
+### 42.6 Enrichment rule
+- External enrichment is attempted only for `marketGroup == europe_us`.
+- External index enrichment is triggered when either is missing:
+  - `currentIndexValue`
+  - `baseIndexValue`
+- External FX enrichment is triggered when either is missing:
+  - `currentFxRate`
+  - `baseFxValue`
+- When a missing field is filled from the provider:
+  - keep the original field names used by the strategy
+  - set aligned `baseIndexDate / baseFxDate` to the real provider date when the source field was empty
+- Existing source/Tencent values remain preferred when already present; the external path fills only the gaps.
+
+### 42.7 Truthful fallback rule
+- Rows with an exact external symbol may enter the full `T-2 / navDate-aligned` IOPV path after enrichment.
+- Rows without an exact external symbol keep the pre-existing truthful fallback order:
+  - source same-day NAV direct-read when available
+  - source estimate path when available
+  - otherwise `missing_inputs`
+- Proxy ETF / guessed symbol is not allowed to silently masquerade as an exact index series in this round.
+
+### 42.8 Diagnosis rule
+- `sourceSummary` may expose external-helper usage counts for diagnosis.
+- The outward dataset `source` string must reflect the added provider when the external helper is enabled, for example `jisilu+tencent+stooq`.
+
+## 42. LOF NAV-date Formula Split And Europe External-anchor Spec (2026-03-25)
+
+### 42.1 Outward premium rule
+- `strategy/lof_arbitrage/service.py` keeps:
+  - `premiumRate = (iopv / price - 1) * 100`
+
+### 42.2 Index / Asia branch rule
+- For `marketGroup in {"index", "asia"}`:
+  - if `navDate == priceDate`:
+    - outward `iopv = nav`
+    - no extra index / FX extrapolation is applied
+    - outward `calcMode` must identify same-day direct NAV mode
+  - otherwise:
+    - outward `iopv = nav * (1 + indexIncreaseRate / 100) * fx_ratio`
+- `indexIncreaseRate` in this branch continues to use the normalized Jisilu source field directly.
+
+### 42.3 Europe branch rule
+- For `marketGroup == "europe_us"`:
+  - the strategy must estimate from the latest published NAV date rather than a hardcoded relative day label
+  - if `navDate` maps to the stored `base*Date/base*Value` anchor:
+    - use that anchor
+  - if `navDate` maps to the stored `mid*Date/mid*Value` anchor:
+    - use that anchor
+  - current index / current FX values must come from live external quote fetching when available
+  - if the current external quote is unavailable, the strategy may degrade to the existing truthful source-estimate branch
+- The Europe branch must therefore support both:
+  - `T-2 NAV + today / T-2 anchor`
+  - `T-1 NAV + today / T-1 anchor`
+
+### 42.4 Source hydration rule
+- `data_fetch/lof_arbitrage/source.py` must keep exposing the helper fields required by the split formula, including at least:
+  - `priceDate`
+  - `navDate`
+  - `baseIndexDate`
+  - `baseIndexValue`
+  - `midIndexDate`
+  - `midIndexValue`
+  - `baseFxDate`
+  - `baseFxValue`
+  - `midFxDate`
+  - `midFxValue`
+  - `currentIndexValue`
+  - `currentFxRate`
+- The source layer may additionally expose truthful fallback live values already present in Jisilu helper text, but must still prefer external live quotes first.
+
+### 42.5 Monitor exclusion rule
+- Pool eligibility stays false when:
+  - `applyStatus` contains `暂停申购`
+- This rule applies before:
+  - limited-pool threshold checks
+  - unlimited-pool threshold checks
+
+## 43. LOF Commodity-source Merge Spec (2026-03-25)
+
+### 43.1 Internal source contract
+- `data_fetch/lof_arbitrage/source.py` must extend the current Jisilu source map with one additional internal fetch-only source:
+  - `commodity`
+- Its truthful source endpoints are:
+  - page `https://www.jisilu.cn/data/qdii/#qdiic`
+  - api `https://www.jisilu.cn/data/qdii/qdii_list/C`
+
+### 43.2 Outward grouping rule
+- `commodity` is not a new outward LOF market group.
+- Normalized rows fetched from `commodity` must be emitted with:
+  - outward `marketGroup = "europe_us"`
+  - outward `groupLabel = "QDII欧美"`
+- The row must still preserve its own source trace fields:
+  - `sourcePageUrl`
+  - `sourceApiUrl`
+
+### 43.3 Summary aggregation rule
+- The fetch layer's `sourceSummary.groups.europe_us` must aggregate:
+  - Europe/US source counts
+  - plus commodity-source counts
+- The aggregation must apply to at least:
+  - `visibleCount`
+  - `allCount`
+  - `guestLimited`
+  - `warn`
+- Existing outward groups remain exactly:
+  - `index`
+  - `europe_us`
+  - `asia`
+
+### 43.4 Regression boundary
+- `presentation/dashboard/dashboard_page.js` does not need a new LOF subtab for this round.
+- Existing `strategy/lof_arbitrage/service.py` logic continues to consume the normalized outward rows without any non-LOF side effects.
+
 ### 39.11 Push rule
 - Add independent notification module:
   - `notification/lof_arbitrage/service.js`

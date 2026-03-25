@@ -271,6 +271,25 @@ def resolve_fx_quote_code(currency: str) -> str:
     return FX_QUOTE_MAP.get(clean_text(currency).upper(), "")
 
 
+def fetch_open_er_api_rate(currency: str) -> Optional[float]:
+    normalized = clean_text(currency).upper()
+    if not normalized or normalized == "CNY":
+        return 1.0
+    try:
+        response = requests.get(
+            f"https://open.er-api.com/v6/latest/{normalized}",
+            timeout=REQUEST_TIMEOUT_MS / 1000.0,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        response.raise_for_status()
+        payload = response.json() if response.content else {}
+        if str(payload.get("result") or "").lower() != "success":
+            return None
+        return to_float((payload.get("rates") or {}).get("CNY"))
+    except Exception:
+        return None
+
+
 def parse_cal_tips(tips: Any) -> Dict[str, Any]:
     text = clean_text(tips)
     if not text:
@@ -326,6 +345,7 @@ def normalize_raw_row(group_key: str, payload_row: Dict[str, Any], page_url: str
         "groupLabel": GROUP_META[group_key]["label"],
         "currency": currency,
         "price": to_float(row.get("price")),
+        "priceDate": clean_text(row.get("price_dt")),
         "changeRate": to_rate_percent(row.get("increase_rt")),
         "turnoverWan": to_float(row.get("volume")),
         "shareAmountWan": to_float(row.get("amount")),
@@ -353,6 +373,8 @@ def normalize_raw_row(group_key: str, payload_row: Dict[str, Any], page_url: str
         "custodianFeeText": clean_text(row.get("t_fee")),
         "sourceIopv": to_float(row.get("iopv")),
         "sourceIopvDate": clean_text(row.get("iopv_dt")),
+        "sourceNavDiscountRate": to_rate_percent(row.get("nav_discount_rt")),
+        "sourceIopvDiscountRate": to_rate_percent(row.get("iopv_discount_rt")),
         "sourceEstimateValue": to_float(row.get("estimate_value")),
         "sourceEstimateValueText": clean_text(row.get("estimate_value")),
         "sourceEstimateIncreaseRate": to_rate_percent(row.get("est_val_increase_rt")),
@@ -389,10 +411,16 @@ def hydrate_quotes(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, float], Dict[s
         code: to_float((quote_map.get(code) or {}).get("price"))
         for code in index_codes
     }
-    fx_values = {
-        currency: (1.0 if currency == "CNY" else to_float((quote_map.get(resolve_fx_quote_code(currency)) or {}).get("price")))
-        for currency in sorted({clean_text(item.get("currency")).upper() or "CNY" for item in rows})
-    }
+    fx_values: Dict[str, Optional[float]] = {}
+    for currency in sorted({clean_text(item.get("currency")).upper() or "CNY" for item in rows}):
+        if currency == "CNY":
+            fx_values[currency] = 1.0
+            continue
+        quote_code = resolve_fx_quote_code(currency)
+        fx_value = to_float((quote_map.get(quote_code) or {}).get("price")) if quote_code else None
+        if fx_value is None or fx_value <= 0:
+            fx_value = fetch_open_er_api_rate(currency)
+        fx_values[currency] = fx_value
     return index_values, fx_values
 
 
@@ -438,7 +466,7 @@ def get_lof_arbitrage_source_snapshot() -> Dict[str, Any]:
     for row in source_rows:
         current_index_quote_code = resolve_index_quote_code(row["marketGroup"], row)
         row["currentIndexQuoteCode"] = current_index_quote_code
-        row["currentIndexValue"] = index_values.get(current_index_quote_code)
+        row["currentIndexValue"] = index_values.get(current_index_quote_code) or to_float(row.get("liveIndexValueFromTips"))
         row["currentFxRate"] = fx_values.get(clean_text(row.get("currency")).upper() or "CNY")
 
     source_summary = {

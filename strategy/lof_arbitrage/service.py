@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from shared.config.script_config import get_config
 from shared.models.service_result import build_success
@@ -38,11 +38,16 @@ def _round(value: Optional[float], digits: int = 4) -> Optional[float]:
     return round(float(value), digits)
 
 
+def _normalize_date_text(value: Any) -> str:
+    text = str(value or "").strip()
+    return text[:10] if len(text) >= 10 else text
+
+
 def _calc_premium_rate(iopv: Optional[float], price: Optional[float]) -> Optional[float]:
-    # 溢价率口径按页面正式合同执行：现价 / IOPV - 1，IOPV 无效时不返回伪结果。
+    # 正式口径：溢价率 = (IOPV / 现价 - 1) × 100%
     if iopv is None or iopv <= 0 or price is None or price <= 0:
         return None
-    return (price / iopv - 1.0) * 100.0
+    return (iopv / price - 1.0) * 100.0
 
 
 def _resolve_time_note(group_key: str) -> str:
@@ -51,6 +56,32 @@ def _resolve_time_note(group_key: str) -> str:
 
 def _is_unlimited_apply(row: Dict[str, Any]) -> bool:
     return not bool(row.get("limitedApply"))
+
+
+def _is_apply_paused(row: Dict[str, Any]) -> bool:
+    status_text = str(row.get("applyStatus") or "").strip()
+    return "暂停申购" in status_text
+
+
+def _is_same_day_nav(row: Dict[str, Any]) -> bool:
+    nav_date = _normalize_date_text(row.get("navDate"))
+    price_date = _normalize_date_text(row.get("priceDate") or row.get("raw", {}).get("price_dt"))
+    return bool(nav_date and nav_date == price_date)
+
+
+def _pick_anchor_value(nav_date: str, dated_values: Sequence[Tuple[Any, Any]]) -> Optional[float]:
+    # 优先选择日期与净值日期对齐的真实锚点；若没有，再按既有真实顺序回退。
+    if nav_date:
+        for date_value, raw_value in dated_values:
+            if _normalize_date_text(date_value) == nav_date:
+                parsed = _to_float(raw_value)
+                if parsed is not None and parsed > 0:
+                    return parsed
+    for _date_value, raw_value in dated_values:
+        parsed = _to_float(raw_value)
+        if parsed is not None and parsed > 0:
+            return parsed
+    return None
 
 
 def _calc_iopv(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -65,6 +96,7 @@ def _calc_iopv(row: Dict[str, Any]) -> Dict[str, Any]:
     source_estimate_value = _to_float(row.get("sourceEstimateValue"))
     source_estimate_increase_rate = _to_float(row.get("sourceEstimateIncreaseRate"))
     index_increase_rate = _to_float(row.get("indexIncreaseRate"))
+    nav_date = _normalize_date_text(row.get("navDate"))
 
     if source_iopv is not None and source_iopv > 0:
         return {
@@ -74,30 +106,51 @@ def _calc_iopv(row: Dict[str, Any]) -> Dict[str, Any]:
             "premiumRate": _calc_premium_rate(source_iopv, price),
         }
 
+    if group_key in {"index", "asia"} and nav is not None and nav > 0 and _is_same_day_nav(row):
+        return {
+            "iopv": nav,
+            "calcMode": "same_day_nav_direct",
+            "calcStatus": "同日净值已发布，直接以当日净值作为 IOPV",
+            "premiumRate": _calc_premium_rate(nav, price),
+        }
+
     if group_key in {"index", "asia"}:
         base_fx_rate = _to_float(row.get("baseFxValue"))
         fx_ratio = 1.0
         if currency != "CNY":
             if current_fx_rate and base_fx_rate and base_fx_rate > 0:
                 fx_ratio = current_fx_rate / base_fx_rate
-            elif current_fx_rate and row.get("navDate") == row.get("raw", {}).get("price_dt"):
+            elif current_fx_rate and _is_same_day_nav(row):
                 fx_ratio = 1.0
             else:
                 fx_ratio = None
 
-        if nav is not None and index_increase_rate is not None and fx_ratio is not None:
+        if nav is not None and nav > 0 and index_increase_rate is not None and fx_ratio is not None:
             iopv = nav * (1.0 + index_increase_rate / 100.0) * fx_ratio
             return {
                 "iopv": iopv,
                 "calcMode": "t1_nav_index_fx",
-                "calcStatus": "按 T-1 净值与指数涨幅修正",
+                "calcStatus": "按 T-1 净值、集思录指数涨跌幅与汇率修正",
                 "premiumRate": _calc_premium_rate(iopv, price),
             }
 
     if group_key == "europe_us":
         current_index_value = _to_float(row.get("currentIndexValue"))
-        base_index_value = _to_float(row.get("baseIndexValue"))
-        base_fx_value = _to_float(row.get("baseFxValue")) or (1.0 if currency == "CNY" else None)
+        base_index_value = _pick_anchor_value(
+            nav_date,
+            [
+                (row.get("midIndexDate"), row.get("midIndexValue")),
+                (row.get("baseIndexDate"), row.get("baseIndexValue")),
+            ],
+        )
+        base_fx_value = _pick_anchor_value(
+            nav_date,
+            [
+                (row.get("midFxDate"), row.get("midFxValue")),
+                (row.get("baseFxDate"), row.get("baseFxValue")),
+            ],
+        ) or (1.0 if currency == "CNY" else None)
+
         if (
             nav is not None and nav > 0 and
             current_index_value is not None and current_index_value > 0 and
@@ -108,8 +161,8 @@ def _calc_iopv(row: Dict[str, Any]) -> Dict[str, Any]:
             iopv = nav * (current_index_value / base_index_value) * (current_fx_rate / base_fx_value)
             return {
                 "iopv": iopv,
-                "calcMode": "t2_live_index_fx",
-                "calcStatus": "按 T-2 基准与实时指数/汇率修正",
+                "calcMode": "nav_date_aligned_index_fx",
+                "calcStatus": "按净值日期对齐后的指数与汇率修正",
                 "premiumRate": _calc_premium_rate(iopv, price),
             }
 
@@ -121,7 +174,7 @@ def _calc_iopv(row: Dict[str, Any]) -> Dict[str, Any]:
             "premiumRate": _calc_premium_rate(source_estimate_value, price),
         }
 
-    if nav is not None and source_estimate_increase_rate is not None:
+    if nav is not None and nav > 0 and source_estimate_increase_rate is not None:
         iopv = nav * (1.0 + source_estimate_increase_rate / 100.0)
         return {
             "iopv": iopv,
@@ -144,8 +197,10 @@ def _build_row(row: Dict[str, Any]) -> Dict[str, Any]:
     turnover_wan = _to_float(row.get("turnoverWan"))
     limited_apply = bool(row.get("limitedApply"))
     apply_limit_amount = _to_float(row.get("applyLimitAmount"))
+    apply_paused = _is_apply_paused(row)
 
     limited_monitor_eligible = bool(
+        not apply_paused and
         limited_apply and
         apply_limit_amount is not None and
         apply_limit_amount < LIMITED_APPLY_CAP_AMOUNT and
@@ -153,6 +208,7 @@ def _build_row(row: Dict[str, Any]) -> Dict[str, Any]:
         premium_rate is not None and premium_rate > LIMITED_PREMIUM_RATE_THRESHOLD
     )
     unlimited_monitor_eligible = bool(
+        not apply_paused and
         _is_unlimited_apply(row) and
         turnover_wan is not None and turnover_wan > MIN_TURNOVER_WAN and
         premium_rate is not None and abs(premium_rate) > UNLIMITED_ABS_PREMIUM_RATE_THRESHOLD
