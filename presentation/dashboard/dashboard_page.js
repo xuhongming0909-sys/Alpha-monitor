@@ -2073,7 +2073,7 @@ function buildConvertibleColumns() {
     },
     {
       key: 'stockAtr20',
-      label: '正股ATR(20日)',
+      label: '正股ATR20均值',
       columnClassName: 'col-num',
       sortable: true,
       sortType: 'number',

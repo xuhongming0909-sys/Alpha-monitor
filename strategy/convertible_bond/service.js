@@ -190,10 +190,11 @@ function enrichDiscountStrategyRow(row, options = {}) {
   const remainingSizeYi = toNum(row?.remainingSizeYi);
   const stockAvgTurnoverAmount20Yi = toNum(row?.stockAvgTurnoverAmount20Yi);
   const discountRate = premiumRate === null ? null : -premiumRate;
-  const stockAtr20Pct = (discountRate !== null && stockPrice !== null && stockPrice > 0 && stockAtr20 !== null)
+  const hasPositiveDiscount = discountRate !== null && discountRate > 0;
+  const stockAtr20Pct = (stockPrice !== null && stockPrice > 0 && stockAtr20 !== null)
     ? (stockAtr20 / stockPrice) * 100
     : null;
-  const atrRatio = (discountRate !== null && stockAtr20Pct !== null && stockAtr20Pct > 0)
+  const atrRatio = (hasPositiveDiscount && stockAtr20Pct !== null && stockAtr20Pct > 0)
     ? discountRate / stockAtr20Pct
     : null;
   const atrCoefficient = interpolateByAnchors(atrRatio, config.atrAnchors, DEFAULT_ATR_ANCHORS);
@@ -212,7 +213,7 @@ function enrichDiscountStrategyRow(row, options = {}) {
   const boardType = normalizeBoardType(row?.stockCode);
   const boardCoefficient = toNum(config.boardCoefficients[boardType]);
   const weightedDiscountRate = (
-    discountRate !== null &&
+    hasPositiveDiscount &&
     atrCoefficient !== null &&
     sellPressureCoefficient !== null &&
     boardCoefficient !== null
