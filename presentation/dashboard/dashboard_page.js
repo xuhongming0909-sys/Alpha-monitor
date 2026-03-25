@@ -13,7 +13,7 @@ function resolveApiBase() {
 
 const API_BASE = resolveApiBase();
 const PAGE_SIZE = 50;
-const FORCE_REFRESH_RESOURCE_KEYS = ['exchangeRate', 'ipo', 'bonds', 'cbArb', 'ah', 'ab', 'merger'];
+const FORCE_REFRESH_RESOURCE_KEYS = ['exchangeRate', 'ipo', 'bonds', 'cbArb', 'ah', 'ab', 'merger', 'cbRightsIssue'];
 const CRITICAL_CACHE_REVALIDATION_KEYS = ['exchangeRate', 'cbArb', 'ah', 'ab'];
 const DEFAULT_TABLE_UI_CONFIG = Object.freeze({
   desktopFontPx: 14,
@@ -40,6 +40,7 @@ const ENDPOINTS = {
   ipo: '/api/market/ipo',
   bonds: '/api/market/convertible-bonds',
   cbArb: '/api/market/convertible-bond-arbitrage',
+  cbRightsIssue: '/api/market/cb-rights-issue',
   ah: '/api/market/ah',
   ab: '/api/market/ab',
   monitor: '/api/monitors',
@@ -48,9 +49,10 @@ const ENDPOINTS = {
   dividendRefresh: '/api/dividend?action=refresh',
   merger: '/api/market/event-arbitrage',
   pushConfig: '/api/push/config',
+  cbRightsIssuePushConfig: '/api/push/cb-rights-issue-config',
 };
 
-const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'monitor', 'dividend', 'merger'];
+const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'monitor', 'dividend', 'merger', 'cb-rights-issue'];
 const EVENT_ARB_SUBTAB_SEQUENCE = ['a_event', 'hk_private', 'cn_private', 'rights_issue', 'announcement_pool'];
 const MONITOR_MARKET_OPTIONS = ['A', 'H', 'B'];
 const MONITOR_CURRENCY_OPTIONS = ['CNY', 'HKD', 'USD'];
@@ -92,6 +94,8 @@ const TABLE_DEFAULTS = {
   monitor: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   dividend: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   merger: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
+  cbRightsIssueMonitor: { sortKey: 'expectedReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
+  cbRightsIssueSource: { sortKey: 'expectedReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   eventArbHk: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   eventArbCn: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
   eventArbA: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
@@ -103,6 +107,7 @@ const state = {
   mergerSubview: 'a_event',
   eventsBound: false,
   savingPush: false,
+  savingCbRightsIssuePush: false,
   savingMonitor: false,
   cacheRevalidated: {},
   monitorEditor: createMonitorEditorState(),
@@ -124,6 +129,8 @@ const state = {
     monitor: createTableState('monitor'),
     dividend: createTableState('dividend'),
     merger: createTableState('merger'),
+    cbRightsIssueMonitor: createTableState('cbRightsIssueMonitor'),
+    cbRightsIssueSource: createTableState('cbRightsIssueSource'),
     eventArbHk: createTableState('eventArbHk'),
     eventArbCn: createTableState('eventArbCn'),
     eventArbA: createTableState('eventArbA'),
@@ -136,12 +143,14 @@ const state = {
     ipo: resourceState(),
     bonds: resourceState(),
     cbArb: resourceState(),
+    cbRightsIssue: resourceState(),
     ah: resourceState(),
     ab: resourceState(),
     monitor: resourceState(),
     dividend: resourceState(),
     merger: resourceState(),
     pushConfig: resourceState(),
+    cbRightsIssuePushConfig: resourceState(),
   },
 };
 
@@ -154,6 +163,7 @@ const dom = {
     monitor: document.getElementById('panel-monitor'),
     dividend: document.getElementById('panel-dividend'),
     merger: document.getElementById('panel-merger'),
+    'cb-rights-issue': document.getElementById('panel-cb-rights-issue'),
   },
   statusLine: document.getElementById('status-line'),
   statusUpdateText: document.getElementById('status-update-text'),
@@ -536,6 +546,36 @@ function readFreshnessText(keys) {
   return '实时快照';
 }
 
+function readCbRightsIssueDataset() {
+  const payload = readResourceObject('cbRightsIssue');
+  return payload?.data && typeof payload.data === 'object' ? payload.data : {};
+}
+
+function readCbRightsIssueMonitorRows() {
+  const dataset = readCbRightsIssueDataset();
+  return Array.isArray(dataset.monitorList) ? dataset.monitorList : [];
+}
+
+function readCbRightsIssueSourceRows() {
+  const dataset = readCbRightsIssueDataset();
+  return Array.isArray(dataset.sourceRows) ? dataset.sourceRows : [];
+}
+
+function readCbRightsIssueSummary() {
+  const dataset = readCbRightsIssueDataset();
+  return dataset?.sourceSummary && typeof dataset.sourceSummary === 'object' ? dataset.sourceSummary : {};
+}
+
+function readCbRightsIssueRebuildStatus() {
+  const dataset = readCbRightsIssueDataset();
+  return dataset?.rebuildStatus && typeof dataset.rebuildStatus === 'object' ? dataset.rebuildStatus : {};
+}
+
+function readCbRightsIssuePushConfigViewModel() {
+  const payload = readResourceObject('cbRightsIssuePushConfig');
+  return payload?.data && typeof payload.data === 'object' ? payload.data : {};
+}
+
 function showToast(message, isError = false) {
   if (!dom.toast) return;
   dom.toast.textContent = String(message || (isError ? '操作失败' : '操作成功'));
@@ -628,6 +668,13 @@ function bindEvents() {
   });
 
   document.addEventListener('submit', (event) => {
+    const cbRightsIssuePushForm = event.target.closest('#cb-rights-issue-push-form');
+    if (cbRightsIssuePushForm) {
+      event.preventDefault();
+      void saveCbRightsIssuePushConfig(cbRightsIssuePushForm);
+      return;
+    }
+
     const monitorForm = event.target.closest('#monitor-editor-form');
     if (!monitorForm) return;
     event.preventDefault();
@@ -784,6 +831,8 @@ async function bootstrap(options = {}) {
     loadResource('bonds', ENDPOINTS.bonds, renderHeaderOnly, { force: forceMarket }),
     loadResource('pushConfig', ENDPOINTS.pushConfig, renderPushSettings),
     loadResource('cbArb', ENDPOINTS.cbArb, renderEverything, { force: forceMarket }),
+    loadResource('cbRightsIssue', ENDPOINTS.cbRightsIssue, renderEverything, { force: forceMarket }),
+    loadResource('cbRightsIssuePushConfig', ENDPOINTS.cbRightsIssuePushConfig, renderEverything),
     loadResource('ah', ENDPOINTS.ah, renderEverything, { force: forceMarket }),
     loadResource('ab', ENDPOINTS.ab, renderEverything, { force: forceMarket }),
     loadResource('monitor', ENDPOINTS.monitor, renderEverything),
@@ -1253,6 +1302,41 @@ async function savePushConfig() {
   }
 }
 
+async function saveCbRightsIssuePushConfig(form) {
+  const config = readCbRightsIssuePushConfigViewModel();
+  const formData = new FormData(form);
+  const time1 = String(formData.get('time1') || '').trim();
+  const time2 = String(formData.get('time2') || '').trim();
+
+  if (!time1 || !time2) {
+    showToast('抢权配售推送时间需要完整填写', true);
+    return;
+  }
+
+  state.savingCbRightsIssuePush = true;
+  renderCbRightsIssuePanel();
+  try {
+    const payload = await fetchJson(ENDPOINTS.cbRightsIssuePushConfig, {
+      method: 'POST',
+      body: JSON.stringify({
+        enabled: config.enabled !== false,
+        times: [time1, time2],
+      }),
+    });
+    state.resources.cbRightsIssuePushConfig.status = 'ready';
+    state.resources.cbRightsIssuePushConfig.data = payload;
+    state.resources.cbRightsIssuePushConfig.error = null;
+    showToast('抢权配售推送时间已保存');
+  } catch (error) {
+    state.resources.cbRightsIssuePushConfig.status = 'error';
+    state.resources.cbRightsIssuePushConfig.error = error;
+    showToast(error.message || '抢权配售推送时间保存失败', true);
+  } finally {
+    state.savingCbRightsIssuePush = false;
+    renderCbRightsIssuePanel();
+  }
+}
+
 function readMonitorEditorDraft() {
   return state.monitorEditor?.draft || createMonitorDraft();
 }
@@ -1680,6 +1764,7 @@ function handleSortClick(tableKey, sortKey) {
   if (tableKey === 'cbArb') renderConvertibleBondPanel();
   if (tableKey === 'ah') renderPremiumPanel('ah');
   if (tableKey === 'ab') renderPremiumPanel('ab');
+  if (tableKey === 'cbRightsIssueMonitor' || tableKey === 'cbRightsIssueSource') renderCbRightsIssuePanel();
 }
 
 function handlePageClick(tableKey, action) {
@@ -1699,11 +1784,14 @@ function handlePageClick(tableKey, action) {
   if (tableKey === 'ab') renderPremiumPanel('ab');
   if (tableKey === 'monitor') renderMonitorPanel();
   if (tableKey === 'dividend') renderDividendPanel();
+  if (tableKey === 'cbRightsIssueMonitor' || tableKey === 'cbRightsIssueSource') renderCbRightsIssuePanel();
   if (tableKey === 'merger' || tableKey.startsWith('eventArb')) renderMergerPanel();
 }
 
 function readTableSourceRows(tableKey) {
   if (tableKey === 'cbArb') return readResourceArray('cbArb');
+  if (tableKey === 'cbRightsIssueMonitor') return readCbRightsIssueMonitorRows();
+  if (tableKey === 'cbRightsIssueSource') return readCbRightsIssueSourceRows();
   if (tableKey === 'ah') return readResourceArray('ah');
   if (tableKey === 'ab') return readResourceArray('ab');
   if (tableKey === 'monitor') return readResourceArray('monitor');
@@ -1717,6 +1805,8 @@ function readTableSourceRows(tableKey) {
 
 function getTableColumns(tableKey) {
   if (tableKey === 'cbArb') return buildConvertibleColumns();
+  if (tableKey === 'cbRightsIssueMonitor') return buildCbRightsIssueMonitorColumns();
+  if (tableKey === 'cbRightsIssueSource') return buildCbRightsIssueSourceColumns();
   if (tableKey === 'ah') return buildPremiumColumns('ah');
   if (tableKey === 'ab') return buildPremiumColumns('ab');
   return [];
@@ -1866,6 +1956,8 @@ function resolveRowId(tableKey, row, fallbackIndex) {
   if (tableKey === 'ah') return `${row.aCode || ''}-${row.hCode || ''}-${fallbackIndex}`;
   if (tableKey === 'ab') return `${row.aCode || ''}-${row.bCode || ''}-${fallbackIndex}`;
   if (tableKey === 'monitor') return String(row.id || row.name || fallbackIndex);
+  if (tableKey === 'cbRightsIssueMonitor') return String(row.bondCode || row.stockCode || fallbackIndex);
+  if (tableKey === 'cbRightsIssueSource') return String(row.bondCode || row.stockCode || fallbackIndex);
   if (tableKey === 'merger') return String(row.announcementId || `${row.secCode || ''}-${row.announcementTime || ''}-${fallbackIndex}`);
   if (tableKey === 'eventArbAnnouncement') return String(row.announcementId || `${row.secCode || ''}-${row.announcementTime || ''}-${fallbackIndex}`);
   if (tableKey === 'eventArbHk' || tableKey === 'eventArbCn' || tableKey === 'eventArbA') {
@@ -2327,6 +2419,7 @@ function renderActivePanel() {
   if (state.activeTab === 'monitor') return renderMonitorPanel();
   if (state.activeTab === 'dividend') return renderDividendPanel();
   if (state.activeTab === 'merger') return renderMergerPanel();
+  if (state.activeTab === 'cb-rights-issue') return renderCbRightsIssuePanel();
 }
 
 function renderConvertibleBondPanel() {
@@ -2462,6 +2555,205 @@ function buildConvertibleExplainText(rows) {
   ].join('；');
 
   return escapeHtml(`${baseText} ${detailText}。`);
+}
+
+function buildCbRightsIssuePushStateText() {
+  const config = readCbRightsIssuePushConfigViewModel();
+  const deliveryStatus = config?.deliveryStatus && typeof config.deliveryStatus === 'object' ? config.deliveryStatus : {};
+  const times = Array.isArray(config?.times) ? config.times.filter(Boolean) : [];
+  const parts = [
+    times.length ? `时间 ${times.join(' / ')}` : '时间 --',
+    deliveryStatus.webhookConfigured ? 'Webhook已配置' : 'Webhook未配置',
+    deliveryStatus.lastSuccessAt ? `最近成功 ${formatDate(deliveryStatus.lastSuccessAt)}` : '',
+    deliveryStatus.lastError ? `最近失败 ${String(deliveryStatus.lastError).slice(0, 80)}` : '',
+  ].filter(Boolean);
+  return parts.join(' / ');
+}
+
+function renderCbRightsIssuePushCard() {
+  const config = readCbRightsIssuePushConfigViewModel();
+  const times = Array.isArray(config?.times) ? config.times : ['08:00', '14:30'];
+  const loading = state.resources.cbRightsIssuePushConfig.status === 'loading' && !state.resources.cbRightsIssuePushConfig.data;
+  const disabled = state.savingCbRightsIssuePush || loading;
+
+  return `
+    <div class="list-card">
+      <div class="module-toolbar">
+        <div>
+          <h3>独立推送设置</h3>
+          <div class="section-note">该模块独立于总推送，默认仅在交易日按设定时间推送当天正式入池项目。</div>
+        </div>
+        <div class="panel-meta">
+          <span>${escapeHtml(buildCbRightsIssuePushStateText() || '正在读取推送状态')}</span>
+        </div>
+      </div>
+      <form id="cb-rights-issue-push-form" class="push-form">
+        <div class="input-group">
+          <label for="cb-rights-issue-push-time-1">推送时间 1</label>
+          <input id="cb-rights-issue-push-time-1" name="time1" type="time" value="${escapeHtml(times[0] || '')}" ${disabled ? 'disabled' : ''} />
+        </div>
+        <div class="input-group">
+          <label for="cb-rights-issue-push-time-2">推送时间 2</label>
+          <input id="cb-rights-issue-push-time-2" name="time2" type="time" value="${escapeHtml(times[1] || '')}" ${disabled ? 'disabled' : ''} />
+        </div>
+        <div class="button-row inline">
+          <button type="submit" class="btn-primary" ${disabled ? 'disabled' : ''}>保存</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+function buildCbRightsIssueMonitorColumns() {
+  return [
+    { key: 'index', label: '序号' },
+    { key: 'bondCode', label: '转债代码', columnClassName: 'col-code', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.bondCode || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.bondCode || '--')}</span>` },
+    { key: 'bondName', label: '转债名称', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.bondName || ''), render: (row) => escapeHtml(row.bondName || '--') },
+    { key: 'stockCode', label: '正股代码', columnClassName: 'col-code', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.stockCode || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.stockCode || '--')}</span>` },
+    { key: 'stockName', label: '正股名称', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.stockName || ''), render: (row) => escapeHtml(row.stockName || '--') },
+    { key: 'progressName', label: '当前阶段', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.progressName || ''), render: (row) => escapeHtml(row.progressName || '--') },
+    { key: 'applyDate', label: '申购日', columnClassName: 'col-date', sortable: true, sortType: 'date', defaultDir: 'asc', sortValue: (row) => normalizeDateKey(row.applyDate), render: (row) => escapeHtml(formatDateOnly(row.applyDate)) },
+    { key: 'recordDate', label: '股权登记日', columnClassName: 'col-date', sortable: true, sortType: 'date', defaultDir: 'asc', sortValue: (row) => normalizeDateKey(row.recordDate), render: (row) => escapeHtml(formatDateOnly(row.recordDate)) },
+    { key: 'requiredSharesFinal', label: '配10张股数', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.requiredSharesFinal), render: (row) => formatInt(row.requiredSharesFinal) },
+    { key: 'requiredFunds', label: '配售所需资金', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.requiredFunds), render: (row) => formatNumber(row.requiredFunds, 2) },
+    { key: 'expectedProfit', label: '配售预期收益', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.expectedProfit), render: (row) => formatNumber(row.expectedProfit, 2) },
+    { key: 'expectedReturnRate', label: '预计收益率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.expectedReturnRate), className: (row) => statusClass(row.expectedReturnRate), render: (row) => formatPercent(row.expectedReturnRate, 2) },
+    { key: 'sourceUrl', label: '来源', render: (row) => buildAnchor(row.sourceUrl, '来源页') || '--' },
+  ];
+}
+
+function buildCbRightsIssueSourceColumns() {
+  return [
+    { key: 'index', label: '序号' },
+    { key: 'bondCode', label: '转债代码', columnClassName: 'col-code', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.bondCode || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.bondCode || '--')}</span>` },
+    { key: 'bondName', label: '转债名称', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.bondName || ''), render: (row) => escapeHtml(row.bondName || '--') },
+    { key: 'stockCode', label: '正股代码', columnClassName: 'col-code', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.stockCode || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.stockCode || '--')}</span>` },
+    { key: 'stockName', label: '正股名称', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.stockName || ''), render: (row) => escapeHtml(row.stockName || '--') },
+    { key: 'progressName', label: '阶段', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.progressName || ''), render: (row) => escapeHtml(row.progressName || '--') },
+    { key: 'applyDate', label: '申购日', columnClassName: 'col-date', sortable: true, sortType: 'date', defaultDir: 'asc', sortValue: (row) => normalizeDateKey(row.applyDate), render: (row) => escapeHtml(formatDateOnly(row.applyDate)) },
+    { key: 'recordDate', label: '登记日', columnClassName: 'col-date', sortable: true, sortType: 'date', defaultDir: 'asc', sortValue: (row) => normalizeDateKey(row.recordDate), render: (row) => escapeHtml(formatDateOnly(row.recordDate)) },
+    { key: 'listDate', label: '上市日', columnClassName: 'col-date', sortable: true, sortType: 'date', defaultDir: 'asc', sortValue: (row) => normalizeDateKey(row.listDate), render: (row) => escapeHtml(formatDateOnly(row.listDate)) },
+    { key: 'stockPrice', label: '正股现价', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.stockPrice), render: (row) => formatNumber(row.stockPrice, 2) },
+    { key: 'ma20CloseDb', label: '20日均价', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.ma20CloseDb ?? row.ma20Price), render: (row) => formatNumber(row.ma20CloseDb ?? row.ma20Price, 2) },
+    { key: 'convertPrice', label: '转股价', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.convertPrice), render: (row) => formatNumber(row.convertPrice, 2) },
+    { key: 'volatility60', label: '60日波动率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.volatility60), render: (row) => formatRatioPercent(row.volatility60, 2) },
+    { key: 'expectedReturnRate', label: '预计收益率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.expectedReturnRate), className: (row) => statusClass(row.expectedReturnRate), render: (row) => formatPercent(row.expectedReturnRate, 2) },
+  ];
+}
+
+function buildCbRightsIssueDetailItems(row) {
+  return [
+    { label: '阶段合格', value: row.stageEligible ? '是' : '否' },
+    { label: '正式入池', value: row.monitorEligible ? '是' : '否' },
+    { label: '原始所需股数', value: formatNumber(row.requiredSharesRaw, 2) },
+    { label: '调整后股数', value: formatNumber(row.requiredSharesAdjusted, 2) },
+    { label: '最终取整股数', value: formatInt(row.requiredSharesFinal) },
+    { label: '市场规则', value: row.marketRule || '--' },
+    { label: '期权行权价', value: formatNumber(row.optionStrikePrice, 2) },
+    { label: '期权数量', value: formatNumber(row.optionQuantity, 4) },
+    { label: '单位期权价值', value: formatNumber(row.optionUnitValue, 4) },
+    { label: '60日波动率', value: formatRatioPercent(row.volatility60, 2) },
+    { label: '十年期国债收益率', value: formatPercent(row.treasuryYield10y, 2) },
+    { label: '未入池原因', value: row.monitorEligible ? '已入池' : (row.nonEligibleReason || '--') },
+  ];
+}
+
+function renderCbRightsIssuePanel() {
+  const panel = dom.tabPanels['cb-rights-issue'];
+  const resource = state.resources.cbRightsIssue;
+  if (!panel) return;
+
+  if (resource.status === 'loading' || resource.status === 'idle') {
+    panel.innerHTML = moduleLoading('可转债抢权配售正在抓取固定来源与历史库数据');
+    return;
+  }
+
+  if (resource.status === 'error') {
+    panel.innerHTML = moduleError('可转债抢权配售加载失败', resource.error?.message);
+    return;
+  }
+
+  const monitorRows = readCbRightsIssueMonitorRows();
+  const sourceRows = readCbRightsIssueSourceRows();
+  const summary = readCbRightsIssueSummary();
+  const rebuildStatus = readCbRightsIssueRebuildStatus();
+  const pushCard = renderCbRightsIssuePushCard();
+
+  panel.innerHTML = `
+    <div class="module-shell">
+      <div class="module-toolbar">
+        <div>
+          <div class="tab-title">可转债抢权配售</div>
+          <div class="section-note">固定读取集思录预案来源，结合本功能独立正股历史库计算 60 日波动率与预计收益率；不再单独提供 URL 解析输入区。</div>
+        </div>
+        <div class="panel-meta">
+          <span>固定源总数 ${escapeHtml(formatInt(summary.totalRows))}</span>
+          <span>阶段合格 ${escapeHtml(formatInt(summary.eligibleStageCount))}</span>
+          <span>正式入池 ${escapeHtml(formatInt(summary.monitorEligibleCount))}</span>
+          <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('cbRightsIssue') || rebuildStatus.lastRebuildAt))}</span>
+          <span>${escapeHtml(readFreshnessText('cbRightsIssue'))}</span>
+        </div>
+      </div>
+      <div class="summary-grid summary-grid-three">
+        ${renderSummaryCard('今日监控列表', monitorRows.length ? monitorRows.slice(0, 3).map((row) => ({
+          title: `${row.bondName || '--'} ${row.bondCode || ''}`.trim(),
+          subtitle: `${row.stockName || '--'} / 登记日 ${formatDateOnly(row.recordDate)}`,
+          value: formatPercent(row.expectedReturnRate, 2),
+          valueClass: statusClass(row.expectedReturnRate),
+        })) : [{ title: '暂无正式入池项目', subtitle: '当前没有满足阶段+收益率门槛的项目', value: '--' }], 'compact-card')}
+        ${renderSummaryCard('固定源状态', [
+          { title: summary.sourceTitle || '集思录可转债预案', subtitle: `来源 ${summary.sourceUrl || '--'}`, value: formatInt(summary.totalRows) || '--' },
+          { title: '最近重建', subtitle: rebuildStatus.lastRebuildError ? `失败: ${String(rebuildStatus.lastRebuildError).slice(0, 60)}` : '正常', value: rebuildStatus.lastRebuildAt ? formatDate(rebuildStatus.lastRebuildAt) : '--' },
+        ], 'compact-card')}
+        ${renderSummaryCard('口径提醒', [
+          { title: '深市/沪市股数规则', subtitle: '深市直接取整 100 股；沪市使用 ×0.5 ×0.6 后再取整', value: '真实计算' },
+          { title: '60日波动率', subtitle: '严格来自本功能独立历史库，不足则不入池', value: 'DB权威' },
+        ], 'compact-card')}
+      </div>
+      <div class="list-card">
+        <div class="module-toolbar">
+          <div>
+            <h3>监控列表</h3>
+            <div class="section-note">只保留当天满足阶段与收益率门槛的正式监控项目。</div>
+          </div>
+          <div class="panel-meta">
+            <span>入池 ${escapeHtml(formatInt(monitorRows.length))}</span>
+          </div>
+        </div>
+        ${renderPaginatedTable({
+          tableKind: 'convertible',
+          tableKey: 'cbRightsIssueMonitor',
+          columns: buildCbRightsIssueMonitorColumns(),
+          rows: monitorRows,
+          emptyMessage: '当前没有满足门槛的抢权配售正式监控项目',
+          detailRenderer: (row) => renderDetailGrid(buildCbRightsIssueDetailItems(row)),
+          detailMode: 'always',
+        })}
+      </div>
+      ${pushCard}
+      <div class="list-card">
+        <div class="module-toolbar">
+          <div>
+            <h3>固定来源结构化信息</h3>
+            <div class="section-note">保留固定来源的关键字段，并补充实时价、波动率和收益测算结果，方便直接审核每一项的入池依据。</div>
+          </div>
+          <div class="panel-meta">
+            <span>来源页 ${buildAnchor(summary.sourceUrl, '打开') || '--'}</span>
+          </div>
+        </div>
+        ${renderPaginatedTable({
+          tableKind: 'convertible',
+          tableKey: 'cbRightsIssueSource',
+          columns: buildCbRightsIssueSourceColumns(),
+          rows: sourceRows,
+          emptyMessage: '固定来源当前没有返回结构化项目',
+          detailRenderer: (row) => renderDetailGrid(buildCbRightsIssueDetailItems(row)),
+          detailMode: 'always',
+        })}
+      </div>
+      ${renderModuleFootnote('cbRightsIssue')}
+    </div>
+  `;
 }
 
 function renderPremiumPanel(type) {

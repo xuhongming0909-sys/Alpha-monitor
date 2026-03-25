@@ -10,6 +10,11 @@ from data_fetch.ah_premium.normalizer import normalize_ah_snapshot
 from data_fetch.convertible_bond.fetcher import fetch_convertible_bond_snapshot
 from data_fetch.convertible_bond.history_sync import sync_convertible_bond_stock_history
 from data_fetch.convertible_bond.normalizer import normalize_convertible_bond_snapshot
+from data_fetch.cb_rights_issue.fetcher import (
+    fetch_cb_rights_issue_snapshot,
+    sync_cb_rights_issue_stock_history_snapshot,
+)
+from data_fetch.cb_rights_issue.normalizer import normalize_cb_rights_issue_snapshot
 from data_fetch.dividend.fetcher import fetch_dividend_snapshot, fetch_upcoming_dividend_snapshot
 from data_fetch.event_arbitrage.fetcher import fetch_event_arbitrage_snapshot
 from data_fetch.event_arbitrage.normalizer import normalize_event_arbitrage_snapshot
@@ -25,6 +30,7 @@ from shared.paths.tool_paths import ensure_scripts_on_path
 from strategy.ab_premium.service import build_ab_response
 from strategy.ah_premium.service import build_ah_response
 from strategy.convertible_bond.service import build_convertible_bond_response
+from strategy.cb_rights_issue.service import build_cb_rights_issue_response
 from strategy.dividend.service import build_dividend_response
 from strategy.event_arbitrage.service import build_event_arbitrage_response
 from strategy.merger.service import build_merger_response
@@ -88,6 +94,16 @@ def action_sync_cb_stock_history(force_full: bool = False) -> dict:
     return sync_convertible_bond_stock_history(force_full=force_full)
 
 
+def action_cb_rights_issue() -> dict:
+    payload = fetch_cb_rights_issue_snapshot()
+    records = normalize_cb_rights_issue_snapshot(payload)
+    return build_cb_rights_issue_response(payload, records)
+
+
+def action_sync_cb_rights_issue_stock_history(force_full: bool = False) -> dict:
+    return sync_cb_rights_issue_stock_history_snapshot(force_full=force_full)
+
+
 def action_merger() -> dict:
     payload = fetch_merger_snapshot()
     records = normalize_merger_snapshot(payload)
@@ -143,6 +159,10 @@ def main() -> None:
             dump(action_convertible_bond())
         elif action == "sync-cb-stock-history":
             dump(action_sync_cb_stock_history(force_full="--force-full" in args[1:]))
+        elif action == "cb-rights-issue":
+            dump(action_cb_rights_issue())
+        elif action == "sync-cb-rights-issue-stock-history":
+            dump(action_sync_cb_rights_issue_stock_history(force_full="--force-full" in args[1:]))
         elif action == "merger":
             dump(action_merger())
         elif action == "event-arbitrage":

@@ -49,6 +49,9 @@ storage:
     push_config: "push_config.json"
     push_runtime_state: "push_runtime_state.json"
     event_arbitrage_cache: "event_arbitrage_cache.json"
+    cb_rights_issue_state: "cb_rights_issue_state.json"
+    cb_rights_issue_push_config: "cb_rights_issue_push_config.json"
+    cb_rights_issue_push_runtime: "cb_rights_issue_push_runtime.json"
 
 logging:
   # Minimal logging defaults
@@ -105,6 +108,9 @@ plugins:
     custom_monitor:
       enabled: true
       folder: "data_fetch/custom_monitor"
+    cb_rights_issue:
+      enabled: true
+      folder: "data_fetch/cb_rights_issue"
   strategy:
     ah_premium:
       enabled: true
@@ -130,6 +136,9 @@ plugins:
     custom_monitor:
       enabled: true
       folder: "strategy/custom_monitor"
+    cb_rights_issue:
+      enabled: true
+      folder: "strategy/cb_rights_issue"
 
 data_fetch:
   # Fetch layer config only controls upstream access and normalization cadence
@@ -222,6 +231,19 @@ data_fetch:
       intraday: true
       refresh_interval_ms: 300000
       data_source: "runtime_state"
+    cb_rights_issue:
+      intraday: true
+      refresh_interval_ms: 900000
+      daily_incremental_sync: true
+      sync_stock_history_before_strategy: true
+      request_timeout_ms: 20000
+      history_lookback_days: 420
+      max_history_sync_workers: 8
+      inline_history_hydrate_limit: 12
+      source_page_url: "https://www.jisilu.cn/web/data/cb/pre"
+      source_api_url: "https://www.jisilu.cn/webapi/cb/pre/"
+      source_title: "集思录可转债预案"
+      source_referer: "https://www.jisilu.cn/web/data/cb/pre"
 
 strategy:
   # Strategy layer reads only normalized records plus config
@@ -311,6 +333,20 @@ strategy:
   custom_monitor:
     support_stock_plus_cash: true
     support_pure_cash_mode: true
+  cb_rights_issue:
+    min_expected_return_rate: 8
+    target_bond_lots: 10
+    lot_size_shares: 100
+    shanghai_ratio_factor: 0.5
+    shanghai_correction_factor: 0.6
+    moving_average_window: 20
+    volatility_window: 60
+    option_term_years: 6
+    option_model: "black_scholes"
+    eligible_progress_keywords:
+      - "上市委通过"
+      - "同意注册"
+      - "注册生效"
 
 presentation:
   # Presentation layer controls API shaping and dashboard visibility
@@ -400,6 +436,18 @@ presentation:
       strategy_notes:
         - "页面统一承接港股套利、中概私有、A股套利与公告池，优先展示当前仍有观察价值的条目。"
         - "若公开源缺失某一子类，页面会保留空态或缓存态说明，不伪造结果。"
+    cbRightsIssue:
+      data_sources:
+        - "固定源使用集思录可转债预案页面及其真实 JSON 接口；正股历史库为本功能独立维护。"
+        - "正股实时价格与十年期国债收益率来自统一市场 / AkShare 实时抓取。"
+      formulas:
+        - "配售所需资金 = 配售10张实际所需股数 × 当前股价。"
+        - "配售预期收益 = 单位期权价值 × 期权数量。"
+        - "预计收益率 = 配售预期收益 ÷ 配售所需资金。"
+      strategy_notes:
+        - "只有处于上市委通过、同意注册(注册生效)或已明确申购日，且预计收益率大于 8% 的项目才进入当天监控列表。"
+        - "60日波动率严格来自本功能独立历史库，若历史不足则不入池。"
+        - "页面展示的是配售期权价值估算口径，不代表实际收益保证。"
   stock_search:
     default_limit: 10
     max_limit: 100
@@ -439,6 +487,12 @@ notification:
     default_times:
       - "08:00"
       - "20:18"
+  cb_rights_issue:
+    enabled: true
+    trading_days_only: true
+    default_times:
+      - "08:00"
+      - "14:30"
   wecom:
     webhook_url: "${WECOM_WEBHOOK_URL}"
     push_html_url: "${PUSH_HTML_URL}"

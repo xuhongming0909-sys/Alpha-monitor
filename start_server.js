@@ -12,17 +12,22 @@ const {
   nowIso: sharedNowIso,
   getShanghaiParts: sharedGetShanghaiParts,
   normalizeDateText: sharedNormalizeDateText,
+  isTradingWeekday: sharedIsTradingWeekday,
   isTradingSession: sharedIsTradingSession,
   isAfterCutoff: sharedIsAfterCutoff,
 } = require('./shared/time/shanghai_time');
 const { normalizeError: sharedNormalizeError } = require('./shared/models/service_result');
 const { createPushConfigStore } = require('./notification/scheduler/push_config_store');
 const { createPushRuntimeStore } = require('./notification/scheduler/push_runtime_store');
+const { createModulePushConfigStore } = require('./notification/scheduler/module_push_config_store');
+const { createModulePushRuntimeStore } = require('./notification/scheduler/module_push_runtime_store');
 const { createWeComClient } = require('./notification/wecom/client');
 const { buildSummaryMarkdown: buildNotificationSummaryMarkdown } = require('./notification/styles/markdown_style');
+const { buildCbRightsIssueMarkdown } = require('./notification/styles/cb_rights_issue_markdown');
 const { buildConvertibleBondDiscountMarkdown } = require('./notification/styles/discount_strategy_markdown');
 const { createMainSummaryService } = require('./notification/summary/main_summary');
 const { createEventAlertService } = require('./notification/alerts/event_alert_service');
+const { createCbRightsIssuePushService } = require('./notification/cb_rights_issue/service');
 const { createMergerReportService } = require('./notification/merger_report/service');
 const { createWeComScheduler } = require('./notification/scheduler/wecom_scheduler');
 const {
@@ -75,6 +80,12 @@ const PRESENTATION_DASHBOARD_MODULE_NOTES_CONFIG = PRESENTATION_CONFIG?.dashboar
 const EVENT_ARB_STRATEGY_CONFIG = STRATEGY_CONFIG?.event_arbitrage || {};
 const CONVERTIBLE_BOND_STRATEGY_CONFIG = (STRATEGY_CONFIG?.convertible_bond && typeof STRATEGY_CONFIG.convertible_bond === 'object')
   ? STRATEGY_CONFIG.convertible_bond
+  : {};
+const CB_RIGHTS_ISSUE_STRATEGY_CONFIG = (STRATEGY_CONFIG?.cb_rights_issue && typeof STRATEGY_CONFIG.cb_rights_issue === 'object')
+  ? STRATEGY_CONFIG.cb_rights_issue
+  : {};
+const CB_RIGHTS_ISSUE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.cb_rights_issue && typeof NOTIFICATION_CONFIG.cb_rights_issue === 'object')
+  ? NOTIFICATION_CONFIG.cb_rights_issue
   : {};
 const INDEX_FILE = path.resolve(ROOT, PRESENTATION_CONFIG.dashboard_entry || './index.html');
 const STATIC_DATA_DIR = PATH_POLICY.dataRootDir;
@@ -300,6 +311,14 @@ const DEFAULT_PUSH_CONFIG = {
   times: DEFAULT_MAIN_PUSH_TIMES.slice(0, 2),
   modules: DEFAULT_NOTIFICATION_MODULES,
 };
+const DEFAULT_CB_RIGHTS_ISSUE_PUSH_CONFIG = {
+  enabled: Boolean(CB_RIGHTS_ISSUE_NOTIFICATION_CONFIG?.enabled),
+  times: normalizeTimeListConfig(
+    CB_RIGHTS_ISSUE_NOTIFICATION_CONFIG?.default_times,
+    '08:00'
+  ).slice(0, 2),
+  tradingDaysOnly: CB_RIGHTS_ISSUE_NOTIFICATION_CONFIG?.trading_days_only !== false,
+};
 
 function buildDashboardTableUiConfig(config = {}) {
   const minWidthSource = config && typeof config.min_width_by_kind === 'object' ? config.min_width_by_kind : {};
@@ -347,6 +366,7 @@ function buildDashboardModuleNotesConfig(config = {}) {
     monitor: buildModuleNote('monitor'),
     dividend: buildModuleNote('dividend'),
     merger: buildModuleNote('merger'),
+    cbRightsIssue: buildModuleNote('cbRightsIssue'),
   };
 }
 
@@ -512,6 +532,10 @@ function getShanghaiParts(date = new Date()) {
   return sharedGetShanghaiParts(date);
 }
 
+function isTradingWeekday(date = new Date()) {
+  return sharedIsTradingWeekday(date);
+}
+
 function isTradingSession(date = new Date()) {
   return sharedIsTradingSession(date);
 }
@@ -609,6 +633,23 @@ const DATASETS = {
       return callDataCore(['cb-arb'], { timeout: 300000, maxBuffer: 1024 * 1024 * 50 });
     },
   },
+  cbRightsIssue: {
+    intraday: pluginFetchConfig('cb_rights_issue').intraday !== false,
+    refreshIntervalMs: toIntConfig(pluginFetchConfig('cb_rights_issue').refresh_interval_ms, 15 * 60 * 1000),
+    dbDailySync: pluginFetchConfig('cb_rights_issue').daily_incremental_sync !== false,
+    fetch: async (options = {}) => {
+      if (pluginFetchConfig('cb_rights_issue').sync_stock_history_before_strategy !== false && (options.force || options.dailySync)) {
+        await callDataCore(['sync-cb-rights-issue-stock-history'], { timeout: 900000, maxBuffer: 1024 * 1024 * 50 });
+      }
+      return callDataCore(['cb-rights-issue'], { timeout: 300000, maxBuffer: 1024 * 1024 * 50 });
+    },
+    dailySync: async () => {
+      if (pluginFetchConfig('cb_rights_issue').sync_stock_history_before_strategy !== false) {
+        await callDataCore(['sync-cb-rights-issue-stock-history'], { timeout: 900000, maxBuffer: 1024 * 1024 * 50 });
+      }
+      return callDataCore(['cb-rights-issue'], { timeout: 300000, maxBuffer: 1024 * 1024 * 50 });
+    },
+  },
   merger: {
     intraday: Boolean(pluginFetchConfig('merger').intraday),
     dbDailySync: Boolean(pluginFetchConfig('merger').daily_incremental_sync),
@@ -638,6 +679,29 @@ const pushRuntimeState = STATE_REGISTRY.read('push_runtime_state', 'push_runtime
   eventAlertRecords: {},
   eventArbSeenItems: {},
   eventArbDailyNewItems: {},
+});
+const cbRightsIssueStateStore = STATE_REGISTRY.read('cb_rights_issue_state', 'cb_rights_issue_state.json', {
+  monitorList: [],
+  sourceRows: [],
+  sourceSummary: {},
+  lastRebuildAt: null,
+  lastRebuildDate: null,
+  lastRebuildError: null,
+  updateTime: null,
+  source: null,
+  sourceUrl: null,
+  sourceTitle: null,
+});
+const cbRightsIssuePushConfigStore = STATE_REGISTRY.read('cb_rights_issue_push_config', 'cb_rights_issue_push_config.json', {
+  enabled: DEFAULT_CB_RIGHTS_ISSUE_PUSH_CONFIG.enabled,
+  times: [...DEFAULT_CB_RIGHTS_ISSUE_PUSH_CONFIG.times],
+  tradingDaysOnly: DEFAULT_CB_RIGHTS_ISSUE_PUSH_CONFIG.tradingDaysOnly,
+});
+const cbRightsIssuePushRuntimeState = STATE_REGISTRY.read('cb_rights_issue_push_runtime', 'cb_rights_issue_push_runtime.json', {
+  pushRecords: {},
+  lastAttemptAt: null,
+  lastSuccessAt: null,
+  lastError: null,
 });
 const cbDiscountStrategyState = STATE_REGISTRY.read('cb_discount_strategy_state', 'cb_discount_strategy_state.json', {
   initializedDate: null,
@@ -679,6 +743,18 @@ function savePushConfigStore() {
 
 function savePushRuntimeState() {
   STATE_REGISTRY.write('push_runtime_state', 'push_runtime_state.json', pushRuntimeState);
+}
+
+function saveCbRightsIssueStateStore() {
+  STATE_REGISTRY.write('cb_rights_issue_state', 'cb_rights_issue_state.json', cbRightsIssueStateStore);
+}
+
+function saveCbRightsIssuePushConfigStore() {
+  STATE_REGISTRY.write('cb_rights_issue_push_config', 'cb_rights_issue_push_config.json', cbRightsIssuePushConfigStore);
+}
+
+function saveCbRightsIssuePushRuntimeState() {
+  STATE_REGISTRY.write('cb_rights_issue_push_runtime', 'cb_rights_issue_push_runtime.json', cbRightsIssuePushRuntimeState);
 }
 
 function saveCbDiscountStrategyState() {
@@ -898,6 +974,16 @@ const pushRuntimeDomain = createPushRuntimeStore({
   parsePushMinutes: (value) => pushConfigDomain.parsePushMinutes(value),
   nowIso,
 });
+const cbRightsIssuePushConfigDomain = createModulePushConfigStore({
+  state: cbRightsIssuePushConfigStore,
+  defaultConfig: DEFAULT_CB_RIGHTS_ISSUE_PUSH_CONFIG,
+  save: saveCbRightsIssuePushConfigStore,
+});
+const cbRightsIssuePushRuntimeDomain = createModulePushRuntimeStore({
+  state: cbRightsIssuePushRuntimeState,
+  save: saveCbRightsIssuePushRuntimeState,
+  parsePushMinutes: (value) => cbRightsIssuePushConfigDomain.parsePushMinutes(value),
+});
 const cbDiscountStrategyDomain = createConvertibleBondDiscountRuntimeStore({
   state: cbDiscountStrategyState,
   save: saveCbDiscountStrategyState,
@@ -929,6 +1015,19 @@ const eventAlertService = createEventAlertService({
   getShanghaiParts,
   isTradingSession,
   nowIso,
+});
+const cbRightsIssuePushService = createCbRightsIssuePushService({
+  getConfig: () => cbRightsIssuePushConfigDomain.getConfig(),
+  runtimeStore: cbRightsIssuePushRuntimeDomain,
+  getDataset,
+  sendMarkdown: (markdown) => weComClient.sendMarkdown(markdown),
+  buildMarkdown: buildCbRightsIssueMarkdown,
+  getShanghaiParts,
+  parsePushMinutes: (value) => cbRightsIssuePushConfigDomain.parsePushMinutes(value),
+  isTradingWeekday,
+  nowIso,
+  logInfo: (message) => console.info(message),
+  logError: (scope, error) => console.error(scope, error?.message || error),
 });
 const mergerReportService = createMergerReportService({
   nowIso,
@@ -972,6 +1071,18 @@ function getPushDeliveryStatus() {
   };
 }
 
+function getCbRightsIssuePushDeliveryStatus() {
+  const config = cbRightsIssuePushConfigDomain.getConfig();
+  return {
+    webhookConfigured: Boolean(WECOM_WEBHOOK_URL),
+    schedulerEnabled: PUSH_SCHEDULER_RUNTIME_ENABLED,
+    tradingDaysOnly: config.tradingDaysOnly !== false,
+    lastAttemptAt: cbRightsIssuePushRuntimeState.lastAttemptAt || null,
+    lastSuccessAt: cbRightsIssuePushRuntimeState.lastSuccessAt || null,
+    lastError: cbRightsIssuePushRuntimeState.lastError || null,
+  };
+}
+
 function getDiscountStrategyConfig() {
   return {
     ...DISCOUNT_STRATEGY_CONFIG,
@@ -999,6 +1110,15 @@ function buildDiscountStrategyStatus() {
 
 function buildPushConfigViewModel(config) {
   return buildPushConfigResponse(config, pushRuntimeState, getPushDeliveryStatus(), buildDiscountStrategyStatus());
+}
+
+function buildCbRightsIssuePushConfigViewModel(config) {
+  return {
+    enabled: config?.enabled !== false,
+    times: Array.isArray(config?.times) ? config.times : [...DEFAULT_CB_RIGHTS_ISSUE_PUSH_CONFIG.times],
+    tradingDaysOnly: config?.tradingDaysOnly !== false,
+    deliveryStatus: getCbRightsIssuePushDeliveryStatus(),
+  };
 }
 
 function getStateDate(key) {
@@ -1203,7 +1323,51 @@ function normalizeDatasetPayload(key, result) {
       discountMonitorSummary: snapshot.discountMonitorSummary,
     };
   }
+  if (key === 'cbRightsIssue') {
+    const payload = result.data && typeof result.data === 'object' ? result.data : {};
+    const rebuildAt = String(payload.rebuildStatus?.lastRebuildAt || result.updateTime || '').trim();
+    const rebuildDate = normalizeYmd(rebuildAt);
+    const todayDate = getShanghaiParts().date;
+    if (rebuildDate && rebuildDate !== todayDate) {
+      return {
+        ...result,
+        data: {
+          ...payload,
+          monitorList: [],
+          rebuildStatus: {
+            ...(payload.rebuildStatus && typeof payload.rebuildStatus === 'object' ? payload.rebuildStatus : {}),
+            sameDayCleared: true,
+            clearedForDate: todayDate,
+          },
+        },
+      };
+    }
+  }
   return result;
+}
+
+function persistCbRightsIssueStateFromResult(result) {
+  if (!result || typeof result !== 'object') return;
+  if (result.success === false) {
+    cbRightsIssueStateStore.lastRebuildAt = nowIso();
+    cbRightsIssueStateStore.lastRebuildDate = getShanghaiParts().date;
+    cbRightsIssueStateStore.lastRebuildError = normalizeError(result.error || 'cb_rights_issue_refresh_failed');
+    saveCbRightsIssueStateStore();
+    return;
+  }
+
+  const payload = result.data && typeof result.data === 'object' ? result.data : {};
+  cbRightsIssueStateStore.monitorList = Array.isArray(payload.monitorList) ? payload.monitorList : [];
+  cbRightsIssueStateStore.sourceRows = Array.isArray(payload.sourceRows) ? payload.sourceRows : [];
+  cbRightsIssueStateStore.sourceSummary = payload.sourceSummary && typeof payload.sourceSummary === 'object' ? payload.sourceSummary : {};
+  cbRightsIssueStateStore.lastRebuildAt = payload.rebuildStatus?.lastRebuildAt || result.updateTime || nowIso();
+  cbRightsIssueStateStore.lastRebuildDate = getShanghaiParts().date;
+  cbRightsIssueStateStore.lastRebuildError = payload.rebuildStatus?.lastRebuildError || null;
+  cbRightsIssueStateStore.updateTime = result.updateTime || null;
+  cbRightsIssueStateStore.source = result.source || null;
+  cbRightsIssueStateStore.sourceUrl = result.sourceUrl || payload.sourceSummary?.sourceUrl || null;
+  cbRightsIssueStateStore.sourceTitle = result.sourceTitle || payload.sourceSummary?.sourceTitle || null;
+  saveCbRightsIssueStateStore();
 }
 
 function shouldRetryDatasetBySchema(key, result) {
@@ -1236,6 +1400,9 @@ async function refreshDataset(key, options = {}) {
     let finalResult = first;
     if (shouldRetryDatasetBySchema(key, first)) {
       finalResult = await fetchDatasetOnce(key, normalizeDatasetRetryOptions(key, options));
+    }
+    if (key === 'cbRightsIssue') {
+      persistCbRightsIssueStateFromResult(finalResult);
     }
     if (finalResult && typeof finalResult === 'object' && finalResult.success !== false) {
       writeDatasetCache(key, finalResult);
@@ -1398,7 +1565,7 @@ async function runDataJobsCycle(context = 'tick', options = {}) {
 
   try {
     if (options.preloadDatasets) {
-      const preloadKeys = ['exchangeRate', 'ah', 'ab', 'cbArb', 'merger', 'eventArb', 'ipo', 'bonds'];
+      const preloadKeys = ['exchangeRate', 'ah', 'ab', 'cbArb', 'cbRightsIssue', 'merger', 'eventArb', 'ipo', 'bonds'];
       await Promise.allSettled(preloadKeys.map((key) => getDataset(key)));
       details.preloadedDatasets = preloadKeys;
     }
@@ -1430,6 +1597,7 @@ async function runPushSchedulerCycle(context = 'tick') {
 
   try {
     await weComScheduler.runTick();
+    await cbRightsIssuePushService.runIfNeeded();
     updateHealthSection('push_scheduler', 'ok', 'Push scheduler is healthy', details);
   } catch (error) {
     updateHealthSection('push_scheduler', 'warn', `Push scheduler degraded: ${error?.message || error}`, {
@@ -2381,6 +2549,9 @@ registerPushRoutes({
   getPushRuntimeState: () => pushRuntimeState,
   pushByModulesToWeCom: pushManualSummaryToWeCom,
   pushEventAlertsToWeCom: pushManualEventAlertsToWeCom,
+  getCbRightsIssuePushConfig: () => cbRightsIssuePushConfigDomain.getConfig(),
+  updateCbRightsIssuePushConfig: (payload) => cbRightsIssuePushConfigDomain.updateConfig(payload),
+  buildCbRightsIssuePushConfigResponse: buildCbRightsIssuePushConfigViewModel,
 });
 
 registerDashboardRoutes({

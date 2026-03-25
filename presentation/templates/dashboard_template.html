@@ -450,7 +450,7 @@
       .tab-nav {
         /* 主导航压缩为更像信息切换条，而不是大卡片按钮组 */
         display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         gap: 6px;
         margin: 8px 0 6px;
       }
@@ -1426,6 +1426,7 @@
         <button class="tab-button" data-tab="monitor" type="button">监控套利</button>
         <button class="tab-button" data-tab="dividend" type="button">分红提醒</button>
         <button class="tab-button" data-tab="merger" type="button">事件套利</button>
+        <button class="tab-button" data-tab="cb-rights-issue" type="button">可转债抢权配售</button>
       </nav>
 
       <section id="tab-panels">
@@ -1435,6 +1436,7 @@
         <section id="panel-monitor" class="panel-surface tab-panel"></section>
         <section id="panel-dividend" class="panel-surface tab-panel"></section>
         <section id="panel-merger" class="panel-surface tab-panel"></section>
+        <section id="panel-cb-rights-issue" class="panel-surface tab-panel"></section>
       </section>
 
       <section class="push-strip" aria-label="推送设置">

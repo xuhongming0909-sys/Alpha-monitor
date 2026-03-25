@@ -15,6 +15,9 @@ function registerPushRoutes(options = {}) {
     getPushRuntimeState,
     pushByModulesToWeCom,
     pushEventAlertsToWeCom,
+    getCbRightsIssuePushConfig,
+    updateCbRightsIssuePushConfig,
+    buildCbRightsIssuePushConfigResponse,
   } = options;
 
   app.get("/api/push/config", (_req, res) => {
@@ -26,6 +29,23 @@ function registerPushRoutes(options = {}) {
     try {
       const next = updatePushConfig(req.body || {});
       return sendSuccess(res, buildPushConfigResponse(next, getPushRuntimeState()));
+    } catch (error) {
+      return sendError(res, error, 400, null);
+    }
+  });
+
+  app.get("/api/push/cb-rights-issue-config", (_req, res) => {
+    try {
+      return sendSuccess(res, buildCbRightsIssuePushConfigResponse(getCbRightsIssuePushConfig()));
+    } catch (error) {
+      return sendError(res, error, 500, null);
+    }
+  });
+
+  app.post("/api/push/cb-rights-issue-config", (req, res) => {
+    try {
+      const next = updateCbRightsIssuePushConfig(req.body || {});
+      return sendSuccess(res, buildCbRightsIssuePushConfigResponse(next));
     } catch (error) {
       return sendError(res, error, 400, null);
     }
