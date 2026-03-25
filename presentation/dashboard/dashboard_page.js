@@ -88,19 +88,37 @@ const SUBSCRIPTION_STAGES = [
 ];
 
 const TABLE_DEFAULTS = {
-  cbArb: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  ah: { sortKey: 'premium', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  ab: { sortKey: 'premium', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  monitor: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  dividend: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  merger: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  cbRightsIssueMonitor: { sortKey: 'expectedReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  cbRightsIssueSource: { sortKey: 'expectedReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  eventArbHk: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  eventArbCn: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  eventArbA: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
-  eventArbAnnouncement: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE },
+  cbArb: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  ah: { sortKey: 'premium', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  ab: { sortKey: 'premium', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  monitor: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  dividend: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  merger: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  cbRightsIssueMonitor: { sortKey: 'expectedReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  cbRightsIssueSource: { sortKey: 'expectedReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  eventArbHk: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  eventArbCn: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  eventArbA: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  eventArbAnnouncement: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
 };
+
+const TABLE_SEARCH_CONFIG = Object.freeze({
+  cbArb: {
+    placeholder: '搜索转债代码/名称、正股代码/名称',
+    hint: '可按转债代码、转债名称、正股代码、正股名称搜索',
+    fields: ['code', 'bondName', 'stockCode', 'stockName'],
+  },
+  ah: {
+    placeholder: '搜索A股/H股代码或名称',
+    hint: '可按A股代码、A股名称、H股代码、H股名称搜索',
+    fields: ['aCode', 'aName', 'hCode', 'hName'],
+  },
+  ab: {
+    placeholder: '搜索A股/B股代码或名称',
+    hint: '可按A股代码、A股名称、B股代码、B股名称搜索',
+    fields: ['aCode', 'aName', 'bCode', 'bName'],
+  },
+});
 
 const state = {
   activeTab: 'cb-arb',
@@ -506,6 +524,50 @@ function normalizeDateKey(value) {
   return `${year}-${month}-${day}`;
 }
 
+function normalizeSearchText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function readTableSearchConfig(tableKey) {
+  return TABLE_SEARCH_CONFIG[tableKey] || null;
+}
+
+function readTableSearchQuery(tableKey) {
+  return normalizeSearchText(state.tables?.[tableKey]?.searchQuery || '');
+}
+
+function readTableSearchTokens(tableKey) {
+  const query = readTableSearchQuery(tableKey);
+  return query ? query.split(/\s+/).filter(Boolean) : [];
+}
+
+function buildTableSearchHaystack(tableKey, row) {
+  const config = readTableSearchConfig(tableKey);
+  if (!config) return '';
+  return config.fields
+    .map((field) => normalizeSearchText(row?.[field]))
+    .filter(Boolean)
+    .join(' ');
+}
+
+function applyTableSearch(tableKey, rows) {
+  const tokens = readTableSearchTokens(tableKey);
+  if (!tokens.length) return [...rows];
+  return rows.filter((row) => {
+    const haystack = buildTableSearchHaystack(tableKey, row);
+    return tokens.every((token) => haystack.includes(token));
+  });
+}
+
+function setTableSearchQuery(tableKey, query) {
+  if (!state.tables?.[tableKey]) return;
+  state.tables[tableKey].searchQuery = String(query || '');
+  state.tables[tableKey].page = 1;
+  if (tableKey === 'cbArb') return renderConvertibleBondPanel();
+  if (tableKey === 'ah') return renderPremiumPanel('ah');
+  if (tableKey === 'ab') return renderPremiumPanel('ab');
+}
+
 function todayKey() {
   const now = new Date();
   const year = now.getFullYear();
@@ -682,6 +744,15 @@ function bindEvents() {
   });
 
   document.addEventListener('input', (event) => {
+    const tableSearchField = event.target.closest('[data-table-search-key]');
+    if (tableSearchField) {
+      setTableSearchQuery(
+        String(tableSearchField.dataset.tableSearchKey || '').trim(),
+        String(tableSearchField.value || '')
+      );
+      return;
+    }
+
     const monitorField = event.target.closest('#monitor-editor-form [name]');
     if (!monitorField) return;
     const fieldName = String(monitorField.name || '').trim();
@@ -747,6 +818,12 @@ function bindEvents() {
     const pageTarget = event.target.closest('.pagination-button[data-table-key][data-page-action]');
     if (pageTarget) {
       handlePageClick(pageTarget.dataset.tableKey, pageTarget.dataset.pageAction);
+      return;
+    }
+
+    const clearSearchTarget = event.target.closest('[data-table-search-clear]');
+    if (clearSearchTarget) {
+      setTableSearchQuery(String(clearSearchTarget.dataset.tableSearchClear || '').trim(), '');
       return;
     }
 
@@ -1884,8 +1961,9 @@ function sortRowsByColumn(rows, column, direction) {
 
 function getProcessedTableRows(tableKey, rows, columns) {
   const tableState = state.tables[tableKey];
+  const filteredRows = applyTableSearch(tableKey, rows);
   const sortColumn = columns.find((item) => item.key === tableState.sortKey && item.sortable);
-  const sortedRows = sortColumn ? sortRowsByColumn(rows, sortColumn, tableState.sortDir) : [...rows];
+  const sortedRows = sortColumn ? sortRowsByColumn(filteredRows, sortColumn, tableState.sortDir) : [...filteredRows];
   const totalRows = sortedRows.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / tableState.pageSize));
   const page = Math.min(Math.max(tableState.page, 1), totalPages);
@@ -1896,6 +1974,7 @@ function getProcessedTableRows(tableKey, rows, columns) {
     sortedRows,
     page,
     totalRows,
+    rawTotalRows: rows.length,
     totalPages,
     startIndex,
     sortColumn,
@@ -1981,10 +2060,13 @@ function renderDetailGrid(items) {
 }
 
 function renderPagination(tableKey, model) {
+  const totalText = model.rawTotalRows > model.totalRows
+    ? `筛选后 ${model.totalRows} / ${model.rawTotalRows} 条`
+    : `共 ${model.totalRows} 条`;
   return `
     <div class="pagination-bar">
       <div class="pagination-status">
-        第 ${escapeHtml(String(model.page))} / ${escapeHtml(String(model.totalPages))} 页，共 ${escapeHtml(String(model.totalRows))} 条
+        第 ${escapeHtml(String(model.page))} / ${escapeHtml(String(model.totalPages))} 页，${escapeHtml(totalText)}
       </div>
       <div class="pagination-buttons">
         <button type="button" class="pagination-button" data-table-key="${escapeHtml(tableKey)}" data-page-action="first" ${model.page <= 1 ? 'disabled' : ''}>首页</button>
@@ -2093,6 +2175,32 @@ function renderSummaryCard(title, rows, extraClass = "") {
       <h3>${escapeHtml(title)}</h3>
       ${body}
     </section>
+  `;
+}
+
+function renderTableSearchBar(tableKey) {
+  const config = readTableSearchConfig(tableKey);
+  if (!config) return '';
+  const query = String(state.tables?.[tableKey]?.searchQuery || '');
+  return `
+    <div class="table-search-bar">
+      <div class="table-search-main">
+        <input
+          type="text"
+          class="table-search-input"
+          data-table-search-key="${escapeHtml(tableKey)}"
+          value="${escapeHtml(query)}"
+          placeholder="${escapeHtml(config.placeholder)}"
+        />
+        <button
+          type="button"
+          class="btn-secondary table-search-clear"
+          data-table-search-clear="${escapeHtml(tableKey)}"
+          ${query ? '' : 'disabled'}
+        >清空</button>
+      </div>
+      <div class="table-search-hint">${escapeHtml(config.hint)}</div>
+    </div>
   `;
 }
 
@@ -2504,6 +2612,7 @@ function renderConvertibleBondPanel() {
       <div class="summary-grid summary-grid-three">${summaryCards}</div>
       <div class="list-card">
         <h3>主表</h3>
+        ${renderTableSearchBar('cbArb')}
         ${renderPaginatedTable({
           tableKey: "cbArb",
           tableKind: "convertible",
@@ -2813,6 +2922,7 @@ function renderPremiumPanel(type) {
       </div>
       <div class="list-card">
         <h3>主表</h3>
+        ${renderTableSearchBar(type)}
         ${renderPaginatedTable({
           tableKey: type,
           tableKind: 'premium',

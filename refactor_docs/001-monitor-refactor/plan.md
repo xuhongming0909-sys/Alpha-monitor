@@ -1356,3 +1356,29 @@ Acceptance:
 - A dedicated stock-history DB still exists for this feature, but only `60日波动率` depends on it.
 - The feature has independent push config/runtime and can expose truthful last success/error state.
 - Existing `打新 / 转债套利 / AH / AB / 监控套利 / 分红提醒 / 事件套利` behavior does not regress.
+
+## 44. Phase AP: Convertible / AH / AB Table Search (2026-03-25)
+
+Goal: let the user quickly find a target convertible bond or stock directly inside the three dense main tables without adding new backend APIs.
+
+Plan:
+1. Keep this round presentation-only:
+   - no fetch change
+   - no strategy/formula change
+   - no route change
+2. Add a shared client-side search capability to:
+   - `转债套利`
+   - `AH溢价`
+   - `AB溢价`
+3. Search works on the already loaded real rows and filters before pagination.
+4. Search continues to coexist with existing sort and 50-row pagination rules.
+5. Search scope:
+   - `转债套利`: 转债代码、转债名称、正股代码、正股名称
+   - `AH溢价`: A股代码、A股名称、H股代码、H股名称
+   - `AB溢价`: A股代码、A股名称、B股代码、B股名称
+
+Acceptance:
+- The three pages visibly expose a search box above the main table.
+- Typing a code or name filters the current table immediately.
+- Clearing the keyword restores the full table.
+- Sorting and 50-row pagination still work on the filtered result set.

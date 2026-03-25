@@ -2473,3 +2473,41 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - the API must return the real failure state
   - the row must not enter `monitorList`
   - the page must not fabricate missing results
+
+## 34. 转债套利 / AH / AB 主表搜索 Spec (2026-03-25)
+
+### 34.1 Scope
+- This round is presentation-only.
+- No new API, route, fetch-plugin, or strategy-plugin behavior is added.
+
+### 34.2 State rule
+- Shared dashboard table state adds one search field for searchable tables:
+  - `searchQuery`
+- Covered tables:
+  - `cbArb`
+  - `ah`
+  - `ab`
+
+### 34.3 Match rule
+- Search is case-insensitive.
+- The query is trimmed before matching.
+- When the query contains spaces, the effective tokens are split by whitespace and all tokens must match the aggregated searchable text.
+- Searchable text mapping:
+  - `cbArb`: `code`, `bondName`, `stockCode`, `stockName`
+  - `ah`: `aCode`, `aName`, `hCode`, `hName`
+  - `ab`: `aCode`, `aName`, `bCode`, `bName`
+
+### 34.4 Table pipeline rule
+- Shared table processing order becomes:
+  1. search filter
+  2. column sort
+  3. 50-row pagination
+- Pagination status continues to reflect the filtered result set.
+
+### 34.5 UI rule
+- Each covered module renders one search box directly above the main table.
+- The search box must provide:
+  - keyword input
+  - clear action
+  - short hint text indicating searchable fields
+- Clearing the keyword resets the current page to page 1 of the full result set.

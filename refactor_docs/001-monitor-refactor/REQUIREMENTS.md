@@ -1146,3 +1146,21 @@
   - the system must surface the real failure reason instead of filling placeholders
 - Regression boundary:
   - `打新 / 转债套利 / AH / AB / 监控套利 / 分红提醒 / 事件套利` existing behavior remains unchanged in this round
+
+## 50. 转债套利 / AH / AB 主表搜索合同 (2026-03-25)
+- 本轮只增加展示层搜索，不新增后端搜索接口。
+- 以下三个页面必须在主表上方提供搜索框：
+  - `转债套利`
+  - `AH溢价`
+  - `AB溢价`
+- 搜索必须基于页面已经加载的真实数据即时筛选，不允许假数据补齐或额外拼装静态结果。
+- 搜索命中范围固定为：
+  - `转债套利`：转债代码、转债名称、正股代码、正股名称
+  - `AH溢价`：A股代码、A股名称、H股代码、H股名称
+  - `AB溢价`：A股代码、A股名称、B股代码、B股名称
+- 搜索属于前端筛选：
+  - 先筛选
+  - 再排序
+  - 最后分页
+- 清空搜索词后必须恢复完整主表。
+- 现有 50 条分页规则、排序语义、接口返回字段和业务公式都不得改变。
