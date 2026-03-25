@@ -1327,6 +1327,7 @@ Plan:
 5. Implement strategy outputs:
    - stage eligibility
    - `配售10张实际所需股数`
+   - Shanghai rule: raw required shares -> `×50%` -> round up to `100股`; if `rounded / raw < 0.6`, add another `100股`
    - `配售所需资金`
    - `单位期权价值`
    - `配售预期收益`

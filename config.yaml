@@ -338,7 +338,8 @@ strategy:
     target_bond_lots: 10
     lot_size_shares: 100
     shanghai_ratio_factor: 0.5
-    shanghai_correction_factor: 0.6
+    shanghai_min_round_ratio: 0.6
+    shanghai_extra_lot_when_below_min_ratio: 100
     moving_average_window: 20
     volatility_window: 60
     option_term_years: 6

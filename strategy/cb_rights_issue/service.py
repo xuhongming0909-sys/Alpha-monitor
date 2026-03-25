@@ -15,7 +15,8 @@ MIN_EXPECTED_RETURN_RATE = float(_STRATEGY_CONFIG.get("min_expected_return_rate"
 TARGET_BOND_LOTS = max(1, int(_STRATEGY_CONFIG.get("target_bond_lots") or 10))
 LOT_SIZE_SHARES = max(1, int(_STRATEGY_CONFIG.get("lot_size_shares") or 100))
 SHANGHAI_RATIO_FACTOR = float(_STRATEGY_CONFIG.get("shanghai_ratio_factor") or 0.5)
-SHANGHAI_CORRECTION_FACTOR = float(_STRATEGY_CONFIG.get("shanghai_correction_factor") or 0.6)
+SHANGHAI_MIN_ROUND_RATIO = float(_STRATEGY_CONFIG.get("shanghai_min_round_ratio") or 0.6)
+SHANGHAI_EXTRA_LOT_WHEN_BELOW_MIN_RATIO = max(0, int(_STRATEGY_CONFIG.get("shanghai_extra_lot_when_below_min_ratio") or LOT_SIZE_SHARES))
 OPTION_TERM_YEARS = float(_STRATEGY_CONFIG.get("option_term_years") or 6.0)
 ELIGIBLE_PROGRESS_KEYWORDS = [str(item or "").strip() for item in (_STRATEGY_CONFIG.get("eligible_progress_keywords") or []) if str(item or "").strip()]
 
@@ -42,6 +43,8 @@ def _is_stage_eligible(row: Dict[str, Any]) -> bool:
 
 
 def _resolve_required_shares(row: Dict[str, Any]) -> Dict[str, Any]:
+    """计算配售10张所需股数，输出原始值、调整值和最终取整值。"""
+
     raw_required = _to_float(row.get("rawRequiredShares"))
     if raw_required is None or raw_required <= 0:
         return {
@@ -53,13 +56,17 @@ def _resolve_required_shares(row: Dict[str, Any]) -> Dict[str, Any]:
 
     market = str(row.get("market") or "").strip().lower()
     if market == "sh":
-        adjusted = raw_required * SHANGHAI_RATIO_FACTOR * SHANGHAI_CORRECTION_FACTOR
-        market_rule = "shanghai_raw_x_0.5_x_0.6_then_round_100"
+        # 沪市规则：先按 50% 估算，再按 100 股向上取整；若取整后相对原始所需股数低于 0.6，再补 100 股。
+        adjusted = raw_required * SHANGHAI_RATIO_FACTOR
+        final_required = int(math.ceil(adjusted / LOT_SIZE_SHARES) * LOT_SIZE_SHARES)
+        if raw_required > 0 and (final_required / raw_required) < SHANGHAI_MIN_ROUND_RATIO:
+            final_required += SHANGHAI_EXTRA_LOT_WHEN_BELOW_MIN_RATIO
+        market_rule = "shanghai_raw_x_0.5_round_100_then_plus_100_when_ratio_below_0.6"
     else:
         adjusted = raw_required
+        final_required = int(math.ceil(adjusted / LOT_SIZE_SHARES) * LOT_SIZE_SHARES)
         market_rule = "shenzhen_raw_then_round_100"
 
-    final_required = int(math.ceil(adjusted / LOT_SIZE_SHARES) * LOT_SIZE_SHARES)
     return {
         "requiredSharesRaw": _round(raw_required, 4),
         "requiredSharesAdjusted": _round(adjusted, 4),
