@@ -2634,8 +2634,8 @@ function buildCbRightsIssueSourceColumns() {
     { key: 'recordDate', label: '登记日', columnClassName: 'col-date', sortable: true, sortType: 'date', defaultDir: 'asc', sortValue: (row) => normalizeDateKey(row.recordDate), render: (row) => escapeHtml(formatDateOnly(row.recordDate)) },
     { key: 'listDate', label: '上市日', columnClassName: 'col-date', sortable: true, sortType: 'date', defaultDir: 'asc', sortValue: (row) => normalizeDateKey(row.listDate), render: (row) => escapeHtml(formatDateOnly(row.listDate)) },
     { key: 'stockPrice', label: '正股现价', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.stockPrice), render: (row) => formatNumber(row.stockPrice, 2) },
-    { key: 'ma20CloseDb', label: '20日均价', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.ma20CloseDb ?? row.ma20Price), render: (row) => formatNumber(row.ma20CloseDb ?? row.ma20Price, 2) },
-    { key: 'convertPrice', label: '转股价', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.convertPrice), render: (row) => formatNumber(row.convertPrice, 2) },
+    { key: 'convertPrice', label: '源转股价(20日均值)', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.convertPrice), render: (row) => formatNumber(row.convertPrice, 2) },
+    { key: 'optionStrikePrice', label: '行权价', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.optionStrikePrice), render: (row) => formatNumber(row.optionStrikePrice, 2) },
     { key: 'volatility60', label: '60日波动率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.volatility60), render: (row) => formatRatioPercent(row.volatility60, 2) },
     { key: 'expectedReturnRate', label: '预计收益率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.expectedReturnRate), className: (row) => statusClass(row.expectedReturnRate), render: (row) => formatPercent(row.expectedReturnRate, 2) },
   ];
@@ -2649,6 +2649,7 @@ function buildCbRightsIssueDetailItems(row) {
     { label: '调整后股数', value: formatNumber(row.requiredSharesAdjusted, 2) },
     { label: '最终取整股数', value: formatInt(row.requiredSharesFinal) },
     { label: '市场规则', value: row.marketRule || '--' },
+    { label: '源转股价(20日均值)', value: formatNumber(row.optionReferencePrice ?? row.convertPrice, 2) },
     { label: '期权行权价', value: formatNumber(row.optionStrikePrice, 2) },
     { label: '期权数量', value: formatNumber(row.optionQuantity, 4) },
     { label: '单位期权价值', value: formatNumber(row.optionUnitValue, 4) },
@@ -2707,7 +2708,8 @@ function renderCbRightsIssuePanel() {
         ], 'compact-card')}
         ${renderSummaryCard('口径提醒', [
           { title: '深市/沪市股数规则', subtitle: '深市直接取整 100 股；沪市按原始股数 ×0.6 后再取整', value: '真实计算' },
-          { title: '60日波动率', subtitle: '严格来自本功能独立历史库，不足则不入池', value: 'DB权威' },
+          { title: '行权价判定', subtitle: 'URL转股价按20日均值代理，与正股现价取大值', value: '已简化' },
+          { title: '60日波动率', subtitle: '严格来自本功能独立历史库（后复权），不足则不入池', value: 'DB权威' },
         ], 'compact-card')}
       </div>
       <div class="list-card">

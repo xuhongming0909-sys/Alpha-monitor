@@ -1101,7 +1101,8 @@
   - 沪市: raw required shares for 10 bonds, then apply `× 0.6`, then round up to `100股`
   - 沪市 `0.6` 修正规则 is enabled in phase 1 as a direct multiplier
 - `单位期权价值` contract:
-  - strike input uses `max(前20个交易日收盘均值, 当前价)` as the exercised reference
+  - strike input uses `max(源页面 convertPrice, 当前价)` as the exercised reference
+  - source `convertPrice` is treated as the source-provided `20日均值` proxy
   - risk-free rate uses real 10Y treasury yield
   - volatility uses real underlying-stock `60日历史波动率`
   - term is fixed to `6年`
@@ -1109,11 +1110,9 @@
 - The page must clearly state that this is an estimated rights-issue option-value model rather than guaranteed realized profit.
 - This feature must maintain its own independent underlying-stock history database:
   - it is separate from the existing convertible-bond underlying history DB
-  - tracked stock universe comes from the current fixed-source rows
-  - new stocks are added automatically when new rows appear
-  - stale stocks may be removed automatically when they leave the effective universe
-  - the DB must append/update the latest trading-day bar daily
+  - it stores real `后复权` daily closes for this feature only
   - `60日波动率` must be calculated from this DB rather than static page fields
+  - the DB is used for volatility only and must not be used to override the strike reference
 - New public API contract:
   - `GET /api/market/cb-rights-issue`
     - returns `monitorList`

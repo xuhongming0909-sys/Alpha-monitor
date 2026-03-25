@@ -94,9 +94,6 @@ def _black_scholes_call(spot: float, strike: float, years: float, risk_free_rate
 def _build_row(row: Dict[str, Any], risk_free_rate: Optional[float], treasury_yield_10y: Optional[float]) -> Dict[str, Any]:
     stock_price = _to_float(row.get("stockPrice"))
     convert_price = _to_float(row.get("convertPrice"))
-    ma20_price = _to_float(row.get("ma20CloseDb"))
-    if ma20_price is None:
-        ma20_price = _to_float(row.get("ma20Price"))
     volatility60 = _to_float(row.get("volatility60"))
     required_share_info = _resolve_required_shares(row)
 
@@ -110,8 +107,9 @@ def _build_row(row: Dict[str, Any], risk_free_rate: Optional[float], treasury_yi
     if stock_price and stock_price > 0 and required_share_info["requiredSharesFinal"]:
         required_funds = required_share_info["requiredSharesFinal"] * stock_price
 
-    if stock_price and stock_price > 0 and ma20_price and ma20_price > 0:
-        option_strike_price = max(stock_price, ma20_price)
+    if stock_price and stock_price > 0 and convert_price and convert_price > 0:
+        # URL 页面给出的转股价按 20 日均值代理处理，行权价取它与当前价的较大值。
+        option_strike_price = max(stock_price, convert_price)
         option_quantity = 1000.0 / option_strike_price if option_strike_price > 0 else None
 
     if (
@@ -145,6 +143,8 @@ def _build_row(row: Dict[str, Any], risk_free_rate: Optional[float], treasury_yi
         reason = "stage_not_eligible"
     elif required_funds is None:
         reason = "missing_required_funds"
+    elif convert_price is None:
+        reason = "missing_convert_price_reference"
     elif volatility60 is None:
         reason = "missing_volatility60"
     elif expected_return_rate is None:
@@ -157,6 +157,7 @@ def _build_row(row: Dict[str, Any], risk_free_rate: Optional[float], treasury_yi
         **required_share_info,
         "stageEligible": stage_eligible,
         "monitorEligible": monitor_eligible,
+        "optionReferencePrice": _round(convert_price, 4),
         "optionStrikePrice": _round(option_strike_price, 4),
         "optionQuantity": _round(option_quantity, 6),
         "optionUnitValue": _round(option_unit_value, 6),

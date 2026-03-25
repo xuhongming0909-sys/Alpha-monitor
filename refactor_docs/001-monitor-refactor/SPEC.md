@@ -2296,17 +2296,14 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - `stock_price_history(symbol, trade_date, close_hfq, source, created_at, updated_at)`
   - `stock_price_sync_state(symbol, last_trade_date, source, updated_at)`
   - `stock_symbol_universe(symbol, status, note, updated_at)`
-- Universe update rule:
-  - derive current stock codes from the latest source rows
-  - add new symbols into universe automatically
-  - purge symbols not in the effective source universe
 - Sync rule:
+  - the DB stores real `后复权` closes for this module
   - incremental by default using `last_trade_date - 5 days`
   - force-full path is supported
   - latest trading-day row must be appended/updated daily
 - Read rule:
   - `60日波动率` requires at least `61` closes from this dedicated DB
-  - when local DB lacks enough rows, sync/hydrate first
+  - the DB is used for volatility only and not for strike-reference override
   - if rows are still insufficient after sync, the feature row remains non-eligible
 
 ### 33.5 Normalized row contract
@@ -2317,7 +2314,6 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - `stockName`
   - `stockPrice`
   - `convertPrice`
-  - `ma20Price`
   - `progress`
   - `progressName`
   - `progressDate`
@@ -2331,7 +2327,8 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 - Raw-source fields may also be preserved in `raw`.
 
 ### 33.6 Strategy formula rule
-- `行权价 = max(前20个交易日收盘均值, 当前价)`
+- `行权价 = max(source convertPrice, 当前价)`
+- source `convertPrice` is treated as the source-provided `20日均值` proxy
 - `期权数量 = 1000 / 行权价`
 - `配售所需资金 = 配售10张实际所需股数 × 当前股价`
 - `配售预期收益 = 单位期权价值 × 期权数量`
