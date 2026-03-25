@@ -2706,7 +2706,7 @@ function renderCbRightsIssuePanel() {
           { title: '最近重建', subtitle: rebuildStatus.lastRebuildError ? `失败: ${String(rebuildStatus.lastRebuildError).slice(0, 60)}` : '正常', value: rebuildStatus.lastRebuildAt ? formatDate(rebuildStatus.lastRebuildAt) : '--' },
         ], 'compact-card')}
         ${renderSummaryCard('口径提醒', [
-          { title: '深市/沪市股数规则', subtitle: '深市直接取整 100 股；沪市先 ×0.5 取整，若不足原始股数 0.6 再补 100 股', value: '真实计算' },
+          { title: '深市/沪市股数规则', subtitle: '深市直接取整 100 股；沪市按原始股数 ×0.6 后再取整', value: '真实计算' },
           { title: '60日波动率', subtitle: '严格来自本功能独立历史库，不足则不入池', value: 'DB权威' },
         ], 'compact-card')}
       </div>

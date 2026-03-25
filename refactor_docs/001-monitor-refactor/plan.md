@@ -1327,7 +1327,7 @@ Plan:
 5. Implement strategy outputs:
    - stage eligibility
    - `配售10张实际所需股数`
-   - Shanghai rule: raw required shares -> `×50%` -> round up to `100股`; if `rounded / raw < 0.6`, add another `100股`
+   - Shanghai rule: raw required shares -> `×0.6` -> round up to `100股`
    - `配售所需资金`
    - `单位期权价值`
    - `配售预期收益`
@@ -1351,7 +1351,7 @@ Plan:
 Acceptance:
 - Dashboard root tabs increase from 6 to 7, and the new `可转债抢权配售` page renders real data.
 - The page has no standalone URL parse area; it reads only the fixed Jisilu pre-plan source.
-- Only rows in `上市委通过 / 同意注册(注册生效) / 已明确申购日` and `预计收益率 > 8%` enter the monitor list.
+- Only rows in `上市委通过 / 同意注册(注册生效) / 已明确申购日` and `预计收益率 > 6%` enter the monitor list.
 - A dedicated stock-history DB exists for this feature, and `60日波动率` is computed from that DB rather than a static page field.
 - The feature has independent push config/runtime and can expose truthful last success/error state.
 - Existing `打新 / 转债套利 / AH / AB / 监控套利 / 分红提醒 / 事件套利` behavior does not regress.

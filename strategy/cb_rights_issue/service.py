@@ -11,12 +11,10 @@ from shared.models.service_result import build_success
 _CONFIG = get_config()
 _STRATEGY_CONFIG = (((_CONFIG.get("strategy") or {}).get("cb_rights_issue") or {}))
 
-MIN_EXPECTED_RETURN_RATE = float(_STRATEGY_CONFIG.get("min_expected_return_rate") or 8.0)
+MIN_EXPECTED_RETURN_RATE = float(_STRATEGY_CONFIG.get("min_expected_return_rate") or 6.0)
 TARGET_BOND_LOTS = max(1, int(_STRATEGY_CONFIG.get("target_bond_lots") or 10))
 LOT_SIZE_SHARES = max(1, int(_STRATEGY_CONFIG.get("lot_size_shares") or 100))
-SHANGHAI_RATIO_FACTOR = float(_STRATEGY_CONFIG.get("shanghai_ratio_factor") or 0.5)
-SHANGHAI_MIN_ROUND_RATIO = float(_STRATEGY_CONFIG.get("shanghai_min_round_ratio") or 0.6)
-SHANGHAI_EXTRA_LOT_WHEN_BELOW_MIN_RATIO = max(0, int(_STRATEGY_CONFIG.get("shanghai_extra_lot_when_below_min_ratio") or LOT_SIZE_SHARES))
+SHANGHAI_RATIO_FACTOR = float(_STRATEGY_CONFIG.get("shanghai_ratio_factor") or 0.6)
 OPTION_TERM_YEARS = float(_STRATEGY_CONFIG.get("option_term_years") or 6.0)
 ELIGIBLE_PROGRESS_KEYWORDS = [str(item or "").strip() for item in (_STRATEGY_CONFIG.get("eligible_progress_keywords") or []) if str(item or "").strip()]
 
@@ -56,12 +54,10 @@ def _resolve_required_shares(row: Dict[str, Any]) -> Dict[str, Any]:
 
     market = str(row.get("market") or "").strip().lower()
     if market == "sh":
-        # 沪市规则：先按 50% 估算，再按 100 股向上取整；若取整后相对原始所需股数低于 0.6，再补 100 股。
+        # 沪市规则：原始所需股数直接乘 0.6，再按 100 股向上取整。
         adjusted = raw_required * SHANGHAI_RATIO_FACTOR
         final_required = int(math.ceil(adjusted / LOT_SIZE_SHARES) * LOT_SIZE_SHARES)
-        if raw_required > 0 and (final_required / raw_required) < SHANGHAI_MIN_ROUND_RATIO:
-            final_required += SHANGHAI_EXTRA_LOT_WHEN_BELOW_MIN_RATIO
-        market_rule = "shanghai_raw_x_0.5_round_100_then_plus_100_when_ratio_below_0.6"
+        market_rule = "shanghai_raw_x_0.6_then_round_100"
     else:
         adjusted = raw_required
         final_required = int(math.ceil(adjusted / LOT_SIZE_SHARES) * LOT_SIZE_SHARES)

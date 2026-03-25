@@ -334,12 +334,10 @@ strategy:
     support_stock_plus_cash: true
     support_pure_cash_mode: true
   cb_rights_issue:
-    min_expected_return_rate: 8
+    min_expected_return_rate: 6
     target_bond_lots: 10
     lot_size_shares: 100
-    shanghai_ratio_factor: 0.5
-    shanghai_min_round_ratio: 0.6
-    shanghai_extra_lot_when_below_min_ratio: 100
+    shanghai_ratio_factor: 0.6
     moving_average_window: 20
     volatility_window: 60
     option_term_years: 6
@@ -446,7 +444,7 @@ presentation:
         - "配售预期收益 = 单位期权价值 × 期权数量。"
         - "预计收益率 = 配售预期收益 ÷ 配售所需资金。"
       strategy_notes:
-        - "只有处于上市委通过、同意注册(注册生效)或已明确申购日，且预计收益率大于 8% 的项目才进入当天监控列表。"
+        - "只有处于上市委通过、同意注册(注册生效)或已明确申购日，且预计收益率大于 6% 的项目才进入当天监控列表。"
         - "60日波动率严格来自本功能独立历史库，若历史不足则不入池。"
         - "页面展示的是配售期权价值估算口径，不代表实际收益保证。"
   stock_search:

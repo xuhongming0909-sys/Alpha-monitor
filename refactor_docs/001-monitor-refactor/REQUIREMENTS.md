@@ -1086,7 +1086,7 @@
   - page footnote
 - The monitor list only includes rows that satisfy both:
   - stage is one of `上市委通过` / `同意注册(注册生效)` / `已明确申购日`
-  - `预计收益率 > 8%`
+  - `预计收益率 > 6%`
 - `已明确申购日` means the row has a real `apply_date`; this round does not add an extra “提前3天/5天窗口” rule.
 - The same-day monitor list is rebuilt daily:
   - clear previous day state at `00:00`
@@ -1098,9 +1098,8 @@
   - `预计收益率 = 配售预期收益 ÷ 配售所需资金`
 - `配售10张实际所需股数` contract:
   - 深市: raw required shares for 10 bonds, then round up to `100股`
-  - 沪市: raw required shares for 10 bonds, then apply `× 50%`, then round up to `100股`
-  - 若 `roundUpResult / rawRequiredShares < 0.6`，则沪市结果再补 `100股`
-  - 沪市 `0.6` 修正规则 is enabled in phase 1 as a formal business rule, but it is a post-rounding minimum-ratio check rather than a direct multiplier
+  - 沪市: raw required shares for 10 bonds, then apply `× 0.6`, then round up to `100股`
+  - 沪市 `0.6` 修正规则 is enabled in phase 1 as a direct multiplier
 - `单位期权价值` contract:
   - strike input uses `max(前20个交易日收盘均值, 当前价)` as the exercised reference
   - risk-free rate uses real 10Y treasury yield

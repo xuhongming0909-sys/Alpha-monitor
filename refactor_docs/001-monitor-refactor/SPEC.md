@@ -2351,9 +2351,8 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
     - round up to the next `100`
   - if the stock is Shanghai-market:
     - compute raw required shares for 10 bonds
-    - multiply by `0.5`
+    - multiply by `0.6`
     - round up to the next `100`
-    - if `roundedRequiredShares / rawRequiredShares < 0.6`, add one more `100`
 - Output field must preserve:
   - raw required shares
   - adjusted required shares
