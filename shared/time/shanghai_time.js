@@ -15,6 +15,7 @@ function getShanghaiParts(date = new Date()) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: SHANGHAI_TIMEZONE,
     hour12: false,
+    hourCycle: "h23",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -25,10 +26,13 @@ function getShanghaiParts(date = new Date()) {
   });
   const parts = Object.fromEntries(formatter.formatToParts(date).map((item) => [item.type, item.value]));
   const weekdayMap = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0 };
+  const rawHour = Number(parts.hour || 0);
+  // 部分 Node/ICU 运行环境会把上海时间午夜格式化成 24:xx，这里统一归一为 00:xx。
+  const normalizedHour = rawHour === 24 ? 0 : rawHour;
 
   return {
     date: `${parts.year}-${parts.month}-${parts.day}`,
-    hour: Number(parts.hour || 0),
+    hour: normalizedHour,
     minute: Number(parts.minute || 0),
     second: Number(parts.second || 0),
     weekday: weekdayMap[parts.weekday] ?? -1,

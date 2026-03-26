@@ -1,5 +1,7 @@
 "use strict";
 
+const { getShanghaiParts } = require("../../shared/time/shanghai_time");
+
 /**
  * 推送运行态存储。
  * 负责记录定时推送记录、异动冷却记录，以及事件套利新增项的次日汇总缓冲。
@@ -7,7 +9,6 @@
 function createPushRuntimeStore(options = {}) {
   const state = options.state || {};
   const save = typeof options.save === "function" ? options.save : () => state;
-  const SHANGHAI_TIME_ZONE = "Asia/Shanghai";
   const parsePushMinutes = options.parsePushMinutes || ((value) => {
     const [h, m] = String(value || "").split(":").map((item) => Number(item));
     if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
@@ -15,16 +16,6 @@ function createPushRuntimeStore(options = {}) {
     return h * 60 + m;
   });
   const nowIso = typeof options.nowIso === "function" ? options.nowIso : () => new Date().toISOString();
-  const shanghaiFormatter = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: SHANGHAI_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-
   function normalizePushTimes(items) {
     return Array.from(new Set(
       (Array.isArray(items) ? items : [])
@@ -64,17 +55,12 @@ function createPushRuntimeStore(options = {}) {
   function getShanghaiPartsFromIso(isoText) {
     const timestamp = Date.parse(String(isoText || "").trim());
     if (!Number.isFinite(timestamp)) return null;
-    const parts = Object.fromEntries(
-      shanghaiFormatter
-        .formatToParts(new Date(timestamp))
-        .filter((item) => item.type !== "literal")
-        .map((item) => [item.type, item.value])
-    );
-    const hour = Number(parts.hour);
-    const minute = Number(parts.minute);
-    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    const parts = getShanghaiParts(new Date(timestamp));
+    const hour = Number(parts?.hour);
+    const minute = Number(parts?.minute);
+    if (!parts || !Number.isFinite(hour) || !Number.isFinite(minute)) return null;
     return {
-      date: `${parts.year}-${parts.month}-${parts.day}`,
+      date: String(parts.date || "").trim(),
       hour,
       minute,
       minutes: hour * 60 + minute,
