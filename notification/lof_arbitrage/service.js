@@ -154,13 +154,20 @@ function createLofArbitragePushService(options = {}) {
     const nowMinutes = sh.hour * 60 + sh.minute;
     if (sanitized.changed) {
       runtimeStore.save();
+      logInfo(`[push][lof_arbitrage] sanitized dirty records date=${sh.date} kept=${sentTimes.join(",") || "none"}`);
     }
 
     for (const timeText of scheduleTimes) {
       const targetMinutes = parsePushMinutes(timeText);
       if (targetMinutes === null) continue;
-      if (nowMinutes < targetMinutes) continue;
-      if (sentTimes.includes(timeText)) continue;
+      if (nowMinutes < targetMinutes) {
+        logInfo(`[push][lof_arbitrage] slot=${timeText} date=${sh.date} skipped=not_due_yet`);
+        continue;
+      }
+      if (sentTimes.includes(timeText)) {
+        logInfo(`[push][lof_arbitrage] slot=${timeText} date=${sh.date} skipped=already_sent`);
+        continue;
+      }
 
       logInfo(`[push][lof_arbitrage] slot=${timeText} date=${sh.date} action=attempt`);
       try {

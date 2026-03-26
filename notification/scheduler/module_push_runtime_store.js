@@ -1,12 +1,16 @@
 "use strict";
 
+const { getShanghaiParts } = require("../../shared/time/shanghai_time");
+
 /**
  * 模块级推送运行态。
- * 只记录独立模块自己的定时发送记录与最近成功/失败状态。
+ * 只记录独立模块自己的定时发送记录与最近成功/失败状态，
+ * 并在读取当日计划时自动清理不可信的未来时段记录。
  */
 function createModulePushRuntimeStore(options = {}) {
   const state = options.state || {};
   const save = typeof options.save === "function" ? options.save : () => state;
+  const nowIso = typeof options.nowIso === "function" ? options.nowIso : () => new Date().toISOString();
   const parsePushMinutes = typeof options.parsePushMinutes === "function"
     ? options.parsePushMinutes
     : ((value) => {
@@ -48,13 +52,47 @@ function createModulePushRuntimeStore(options = {}) {
     );
   }
 
+  function getPushSuccessIso() {
+    ensureStateShape();
+    return state.lastSuccessAt || null;
+  }
+
+  function getShanghaiPartsFromIso(isoText) {
+    const timestamp = Date.parse(String(isoText || "").trim());
+    if (!Number.isFinite(timestamp)) return null;
+    const parts = getShanghaiParts(new Date(timestamp));
+    const hour = Number(parts?.hour);
+    const minute = Number(parts?.minute);
+    if (!parts || !Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    return {
+      date: String(parts.date || "").trim(),
+      hour,
+      minute,
+      minutes: hour * 60 + minute,
+    };
+  }
+
   function sanitizeScheduledPushRecord(dateText, scheduleTimes) {
-    const existing = getPushRecord(dateText);
+    const date = String(dateText || "").trim();
+    if (!date) return { times: [], changed: false };
+
+    const existing = getPushRecord(date);
     const allowed = new Set(normalizePushTimes(scheduleTimes));
-    const next = existing.filter((item) => allowed.has(item));
+    let next = existing.filter((item) => allowed.has(item));
+
+    const today = getShanghaiPartsFromIso(nowIso())?.date || null;
+    const latestSuccess = getShanghaiPartsFromIso(getPushSuccessIso());
+    if (today && date === today) {
+      if (latestSuccess?.date === today) {
+        next = next.filter((item) => (parsePushMinutes(item) ?? Number.POSITIVE_INFINITY) <= latestSuccess.minutes);
+      } else {
+        next = [];
+      }
+    }
+
     const changed = next.length !== existing.length || next.some((item, index) => item !== existing[index]);
     if (changed) {
-      setPushRecord(dateText, next);
+      setPushRecord(date, next);
     }
     return { times: next, changed };
   }
@@ -83,6 +121,8 @@ function createModulePushRuntimeStore(options = {}) {
     normalizePushTimes,
     getPushRecord,
     setPushRecord,
+    getPushSuccessIso,
+    getShanghaiPartsFromIso,
     sanitizeScheduledPushRecord,
     setAttempt,
     setSuccess,
