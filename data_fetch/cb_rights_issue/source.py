@@ -33,6 +33,7 @@ SOURCE_PAGE_URL = str(_FETCH_CONFIG.get("source_page_url") or "https://www.jisil
 SOURCE_API_URL = str(_FETCH_CONFIG.get("source_api_url") or "https://www.jisilu.cn/webapi/cb/pre/").strip()
 SOURCE_REFERER = str(_FETCH_CONFIG.get("source_referer") or SOURCE_PAGE_URL).strip()
 SOURCE_TITLE = str(_FETCH_CONFIG.get("source_title") or "集思录可转债预案").strip()
+EASTMONEY_QUOTE_URL = "https://push2.eastmoney.com/api/qt/ulist.np/get"
 REQUEST_TIMEOUT_MS = max(5000, int(_FETCH_CONFIG.get("request_timeout_ms") or 20000))
 INLINE_HISTORY_HYDRATE_LIMIT = max(1, int(_FETCH_CONFIG.get("inline_history_hydrate_limit") or 12))
 ACTIVE_VOL_WINDOW = 250
@@ -123,11 +124,61 @@ def _normalize_market_value_to_yi(value: Any) -> Optional[float]:
     return market_value
 
 
+def _to_eastmoney_secid(stock_code: str) -> str:
+    code = normalize_stock_code(stock_code)
+    if not code:
+        return ""
+    return f"{1 if code.startswith(('5', '6', '9')) else 0}.{code}"
+
+
+def _load_stock_market_value_map_from_eastmoney(stock_codes: Iterable[str]) -> Dict[str, Optional[float]]:
+    target_codes = sorted({normalize_stock_code(code) for code in stock_codes if normalize_stock_code(code)})
+    if not target_codes:
+        return {}
+
+    result: Dict[str, Optional[float]] = {}
+    for index in range(0, len(target_codes), 80):
+        batch = target_codes[index:index + 80]
+        secids = [secid for secid in (_to_eastmoney_secid(code) for code in batch) if secid]
+        if not secids:
+            continue
+        try:
+            response = requests.get(
+                EASTMONEY_QUOTE_URL,
+                params={
+                    "fltt": "2",
+                    "invt": "2",
+                    "fields": "f12,f20",
+                    "secids": ",".join(secids),
+                },
+                headers={
+                    "User-Agent": "Mozilla/5.0",
+                    "Referer": "https://quote.eastmoney.com/",
+                    "Accept": "application/json,text/plain,*/*",
+                },
+                timeout=REQUEST_TIMEOUT_MS / 1000.0,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except Exception:
+            continue
+
+        for item in (((payload or {}).get("data") or {}).get("diff") or []):
+            code = normalize_stock_code(item.get("f12"))
+            if not code:
+                continue
+            market_value_yi = _normalize_market_value_to_yi(item.get("f20"))
+            if market_value_yi is not None:
+                result[code] = market_value_yi
+    return result
+
+
 def _load_stock_market_value_map(stock_codes: Iterable[str]) -> Dict[str, Optional[float]]:
     target_codes = {normalize_stock_code(code) for code in stock_codes if normalize_stock_code(code)}
     if not target_codes:
         return {}
 
+    result: Dict[str, Optional[float]] = {}
     for fetcher in (getattr(ak, "stock_zh_a_spot_em", None), getattr(ak, "stock_zh_a_spot", None)):
         if fetcher is None:
             continue
@@ -138,11 +189,11 @@ def _load_stock_market_value_map(stock_codes: Iterable[str]) -> Dict[str, Option
         if df is None or df.empty:
             continue
 
-        code_col = next((name for name in ("\u4ee3\u7801", "code", "symbol") if name in df.columns), None)
+        code_col = next((name for name in ("代码", "code", "symbol") if name in df.columns), None)
         market_value_col = next(
             (
                 name
-                for name in ("\u603b\u5e02\u503c", "\u603b\u5e02\u503c(\u5143)", "market_value", "marketValue")
+                for name in ("总市值", "总市值(元)", "market_value", "marketValue")
                 if name in df.columns
             ),
             None,
@@ -150,16 +201,21 @@ def _load_stock_market_value_map(stock_codes: Iterable[str]) -> Dict[str, Option
         if not code_col or not market_value_col:
             continue
 
-        result: Dict[str, Optional[float]] = {}
         for _, series in df.iterrows():
             code = normalize_stock_code(series.get(code_col))
             if not code or code not in target_codes:
                 continue
-            result[code] = _normalize_market_value_to_yi(series.get(market_value_col))
+            market_value_yi = _normalize_market_value_to_yi(series.get(market_value_col))
+            if market_value_yi is not None:
+                result[code] = market_value_yi
         if result:
-            return result
+            break
 
-    return {}
+    missing_codes = sorted(code for code in target_codes if code not in result)
+    if missing_codes:
+        result.update(_load_stock_market_value_map_from_eastmoney(missing_codes))
+
+    return result
 
 
 def _calc_volatility_from_closes(closes: List[float]) -> Optional[float]:
@@ -201,6 +257,7 @@ def _hydrate_missing_history(metrics: Dict[str, Dict[str, Any]]) -> Dict[str, An
         return {"requested": 0, "success": True}
     if len(missing) > INLINE_HISTORY_HYDRATE_LIMIT:
         return {"requested": len(missing), "success": False, "skipped": "over_inline_limit"}
+
     from data_fetch.cb_rights_issue.history_source import sync_cb_rights_issue_stock_history
 
     return sync_cb_rights_issue_stock_history(target_symbols=missing)
@@ -230,7 +287,7 @@ def _load_trade_calendar_dates() -> List[str]:
     if df is None or df.empty:
         return []
 
-    date_col = next((name for name in ("trade_date", "\u65e5\u671f", "date") if name in df.columns), None)
+    date_col = next((name for name in ("trade_date", "日期", "date") if name in df.columns), None)
     if not date_col:
         return []
 
@@ -333,7 +390,7 @@ def get_cb_rights_issue_source_snapshot() -> Dict[str, Any]:
         "success": True,
         "data": rows,
         "updateTime": now_iso(),
-        "source": "jisilu+tencent+sina+akshare",
+        "source": "jisilu+tencent+sina+akshare+eastmoney",
         "sourceUrl": SOURCE_PAGE_URL,
         "sourceApiUrl": SOURCE_API_URL,
         "sourceTitle": SOURCE_TITLE,

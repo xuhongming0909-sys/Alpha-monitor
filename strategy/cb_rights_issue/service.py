@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from bisect import bisect_right
 from datetime import datetime
 from statistics import median
@@ -28,6 +29,7 @@ APPLY_STAGE_KEYWORDS = tuple(
 )
 REGISTRATION_STAGE_KEYWORDS = ("同意注册", "注册生效")
 LISTING_COMMITTEE_STAGE_KEYWORDS = ("上市委通过",)
+TIMELINE_LINE_PATTERN = re.compile(r"(?P<date>\d{4}-\d{2}-\d{2})\s*(?P<name>.+)")
 
 
 def _to_float(value: Any) -> Optional[float]:
@@ -82,8 +84,14 @@ def _add_trading_days(trade_calendar: List[str], start_date: str, trading_days: 
     return trade_calendar[target_index]
 
 
+def _clean_progress_text(value: Any) -> str:
+    text = str(value or "").replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+    text = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _normalize_progress_sample_group(progress_name: str) -> str:
-    text = str(progress_name or "").strip()
+    text = _clean_progress_text(progress_name)
     if any(keyword in text for keyword in LISTING_COMMITTEE_STAGE_KEYWORDS):
         return "listing_committee"
     if any(keyword in text for keyword in REGISTRATION_STAGE_KEYWORDS):
@@ -94,8 +102,42 @@ def _normalize_progress_sample_group(progress_name: str) -> str:
 def _is_apply_stage(row: Dict[str, Any]) -> bool:
     if _normalize_date_text(row.get("applyDate")):
         return True
-    progress_name = str(row.get("progressName") or "").strip()
+    progress_name = _clean_progress_text(row.get("progressName"))
     return any(keyword in progress_name for keyword in APPLY_STAGE_KEYWORDS)
+
+
+def _extract_progress_timeline(row: Dict[str, Any]) -> List[tuple[str, str]]:
+    result: List[tuple[str, str]] = []
+    progress_full = str(row.get("progressFull") or "").replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+    for line in progress_full.splitlines():
+        cleaned_line = re.sub(r"<[^>]+>", " ", str(line or "")).strip()
+        if not cleaned_line:
+            continue
+        match = TIMELINE_LINE_PATTERN.match(cleaned_line)
+        if not match:
+            continue
+        date_text = _normalize_date_text(match.group("date"))
+        stage_name = _clean_progress_text(match.group("name"))
+        if date_text and stage_name:
+            result.append((date_text, stage_name))
+
+    progress_date = _normalize_date_text(row.get("progressDate"))
+    progress_name = _clean_progress_text(row.get("progressName"))
+    if progress_date and progress_name and (progress_date, progress_name) not in result:
+        result.append((progress_date, progress_name))
+    return result
+
+
+def _extract_stage_dates_from_row(row: Dict[str, Any]) -> Dict[str, str]:
+    stage_dates: Dict[str, str] = {}
+    for date_text, stage_name in _extract_progress_timeline(row):
+        sample_group = _normalize_progress_sample_group(stage_name)
+        if not sample_group:
+            continue
+        previous = stage_dates.get(sample_group)
+        if not previous or date_text > previous:
+            stage_dates[sample_group] = date_text
+    return stage_dates
 
 
 def _build_stage_lag_median_map(rows: List[Dict[str, Any]], trade_calendar: List[str]) -> Dict[str, int]:
@@ -107,15 +149,14 @@ def _build_stage_lag_median_map(rows: List[Dict[str, Any]], trade_calendar: List
         "registration": [],
     }
     for row in rows:
-        sample_group = _normalize_progress_sample_group(str(row.get("progressName") or ""))
-        progress_date = _normalize_date_text(row.get("progressDate"))
         apply_date = _normalize_date_text(row.get("applyDate"))
-        if not sample_group or not progress_date or not apply_date:
+        if not apply_date:
             continue
-        gap = _count_trading_days(trade_calendar, progress_date, apply_date)
-        if gap is None or gap <= 0:
-            continue
-        samples[sample_group].append(gap)
+        for sample_group, progress_date in _extract_stage_dates_from_row(row).items():
+            gap = _count_trading_days(trade_calendar, progress_date, apply_date)
+            if gap is None or gap <= 0:
+                continue
+            samples[sample_group].append(gap)
 
     medians: Dict[str, int] = {}
     for key, values in samples.items():
