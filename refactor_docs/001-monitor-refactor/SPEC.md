@@ -465,7 +465,7 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - `杞偂浠?/ 杞偂浠峰€糮
   - `杞偂婧环鐜嘸
   - `鍙屼綆`
-  - `60鏃ユ尝鍔ㄧ巼`
+  - `250日波动率`
   - `绾€轰环鍊?/ 鐞嗚浠锋牸`
   - `鐞嗚婧环鐜嘸
   - `鍒版湡绋庡墠鏀剁泭鐜嘸
@@ -970,7 +970,7 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - `doubleLow`
   - `redeemTriggerPrice`
   - `putbackPrice`
-  - `volatility60`
+  - `volatility250`
   - `callOptionValue`
   - `putOptionValue`
   - `theoreticalPrice`
@@ -1011,19 +1011,20 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 - `绾€烘孩浠风巼` is rendered as `(杞€虹幇浠?/ 绾€哄熀鍑?- 1) * 100`:
   - prefer `pureBondValue`
   - fallback to `bondValue`
-- `60鏃ユ尝鍔ㄧ巼` is currently rendered from the annualized standard deviation of recent stock close-to-close log returns:
+- `250日波动率` is currently rendered from the annualized standard deviation of the latest `250` stock close-to-close log returns:
   - source close series = cached adjusted stock closes
   - current display semantics = historical estimate / reference
 - `鏈熸潈鐞嗚浠峰€糮 is rendered as:
-  - prefer `callOptionValue - putOptionValue`
+  - prefer `callOptionValue`
+  - compatibility fallback to `callOptionValue - putOptionValue` only when legacy rows still carry the old pricing formula
   - fallback to `theoreticalPrice - 绾€哄熀鍑哷
 - `鐞嗚浠峰€糮 is rendered from `theoreticalPrice`.
 - `鐞嗚婧环鐜嘸 is rendered from `theoreticalPremiumRate`.
 - The page must include a visible formula hint near the `杞€哄鍒ー main table, stating at least:
   - `鐞嗚浠峰€?= 绾€轰环鍊?+ 鏈熸潈鐞嗚浠峰€糮
-  - `鏈熸潈鐞嗚浠峰€?= 鐪嬫定鏈熸潈浠峰€?- 鐪嬭穼鏈熸潈浠峰€糮
+  - `鏈熸潈鐞嗚浠峰€?= 鐪嬫定鏈熸潈(杞偂浠? - 鐪嬫定鏈熸潈(寮鸿祹浠?
 - The page must also visibly mark the following fields as reference-only in this round:
-  - `60鏃ユ尝鍔ㄧ巼`
+  - `250日波动率`
   - `鏈熸潈鐞嗚浠峰€糮
   - `鐞嗚浠峰€糮
   - `鐞嗚婧环鐜嘸
@@ -1111,303 +1112,6 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - scheduler config or push behavior
   - market API payload semantics
 
-## 23. LOF Arbitrage Zero-login Spec (2026-03-23)
-
-### 23.1 Scope
-- This round adds a new top-level dashboard module `LOF濂楀埄`.
-- Phase-1 source scope is fixed to direct public JSON requests against Jisilu QDII endpoints:
-  - `/data/qdii/qdii_list/E`
-  - `/data/qdii/qdii_list/A`
-  - `/data/qdii/qdii_list/C`
-- Firecrawl is not in the hot path for this round.
-
-### 23.2 Layering
-- `data_fetch/lof_arbitrage/fetcher.py` only handles:
-  - source request
-  - retry / timeout
-  - per-category cache fallback
-  - outward raw-category snapshot
-- `data_fetch/lof_arbitrage/normalizer.py` only maps source fields into bus rows.
-- `strategy/lof_arbitrage/service.py` only handles:
-  - premium-basis selection
-  - fee adjustment
-  - action-status classification
-  - overview aggregation
-- `presentation` only handles:
-  - route registration
-  - dataset refresh
-  - dashboard rendering
-
-### 23.3 API contract
-- New route: `GET /api/market/lof-arbitrage`
-- Response shape is fixed to:
-  - `success`
-  - `data.overview`
-  - `data.rows`
-  - `data.groups`
-  - `data.sourceStatus`
-  - `data.iopvSearch`
-  - `error`
-  - `updateTime`
-  - `cacheTime`
-  - `servedFromCache`
-
-### 23.4 Source groups
-- `data.groups` fixed keys:
-  - `europe_us`
-  - `asia`
-  - `commodity`
-- `data.sourceStatus` fixed keys mirror the same 3 groups.
-- Any single-group source failure must only degrade that group and may not blank the whole LOF page or homepage.
-
-### 23.5 Standardized row schema
-- Each outward LOF row must expose at least:
-  - `id`
-  - `source`
-  - `category`
-  - `market`
-  - `symbol`
-  - `name`
-  - `issuer`
-  - `currentPrice`
-  - `changeRate`
-  - `volumeWan`
-  - `navValue`
-  - `navDate`
-  - `navPremiumRate`
-  - `iopv`
-  - `iopvTime`
-  - `iopvPremiumRate`
-  - `estimatedValue`
-  - `estimatedTime`
-  - `estimatedPremiumRate`
-  - `premiumBasis`
-  - `premiumRate`
-  - `confidence`
-  - `estimatedCostRate`
-  - `netPremiumRate`
-  - `applyStatus`
-  - `applyOpen`
-  - `applyFeeRate`
-  - `redeemStatus`
-  - `redeemFeeRate`
-  - `managementFeeRate`
-  - `currency`
-  - `t0`
-  - `actionStatus`
-  - `actionRank`
-  - `riskFlags`
-  - `detailUrl`
-  - `raw`
-
-### 23.6 Premium-basis rule
-- Phase-1 signal basis priority is fixed to:
-  1. `iopvPremiumRate`
-  2. `estimatedPremiumRate`
-  3. `navPremiumRate`
-- The outward row field `premiumBasis` must be one of:
-  - `iopv`
-  - `estimate`
-  - `nav`
-- The outward row field `confidence` must be one of:
-  - `high`
-  - `medium`
-  - `low`
-
-### 23.7 Action-status rule
-- `actionStatus = 涓嶅彲鍙備笌` when current apply status is paused/closed.
-- `actionStatus = 鏃犳槑鏄炬孩浠穈 when outward signal premium is missing or non-positive.
-- `actionStatus = 浠呰瀵焋 when:
-  - only NAV premium is available and phase-1 rule forbids treating NAV-only rows as execution-grade
-  - or apply is limited and the current strategy config keeps limited-apply rows as watch-only
-- `actionStatus = 濂楀埄鍊欓€塦 only when all of the following hold:
-  - signal premium exists
-  - signal premium >= `strategy.lof_arbitrage.premium_threshold_pct`
-  - net premium >= `strategy.lof_arbitrage.min_net_premium_pct`
-  - apply is open
-  - row is not downgraded by the phase-1 NAV-only rule
-
-### 23.8 Fee and risk rules
-- `estimatedCostRate` in phase 1 is the conservative visible fee sum of:
-  - `applyFeeRate`
-  - `managementFeeRate`
-- `netPremiumRate = premiumRate - estimatedCostRate` when both are available.
-- `riskFlags` must append warnings for at least:
-  - NAV-only signal
-  - limited apply
-  - paused apply
-  - low liquidity under `strategy.lof_arbitrage.low_liquidity_volume_wan`
-
-### 23.9 Dashboard rendering
-- The dashboard adds a new root tab key `lof-arb`.
-- The LOF page structure is fixed to:
-  1. module title and status text
-  2. market subtab strip
-  3. one paginated main table
-- Visible top summary cards are removed from the LOF page in this round:
-  - `濂楀埄鍊欓€塦
-  - `浠呰瀵焋
-  - `鏁版嵁閾捐矾`
-- Main table columns are fixed to:
-  - `搴忓彿`
-  - `浠ｇ爜`
-  - `鍩洪噾 / 鍒嗗尯`
-  - `鐜颁环 / 娑ㄥ箙`
-  - `鍑€鍊?/ 婧环`
-  - `IOPV / 婧环`
-  - `浼板€?/ 婧环`
-  - `淇″彿婧环`
-  - `鎵ｈ垂鍚庢孩浠穈
-  - `鐢宠喘鐘舵€乣
-  - `鎴愪氦棰?涓?`
-  - `缁撹`
-  - `璇︽儏`
-- Each row must render an always-visible secondary detail block for:
-  - dates
-  - fees
-  - currency / T+0
-  - reference index
-  - risk flags
-
-### 23.10 Search-status exposure
-- `data.iopvSearch` is phase-1 operational metadata for the continuing zero-login IOPV search.
-- It must expose at least:
-  - `publicSourceStatus`
-  - `currentZeroLoginAvailability`
-- This metadata is informational only and must not block the page render.
-
-## 24. LOF Authenticated Enrichment Spec (2026-03-23)
-
-### 24.1 Fetch-mode rule
-- `data_fetch/lof_arbitrage/fetcher.py` keeps using:
-  - `/data/qdii/qdii_list/E`
-  - `/data/qdii/qdii_list/A`
-  - `/data/qdii/qdii_list/C`
-- New optional config:
-  - `data_fetch.plugins.lof_arbitrage.jisilu_cookie`
-- When this cookie is present, the fetch session must send it as a request header and mark the source status as authenticated-enhanced.
-- When the authenticated request fails or yields no usable response, the fetch layer must retry or fall back to the public path without taking down the module.
-
-### 24.2 Source-status additions
-- `data.sourceStatus.{group}` must additionally allow:
-  - `cookieConfigured`
-  - `authMode`
-  - `usedLoginEnhancedRows`
-- `authMode` is fixed to one of:
-  - `public`
-  - `authenticated`
-  - `authenticated_fallback_public`
-- `usedLoginEnhancedRows = true` only when the returned row set came from the authenticated request path.
-
-### 24.3 Standardized LOF row additions
-- Each outward LOF row keeps the phase-1 schema and additionally exposes:
-  - `amountWanShares`
-  - `amountIncreaseWanShares`
-  - `amountIncreaseRate`
-  - `navValueText`
-  - `navPremiumRateText`
-  - `iopvText`
-  - `iopvPremiumRateText`
-  - `estimatedValueText`
-  - `estimatedPremiumRateText`
-  - `referenceIndex`
-  - `referenceIndexChangeRate`
-  - `applyFeeText`
-  - `redeemFeeText`
-  - `managementFeeText`
-  - `officialUrl`
-  - `sourceDetailUrl`
-- `officialUrl` comes from the source row `urls` field when available.
-- `sourceDetailUrl` is the Jisilu detail page for the row symbol.
-
-### 24.4 LOF page navigation
-- The LOF page adds visible internal subtabs:
-  - `europe_us`
-  - `asia`
-  - `commodity`
-- Visible labels are fixed to:
-  - `娆х編甯傚満`
-  - `浜氭床甯傚満`
-  - `鍟嗗搧`
-- Frontend default LOF subtab becomes `europe_us`.
-
-### 24.5 LOF long-table rendering
-- The LOF main view renders one long table for the active market subtab.
-- Main table columns are fixed to:
-  - `搴忓彿`
-  - `浠ｇ爜`
-  - `鍚嶇О`
-  - `鐜颁环`
-  - `娑ㄨ穼骞卄
-  - `鎴愪氦棰?涓囧厓)`
-  - `鍦哄唴浠介(涓囦唤)`
-  - `鍦哄唴鏂板(涓囦唤)`
-  - `IOPV`
-  - `IOPV婧环鐜嘸
-  - `T-2鍑€鍊糮
-  - `鍑€鍊兼棩鏈焋
-  - `T-2鍑€鍊兼孩浠穈
-  - `T-1鎸囨暟娑ㄥ箙`
-  - `鐩稿叧鎸囨暟`
-  - `鐢宠喘璐筦
-  - `鐢宠喘鐘舵€乣
-  - `璧庡洖璐筦
-  - `璧庡洖鐘舵€乣
-  - `绠℃墭璐筦
-  - `鍩洪噾鍏徃`
-  - `瀹樻柟閾炬帴`
-  - `闆嗘€濆綍璇︽儏`
-- The long table becomes the immediate primary reading path, without a visible summary-card band above it.
-
-### 24.6 Missing-value truthfulness
-- `IOPV`-related fields must remain empty when the current source chain does not return them.
-- Frontend display text for truly missing `IOPV` / estimate values must use an explicit unavailability label rather than a fabricated number.
-- The page should continue exposing the operational search state for better `IOPV` coverage, but this status is informational only.
-
-### 24.7 LOF derived-estimate completion
-- `data_fetch/lof_arbitrage/normalizer.py` may derive estimate fields only from source-provided raw fields.
-- Phase-1 allowed estimate derivation:
-  - `estimatedValue = navValue * (1 + est_val_increase_rt / 100)`
-  - only when direct `estimate_value` is empty
-- Phase-1 allowed estimate-premium derivation:
-  - `estimatedPremiumRate = ((currentPrice / estimatedValue) - 1) * 100`
-  - only when direct `discount_rt` is empty and `estimatedValue` exists
-- `estimatedSource` fixed values:
-  - `direct_source`
-  - `derived_from_est_val_increase_rt`
-- `estimatedSourceLabel` fixed outward semantics:
-  - `婧愮洿鎺ヨ繑鍥瀈
-  - `Jisilu浼板€兼定骞呮帹瀵糮
-- LOF outward row additions for this round include:
-  - `estimatedSource`
-  - `estimatedSourceLabel`
-  - `estimatedIncreaseRate`
-  - `estimatedIncreaseRateText`
-  - `turnoverRate`
-  - `priceDate`
-  - `amountDate`
-  - `calculationTips`
-  - `fundType`
-- `estimatedTime` fallback order is fixed to:
-  1. `last_est_datetime`
-  2. `last_est_dt + last_est_time`
-  3. `est_val_dt`
-  4. `last_time`
-- The LOF main table additionally renders:
-  - `缁撹`
-  - `淇″彿婧环`
-- `淇″彿婧环` sorts by `premiumRate` descending by default inside each LOF market subtab.
-- LOF detail rows additionally render:
-  - `浼板€兼潵婧恅
-  - `浼板€兼定骞卄
-  - `鍙傝€冧环`
-  - `浼板€艰鏄巂
-  - `鎶ヤ环鏃堕棿`
-- LOF secondary detail rows remain always visible beneath each row and serve as the default supplementary reading path.
-- `IOPV` remains independent from the derived estimate path:
-  - derived estimate logic must not populate `IOPV`
-  - derived estimate logic must not populate `IOPV婧环鐜嘸
-
 ## 25. Event-arbitrage Detail Text Responsive Spec (2026-03-24)
 
 ### 25.1 Scope
@@ -1419,33 +1123,6 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 - `娓偂濂楀埄` and `涓绉佹湁` detail `澶囨敞` use the same dedicated single-column variant.
 - The single-column variant must span the available detail-row width on desktop instead of inheriting the default 4-column detail-grid compression.
 - On narrow screens the same block continues wrapping naturally without horizontal overflow.
-## 25. LOF Homepage Cancellation Spec (2026-03-24)
-
-### 25.1 Scope rule
-- `LOF濂楀埄` is removed from the public homepage module set in this round.
-- This round is a homepage/runtime disconnect, not a full backend deletion.
-
-### 25.2 Homepage navigation rule
-- Visible homepage root tabs are fixed to:
-  - `cb-arb`
-  - `ah`
-  - `ab`
-  - `monitor`
-  - `dividend`
-  - `merger`
-- The homepage template must not render:
-  - `data-tab="lof-arb"`
-  - `panel-lof-arb`
-
-### 25.3 Dashboard bootstrap rule
-- Frontend bootstrap must not request the LOF dataset.
-- Frontend force-refresh key list must not include `lofArb`.
-- The active-panel router must not route homepage tabs to `renderLofArbitragePanel()`.
-
-### 25.4 Runtime preload rule
-- Server preload dataset keys must not include `lofArb`.
-- Existing backend route `GET /api/market/lof-arbitrage` may remain implemented, but it is outside the active homepage contract.
-
 ## 26. Shared Dashboard Table Readability Spec (2026-03-24)
 
 ### 26.1 Config contract
@@ -1518,41 +1195,6 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - limited font growth only
   - existing horizontal scroll containers remain valid
   - no separate mobile-only table rendering mode
-
-## 26. LOF Complete Removal Spec (2026-03-24)
-
-### 26.1 Scope rule
-- `LOF濂楀埄` is fully removed from the active repository/runtime surface in this round.
-- This round supersedes the earlier LOF homepage-cancellation-only approach.
-
-### 26.2 Required removals
-- Remove the LOF public route registration:
-  - `GET /api/market/lof-arbitrage`
-- Remove the LOF data-core action exposure:
-  - `lof-arbitrage` in `data_dispatch.py`
-- Remove active LOF dataset registration from server runtime.
-- Remove active LOF bootstrap/render logic from the dashboard bundle.
-- Remove active LOF config sections from `config.yaml`, including:
-  - runtime file key
-  - data-fetch plugin registration
-  - strategy registration
-  - LOF plugin tuning section
-  - LOF strategy section
-  - LOF presentation section
-- Remove retired implementation directories:
-  - `data_fetch/lof_arbitrage`
-  - `strategy/lof_arbitrage`
-
-### 26.3 Post-removal contract
-- Homepage visible root tabs remain:
-  - `cb-arb`
-  - `ah`
-  - `ab`
-  - `monitor`
-  - `dividend`
-  - `merger`
-- Unknown former LOF route access must fall back to the project's normal API 404 behavior.
-- No active code path may still request, preload, or dispatch LOF data.
 
 ## 27. Repository-local mini-SWE-agent Integration Spec (2026-03-24)
 
@@ -1962,7 +1604,7 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 ## 32. Core-table Concentration + Dividend Watchlist Merge Spec (2026-03-24)
 
 ### 32.1 Convertible volatility visibility rule
-- `buildConvertibleColumns()` keeps `volatility60 ?? annualizedVolatility` as the visible read path for `60鏃ユ尝鍔ㄧ巼`.
+- `buildConvertibleColumns()` keeps `volatility250 ?? volatility60 ?? annualizedVolatility` as the visible read path for `250日波动率`.
 - The field stays in the default main table instead of being pushed behind non-core trailing fields.
 - User-facing copy must describe this field as historical K-line real-data volatility, not a fabricated placeholder metric.
 
@@ -2068,10 +1710,8 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 ## 33. DB-authoritative Convertible Volatility Spec (2026-03-24)
 
 ### 33.1 Volatility sample rule
-- `volatility20` uses the latest `20` close-to-close log returns.
-- `volatility60` uses the latest `60` close-to-close log returns.
-- `volatility120` uses the latest `120` close-to-close log returns.
-- Therefore the read path must load at least `121` closes for the largest current window.
+- `volatility250` uses the latest `250` close-to-close log returns from real `后复权` daily history.
+- Therefore the read path must load at least `251` closes for the active current window.
 
 ### 33.2 Database authority rule
 - The visible convertible-bond volatility fields are calculated from `runtime_data/shared/stock_price_history.db`.
@@ -2099,7 +1739,7 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 ## 35. Convertible Volatility Percent Display Spec (2026-03-24)
 
 ### 35.1 Payload unit rule
-- `volatility60` and `annualizedVolatility` remain ratio-form numeric fields in the payload.
+- `volatility250` and `annualizedVolatility` remain ratio-form numeric fields in the payload.
 - Example: `0.3491101749` represents `34.91101749%`.
 
 ### 35.2 Front-end display rule
@@ -2108,7 +1748,7 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 
 ### 35.3 Coverage rule
 - This rule applies to:
-  - the convertible-bond `60鏃ユ尝鍔ㄧ巼` table column
+  - the convertible-bond `250日波动率` table column
   - the bottom real-example note built from the same row payload
 
 ## 36. Scheduled Push Truth Recovery Spec (2026-03-24)
@@ -2202,7 +1842,8 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 - bootstrap seeds the monitored list silently and must not emit historical buy alerts
 
 ### 32.4 Runtime-state contract
-- independent state file: untime_data/shared/cb_discount_strategy_state.json
+- independent state file: 
+untime_data/shared/cb_discount_strategy_state.json
 - minimum persisted fields:
   - monitored bond map/list
   - prior buy-zone state
@@ -2257,6 +1898,48 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 
 ### 33.1 Scope
 - This round adds a new independent module only:
+
+## 65. Convertible Discount Push Session Spec (2026-03-27)
+
+### 65.1 Session gate
+- `tradingDaysOnly = true` means the module only runs on Shanghai weekday `1..5`.
+- `sessionWindows` defaults to:
+  - `09:30-11:30`
+  - `13:00-15:00`
+- A discount push is eligible only when current Shanghai time falls inside one of the
+  configured session windows.
+- `15:00+` is outside the discount-push session and must suppress both timed-monitor and
+  instant buy/sell sends.
+
+### 65.2 Push-lane separation
+- Timed monitor-list push:
+  - keeps using `monitorSessionTimes`
+  - due slots are filtered by the active session windows
+  - each slot may send at most once per date
+- Instant push:
+  - buy signal is emitted only on buy-zone crossing during an active session window
+  - sell signal is emitted only on sell-zone crossing during an active session window
+- A shared scheduler tick may call both checks in one pass, but the implementation must
+  preserve separate runtime timestamps and separate markdown titles for:
+  - buy
+  - sell
+  - monitor
+
+### 65.3 Config contract
+- `strategy.convertible_bond.discount_strategy` additionally preserves:
+  - `trading_days_only`
+  - `session_windows`
+  - `monitor_session_times`
+- Invalid or empty `session_windows` must fall back to the default A-share windows above.
+
+### 65.4 Dashboard status contract
+- `GET /api/push/config` discount-strategy status must additionally expose:
+  - `tradingDaysOnly`
+  - `sessionWindows`
+  - `monitorSessionTimes`
+- Dashboard wording must distinguish:
+  - “监控时点” for the timed monitor list
+  - “即时时段” for buy/sell zone-crossing evaluation
   - `data_fetch/cb_rights_issue`
   - `strategy/cb_rights_issue`
   - dashboard `可转债抢权配售` page
@@ -2302,7 +1985,7 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - force-full path is supported
   - latest trading-day row must be appended/updated daily
 - Read rule:
-  - `60日波动率` requires at least `61` closes from this dedicated DB
+  - `250日波动率` requires at least `251` closes from this dedicated DB
   - the DB is used for volatility only and not for strike-reference override
   - if rows are still insufficient after sync, the feature row remains non-eligible
 
@@ -2380,7 +2063,7 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - `requiredFunds`
   - `optionStrikePrice`
   - `optionQuantity`
-  - `volatility60`
+  - `volatility250`
   - `treasuryYield10y`
   - `optionUnitValue`
   - `expectedProfit`
@@ -2570,14 +2253,13 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - table filtering must not trigger panel re-render
 - On `compositionend`, the final committed text must trigger the normal filter render exactly once.
 
-## 36. Convertible Strike-price Simplification Spec (2026-03-25)
+## 36. Convertible Strike-price Simplification + Call-spread Pricing Spec (2026-03-25, amended 2026-03-30)
 
 ### 36.1 Scope
-- This round changes only the strike-price rule inside convertible theoretical pricing.
+- This round changes the strike-price rule and the option-leg formula inside convertible theoretical pricing.
 - This round does not change:
   - route shape
   - pure-bond source truth rule
-  - branch rule for redeem-trigger handling
 
 ### 36.2 Call-strike rule
 - In `_build_theoretical_metrics(...)`, when `convertPrice > 0`:
@@ -2585,15 +2267,25 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - `callStrike = convertPrice`
 - The old derived-strike rule is removed:
   - `max(bondValue / optionQty, convertPrice)` is no longer allowed
+- This section is superseded by section 95 on 2026-03-30 and is no longer the live rule.
 
-### 36.3 Pricing branch rule
-- Keep the existing branch:
-  - if `stockPrice < redeemTriggerPrice`, theoretical price = `bondValue + call`
-  - else theoretical price = `bondValue + call - put`
-- Only the strike-price input to the call-option leg changes in this round.
+### 36.3 Call-spread pricing rule
+- The old pricing branch is retired:
+  - `bond + call`
+  - `bond + call - put`
+- In `_build_theoretical_metrics(...)`, the live option leg must use:
+  - `longCallStrike = convertPrice`
+  - `shortCallStrike = redeemTriggerPrice`
+  - `longCallValue = americanCall(stockPrice, convertPrice, remainingYears, riskFreeRate, vol) * optionQty`
+  - `shortCallValue = americanCall(stockPrice, redeemTriggerPrice, remainingYears, riskFreeRate, vol) * optionQty`
+  - `callSpreadValue = max(longCallValue - shortCallValue, 0)`
+  - `theoreticalPrice = bondValue + callSpreadValue`
+- Missing any core real input, especially missing `redeemTriggerPrice`, must lead to truthful null `theoreticalPrice / theoreticalPremiumRate`.
 
 ### 36.4 Outward payload rule
 - `callStrike20 / callStrike60 / callStrike120` must equal the same row's `convertPrice` when `convertPrice` is valid.
+- `callOptionValue*` now means the net call-spread value.
+- `putOptionValue*` remains compatibility-only and must be `null`.
 
 ## 37. Convertible Sticky Bond-name Column Spec (2026-03-25)
 
@@ -2666,7 +2358,7 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - delete older rows beyond that limit
   - delete orphaned sync-state rows when a symbol no longer has price rows
 - The configured kept row count must stay safely above the live calculation floor for:
-  - `120日波动率` requiring `121` closes
+  - `250日波动率` requiring `251` closes
   - `ATR20` requiring `21` rich bars
   - `20日/5日平均成交额`
 
@@ -2677,7 +2369,7 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - keep only the most recent configured row count for each symbol
   - delete older rows beyond that limit
   - delete orphaned sync-state rows when a symbol no longer has price rows
-- The configured kept row count must stay safely above the live calculation floor for `60日波动率` requiring `61` closes.
+- The configured kept row count must stay safely above the live calculation floor for `250日波动率` requiring `251` closes.
 
 ### 36.6 Config contract
 - `config.yaml` adds the formal retention controls:
@@ -2773,477 +2465,2037 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
   - monthly partitions
   - multi-tier storage
 
-## 39. LOF Arbitrage Restoration Spec (2026-03-25)
+## 46. Midnight Push Time Normalization Spec (2026-03-26)
 
-### 39.1 Scope
-- This round restores `LOF套利` as an active homepage module.
-- This round adds:
-  - one new fetch plugin `data_fetch/lof_arbitrage`
-  - one new strategy plugin `strategy/lof_arbitrage`
-  - one new dashboard tab and page
-  - one new market API
-  - one new independent push module
+### 46.1 Scope
+- This round changes only timed-push Shanghai-time parsing and dedup alignment.
 - This round does not change:
-  - `AH / AB` formula semantics
-  - `转债套利` strategy semantics
-  - `事件套利` route shape
+  - push content
+  - push schedules
+  - push module selection
+  - non-push business modules
 
-### 39.2 Source-entry rule
-- The authoritative user-facing source-entry URLs are:
-  - `https://www.jisilu.cn/data/lof/#index`
-  - `https://www.jisilu.cn/data/qdii/#qdiie`
-  - `https://www.jisilu.cn/data/qdii/#qdiia`
-- The fetch plugin may resolve the real page-backed JSON list endpoints exposed by those pages:
-  - `GET /data/lof/index_lof_list/`
-  - `GET /data/qdii/qdii_list/E`
-  - `GET /data/qdii/qdii_list/A`
-- The fetch plugin must keep both:
-  - `sourcePageUrl`
-  - `sourceApiUrl`
-  in the outward source summary for diagnosis.
+### 46.2 Shared Shanghai-time rule
+- `shared/time/shanghai_time.js` remains the single authoritative Shanghai-time helper.
+- If locale formatting returns midnight hour as `24`, the helper must normalize:
+  - `24 -> 0`
+- The outward `getShanghaiParts(date)` contract therefore guarantees:
+  - `hour` is always in `0..23`
 
-### 39.3 Source access rule
-- Fetch priority is:
-  1. Firecrawl page read when enabled and configured
-  2. direct JSON / direct page fallback
-- Firecrawl configuration is read only from `config.yaml` and env placeholders.
-- Direct fallback remains production-safe and must work without Firecrawl.
-- Any one source-group failure degrades only that group and may not blank the whole page.
+### 46.3 Runtime dedup rule
+- `notification/scheduler/push_runtime_store.js` must not keep an independent,
+  differently-behaving Shanghai-hour parser.
+- Runtime-state Shanghai-date/hour extraction for ISO timestamps must reuse the
+  same normalized Shanghai-time helper as the scheduler path.
 
-### 39.4 Fetch normalization rule
-- `data_fetch/lof_arbitrage/source.py` is responsible for:
-  - reading the three source groups
-  - normalizing source rows into one internal row shape
-  - applying sample filtering
-  - hydrating external index / fx helper inputs when needed
-  - returning group-level source status
-- `data_fetch/lof_arbitrage/normalizer.py` only maps the fetch snapshot into bus records and must not contain strategy formulas.
-- Minimum normalized row fields include:
-  - `code`
-  - `name`
-  - `marketGroup`
-  - `price`
-  - `changeRate`
-  - `turnoverWan`
-  - `shareAmountWan`
-  - `shareAmountIncreaseWan`
-  - `nav`
-  - `navDate`
-  - `indexIncreaseRate`
-  - `indexName`
-  - `applyFee`
-  - `applyStatus`
-  - `redeemFee`
-  - `redeemStatus`
-  - `custodianFee`
-  - `sourcePageUrl`
-  - `sourceApiUrl`
-  - `raw`
+### 46.4 Scheduler rule
+- In `notification/scheduler/wecom_scheduler.js`:
+  - `nowMinutes = sh.hour * 60 + sh.minute`
+  - with the invariant that `sh.hour` can never be `24`
+- Therefore during Shanghai `00:00-00:59`:
+  - `nowMinutes` must stay in `0..59`
+  - slots like `08:00` and `14:30` must remain `not_due_yet`
 
-### 39.5 Filter rule
-- The fetch layer must keep only LOF rows:
-  - `qdii_list` rows require `lof_type == 'QDII'` or row name contains `LOF`
-  - `index_lof_list` rows are accepted as domestic index LOF candidates
-- The fetch layer must exclude rows whose `名称` contains `ETF`.
-- Rows filtered out by these rules must not enter the strategy layer.
+### 46.5 Affected push paths
+- The fix must protect all timed push flows that rely on Shanghai clock comparison:
+  - main summary push
+  - cb-rights-issue timed push
+  - LOF timed push
 
-### 39.6 Index / FX helper rule
-- The implementation should prefer a small shared helper set instead of many fragmented APIs.
-- Allowed helper pattern for this round:
-  - Tencent real-time quote family for index points and major FX
-  - source-provided index increase fields for `指数LOF / QDII亚洲`
-- `QDII欧美`:
-  - when an external index point + historical FX path is resolvable, compute the full approved formula
-  - when not resolvable but the source exposes a real estimate-change field, the row may be marked as source-estimate based instead of being dropped
-  - outward row must expose which basis was used via `calcStatus` / `calcMode`
-- The row must never pretend an unresolved external mapping is a full direct-index calculation.
+### 46.6 Verification samples
+- The implementation must satisfy:
+  - `2026-03-25T16:04:52.773Z -> { date: "2026-03-26", hour: 0, minute: 4 }`
+  - `2026-03-25T16:59:24.168Z -> { date: "2026-03-26", hour: 0, minute: 59 }`
+  - `2026-03-25T17:00:24.168Z -> { date: "2026-03-26", hour: 1, minute: 0 }`
 
-### 39.7 Strategy rule
-- `strategy/lof_arbitrage/service.py` is responsible for:
-  - IOPV calculation
-  - premium-rate calculation
-  - limited / unlimited pool classification
-  - push-facing row shaping
-- Premium formula is fixed:
-  - `premiumRate = (iopv / price) - 1`
-- `QDII欧美` direct calculation path:
-  - `iopv = nav_t2 * (currentIndex / closeIndexT2) * (currentFx / closeFxT2)`
-- `指数LOF / QDII亚洲` calculation path:
-  - `iopv = nav_t1 * (1 + indexIncreaseRate) * (currentFx / closeFxT1)`
-- `currentFx / closeFxT*` defaults to `1` only for RMB-denominated domestic index rows.
-- Strategy must expose at least:
-  - `iopv`
-  - `premiumRate`
-  - `calcStatus`
-  - `calcMode`
-  - `timeNote`
-  - `limitedMonitorEligible`
-  - `unlimitedMonitorEligible`
+### 46.7 Regression boundary
+- Existing push runtime state shape remains compatible.
+- Existing push-config API routes remain unchanged.
+- Existing scheduler tick frequency remains `60s`.
 
-### 39.8 Pool rule
-- `limitedMonitorEligible` requires:
-  - limited apply status detected
-  - limited amount < `100000`
-  - `premiumRate > 0.01`
-  - `turnoverWan > 100`
-- `unlimitedMonitorEligible` requires:
-  - no limited apply status
-  - `premiumRate > 0.05` or `premiumRate < -0.05`
-  - `turnoverWan > 100`
-- Pool membership is derived each refresh and not manually edited.
+## 47. Refresh Reliability And Status Truthfulness Spec (2026-03-26)
 
-### 39.9 Public API rule
-- Add route:
-  - `GET /api/market/lof-arbitrage`
-- Response data shape includes at least:
-  - `groups`
-  - `defaultGroup`
-  - `rows`
-  - `limitedMonitorRows`
-  - `unlimitedMonitorRows`
-  - `sourceSummary`
-  - `rebuildStatus`
-- Add routes:
-  - `GET /api/push/lof-arbitrage-config`
-  - `POST /api/push/lof-arbitrage-config`
-
-### 39.10 Runtime / dataset rule
-- `data_dispatch.py` adds action:
-  - `lof-arbitrage`
-- `start_server.js` adds dataset key:
-  - `lofArb`
-- The dataset keeps its own runtime store for:
-  - source rows
-  - limited pool rows
-  - unlimited pool rows
-  - last rebuild metadata
-  - source summary
-
-## 40. LOF Premium Formula And Dense Table Spec (2026-03-25)
-
-### 40.1 Strategy formula revision
-- `strategy/lof_arbitrage/service.py` must revise the outward premium calculation to:
-  - `premiumRate = (price / iopv - 1) * 100`
-- The helper still returns `None` when:
-  - `iopv` is missing
-  - `price` is missing
-  - `iopv <= 0`
-- The strategy must continue to calculate `iopv` first and only then derive `premiumRate`.
-- `limitedMonitorEligible` and `unlimitedMonitorEligible` keep evaluating the outward `premiumRate` field after the formula change.
-
-### 40.2 Dashboard table revision
-- `presentation/dashboard/dashboard_page.js` must stop attaching an LOF detail-row renderer to `renderPaginatedTable()`.
-- The LOF main table remains the only primary row-reading surface.
-- The LOF main table may merge paired fields into compact multi-line cells, but must still visibly expose:
-  - `code`
-  - `name`
-  - `price`
-  - `changeRate`
-  - `turnoverWan`
-  - `shareAmountWan`
-  - `shareAmountIncreaseWan`
-  - `nav`
-  - `navDate`
-  - `indexIncreaseRate`
-  - `indexName`
-  - `applyFee`
-  - `applyStatus`
-  - `redeemFee`
-  - `redeemStatus`
-  - `custodianFee`
-  - `iopv`
-  - `premiumRate`
-- The compact table still uses shared:
-  - search
-  - sorting
-  - pagination
-  - horizontal overflow container
-
-### 40.3 Presentation-density rule
-- The LOF table may use a smaller module-specific minimum width than the generic premium tables if needed for page fit.
-- Module-specific compact styling must stay local to the LOF table kind and must not globally shrink unrelated tables.
-
-## 41. LOF NAV-date Priority And Post-close Fix Spec (2026-03-25)
-
-### 41.1 Strategy truth correction
-- `strategy/lof_arbitrage/service.py` must treat the currently deployed LOF premium meaning as:
-  - `premiumRate = (iopv / price - 1) * 100`
-- The previous `price / iopv - 1` document text is superseded in this round and must not drive any active code path.
-
-### 41.2 Same-day NAV shortcut
-- The strategy layer must add a same-day NAV branch before the old T-1 / T-2 extrapolation branches:
-  - input condition:
-    - `navDate == priceDate`
-    - `nav > 0`
-    - source `nav_discount_rt` is present
-  - output rule:
-    - outward `iopv` uses the same-day `nav`
-    - outward `premiumRate` is derived from the source `nav_discount_rt` with the sign converted into the module’s outward premium meaning
-    - outward `calcMode` identifies same-day NAV direct-read mode
-    - outward `calcStatus` explains that same-day NAV already exists and no longer needs extrapolation
-- This same-day NAV branch applies to:
-  - `index`
-  - `asia`
-  - `europe_us`
-
-### 41.3 Europe/US NAV-date aligned extrapolation
-- When `marketGroup == europe_us` and the row still needs extrapolation:
-  - the strategy must determine which stored index / FX anchor matches `navDate`
-  - preferred order:
-    - anchor whose date exactly equals `navDate`
-    - otherwise keep the existing truthful fallback order
-- The implementation may use:
-  - `baseIndexDate / baseIndexValue`
-  - `midIndexDate / midIndexValue`
-  - `baseFxDate / baseFxValue`
-  - `midFxDate / midFxValue`
-  - any other already-fetched real field already present in the normalized row
-- The implementation must not invent a missing `T-1` or `T-2` anchor.
-
-### 41.4 Pool exclusion rule
-- Add helper-level pool exclusion for paused subscription rows:
-  - if `applyStatus` expresses `暂停申购`
-  - then `limitedMonitorEligible = false`
-  - and `unlimitedMonitorEligible = false`
-- The row still remains in:
-  - `rows`
-  - active market subtab table rendering
-- Because the row cannot enter either pool, the existing LOF push service will naturally stop treating it as a new pool-entry candidate.
-
-### 41.5 Data contract additions
-- The normalized LOF row should expose enough truthful source context for the new strategy branch, including at least:
-  - `priceDate`
-  - source `nav_discount_rt` normalized for strategy use
-- These fields may stay internal helper fields and do not need to become required visible columns.
-
-## 42A. LOF Europe/US External Market API Enrichment Spec (2026-03-25)
-
-### 42.1 Scope
-- This round changes only the LOF fetch/helper path for `QDII欧美`.
+### 47.1 Scope
+- This round changes only:
+  - dataset refresh orchestration
+  - dashboard resource-status truthfulness
+  - cbArb intraday refresh critical path
+  - daily-sync completion semantics
+  - Shanghai midnight normalization reuse
 - This round does not change:
-  - LOF source list URLs
-  - LOF dashboard layout
-  - LOF push schedule
-  - AH / AB / convertible logic
+  - market formulas
+  - table schema
+  - push message content
 
-### 42.2 Config contract
-- `config.yaml > data_fetch.plugins.lof_arbitrage.external_market_api` adds:
-  - `enabled`
-  - `provider`
-  - `request_timeout_ms`
-  - `current_quote_url`
-  - `history_quote_url`
-  - `index_symbol_map.cal_index_id`
-  - `index_symbol_map.index_name`
-  - `fx_symbol_map`
-- Phase-1 provider is `stooq`.
+### 47.2 cbArb refresh-path rule
+- `start_server.js > DATASETS.cbArb.fetch` must not require heavy stock-history maintenance during ordinary intraday reads.
+- Ordinary `cbArb` refresh path is fixed to:
+  - fetch latest convertible-bond dataset
+  - reuse already-maintained history database for valuation inputs
+  - persist last-good dataset cache on success
+- Heavy maintenance path remains available only for:
+  - explicit sync task
+  - daily sync
+- Therefore:
+  - `GET /api/market/convertible-bond-arbitrage`
+  - `GET /api/market/convertible-bond-arbitrage?force=1`
+  must not implicitly run `sync-cb-stock-history` first.
 
-### 42.3 Fetch-helper responsibility
-- `data_fetch/lof_arbitrage/source.py` remains the only place that may talk to the external helper API in this round.
-- The helper layer may enrich only helper inputs, not strategy outputs:
-  - `currentIndexValue`
-  - `baseIndexValue`
-  - `currentFxRate`
-  - `baseFxValue`
-  - matching `*Date / *Source / *Symbol` diagnosis fields when useful
+### 47.3 Dataset cache-status rule
+- `withCachedDatasetMeta()` may continue to mark a returned payload as cache-backed.
+- But `GET /api/dashboard/resource-status` must no longer derive `servedFromCache` from “cache file exists”.
+- `readCachedDatasetStatus(resourceKey)` must expose freshness truth using at least:
+  - `updateTime`
+  - `cacheTime`
+  - `refreshing`
+  - `servedFromCache`
+- `servedFromCache` in resource-status must mean:
+  - the current outward dataset is a fallback stale snapshot because refresh failed or no fresh in-memory success exists
+- `servedFromCache = false` must remain valid when:
+  - the latest successful dataset was built normally
+  - and then persisted into the cache file as the standard storage mechanism
 
-### 42.4 Mapping rule
-- Exact external symbol resolution priority is:
-  1. `calIndexId`
-  2. `indexName`
-  3. existing live token field only when an explicit config mapping exists
-- FX symbol resolution is currency-based.
-- If no exact configured mapping exists, the row must skip the external exact path instead of guessing.
+### 47.4 Dashboard header-copy rule
+- `presentation/dashboard/dashboard_page.js` must treat the new resource-status semantics as the single source of truth for freshness text.
+- For critical market modules, header copy must follow:
+  - `refreshing = true` -> background revalidation text
+  - `servedFromCache = true` -> stale fallback text
+  - otherwise -> real-time connected text
+- Fresh same-day datasets must no longer render stale-cache copy only because they were read from persisted cache.
 
-### 42.5 Provider rule
-- For `stooq` current quote:
-  - use `current_quote_url` with one symbol per request
-  - parse the returned latest price
-- For `stooq` nav-date-aligned history:
-  - use `history_quote_url`
-  - request `d1 = d2 = navDate`
-  - use the returned `Close` as the aligned base value
-- The helper must tolerate provider miss / timeout per row and degrade without taking down the whole LOF dataset.
+### 47.5 Daily-sync success rule
+- In `start_server.js > runDailySync()`:
+  - `lastDailySyncDate` may be written only after all required daily-sync dataset refreshes succeeded
+- `Promise.allSettled()` results must be inspected explicitly.
+- If one or more required daily-sync datasets fail:
+  - `lastDailySyncDate` must remain unchanged
+  - failure details should remain visible in logs
+- `lastPremiumHistorySyncDate` keeps its own success gate and must not be conflated with dataset daily-sync success.
 
-### 42.6 Enrichment rule
-- External enrichment is attempted only for `marketGroup == europe_us`.
-- External index enrichment is triggered when either is missing:
-  - `currentIndexValue`
-  - `baseIndexValue`
-- External FX enrichment is triggered when either is missing:
-  - `currentFxRate`
-  - `baseFxValue`
-- When a missing field is filled from the provider:
-  - keep the original field names used by the strategy
-  - set aligned `baseIndexDate / baseFxDate` to the real provider date when the source field was empty
-- Existing source/Tencent values remain preferred when already present; the external path fills only the gaps.
+### 47.6 Shanghai midnight reuse rule
+- Cloud runtime must reuse the normalized midnight rule from `shared/time/shanghai_time.js`.
+- The shared helper contract is:
+  - outward `hour` is always `0..23`
+  - `24:xx` locale output is normalized to `00:xx`
+- Timed push paths must keep reading the shared helper so scheduler decisions and runtime dedup use the same hour semantics.
 
-### 42.7 Truthful fallback rule
-- Rows with an exact external symbol may enter the full `T-2 / navDate-aligned` IOPV path after enrichment.
-- Rows without an exact external symbol keep the pre-existing truthful fallback order:
-  - source same-day NAV direct-read when available
-  - source estimate path when available
-  - otherwise `missing_inputs`
-- Proxy ETF / guessed symbol is not allowed to silently masquerade as an exact index series in this round.
+### 47.7 Verification rule
+- Runtime verification for this round must cover:
+  - `exchange-rate / ipo / bonds / ah / ab / lof-arbitrage / cb-rights-issue / event-arbitrage` force refresh success
+  - `convertible-bond-arbitrage?force=1` same-day success
+  - `resource-status` freshness semantics after a successful refresh
+  - midnight time normalization samples around `00:xx`
 
-### 42.8 Diagnosis rule
-- `sourceSummary` may expose external-helper usage counts for diagnosis.
-- The outward dataset `source` string must reflect the added provider when the external helper is enabled, for example `jisilu+tencent+stooq`.
-
-## 42. LOF NAV-date Formula Split And Europe External-anchor Spec (2026-03-25)
-
-### 42.1 Outward premium rule
-- `strategy/lof_arbitrage/service.py` keeps:
-  - `premiumRate = (iopv / price - 1) * 100`
-
-### 42.2 Index / Asia branch rule
-- For `marketGroup in {"index", "asia"}`:
-  - if `navDate == priceDate`:
-    - outward `iopv = nav`
-    - no extra index / FX extrapolation is applied
-    - outward `calcMode` must identify same-day direct NAV mode
-  - otherwise:
-    - outward `iopv = nav * (1 + indexIncreaseRate / 100) * fx_ratio`
-- `indexIncreaseRate` in this branch continues to use the normalized Jisilu source field directly.
-
-### 42.3 Europe branch rule
-- For `marketGroup == "europe_us"`:
-  - the strategy must estimate from the latest published NAV date rather than a hardcoded relative day label
-  - if `navDate` maps to the stored `base*Date/base*Value` anchor:
-    - use that anchor
-  - if `navDate` maps to the stored `mid*Date/mid*Value` anchor:
-    - use that anchor
-  - current index / current FX values must come from live external quote fetching when available
-  - if the current external quote is unavailable, the strategy may degrade to the existing truthful source-estimate branch
-- The Europe branch must therefore support both:
-  - `T-2 NAV + today / T-2 anchor`
-  - `T-1 NAV + today / T-1 anchor`
-
-### 42.4 Source hydration rule
-- `data_fetch/lof_arbitrage/source.py` must keep exposing the helper fields required by the split formula, including at least:
-  - `priceDate`
-  - `navDate`
-  - `baseIndexDate`
-  - `baseIndexValue`
-  - `midIndexDate`
-  - `midIndexValue`
-  - `baseFxDate`
-  - `baseFxValue`
-  - `midFxDate`
-  - `midFxValue`
-  - `currentIndexValue`
-  - `currentFxRate`
-- The source layer may additionally expose truthful fallback live values already present in Jisilu helper text, but must still prefer external live quotes first.
-
-### 42.5 Monitor exclusion rule
-- Pool eligibility stays false when:
-  - `applyStatus` contains `暂停申购`
-- This rule applies before:
-  - limited-pool threshold checks
-  - unlimited-pool threshold checks
-
-## 43. LOF Commodity-source Merge Spec (2026-03-25)
-
-### 43.1 Internal source contract
-- `data_fetch/lof_arbitrage/source.py` must extend the current Jisilu source map with one additional internal fetch-only source:
-  - `commodity`
-- Its truthful source endpoints are:
-  - page `https://www.jisilu.cn/data/qdii/#qdiic`
-  - api `https://www.jisilu.cn/data/qdii/qdii_list/C`
-
-### 43.2 Outward grouping rule
-- `commodity` is not a new outward LOF market group.
-- Normalized rows fetched from `commodity` must be emitted with:
-  - outward `marketGroup = "europe_us"`
-  - outward `groupLabel = "QDII欧美"`
-- The row must still preserve its own source trace fields:
-  - `sourcePageUrl`
-  - `sourceApiUrl`
-
-### 43.3 Summary aggregation rule
-- The fetch layer's `sourceSummary.groups.europe_us` must aggregate:
-  - Europe/US source counts
-  - plus commodity-source counts
-- The aggregation must apply to at least:
-  - `visibleCount`
-  - `allCount`
-  - `guestLimited`
-  - `warn`
-- Existing outward groups remain exactly:
-  - `index`
-  - `europe_us`
-  - `asia`
-
-### 43.4 Regression boundary
-- `presentation/dashboard/dashboard_page.js` does not need a new LOF subtab for this round.
-- Existing `strategy/lof_arbitrage/service.py` logic continues to consume the normalized outward rows without any non-LOF side effects.
-
-## 44. LOF Premium Price-over-IOPV Spec (2026-03-26)
-
-### 44.1 Outward premium rule
-- `strategy/lof_arbitrage/service.py` must calculate:
-  - `premiumRate = (price / iopv - 1) * 100`
-- If `price` or `iopv` is missing or non-positive:
-  - `premiumRate = None`
-
-### 44.2 Boundary rule
-- This round does not change any `iopv` derivation branch.
-- The switch applies only after `iopv` is determined.
-- `limitedMonitorEligible` and `unlimitedMonitorEligible` continue to read the single outward `premiumRate` field after this formula update.
-
-### 44.3 Note synchronization rule
-- LOF explanatory text in:
-  - `LOF套利策略.md`
-  - `config.yaml`
-  must describe the same `现价 / IOPV - 1` rule as the runtime implementation.
-
-### 39.11 Push rule
-- Add independent notification module:
+### 47.8 Module-local push runtime self-healing
+- `notification/scheduler/module_push_runtime_store.js` must reuse the same-day
+  slot-sanitizing rule that `notification/scheduler/push_runtime_store.js` already
+  applies to the main summary scheduler.
+- The module-local runtime store must expose and internally use:
+  - latest module success ISO
+  - Shanghai same-day parts parsed from ISO timestamps
+  - current-day scheduled-slot sanitation before scheduler decisions
+- Sanitizing rule for the current Shanghai date:
+  - keep only slots that still exist in the configured schedule
+  - if there is no same-day module success, clear all persisted current-day slots
+  - if there is a same-day module success, keep only slots whose configured minute
+    is not later than the latest same-day success minute
+- This hardened module-runtime contract must be consumed by:
+  - `notification/cb_rights_issue/service.js`
   - `notification/lof_arbitrage/service.js`
-  - `notification/styles/lof_arbitrage_markdown.js`
-- Push config uses the same module-push-config/runtime infrastructure as `cb_rights_issue`.
-- Default schedule is:
-  - `13:30`
-  - `14:00`
-  - `14:30`
-- Instant push is triggered when a row newly enters either pool compared with the stored seen-map.
-- Scheduled push sends the full current two-pool list.
+- `notification/lof_arbitrage/service.js` must emit diagnosis logs for:
+  - sanitized dirty records
+  - `not_due_yet`
+  - `already_sent`
+  - send success / failure
 
-### 39.12 Dashboard rule
-- `dashboard_template.html` adds one new root tab:
-  - `data-tab="lof-arb"`
-  - one new panel `panel-lof-arb`
-- `dashboard_page.js` adds:
-  - `lofArb` endpoint and resource state
-  - root-tab loading and rendering
-  - one internal LOF view switcher:
-    - `index`
-    - `europe_us`
-    - `asia`
-- The top page area renders only:
-  - limited-monitor card
-  - unlimited-monitor card
-- The main table uses the shared paginated table renderer with `tableKind="lof"`.
-- The main table keeps 50-row pagination and shared search behavior.
-- The page footnote uses the shared module-note renderer with module key `lofArb`.
+## 48. Dashboard Dual-theme Presentation Spec (2026-03-27)
 
-### 39.13 Config contract
+### 48.1 Scope
+- This round changes only the dashboard presentation theme layer.
+- This round does not change:
+  - business data contracts
+  - API paths
+  - dataset refresh logic
+  - push behavior
+  - scheduler behavior
+  - table schema
+  - module/tab structure
+
+### 48.2 Config contract
 - `config.yaml` adds:
-  - plugin registration entries for `lof_arbitrage`
-  - source page URLs
-  - direct JSON fallback URLs
-  - Firecrawl config
-  - refresh interval
-  - default group
-  - thresholds for both pools
-  - default push times
-  - dashboard module notes for `lofArb`
+  - `presentation.dashboard_theme`
+- Supported values are:
+  - `classic`
+  - `clean_data`
+- Invalid or missing values must fall back to:
+  - `classic`
 
-### 39.14 Truth / failure rule
-- Missing Firecrawl credentials is not an error if direct fallback succeeds.
-- Missing direct source or missing essential source fields returns a truthful module error.
-- Missing enough real inputs for one row:
-  - the row stays visible when possible
-  - `iopv` / `premiumRate` stay empty
-  - `calcStatus` explains the real reason
-- No fake placeholder result is allowed for missing IOPV rows.
+### 48.3 UI-config contract
+- `GET /api/dashboard/ui-config` keeps returning:
+  - `tableUi`
+  - `autoRefresh`
+  - `moduleNotes`
+- It may additionally return:
+  - `dashboardTheme`
+- Existing callers that ignore the new field must continue to work.
+
+### 48.4 Server normalization rule
+- `start_server.js` must normalize the configured dashboard theme once during startup.
+- The normalized theme value must be the single source of truth exposed to the
+  dashboard UI-config route.
+- Theme normalization must not read runtime user state files; it is a static
+  presentation config.
+
+### 48.5 Frontend apply rule
+- `presentation/dashboard/dashboard_page.js` must:
+  - normalize the incoming theme value
+  - apply it to the root document via one stable attribute
+- Recommended outward contract:
+  - `document.documentElement.dataset.dashboardTheme = <theme>`
+- Missing / invalid payload must fall back to:
+  - `classic`
+
+### 48.6 CSS implementation rule
+- `presentation/templates/dashboard_template.html` must keep the existing visual
+  rules as the `classic` baseline.
+- `clean_data` must be implemented as CSS-variable overrides plus a small number of
+  selector-level visual overrides only.
+- This round must not introduce:
+  - a duplicate template
+  - a second HTML entry page
+  - duplicated module markup for theming
+
+### 48.7 Visual behavior contract
+- `clean_data` should shift the dashboard toward a simpler data-terminal look:
+  - lighter neutral page background
+  - flatter white/light panels
+  - calmer steel/blue accent colors
+  - clearer table separators and reduced glow
+- The following must remain unchanged across themes:
+  - root tabs and subtab order
+  - module titles
+  - table columns and values
+  - sorting/search/pagination behavior
+  - push-setting form semantics
+  - auto-refresh behavior
+
+### 48.8 Rollback rule
+- Switching `presentation.dashboard_theme` from `clean_data` back to `classic`
+  must be sufficient to restore the prior appearance.
+- No code rollback is required for a visual rollback in this round.
+
+## 49. Dashboard Footer-note And Compact-label Spec (2026-03-28)
+
+### 49.1 Scope
+- This round changes only dashboard presentation copy/layout density.
+- This round does not change:
+  - API paths
+  - payload semantics
+  - table schema
+  - dataset refresh logic
+  - push behavior
+  - scheduler behavior
+
+### 49.2 Shared footer-note rule
+- `presentation/templates/dashboard_template.html` must provide one shared page-bottom
+  note container outside the tab panels.
+- `presentation/dashboard/dashboard_page.js` must render only the active tab's note
+  into that shared footer container.
+- Module panels must stop rendering inline `renderModuleFootnote(...)` cards.
+
+### 49.3 Note content rule
+- The footer-note content still reuses the existing module-note payload:
+  - `dataSources`
+  - `formulas`
+  - `strategyNotes`
+- The note card title may be shortened, but the three section meanings remain unchanged.
+
+### 49.4 Root-tab compact rule
+- Desktop root tabs must keep the same tab order and count.
+- Visual compaction should use:
+  - shorter labels
+  - smaller height
+  - smaller padding
+  - smaller font size
+- On desktop-width layouts, the preferred rendering remains a single row.
+- Mobile responsive fallback may still wrap into multiple rows.
+
+### 49.5 Visible label-shortening rule
+- Dashboard visible labels may be shortened toward data-page wording, for example:
+  - `转债套利 -> 转债`
+  - `AH溢价 -> AH`
+  - `AB溢价 -> AB`
+  - `LOF套利 -> LOF`
+  - `监控套利 -> 监控`
+  - `分红提醒 -> 分红`
+  - `事件套利 -> 事件`
+  - `可转债抢权配售 -> 抢权`
+- List-area labels may also be shortened, for example:
+  - `主表 -> 列表`
+  - `监控列表 -> 入池列表`
+  - `固定来源结构化信息 -> 来源列表`
+  - `今日登记日提醒 -> 今日登记`
+  - `分红观察名单 -> 观察列表`
+  - `前三 / 倒数前三 -> 前3 / 后3`
+- These changes are display-copy-only and must not alter business meaning.
+
+### 49.6 Dense summary rule
+- Summary-card grids should prefer tighter multi-column layouts on desktop.
+- CSS may switch from fixed `2/3` columns to auto-fit compact columns when doing so
+  reduces vertical waste without hiding data.
+- Summary cards should use reduced spacing and shorter titles, but still keep the same
+  underlying summary data.
+
+### 49.7 Regression boundary
+- Search, sorting, pagination, subtab order, and push-setting interaction remain unchanged.
+- The active module's data note remains available, only its placement changes to the page footer.
+
+## 50. Table-header Compaction And Width-tightening Spec (2026-03-28)
+
+### 50.1 Scope
+- This round changes only dashboard table copy and width density.
+- This round does not change:
+  - root module names
+  - module/tab order
+  - API paths
+  - payload semantics
+  - sorting/searching/pagination behavior
+
+### 50.2 Root-name preservation rule
+- Root tab labels and module titles must keep the original business names:
+  - `转债套利`
+  - `AH溢价`
+  - `AB溢价`
+  - `LOF套利`
+  - `监控套利`
+  - `分红提醒`
+  - `事件套利`
+  - `可转债抢权配售`
+- Any density optimization in this round must happen below the module title layer.
+
+### 50.3 Column-label compaction rule
+- `presentation/dashboard/dashboard_page.js` may shorten visible column labels so long
+  as each label still clearly maps to the same field semantics.
+- Typical compaction patterns include:
+  - `代码 / 名称 / 现价 / 涨幅`
+  - `正股码 / 正股 / 转股值 / 转股溢`
+  - `分位 / 区间 / 收益率 / 公告`
+- The implementation must not hide fields merely to simulate density.
+
+### 50.4 Width-tightening rule
+- `presentation/templates/dashboard_template.html` may reduce shared width constraints for:
+  - code columns
+  - numeric columns
+  - percent columns
+  - date columns
+  - sticky columns in dense tables
+- Dense table kinds such as `convertible / premium / merger / lof` may also reduce
+  their minimum widths when doing so does not remove fields.
+
+### 50.5 Regression boundary
+- No table field is removed in this round.
+- No field is moved into a hidden detail-only path in this round.
+- Existing row data, sort keys, and search keys remain unchanged.
+
+## 50. Convertible Premium-only Truthfulness Spec (2026-03-28)
+
+### 50.1 Scope
+- This round changes only the convertible-bond live source truthfulness, outward
+  premium semantics, dashboard convertible presentation, and related push wording.
+- This round does not change:
+  - AH / AB / LOF / cb-rights-issue / merger formulas
+  - non-convertible tables
+  - non-convertible push schedules
+
+### 50.2 Live field truth rule
+- In `data_fetch/convertible_bond/source.py`, the following fields are live
+  price-derived fields:
+  - `stockPrice`
+  - `convertPrice`
+  - `convertValue`
+  - `premiumRate`
+- These fields must not fall back to `previous_row` cached values during ordinary
+  realtime assembly.
+- `convertValue` must not trust unreliable upstream bulk fields such as stale
+  `TRANSFER_VALUE` when both `stockPrice` and `convertPrice` are available.
+
+### 50.3 Convertible value formula rule
+- Source-layer final formula is fixed to:
+  - `convertValue = stockPrice * 100 / convertPrice`
+- Recompute rule:
+  - whenever `stockPrice > 0` and `convertPrice > 0`, the final outward
+    `convertValue` must be recomputed from that formula
+  - this recomputed value overrides any conflicting upstream realtime/bulk value
+
+### 50.4 Premium formula rule
+- Source-layer final premium formula is fixed to:
+  - `premiumRate = (price / convertValue - 1) * 100`
+- Recompute rule:
+  - whenever `price > 0` and recomputed `convertValue > 0`, final outward
+    `premiumRate` must be recomputed from the formula above
+
+### 50.5 Slow-cache boundary rule
+- The following may still reuse last-good or history-backed cache paths:
+  - volatility fields
+  - ATR-derived fields
+  - turnover-average fields
+  - pure-bond-value snapshots
+  - static metadata supplements
+- These slow-cache paths must not overwrite the final live values of:
+  - `stockPrice`
+  - `convertPrice`
+  - `convertValue`
+  - `premiumRate`
+
+### 50.6 Premium-monitor strategy rule
+- In `strategy/convertible_bond/service.js`, the outward monitor lane becomes
+  premium-only:
+  - buy zone active when `premiumRate < -2`
+  - sell zone active when `premiumRate > -0.5`
+- Runtime state may keep the existing storage shape if needed, but outward wording
+  must reflect `低溢价监控` instead of `折价监控`.
+- Outward summary/push payload no longer needs to include:
+  - `discountRate`
+  - `weightedDiscountRate`
+
+### 50.7 Convertible page rule
+- In `presentation/dashboard/dashboard_page.js`:
+  - remove visible columns `折价率` and `加权折价率`
+  - keep `转股溢价率` as the single outward premium field
+  - top summary card replaces `折价监控` with a premium-based monitor card
+- Sticky-column contract becomes:
+  - sticky `序号`
+  - sticky `转债名称`
+  - `转债代码` remains non-sticky
+
+### 50.8 Public API shaping rule
+- In `start_server.js`, `CB_ARB_PUBLIC_ROW_KEYS` and shaped payloads must stop
+  exposing obsolete outward fields that the page no longer uses:
+  - `discountRate`
+  - `weightedDiscountRate`
+- The converted summary object returned with `cbArb` should use premium wording and
+  remain stable for the dashboard consumer.
+
+### 50.9 Verification rule
+- Concrete verification sample:
+  - code `118025`
+  - if `stockPrice = 106.02`
+  - and `convertPrice = 114.97`
+  - then `convertValue` must be about `92.215`
+- Post-deploy cloud verification must include:
+  - `GET /api/market/convertible-bond-arbitrage?force=1`
+  - dashboard convertible table sticky behavior
+  - premium-based push status wording
+
+### 50.10 Public force-refresh timeout rule
+- `config.yaml > data_fetch.plugins.convertible_bond.force_request_soft_timeout_ms`
+  defines the public-route soft timeout for `cbArb force` requests.
+- When:
+  - `key == cbArb`
+  - `force == true`
+  - a last-good cached payload exists
+  - and the refresh task exceeds the configured soft-timeout window
+- the public route may return:
+  - the latest last-good cached payload
+  - plus `servedFromCache = true`
+  - plus `refreshing = true`
+  - plus `forceAccepted = true`
+  - plus `forceRefreshDeferred = true`
+- The underlying refresh task must continue in background and update the cache on success.
+- This rule exists only to avoid public-proxy `504` while preserving the same real
+  refresh chain behind the scenes.
+
+### 50.11 Frozen-column correction + weighted-discount restore rule
+- `presentation/dashboard/dashboard_page.js`
+  - convertible main-table columns must be reordered so the only frozen columns are:
+    - `index`
+    - `bondName`
+  - `code` remains visible but must not be frozen and must not sit immediately after `bondName`
+  - `weightedDiscountRate` returns as an auxiliary visible strategy field
+  - `premiumRate` remains the primary outward truth field
+- `presentation/templates/dashboard_template.html`
+  - convertible sticky CSS must only reserve frozen offsets for:
+    - `col-index-sticky`
+    - `col-bond-sticky`
+  - `col-code-sticky` must no longer be active in the live contract
+- `strategy/convertible_bond/service.js`
+  - internal `discountRate = -premiumRate`
+  - `weightedDiscountRate = discountRate * atrCoefficient * sellPressureCoefficient * boardCoefficient`
+  - `weightedDiscountRate` is restored to strategy-enriched rows and monitor-summary rows
+  - raw `discountRate` may remain internal, but `premiumRate` stays the primary external pricing truth
+- `start_server.js`
+  - `CB_ARB_PUBLIC_ROW_KEYS` must include `weightedDiscountRate`
+  - public `cbArb` payload keeps `premiumMonitorSummary`, and its items may include `weightedDiscountRate`
+- Cloud verification must confirm:
+  - only `序号 + 转债名称` remain frozen
+  - `加权折价率` is visible again
+  - returned `weightedDiscountRate` is consistent with `-premiumRate`
+
+### 50.12 Convertible main-table compaction rule
+- `presentation/dashboard/dashboard_page.js > buildConvertibleColumns()` must shift
+  from a “show every auxiliary field” pattern to a compact key-metrics pattern.
+- The live visible convertible main table should prefer these compact cells:
+  - `转债价`: bond price + bond change percent
+  - `代码`: bond code only
+  - `正股`: stock name + stock code
+  - `正股价`: stock price + stock change percent
+  - `正股成交`: `stockAvgTurnoverAmount20Yi` primary + `stockAvgTurnoverAmount5Yi` secondary
+  - `转股价`
+  - `转股值`
+  - `转股溢`
+  - `加权折`
+  - `双低`
+  - `纯债价` (optional but still allowed)
+  - `理论溢`
+  - `剩余期`
+  - `规模`
+- The following fields remain backend-visible but must leave the main table:
+  - `listingDate`
+  - `convertStartDate`
+  - `maturityDate`
+  - `optionTheoreticalValue`
+  - `theoreticalPrice`
+- `remainingYears` becomes the single visible term field and should render as a compact
+  year-based value in the main table.
+- `theoreticalPremiumRate` becomes the only visible theoretical-pricing field in the main table.
+- The convertible search UI may stay active, but:
+  - it should render as one compact input line
+  - no standalone clear button
+  - no extra helper-text line
+- `renderPagination()` should stop emphasizing a separate `筛选后` phrase in the visible status text.
+
+## 52. LOF Nav-date-aligned RMB Index-change Spec (2026-03-28)
+
+### 52.1 Scope
+- This round changes only the outward meaning of the LOF page field currently shown as
+  `相关指数涨幅`.
+- This round does not change:
+  - the existing IOPV branch selection order
+  - LOF source URLs
+  - LOF monitor thresholds
+  - LOF push schedule
+
+### 52.2 Outward field rule
+- In `strategy/lof_arbitrage/service.py`, each outward LOF row must add:
+  - `navAlignedIndexChangeRate`
+- The field is the single live page meaning of `相关指数涨幅`.
+
+### 52.3 Formula rule
+- When both `nav > 0` and `iopv > 0`:
+  - `navAlignedIndexChangeRate = (iopv / nav - 1) * 100`
+- This is the outward rate consistent with:
+  - `iopv = nav * (1 + changeRate)`
+- For `same_day_nav_direct` rows:
+  - outward `navAlignedIndexChangeRate = 0`
+
+### 52.4 Semantics rule
+- `navAlignedIndexChangeRate` is always:
+  - relative to the row `navDate`
+  - RMB-priced after any required FX adjustment
+  - based on the final outward `iopv`, not on a raw upstream source field
+- Therefore:
+  - `指数LOF / QDII亚洲` rows both expose the same outward semantics
+  - the visible field reflects the combined result of index move and FX adjustment since `navDate`
+
+### 52.5 Raw-source boundary
+- Existing normalized `indexIncreaseRate` may remain in the backend row for diagnostics.
+- `presentation/dashboard/dashboard_page.js` must stop using raw `indexIncreaseRate`
+  as the visible `相关指数涨幅` field.
+- If `navAlignedIndexChangeRate` is unavailable:
+  - the page shows `--`
+  - it must not silently fall back to raw `indexIncreaseRate`
+
+### 52.6 Presentation rule
+- In `presentation/dashboard/dashboard_page.js > buildLofArbColumns()`:
+  - the `相关指数/涨幅` cell should sort and render by `navAlignedIndexChangeRate`
+  - the visible label may remain `相关指数/涨幅` or become a clearer variant such as
+    `相关指数/人民币涨幅`, but the semantics must follow this section
+
+### 52.7 Verification rule
+- For any row where `nav` and `iopv` are both present:
+  - visible `相关指数涨幅` must match `(iopv / nav - 1) * 100`
+- For same-day NAV rows:
+  - visible `相关指数涨幅` must be `0%`
+- Raw upstream `indexIncreaseRate` must no longer be the displayed value on the page.
+
+## Effective Rollback Note (2026-03-28)
+
+- The currently effective dashboard presentation spec is rolled back from the rejected
+  visual experiment.
+- Effective live spec:
+  - classic dashboard presentation is the active style
+  - module notes render inline with their modules, not in a shared page footer
+  - list titles and table headers use the earlier baseline wording
+  - shared table density, sticky-column layout, and width guidance use the pre-experiment baseline
+- Any earlier dual-theme / footer-note / compact-header descriptions remain historical
+  design records only and must not be treated as the live UI contract.
+
+## 53. Convertible Frozen Identity + Dual-value Label Spec (2026-03-30)
+
+### 53.1 Scope
+- This round changes only the convertible dashboard table presentation.
+- This round does not change:
+  - source-layer pricing formulas
+  - strategy fields
+  - push behavior
+  - public API payload shape
+
+### 53.2 Frozen-column rule
+- In `presentation/dashboard/dashboard_page.js > buildConvertibleColumns()`:
+  - remove the visible `index` column from the live convertible main table
+  - remove the separate visible `code` column
+  - keep one merged identity column keyed by `bondName`
+  - render that cell as:
+    - primary line: `bondName`
+    - secondary line: `code`
+- In `presentation/templates/dashboard_template.html`:
+  - `table[data-table-kind="convertible"]` keeps only one active frozen-column style:
+    - `col-bond-sticky`
+  - legacy `col-index-sticky` frozen offsets must no longer be required for the live
+    convertible contract
+
+### 53.3 Pricing-cell dual-value rule
+- The following visible columns must render as compact stacked cells instead of
+  single-value percentage cells:
+  - `转股溢价`
+  - `加权折价`
+  - `理论溢价`
+- Amount formulas are presentation-only and fixed to:
+  - `convertPremiumAmount = price - convertValue`
+  - `weightedDiscountAmount = convertValue - price`
+  - `theoreticalPremiumAmount = price - theoreticalPrice`
+- Rate lines remain sourced from existing fields:
+  - `premiumRate`
+  - `weightedDiscountRate`
+  - `theoreticalPremiumRate`
+- The stacked display order is fixed to:
+  - first line: amount
+  - second line: rate label + formatted percentage
+
+### 53.4 Visible copy rule
+- The live convertible main-table labels must read:
+  - `转债名称`
+  - `转股溢价`
+  - `加权折价`
+  - `纯债价值`
+  - `理论溢价`
+  - `剩余规模`
+  - `波动率`
+  - `剩余期限`
+- This round keeps the existing compact cells for:
+  - `转债价`
+  - `正股`
+  - `正股价`
+  - `正股成交`
+
+### 53.5 Regression boundary
+- The row sort keys remain attached to the same underlying fields:
+  - `bondName`
+  - `premiumRate`
+  - `weightedDiscountRate`
+  - `theoreticalPremiumRate`
+  - `remainingSizeYi`
+  - `volatility250`
+  - `remainingYears`
+- The table still uses the shared paginated table path and existing search behavior.
+- No backend row field is deleted in this round.
+
+## 52. Active 250D HFQ Volatility Implementation Contract (2026-03-30)
+
+### 52.1 Scope
+- The active volatility standard is switched to `250日年化后复权波动率` for:
+  - convertible-bond theoretical pricing
+  - cb-rights-issue option-value / expected-return pricing
+
+### 52.2 Data source
+- Both chains continue reading real underlying-stock daily `后复权` history from their existing dedicated/local history DB path.
+- No front-end field, scraped static text, or non-history fallback may replace this truth source.
+
+### 52.3 Calculation rule
+- Read the latest `251` closes at minimum.
+- Compute `250` close-to-close log returns.
+- Compute annualized volatility from those returns.
+- The row is volatility-ready only when the `251`-close minimum is satisfied.
+
+### 52.4 Config rule
+- `config.yaml > data_fetch.plugins.convertible_bond.primary_vol_window = 250`
+- `config.yaml > data_fetch.plugins.convertible_bond.volatility_windows` must include `250` as the active pricing window.
+- `config.yaml > strategy.cb_rights_issue.volatility_window = 250`
+- Both history-retention parameters must remain above the `251`-close minimum with operational safety margin.
+
+### 52.5 Compatibility rule
+- During migration, payloads may still expose `volatility60` as a compatibility alias.
+- If the alias exists, it must equal the active `250日年化后复权波动率`; it must not keep the old 60-day value.
+
+### 52.6 Front-end rule
+- User-facing labels and explanation copy for the affected modules must say `250日波动率`.
+- Convertible-bond main-table sorting/rendering must prefer `volatility250`.
+- cb-rights-issue table/detail rendering must prefer `volatility250`.
+
+## 54. Convertible Premium-only Weighted-discount Spec (2026-03-30)
+
+### 54.1 Scope
+- This round changes only the convertible weighted-discount enrichment and the
+  convertible main-table presentation.
+- This round does not change:
+  - convertible live `premiumRate` formula
+  - non-convertible modules
+  - push schedule timing
+
+### 54.2 Base-value rule
+- In `strategy/convertible_bond/service.js > enrichDiscountStrategyRow()`:
+  - the weighted-discount base must use `-premiumRate` directly
+  - the row object must stop exposing a standalone `discountRate` field for this round
+- Signed base:
+  - `premiumRateNegated = -premiumRate`
+
+### 54.3 Coefficient-input rule
+- Because anchor interpolation is defined on non-negative input space, the coefficient
+  magnitude input is fixed to:
+  - `premiumMagnitude = abs(-premiumRate)`
+- Then:
+  - `stockAtr20Pct = stockAtr20 / stockPrice * 100`
+  - `atrRatio = premiumMagnitude / stockAtr20Pct`
+  - `sellPressureRatio = remainingSizeYi / stockAvgTurnoverAmount20Yi`
+
+### 54.4 Weighted-discount rule
+- Final formula is fixed to:
+  - `weightedDiscountRate = (-premiumRate) * atrCoefficient * sellPressureCoefficient * boardCoefficient`
+- Therefore:
+  - negative premium rows produce positive weighted-discount values
+  - positive premium rows produce negative weighted-discount values
+  - the field is no longer restricted to the old low-premium subset
+
+### 54.5 Factor-column rule
+- In `presentation/dashboard/dashboard_page.js > buildConvertibleColumns()`:
+  - insert these visible columns before `加权折价`:
+    - `ATR系数/ATR%`
+    - `抛压系数`
+    - `市场`
+- The recommended cell payload is:
+  - `ATR系数/ATR%`
+    - primary: `atrCoefficient`
+    - secondary: `stockAtr20Pct`
+  - `抛压系数`
+    - primary: `sellPressureCoefficient`
+    - secondary: `sellPressureRatio`
+  - `市场`
+    - primary: board label from stock-code prefix
+    - secondary: `boardCoefficient`
+
+### 54.6 Percentage-first cell rule
+- `转股溢价 / 理论溢价 / 加权折价` must render percentage first and amount second.
+- Presentation-only amount lines are fixed to:
+  - `convertPremiumAmount = price - convertValue`
+  - `weightedDiscountAmount = convertValue - price`
+  - `theoreticalPremiumAmount = price - theoreticalPrice`
+- Their main visible line must use:
+  - `premiumRate`
+  - `weightedDiscountRate`
+  - `theoreticalPremiumRate`
+
+### 54.7 Convertible-sort narrowing rule
+- The live convertible main table must keep sort handles only for:
+  - `premiumRate`
+  - `weightedDiscountRate`
+  - `theoreticalPremiumRate`
+  - `doubleLow`
+- Other convertible columns remain visible but must not render clickable sort buttons.
+
+### 54.8 Convertible premium-rate sort restore rule
+- In `presentation/dashboard/dashboard_page.js > buildConvertibleColumns()`:
+  - the `premiumRate` column must restore:
+    - `sortable: true`
+    - `sortType: 'number'`
+    - `defaultDir: 'desc'`
+    - `sortValue: (row) => toNumber(row.premiumRate)`
+- The sort input must use the numeric source field, not the rendered dual-line cell text.
+- This round does not change:
+  - `premiumRate` formula
+  - dual-line rendering of the cell
+  - any API payload key
+
+### 54.9 Convertible remaining-term year-unit rule
+- In `presentation/dashboard/dashboard_page.js > formatRemainingTerm()`:
+  - the input source remains `remainingYears`
+  - the renderer must always output year units
+  - month-based fallback display is retired for this module
+- Recommended output:
+  - `${formatNumber(remainingYears, 2)}年`
+
+### 54.10 Convertible force-redeem highlight rule
+- In `presentation/dashboard/dashboard_page.js`:
+  - add a dedicated affirmative-status predicate for the convertible table
+  - the row-class hook for `cbArb` must apply a yellow highlight class when:
+    - `forceRedeemStatus` is non-empty
+    - status text matches affirmative force-redeem semantics such as `强赎` or `强制赎回`
+    - status text is not a negative semantic such as `不强赎 / 暂不强赎 / 不提前赎回`
+    - status text is not already terminal such as `完成 / 摘牌 / 终止 / 退市`
+- In `presentation/templates/dashboard_template.html`:
+  - add the yellow row background style for the new convertible force-redeem class
+  - include the sticky left bond-name cell so the fixed column stays visually consistent
+
+### 54.11 Convertible force-redeem source rule
+- The current live force-redeem status source remains unchanged in this round:
+  - `data_fetch/convertible_bond/source.py > _build_cov_basic_map()`
+  - Eastmoney datacenter report `RPT_BOND_CB_LIST`
+  - source field `IS_REDEEM`
+- The field is merged into public rows as:
+  - `forceRedeemStatus`
+- This round is presentation-only with respect to that field; no new upstream source is introduced.
+
+### 54.12 LOF single-slot push rule
+- In `config.yaml`:
+  - `notification.lof_arbitrage.default_times` must be reduced to:
+    - `14:00`
+- In `start_server.js`:
+  - `DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG.times` must normalize to a single fixed slot
+  - existing persisted LOF push config that still contains multiple times must be migrated to `['14:00']`
+  - the LOF push config domain must accept only one time slot
+
+### 54.13 LOF instant-push retirement rule
+- In `notification/lof_arbitrage/service.js`:
+  - remove the old new-entry instant-push path from the active service contract
+  - the active outward service surface for this round is scheduled full-pool push only
+- In `start_server.js > refreshDataset('lofArb')`:
+  - refreshing the LOF dataset must no longer call an instant-push side path
+- Existing stale state keys such as seen maps or instant timestamps may remain readable for compatibility,
+  but they are no longer part of the active behavior contract.
+
+### 54.14 LOF dashboard push-card rule
+- In `presentation/dashboard/dashboard_page.js`:
+  - `buildLofArbPushStateText()` must no longer surface instant success/error wording
+  - `renderLofArbPushCard()` must describe one fixed `14:00` trading-day full push
+  - the old three-input editable time form must be removed from the visible LOF push card
+- In `presentation/templates/dashboard_template.html`:
+  - refresh the dashboard bundle version so the cloud page does not stay on the cached old LOF push card
+
+### 54.15 LOF push API contract rule
+- `GET /api/push/lof-arbitrage-config` remains active, but its effective payload contract for this round is:
+  - `enabled`
+  - `times` with only one value: `14:00`
+  - `tradingDaysOnly`
+  - `deliveryStatus.lastSuccessAt`
+  - `deliveryStatus.lastError`
+  - `deliveryStatus.webhookConfigured`
+  - `deliveryStatus.schedulerEnabled`
+- `POST /api/push/lof-arbitrage-config` may remain for compatibility, but the saved effective schedule must still resolve to the single `14:00` slot.
+
+### 54.16 Convertible force-redeem public-field rule
+- In `start_server.js > CB_ARB_PUBLIC_ROW_KEYS`:
+  - expose these additional real fields for convertible public rows:
+    - `forceRedeemStatus`
+    - `delistDate`
+    - `ceaseDate`
+- This round does not change the sanitize/remove rule:
+  - completed or terminal force-redeem rows are still removed upstream by `strategy/convertible_bond/service.js`
+- The page highlight rule remains presentation-only and must read the real exposed field rather than fabricate a state.
+
+## 55. Cloud-only Web Entry + Local Residue Cleanup Spec (2026-03-30)
+
+### 55.1 Scope
+- This round changes only:
+  - web-entry semantics
+  - operator verification defaults
+  - cleanup of local-only / duplicate web residues
+- This round does not change:
+  - live dashboard business rendering
+  - public API paths
+  - fetch/strategy/notification formulas
+
+### 55.2 Live web-chain rule
+- The only live operator-facing web chain is:
+  - `start_server.js`
+  - `presentation/templates/dashboard_template.html`
+  - `presentation/dashboard/dashboard_page.js`
+- `start_server.js` fallback behavior must not depend on a deleted root `index.html`;
+  the dashboard template path remains the safe default entry.
+
+### 55.3 Residue-removal rule
+- The following files may be removed when they are unreferenced by the live chain:
+  - root `index.html`
+  - `remote_dashboard_template.html`
+  - `remote_dashboard_page.js`
+  - `tools/install_firewall_rule.ps1`
+  - `tools/uninstall_firewall_rule.ps1`
+- Removal is allowed only because they are no longer part of the effective cloud runtime contract.
+- No deletion in this round may touch:
+  - `presentation/templates/dashboard_template.html`
+  - `presentation/dashboard/dashboard_page.js`
+  - cloud deploy scripts under `tools/deploy/`
+
+### 55.4 Cloud-first verification rule
+- `smoke_check.js` must resolve its default target in this order:
+  1. explicit env override
+  2. configured public URL
+  3. configured server base URL
+  4. loopback fallback only when no cloud/public URL is available
+- `tools/check_health.ps1` must follow the same cloud-first default target rule.
+- Explicit user override by env var or command argument remains allowed.
+
+### 55.5 Documentation rule
+- `RUNBOOK.md` and `refactor_docs/001-monitor-refactor/quickstart.md` must consistently describe:
+  - cloud server as the only formal runtime surface
+  - cloud homepage/public health endpoint as the official verification path
+  - local dev start as temporary debugging only
+
+### 55.6 Regression boundary
+- Root path `/` on the live server must still render the current dashboard.
+- Public `/api/health` must remain unchanged.
+- No dashboard tab/module behavior may regress because of this cleanup round.
+
+## 56. Pure-bond Truthfulness + Sort Stability + 250D Readiness Spec (2026-03-30)
+
+### 56.1 Scope
+- This round changes only:
+  - convertible theoretical-pricing pure-bond input rule
+  - dashboard table sort-position stability
+  - default history-sync readiness for 250-day HFQ volatility
+- This round does not change:
+  - convertible premium formula
+  - non-convertible module behavior
+  - public API path names
+
+### 56.2 Pure-bond input rule
+- In `data_fetch/convertible_bond/source.py > _build_theoretical_metrics()`:
+  - `bondValue` may use only `pureBondValue`
+  - `_bond_floor_value()` must no longer be used as a runtime fallback for outward theoretical pricing
+- If `pureBondValue` is missing or non-positive:
+  - outward `bondValue = null`
+  - outward `theoreticalPrice = null`
+  - outward `theoreticalPremiumRate = null`
+  - call/put auxiliary values may stay null unless all required truthful inputs exist
+
+### 56.3 Front-end pure-bond read rule
+- In `presentation/dashboard/dashboard_page.js`:
+  - `readPureBondBase()` must read the truthful upstream pure-bond field first-class
+  - it must not resurrect a retired local discounted fallback through old `bondValue` semantics
+
+### 56.4 Sort-stability rule
+- Sort interaction must preserve the current table wrapper scroll offset.
+- In `presentation/dashboard/dashboard_page.js`:
+  - each sortable table wrapper should expose a stable `data-table-key`
+  - sort/page rerender paths may capture and restore wrapper `scrollLeft` / `scrollTop`
+  - clicking a sort header must not visually snap the user back to the first visible column
+
+### 56.5 250-day default rule
+- `data_fetch/convertible_bond/history_source.py` fallback defaults must no longer assume `20/60/120` when config is absent; the default active window is `250`.
+- `data_fetch/cb_rights_issue/history_source.py` fallback default `volatility_window` must be `250`.
+- `tools/cb_rights_issue_stock_history_db.py` default retention assumptions must remain compatible with the `251`-close minimum rather than the old `90`-row era.
+
+### 56.6 Readiness verification rule
+- DB verification must inspect at least:
+  - symbol count
+  - per-symbol row-count range
+  - how many symbols satisfy `>= 251` closes
+- This verification applies to:
+  - `runtime_data/shared/stock_price_history.db`
+  - `runtime_data/shared/cb_rights_issue_stock_history.db`
+- If readiness is insufficient, the result must be reported truthfully and followed by the appropriate history sync run before cloud close-out.
+
+### 56.7 Regression boundary
+- Convertible visible labels and API keys remain unchanged in this round.
+- Sort result order may change only because of the intended sort key, not because the viewport resets.
+- `250日波动率` wording and `volatility250` preference remain the active live contract.
+
+## 58. Pure-bond Daily-cache Wireback Spec (2026-03-30)
+
+### 58.1 Scope
+- This round changes only the convertible pure-bond read/cache wireback.
+- This round does not change:
+  - option-pricing formula shape
+  - public API path name
+  - non-convertible modules
+  - push behavior
+
+### 58.2 Source-of-truth rule
+- `pureBondValue` remains sourced only from the existing Eastmoney pure-bond interface:
+  - `type=RPTA_WEB_KZZ_LS`
+  - field `PUREBONDVALUE`
+- The system must not restore the retired local discounted-bond fallback.
+
+### 58.3 Read-path rule
+- In `data_fetch/convertible_bond/source.py > get_bond_cb_data()`:
+  - `pureBondMap` must be loaded through the shared daily-cache helper, not read as an unwritten raw aux entry only
+  - the helper must attempt same-day upstream fetch first
+  - if fresh same-day fetch succeeds, the fetched map must be used for outward rows and later persisted through the aux-cache write path
+  - if same-day fetch fails, the read path may reuse only previously cached real upstream values
+
+### 58.4 Outward row rule
+- For each outward convertible row:
+  - when `pureBondMap[code]` exists, expose:
+    - `pureBondValue`
+    - `pureBondValueDate`
+    - `pureBondValueSource`
+  - when the map lacks the code, keep these fields null/absent-equivalent and let the page render `--`
+- `bondValue`, `theoreticalPrice`, and `theoreticalPremiumRate` remain governed by the truthful pure-bond rule from Spec 56.
+
+### 58.5 Runtime wording rule
+- Any assumptions/source-note text in the outward payload must no longer say:
+  - `or_discount_floor_fallback`
+- Wording must reflect the live rule:
+  - pure-bond value comes from upstream API only
+  - missing source value leads to truthful null output
+
+### 58.6 Regression boundary
+- Successful same-day pure-bond fetch must improve visible coverage only; it must not alter non-pure-bond fields.
+- If the upstream pure-bond source is temporarily unavailable, the module may still use older cached real values, but it must not fabricate new ones.
+
+## 82. Convertible Strong-redeem Page Truthfulness + Theoretical-premium 250D Repair Spec (2026-03-30)
+
+### 82.1 Scope
+- This round changes only the convertible read/display chain:
+  - force-redeem page expression
+  - pure-bond/theoretical-premium outward visibility
+  - 250D wording consistency for the affected table/help text
+- This round does not change:
+  - non-convertible modules
+  - the active 250D volatility standard itself
+  - push-rule semantics
+
+### 82.2 Strong-redeem truth rule
+- `presentation/dashboard/dashboard_page.js > isConvertibleForceRedeemHighlighted()` may highlight only rows that:
+  - have affirmative strong-redeem wording
+  - do not carry terminal wording such as `完成 / 摘牌 / 终止 / 退市`
+- `strategy/convertible_bond/service.js > isCbArbRowDelistedOrExpired()` remains the terminal gate:
+  - rows with truthful terminal delist/cease dates or terminal force-redeem wording must be removed from the live list
+- Therefore terminal cases such as `海优转债` must resolve to “not listed in live table” when the source is already terminal.
+
+### 82.3 Theoretical-premium truth rule
+- In `data_fetch/convertible_bond/source.py`:
+  - outward `theoreticalPrice` and `theoreticalPremiumRate` continue to use the current `PRIMARY_VOL_WINDOW`
+  - the active live window remains `250`
+  - truthful outward values require:
+    - `pureBondValue > 0`
+    - `stockPrice`
+    - `convertPrice`
+    - `remainingYears`
+    - `volatility250`
+- If any truthful prerequisite is absent:
+  - outward `theoreticalPrice = null`
+  - outward `theoreticalPremiumRate = null`
+- No local discounted bond-floor fallback may be reintroduced.
+
+### 82.4 Daily-cache read rule
+- The normal `GET /api/market/convertible-bond-arbitrage` path must read the same-day real `pureBondMap` first.
+- If same-day fetch is empty or partially empty:
+  - previously cached real upstream `pureBondValue` snapshots may still fill missing codes
+  - fallback must remain code-by-code and truthful
+- Public row shaping in `start_server.js` must keep exposing:
+  - `pureBondValue`
+  - `theoreticalPrice`
+  - `theoreticalPremiumRate`
+  - `forceRedeemStatus`
+  - `delistDate`
+  - `ceaseDate`
+
+### 82.5 Page wording rule
+- Convertible table and helper wording for this chain must continue to say `250日波动率` / `250日后复权年化波动率`.
+- The helper text may explain the formula only when the example row has truthful:
+  - pure-bond value
+  - theoretical price
+  - option value
+  - 250D volatility
+- It must not imply that blank theoretical-premium rows are computation errors when truthful pure-bond input is absent.
+
+### 82.6 Regression boundary
+- Active non-terminal strong-redeem rows can still highlight yellow.
+- Terminal strong-redeem rows stay filtered out.
+- Rows with truthful pure-bond input recover visible theoretical-premium values.
+- Rows missing truthful pure-bond input remain blank rather than fabricated.
+
+## 84. Custom Monitor Three-decimal Precision Spec (2026-03-30)
+
+### 84.1 Scope
+- This round changes only the custom-monitor chain:
+  - `strategy/custom_monitor/service.js`
+  - `presentation/dashboard/dashboard_page.js`
+  - `notification/styles/markdown_style.js`
+- This round does not change:
+  - custom-monitor formulas
+  - config structure
+  - non-monitor modules
+
+### 84.2 Output precision rule
+- In `strategy/custom_monitor/service.js > recalculateMonitor()`:
+  - outward derived numeric fields must round to `3` decimals
+  - this applies to:
+    - `acquirerPrice`
+    - `targetPrice`
+    - `cashDistributionCny`
+    - `cashPayout`
+    - `stockPayout`
+    - `stockSpread`
+    - `safetyFactor`
+    - `stockYieldRate`
+    - `cashSpread`
+    - `cashYieldRate`
+- Internal formula order remains unchanged; only the outward rounded result changes.
+
+### 84.3 Dashboard display rule
+- In `presentation/dashboard/dashboard_page.js`:
+  - monitor tab table values must render with `3` decimals
+  - monitor detail items and formula text must render with `3` decimals
+- The affected monitor display fields include:
+  - target price
+  - stock-leg yield
+  - cash-leg yield
+  - best yield
+  - acquirer price
+  - target price
+  - cash consideration
+  - stock-leg payout
+  - stock-leg spread
+  - cash option price
+  - cash-leg spread
+  - formula explanation factors
+
+### 84.4 Summary markdown rule
+- In `notification/styles/markdown_style.js > buildMonitorLines()`:
+  - `股票腿收益率`
+  - `现金腿收益率`
+  - `最优收益率`
+  must render with `3` decimals to match the dashboard.
+
+### 84.5 Regression boundary
+- Sorting behavior remains numeric and unchanged in semantics.
+- Monitoring formulas remain unchanged.
+- Non-monitor modules keep their existing display precision.
+
+## 85. Convertible Force-redeem Status Column + Highlight Repair Spec (2026-03-30)
+
+### 85.1 Scope
+- This round changes only the convertible read/display chain:
+  - outward force-redeem status derivation
+  - convertible table trailing status column
+  - convertible strong-redeem row highlight style/rule
+- This round does not change:
+  - convertible pricing formulas
+  - push behavior
+  - non-convertible modules
+
+### 85.2 Source-truth rule
+- In `data_fetch/convertible_bond/source.py`:
+  - raw `isRedeem` must no longer be exposed semantically as outward `forceRedeemStatus`
+  - outward `forceRedeemStatus` must be a derived status text based on stronger real clues, including:
+    - redeem notice dates
+    - terminal delist dates
+    - terminal stop-trading dates when applicable
+- Outward status text may be blank when the source does not provide enough truthful evidence.
+
+### 85.3 Outward status display rule
+- The outward payload may expose supporting fields needed by the page, including notice dates.
+- In `presentation/dashboard/dashboard_page.js`:
+  - the convertible table must add a final column `强赎状态`
+  - the column renders derived status text first
+  - when notice date exists, the second line may render the date
+
+### 85.4 Highlight rule
+- `isConvertibleForceRedeemHighlighted()` must return true only when outward derived status clearly means an active published strong-redeem state.
+- It must return false for:
+  - blank status
+  - generic raw flags such as the retired all-`是` source
+  - terminal states such as `已摘牌 / 已完成强赎 / 已终止上市`
+
+### 85.5 Style rule
+- `presentation/templates/dashboard_template.html` strong-redeem row styling must use a brighter yellow visual treatment.
+- The sticky left identity cell must stay visually aligned with that brighter yellow tone.
+
+### 85.6 Regression boundary
+- Convertible row highlighting becomes narrower and more truthful than the previous false-positive state.
+- The final-column addition must not disturb earlier convertible formulas or sorting semantics.
+
+## 83. Convertible Full-column Sort + Compact-width Spec (2026-03-30)
+
+### 83.1 Scope
+- This round changes only the convertible dashboard table presentation.
+- This round does not change:
+  - fetch logic
+  - pricing formula
+  - public API keys
+  - push/runtime behavior
+
+### 83.2 Sort-surface rule
+- In `presentation/dashboard/dashboard_page.js > buildConvertibleColumns()`:
+  - every visible convertible main-table column must set `sortable: true`
+  - each column must expose an explicit `sortValue`
+  - composite cells must sort by their primary displayed value rather than the rendered HTML text
+
+### 83.3 Convertible sort mapping
+- Required sort mapping for the live table:
+  - `转债名称` -> `bondName`
+  - `转债价` -> `price`
+  - `正股` -> `stockName`
+  - `正股价` -> `stockPrice`
+  - `正股成交` -> `stockAvgTurnoverAmount20Yi`
+  - `转股价` -> `convertPrice`
+  - `转股价值` -> `convertValue`
+  - `转股溢价` -> `premiumRate`
+  - `ATR系数/ATR%` -> `atrCoefficient`
+  - `抛压系数` -> `sellPressureCoefficient`
+  - `市场` -> `boardType`
+  - `加权折价` -> `weightedDiscountRate`
+  - `双低` -> `doubleLow`
+  - `纯债价值` -> `pureBondValue`
+  - `理论溢价` -> `theoreticalPremiumRate`
+  - `剩余规模` -> `remainingSizeYi`
+  - `250日波动率` -> `volatility250`
+  - `剩余期限` -> `remainingYears`
+
+### 83.4 Sort-header affordance rule
+- Sort headers must keep using the existing table-state mechanism, but the visual affordance changes to:
+  - compact up/down indicator
+  - indicator shown above the label
+  - reduced horizontal footprint compared with the previous inline layout
+
+### 83.5 Convertible width rule
+- Convertible width tuning must stay isolated to `table[data-table-kind="convertible"]`.
+- The implementation may add convertible-specific column classes such as:
+  - identity
+  - quote
+  - factor
+  - numeric
+  - percent
+- These classes must tighten width closer to visible content than the old generic shared widths.
+- Generic shared width rules for other table kinds must not be unintentionally widened or broken.
+
+### 83.6 Regression boundary
+- Existing sticky left identity column remains sticky.
+- Existing sort-state persistence and scroll-restoration behavior remain intact.
+- No convertible backend field is added, removed, or renamed in this round.
+
+## 84. CB-rights-issue 250D Enforcement + History-DB Spec (2026-03-30)
+
+### 84.1 Scope
+- This round changes only the cb-rights-issue fetch/strategy/readiness chain.
+- This round does not change:
+  - AH / AB / LOF / dividend modules
+  - convertible-arbitrage pricing chain
+  - push schedule semantics
+
+### 84.2 Live volatility rule
+- In the cb-rights-issue chain, the only real pricing volatility is:
+  - HFQ daily closes
+  - latest 250 close-to-close log returns
+  - annualized by trading-day convention
+- The source row should expose `volatility250`.
+- If `volatility60` is still exposed for compatibility, it must mirror the active `volatility250` value rather than a distinct 60-day metric.
+
+### 84.3 Strategy rule
+- In `strategy/cb_rights_issue/service.py`:
+  - Black-Scholes pricing must read `volatility250` as the live source-of-truth input
+  - it must not use an old real `volatility60` fallback
+  - if `volatility250` is missing, `optionUnitValue / expectedProfit / expectedReturnRate` must remain null
+
+### 84.4 History-readiness rule
+- `runtime_data/shared/cb_rights_issue_stock_history.db` must be verified with:
+  - symbol count
+  - per-symbol row-count range
+  - number of symbols with `>=251` closes
+- A full sync must be run when the DB is still in the old ~90-row state.
+- Truthful exceptions are allowed only for symbols whose listing history itself is insufficient.
+
+### 84.5 Fetch-layer rule
+- In `data_fetch/cb_rights_issue/source.py`:
+  - `historyCloseCount` must reflect the dedicated history DB close count
+  - `volatility250` must be derived only from the dedicated history DB
+  - same-day source rows must not surface a real old 60-day volatility as if it were still active
+
+### 84.6 Regression boundary
+- Existing response envelope remains unchanged.
+- Existing fields may remain for compatibility, but their semantics must align with the 250D live rule.
+- Rows lacking enough history remain visible as source rows, but their pricing metrics must degrade truthfully.
+
+## 87. Convertible Net Call-spread Debug Fields Spec (2026-03-30)
+
+### 87.1 Internal helper fields
+- `data_fetch/convertible_bond/source.py > _build_theoretical_metrics(...)` may additionally preserve:
+  - `longCallOptionValue*`
+  - `shortCallOptionValue*`
+  - `callSpreadOptionValue*`
+  - `redeemCallStrike*`
+- These fields are for verification and explanatory copy alignment.
+
+### 87.2 Primary-window projection rule
+- When the primary volatility window is projected back to row-level outward fields, the row may also carry:
+  - `longCallOptionValue`
+  - `shortCallOptionValue`
+  - `callSpreadOptionValue`
+  - `redeemCallStrike`
+  - `pricingFormula = bond+callspread`
+
+### 87.3 Dashboard wording rule
+- Dashboard explanatory text must describe the live formula as:
+  - `理论价 = 债底 + 净看涨价差价值`
+  - `净看涨价差价值 = call(转股价) - call(强赎价)`
+- If `longCallOptionValue / shortCallOptionValue` are available, the example text should prefer showing both legs explicitly.
+- The above `call(转股价)` wording is superseded by section 95 and is no longer the live wording.
+
+## 86. CB-rights-issue Web-visible 250D Sync + Cache-bust Spec (2026-03-30)
+
+### 86.1 Scope
+- This round changes only the public dashboard presentation layer for `cb_rights_issue`.
+- This round does not change:
+  - the cb-rights-issue pricing formula
+  - public API path or payload shape
+  - push logic
+  - non-cb-rights-issue modules
+
+### 86.2 Visible wording rule
+- In `presentation/dashboard/dashboard_page.js`:
+  - all operator-facing explanatory text for the `可转债抢权配售` panel must match the already-active live volatility rule
+  - stale wording such as `60 日波动率` must be removed
+  - the visible wording must say `250日波动率`
+
+### 86.3 Explanation boundary
+- The panel copy may summarize the rule as:
+  - fixed Jisilu pre-plan source
+  - dedicated HFQ stock-history DB
+  - `250` latest log-return samples annualized
+  - expected return as a reference metric
+- The copy must not imply a separate old 60-day runtime path still exists.
+
+### 86.4 Template cache-bust rule
+- In `presentation/templates/dashboard_template.html`:
+  - the dashboard script query token must be bumped
+  - goal: force browsers to fetch the refreshed front-end bundle after deployment
+- This cache-bust action must remain front-end only and must not create a new route.
+
+### 86.5 Verification rule
+- Public homepage HTML must reference the new dashboard bundle token.
+- Public cb-rights-issue page text must reflect `250日波动率`.
+- Public API `/api/market/cb-rights-issue` continues exposing the already-fixed `volatility250`.
+
+## 87. Convertible Theoretical-option Columns Spec (2026-03-30)
+
+### 87.1 Scope
+- This round changes only the convertible dashboard table presentation.
+- This round does not change:
+  - fetch logic
+  - pricing formula
+  - public API keys
+  - push/runtime behavior
+
+### 87.2 Column placement rule
+- In `presentation/dashboard/dashboard_page.js > buildConvertibleColumns()`:
+  - three new columns must appear immediately after `理论溢价`
+  - the order is fixed as:
+    - `理论期权价值`
+    - `隐含期权价值`
+    - `期权折价率`
+
+### 87.3 Read rule
+- `理论期权价值` must reuse the existing theoretical-pricing result:
+  - if `pricingFormula == "bond+callspread"` and `callOptionValue` exists, read `callOptionValue`
+  - otherwise keep the existing compatibility read path:
+    - `(callOptionValue ?? 0) - (putOptionValue ?? 0)`
+    - fallback `theoreticalPrice - pureBondValue`
+- `隐含期权价值` is:
+  - `price - pureBondValue`
+- `期权折价率` is:
+  - `隐含期权价值 / 理论期权价值 - 1`
+
+### 87.4 Truth boundary
+- If any required truthful input is missing, the derived cell must stay null/blank.
+- No guessed fallback or new backend hydration is allowed in this round.
+
+### 87.5 Sort rule
+- The three new columns remain sortable as numeric columns.
+- Sort mapping is:
+  - `理论期权价值` -> computed theoretical option value
+  - `隐含期权价值` -> `price - pureBondValue`
+  - `期权折价率` -> computed option discount rate
+
+### 87.6 Cache-bust rule
+- `presentation/templates/dashboard_template.html` should bump the dashboard script token again in this round so browsers fetch the new table definition promptly.
+
+## 88. Convertible Option-discount-rate Correction Spec (2026-03-30)
+
+### 88.1 Scope
+- This round changes only the convertible dashboard table presentation.
+- This round does not change:
+  - fetch logic
+  - pricing formula
+  - public API keys
+  - push/runtime behavior
+
+### 88.2 Read rule
+- `理论期权价值` stays unchanged.
+- `隐含期权价值` stays unchanged:
+  - `price - pureBondValue`
+- The old column label `期权比例` must be renamed to:
+  - `期权折价率`
+- `期权折价率` must be corrected to:
+  - `隐含期权价值 / 理论期权价值 - 1`
+
+### 88.3 Truth boundary
+- If `理论期权价值` is missing or equals `0`, `期权折价率` stays null.
+- If `隐含期权价值` is missing, `期权折价率` stays null.
+- No guessed fallback is allowed.
+
+### 88.4 Sort rule
+- In `presentation/dashboard/dashboard_page.js > buildConvertibleColumns()`:
+  - `期权折价率` remains a numeric sortable column
+  - its `sortValue` must read the corrected discount-rate result
+
+### 88.5 Cache-bust rule
+- `presentation/templates/dashboard_template.html` should bump the dashboard script token again in this round so browsers fetch the corrected ratio implementation.
+
+## 90. Convertible Option-discount Cell Stacked-gap Spec (2026-03-30)
+
+### 90.1 Scope
+- This round changes only the convertible dashboard table presentation.
+- This round does not change:
+  - fetch logic
+  - pricing formula
+  - public API keys
+  - push/runtime behavior
+
+### 90.2 Derived display rule
+- In `presentation/dashboard/dashboard_page.js` add one display-only helper:
+  - `optionValueGap = theoreticalOptionValue - implicitOptionValue`
+- `optionValueGap` must stay null when either source value is null.
+
+### 90.3 Cell rendering rule
+- In `buildConvertibleColumns()` the `期权折价率` column must render as a compact stacked cell:
+  - first line: formatted `期权折价率`
+  - second line: `价差 <formatted optionValueGap>`
+- The cell semantic color may continue following the existing rate-based status class.
+
+### 90.4 Sort rule
+- The `期权折价率` column remains sorted by the computed rate only.
+- The displayed `期权价差` text must not become the sort source.
+
+### 90.5 Cache-bust rule
+- `presentation/templates/dashboard_template.html` should bump the dashboard script token again in this round so browsers fetch the updated cell renderer promptly.
+
+## 89. Convertible Summary / Push Force-redeem Exclusion Spec (2026-03-30)
+
+### 89.1 Scope
+- This round changes only convertible summary / push candidate selection.
+- This round does not change:
+  - main-table membership
+  - pricing formulas
+  - public API route paths
+  - non-convertible modules
+
+### 89.2 Active force-redeem rule
+- The system needs one shared helper for active force-redeem exclusion.
+- A row is treated as active force-redeem-excluded when:
+  - `forceRedeemStatus` contains active published semantics such as:
+    - `已公告强赎`
+    - `强赎进行中`
+    - `实施赎回`
+    - `公告赎回`
+- A row is not excluded by this rule when:
+  - status is blank
+  - status means negation such as `不强赎 / 暂不强赎 / 不提前赎回`
+- Terminal rows such as `已完成强赎 / 已摘牌 / 已终止上市 / 停止交易` remain governed by the existing terminal-row filter rather than this active exclusion helper.
+
+### 89.3 Summary rule
+- In `presentation/dashboard/dashboard_page.js`, the convertible page top-summary candidates for:
+  - `双低前3`
+  - `理论溢价前3`
+  must filter out active force-redeem-excluded rows before ranking.
+
+### 89.4 Main-summary push rule
+- `notification/styles/markdown_style.js > buildCbSummaryLines()` relies on `cbArbOpportunitySets(rows)`.
+- Therefore `strategy/convertible_bond/service.js > cbArbOpportunitySets()` must exclude active force-redeem-excluded rows before building category picks.
+
+### 89.5 Convertible independent push rule
+- `strategy/convertible_bond/service.js > buildConvertibleBondDiscountSnapshot()` must exclude active force-redeem-excluded rows from:
+  - buy/sell signal generation
+  - monitor pool
+  - `premiumMonitorSummary`
+- The outward `rows` payload may still keep those rows for page display.
+
+### 89.6 Regression boundary
+- Active force-redeem rows may still appear in the main convertible table.
+- Existing terminal-row filtering remains unchanged.
+- Existing push formats remain unchanged except for the removed excluded rows.
+
+
+### 90.1 Scope
+- This round changes only the LOF chain:
+  - fetch config
+  - LOF source grouping
+  - LOF strategy group shaping
+  - LOF route fallback payload
+  - LOF dashboard subtab/default selection
+  - LOF active operator docs
+- This round does not change:
+  - LOF API path
+  - LOF independent push endpoints
+  - non-LOF modules
+
+### 90.2 Active group rule
+- The only live LOF groups are:
+  - `index`
+  - `asia`
+
+### 90.3 Config rule
+- In `config.yaml > data_fetch.plugins.lof_arbitrage`:
+  - `default_group = index`
+  - `source_page_urls` keeps only:
+    - `index`
+    - `asia`
+  - `source_api_urls` keeps only:
+    - `index`
+    - `asia`
+- In `config.yaml > strategy.lof_arbitrage`:
+  - `default_group = index`
+- Dashboard module notes must describe only the still-live `指数LOF / QDII亚洲`
+  calculation path.
+
+### 90.4 Fetch rule
+- In `data_fetch/lof_arbitrage/source.py`:
+  - `GROUP_META` keeps only `index` and `asia`
+  - `SOURCE_GROUP_ORDER` keeps only `index` and `asia`
+  - `build_group_summary()` keeps only `index` and `asia`
+  - outward `sourceSummary.defaultGroup = index`
+- The fetch layer must no longer emit any retired overseas group label.
+
+### 90.5 Strategy rule
+- In `strategy/lof_arbitrage/service.py`:
+  - default group becomes `index`
+  - outward groups list contains only `index` and `asia`
+- The remaining IOPV branch is:
+  - same-day NAV direct-read when `navDate == priceDate`
+  - otherwise `index / asia` use the existing `T-1` aligned branch
+
+### 90.6 Route and dashboard rule
+- In `presentation/routes/market_routes.js`:
+  - LOF empty fallback payload uses `defaultGroup = index`
+- In `presentation/dashboard/dashboard_page.js`:
+  - `state.lofSubview` initial value becomes `index`
+  - LOF fallback groups become only `index` and `asia`
+  - LOF dashboard rendering must no longer reserve a third historical subtab slot
+
+### 90.7 Truth boundary
+- This round is a removal round, not a source substitution round.
+- The system must not fabricate a replacement third group.
+- Historical overseas samples that no longer belong to a live group must disappear from the active LOF dataset rather than be silently relabeled.
+
+### 90.8 Verification rule
+- Repo search should no longer find live LOF code/config/doc contracts that expose:
+  - any retired overseas group key
+  - any retired overseas visible label
+
+## 91. Convertible Pure-bond Premium Dual-value Column Spec (2026-03-30)
+
+### 91.1 Scope
+- This round changes only the convertible dashboard presentation path:
+  - `presentation/dashboard/dashboard_page.js`
+- This round does not change:
+  - data-fetch logic
+  - API payload keys
+  - pricing formulas
+  - non-convertible modules
+
+### 91.2 Read rule
+- `readPureBondBase(row)` remains the truthful source for `纯债价值`.
+- `computePureBondPremiumRate(row)` must use the user-specified live rule:
+  - `price / pureBondValue - 1`
+  - then render it as a percentage-style ratio value in the table
+- If `price` or `pureBondValue` is missing/non-positive, the column must render `--`.
+
+### 91.3 Column rule
+- In the convertible main table:
+  - visible label becomes `纯债溢价`
+  - primary display = computed pure-bond premium ratio
+  - secondary display = `纯债值 {pureBondValue}`
+
+### 91.4 Sort rule
+- Column sort value must equal `computePureBondPremiumRate(row)`.
+- Sorting must no longer use `readPureBondBase(row)`.
+
+### 91.5 Regression boundary
+- Outward payload still exposes `pureBondValue` unchanged.
+- Other convertible columns and all non-convertible modules keep their current behavior.
+
+## 92. Convertible Force-redeem Marker Simplification Spec (2026-03-30)
+
+### 92.1 Scope
+- This round is limited to:
+  - `start_server.js`
+  - `presentation/dashboard/dashboard_page.js`
+  - `presentation/templates/dashboard_template.html`
+- No fetch-source rule or upstream force-redeem derivation rule changes in this round.
+
+### 92.2 Active force-redeem marker rule
+- The existing active force-redeem semantic boundary remains:
+  - affirmative statuses such as `已公告强赎 / 强赎进行中 / 实施赎回 / 公告赎回` count as active
+  - negative statuses such as `不强赎 / 暂不强赎 / 不提前赎回 / 不赎回` do not count
+  - terminal statuses such as `已完成强赎 / 已摘牌 / 已终止上市 / 退市` do not count
+  - rows whose `ceaseDate / delistDate` are already not later than today do not count
+- The main table must no longer express this state via full-row highlight.
+- Instead, the bond-name cell must append a red `!` marker immediately after the visible bond name when the row matches the active force-redeem rule.
+
+### 92.3 Bond-name reason text rule
+- The convertible bond-name cell must support a truthful secondary reason line assembled only from exposed public fields.
+- The strong-redeem segment must read from:
+  - `forceRedeemStatus`
+  - `forceRedeemNoticeDate`
+- The maturity segment must read from:
+  - `maturityDate`
+  - `maturityRedeemPrice`
+- Recommended rendering contract:
+  - strong-redeem segment example: `强赎 2026-03-30`
+  - maturity segment example: `到期 2028-11-22 / 到期价 108.00`
+- If `maturityRedeemPrice` is missing, the maturity segment must degrade to date-only text and must not fabricate a price.
+- If no truthful reason segment exists, the bond-name cell falls back to its current two-line compact layout.
+
+### 92.4 Column and layout rule
+- Remove the standalone `强赎状态` column from the convertible main table.
+- Remove the convertible row class hook that previously applied yellow background styling.
+- Add only the compact red marker and subtle reason text in the sticky bond-name cell.
+
+### 92.5 Public payload rule
+- `shapeCbArbPublicRows()` must additionally expose:
+  - `maturityRedeemPrice`
+- Existing outward fields remain unchanged.
+
+### 92.6 Regression boundary
+- `summaryRows` and any summary/push exclusion logic that already filters active force-redeem rows must keep their current behavior.
+- Other convertible columns, sorting, and non-convertible modules keep their current behavior.
+
+## 92. Subscription Footnote Removal Spec (2026-03-30)
+
+### 92.1 Scope
+- This round changes only the subscription top-section footnote visibility.
+- This round does not change:
+  - subscription fetch logic
+  - subscription table rendering
+  - dashboard shared footnote renderer
+  - any non-subscription module
+
+### 92.2 Config rule
+- In `config.yaml > presentation.dashboard_module_notes`:
+  - the active `subscription` note object is removed
+  - or equivalently kept empty so the shared renderer receives no visible lines
+
+### 92.3 Rendering rule
+- `presentation/dashboard/dashboard_page.js` keeps the existing shared footnote render path:
+  - `renderModuleFootnote('subscription')`
+- Because the module has no configured note lines after this round:
+  - the renderer must hide the entire footnote card for the subscription section
+
+### 92.4 Regression boundary
+- `cbArb / ah / ab / monitor / dividend / merger` footnotes remain driven by the same
+  config contract and continue rendering normally.
+- `GET /api/dashboard/ui-config` remains the same route; only its effective
+  `moduleNotes.subscription` content becomes empty/absent.
+
+## 93. Convertible Weighted-discount Factor Simplification Spec (2026-03-30)
+
+### 93.1 Scope
+- This round changes only the live convertible weighted-discount factor path:
+  - `strategy/convertible_bond/service.js`
+  - `presentation/dashboard/dashboard_page.js`
+  - convertible strategy docs
+- This round does not change:
+  - public API path
+  - board-coefficient mapping rule
+  - non-convertible modules
+  - push scheduling path
+
+### 93.2 ATR rule
+- In `enrichDiscountStrategyRow()`:
+  - `stockAtr20Pct = stockAtr20 / stockPrice * 100`
+  - `atrCoefficient = stockAtr20Pct`
+- This rule is superseded by section 94 in the same day and is no longer the live rule.
+- Anchor interpolation is retired from the active ATR-coefficient path.
+- `atrRatio` may remain as a compatibility/debug field, but it must not participate in
+  `weightedDiscountRate`.
+
+### 93.3 Sell-pressure rule
+- In `enrichDiscountStrategyRow()`:
+  - `sellPressureRatio = stockAvgTurnoverAmount20Yi / remainingSizeYi`
+  - `sellPressureCoefficient = sellPressureRatio`
+- Guard rule:
+  - if `remainingSizeYi` is missing or `<= 0`, both fields return `null`
+  - if `stockAvgTurnoverAmount20Yi` is missing, both fields return `null`
+
+### 93.4 Weighted-discount rule
+- Final live formula is fixed to:
+  - `weightedDiscountRate = (-premiumRate) * atrCoefficient * sellPressureCoefficient * boardCoefficient`
+- Therefore:
+  - negative-premium rows still yield positive weighted-discount values
+  - positive-premium rows still yield negative weighted-discount values
+  - only the coefficient definitions change in this round
+
+### 93.5 Board rule
+- `normalizeBoardType()` and `normalizeBoardCoefficients()` remain unchanged.
+- `boardCoefficient` keeps the existing mapping:
+  - `科创板`
+  - `创业板`
+  - `主板`
+
+### 93.6 Dashboard factor-column rule
+- In `presentation/dashboard/dashboard_page.js > buildConvertibleColumns()`:
+  - keep the visible labels:
+    - `ATR系数/ATR%`
+    - `抛压系数`
+    - `市场`
+  - update the sell-pressure secondary text to match the live direction:
+    - `成交/规模 {sellPressureRatio}`
+- Existing sort keys remain bound to:
+  - `atrCoefficient`
+  - `sellPressureCoefficient`
+  - `boardCoefficient`-related row data as already implemented
+
+### 93.7 Regression boundary
+- `GET /api/market/convertible-bond-arbitrage` keeps the same path and top-level shape.
+- Existing visible fields remain available:
+  - `stockAtr20Pct`
+  - `atrCoefficient`
+  - `sellPressureRatio`
+  - `sellPressureCoefficient`
+  - `boardCoefficient`
+  - `weightedDiscountRate`
+- The live page and push chain must continue reading the same payload keys after this round.
+
+## 94. Convertible ATR-coefficient Definition Reset Spec (2026-03-30)
+
+### 94.1 Scope
+- This round changes only the live ATR-coefficient definition in the convertible
+  weighted-discount path.
+- This round does not change:
+  - sell-pressure rule
+  - board-coefficient mapping
+  - API path
+  - non-convertible modules
+
+### 94.2 ATR rule
+- In `strategy/convertible_bond/service.js > enrichDiscountStrategyRow()`:
+  - `stockAtr20Pct = stockAtr20 / stockPrice * 100`
+  - `premiumMagnitude = abs(-premiumRate)`
+  - `atrCoefficient = premiumMagnitude / stockAtr20Pct`
+- Guard rule:
+  - if `premiumMagnitude` is missing, `atrCoefficient = null`
+  - if `stockAtr20Pct` is missing or `<= 0`, `atrCoefficient = null`
+- `atrRatio` may remain and should equal the same computed ratio for compatibility.
+
+### 94.3 Sell-pressure and board rule
+- Keep unchanged:
+  - `sellPressureRatio = stockAvgTurnoverAmount20Yi / remainingSizeYi`
+  - `sellPressureCoefficient = sellPressureRatio`
+  - `boardCoefficient` from the existing board mapping
+
+### 94.4 Weighted-discount rule
+- The live formula remains:
+  - `weightedDiscountRate = (-premiumRate) * atrCoefficient * sellPressureCoefficient * boardCoefficient`
+- Only the ATR-coefficient definition changes in this round.
+
+### 94.5 Presentation rule
+- `presentation/dashboard/dashboard_page.js` may keep the visible ATR column label:
+  - `ATR系数/ATR%`
+- The primary number must read `atrCoefficient`.
+- The secondary hint may continue showing `ATR% {stockAtr20Pct}`.
+
+### 94.6 Regression boundary
+- The outward payload keeps:
+  - `stockAtr20Pct`
+  - `atrRatio`
+  - `atrCoefficient`
+  - `sellPressureRatio`
+  - `sellPressureCoefficient`
+  - `weightedDiscountRate`
+- The convertible page and push chain continue to consume the same keys.
+
+## 95. Convertible Long-call Strike Max-rule Spec (2026-03-30)
+
+### 95.1 Scope
+- This round changes only the live long-call strike rule in the convertible
+  theoretical-pricing path.
+- This round does not change:
+  - short-call strike source
+  - option model
+  - non-convertible modules
+
+### 95.2 Strike rule
+- In `data_fetch/convertible_bond/source.py > _build_theoretical_metrics(...)`:
+  - `optionQty = 100 / convertPrice`
+  - `bondFloorStrike = pureBondValue / optionQty`
+  - `callStrike = max(convertPrice, bondFloorStrike)`
+- Guard rule:
+  - if `optionQty` is missing or `<= 0`, `callStrike = null`
+  - if `pureBondValue` is missing, no theoretical value is produced
+
+### 95.3 Call-spread rule
+- The live option leg becomes:
+  - `longCallValue = americanCall(stockPrice, callStrike, remainingYears, riskFreeRate, vol) * optionQty`
+  - `shortCallValue = americanCall(stockPrice, redeemTriggerPrice, remainingYears, riskFreeRate, vol) * optionQty`
+  - `callSpreadValue = max(longCallValue - shortCallValue, 0)`
+  - `theoreticalPrice = pureBondValue + callSpreadValue`
+- Therefore `callStrike*` is a truthful live strike field, not a direct alias of `convertPrice`.
+
+### 95.4 Dashboard wording rule
+- In `presentation/dashboard/dashboard_page.js`:
+  - any formula hint that currently says `call(转股价) - call(强赎价)` must be updated
+  - preferred truthful wording:
+    - `净看涨价差价值 = call(max(转股价, 债底折算行权价)) - call(强赎价)`
+  - the detail text should show the actual `多头行权价` from `callStrike`
+
+### 95.5 Regression boundary
+- The outward payload keeps the same key family:
+  - `callStrike*`
+  - `redeemCallStrike*`
+  - `longCallOptionValue*`
+  - `shortCallOptionValue*`
+  - `callSpreadOptionValue*`
+  - `theoreticalPrice*`
+- Only the meaning of `callStrike*` changes to the live max-rule value.
+
+## 94. Convertible Header Wrap + Width Compression Spec (2026-03-30)
+
+### 94.1 Scope
+- This round is limited to:
+  - `presentation/dashboard/dashboard_page.js`
+  - `presentation/templates/dashboard_template.html`
+- No API field, data source, or strategy logic changes are allowed in this round.
+
+### 94.2 Header rendering rule
+- `renderTableHeader()` must support a column-level optional header HTML field so specific
+  columns can render trusted manual line breaks.
+- Fallback behavior remains unchanged:
+  - if no header HTML is provided, render the escaped plain-text label
+- Convertible long headers may therefore use explicit HTML such as:
+  - `理论期<br>权价值`
+  - `隐含期<br>权价值`
+  - `期权<br>折价率`
+
+### 94.3 Convertible-only wrap rule
+- The wrap behavior must be limited to `table[data-table-kind="convertible"] th`.
+- Convertible header labels may use:
+  - `white-space: normal`
+  - tighter line-height
+  - character-level wrap for CJK text
+- Convertible body cells must keep the current compact single-line reading rule unless
+  they already use stacked value rendering.
+
+### 94.4 Width compression rule
+- Convertible table may reduce:
+  - header/cell horizontal padding
+  - `col-cb-quote` minimum width
+  - `col-cb-volume` minimum width
+  - `col-cb-num` minimum width
+  - `col-cb-percent` minimum width
+  - `col-cb-factor` minimum width
+  - `col-cb-market` minimum width
+- The sticky identity column should remain readable and must not be collapsed to the point
+  that the bond name and marker become unusable.
+
+### 94.5 Regression boundary
+- Sort buttons, sort direction indicator, and sortable behavior remain unchanged.
+- Existing stacked body cells such as premium/discount/theoretical columns keep their
+  current numeric content and ordering semantics.
+
+## 95. Convertible Timed-summary And Top-card Filter Tightening Spec (2026-03-30)
+
+### 95.1 Scope
+- This round changes only the convertible regular-summary candidate path:
+  - `strategy/convertible_bond/service.js`
+  - `start_server.js`
+  - `notification/styles/markdown_style.js`
+  - `presentation/dashboard/dashboard_page.js`
+- This round does not change:
+  - convertible main-table membership
+  - theoretical-pricing formula
+  - low-premium monitor thresholds or its independent push cadence
+  - non-convertible modules
+
+### 95.2 Shared summary-eligibility rule
+- `strategy/convertible_bond/service.js` must expose one shared helper for regular
+  summary candidates.
+- A row is summary-eligible only when all conditions are true:
+  - it survives the existing terminal/delist sanitation
+  - it is not an active force-redeem row
+
+### 95.3 Strategy reuse rule
+- `cbArbOpportunitySets(rows)` must reuse the shared summary-eligible row set instead of
+  rebuilding a looser filter locally.
+- This keeps timed main-summary selection aligned with the page top-summary candidates.
+
+### 95.4 Server summary-shaping rule
+- In `start_server.js > normalizeDatasetPayload(key === 'cbArb')`:
+  - `data` continues exposing the full shaped convertible rows
+  - `premiumMonitorSummary` continues exposing the independent low-premium monitor pool
+  - `summary.topDoubleLow` and `summary.topTheoreticalPremiumRate` must be built only
+    from the shared summary-eligible rows
+- Sorting remains:
+  - `topDoubleLow`: ascending `doubleLow`
+  - `topTheoreticalPremiumRate`: descending `theoreticalPremiumRate`
+
+### 95.5 Timed main-summary markdown rule
+- In `notification/styles/markdown_style.js`:
+  - the convertible block in the main timed summary must narrow to exactly two groups:
+    - `双低前三名`
+    - `理论溢价率前三名`
+  - no other convertible opportunity buckets may appear in this markdown block
+- Each `理论溢价率前三名` line must additionally include:
+  - computed `期权折价率`
+- `期权折价率` must reuse existing truthful row fields only:
+  - theoretical option value from current `callOptionValue / putOptionValue / theoreticalPrice`
+  - implicit option value from `price - pureBondValue`
+  - formula: `隐含期权价值 / 理论期权价值 - 1`
+
+### 95.6 Dashboard top-card rule
+- In `presentation/dashboard/dashboard_page.js > renderConvertiblePanel()`:
+  - `双低前3`
+  - `理论溢价前3`
+  must render from `cbPayload.summary.topDoubleLow` and
+  `cbPayload.summary.topTheoreticalPremiumRate`
+- The `低溢价监控` card must continue reading `cbPayload.premiumMonitorSummary` and must
+  not be replaced by the tightened regular-summary helper.
+
+### 95.7 Regression boundary
+- The main convertible table still shows all live rows allowed by the existing page/API
+  path, including rows outside the tightened summary candidate set.
+- `notification/styles/discount_strategy_markdown.js` remains untouched in this round.
+- Existing low-premium monitor buy/sell thresholds and independent push cadence remain
+  unchanged.
+## 96. CB-rights-issue Single-table Rework + Market-cap Ratio Spec (2026-04-16)
+
+### 96.1 Scope
+- This round changes only the cb-rights-issue chain:
+  - `data_fetch/cb_rights_issue/source.py`
+  - `strategy/cb_rights_issue/service.py`
+  - `presentation/dashboard/dashboard_page.js`
+  - `notification/styles/cb_rights_issue_markdown.js`
+  - `notification/cb_rights_issue/service.js`
+- This round does not change:
+  - AH / AB / LOF / dividend / merger / convertible-arbitrage paths
+  - cb-rights-issue volatility source rule
+  - cb-rights-issue route path
+
+### 96.2 Fetch-layer market-value rule
+- In `data_fetch/cb_rights_issue/source.py`:
+  - stock spot enrichment must additionally load truthful `总市值`
+  - preferred source is the real-time A-share spot API already available through AkShare
+  - outward row field must expose `stockMarketValueYi`
+- Guard rule:
+  - if market value is missing/non-positive, `stockMarketValueYi = null`
+  - `issueRatio` must then remain null
+- `issueScaleYi` must mirror the live `cbAmountYi` row value for public-read clarity.
+
+### 96.3 Main derived-field rule
+- In `strategy/cb_rights_issue/service.py`, outward row fields must follow:
+  - `issueScaleYi = cbAmountYi`
+  - `issueRatio = issueScaleYi / stockMarketValueYi`
+  - `placementShares = rawRequiredShares`
+  - `marginRequiredShares = ceil((rawRequiredShares * 0.6) / 50) * 50`
+  - `requiredFunds = placementShares * stockPrice`
+  - `marginRequiredFunds = marginRequiredShares * stockPrice`
+  - `expectedReturnRate = expectedProfit / requiredFunds * 100`
+  - `marginReturnRate = expectedProfit / marginRequiredFunds * 100`
+- Guard rule:
+  - if any denominator is missing or `<= 0`, the corresponding ratio field must stay null
+
+### 96.4 Peel-yield rule
+- The live peel-yield rule is fixed to released-capital value only:
+  - `rawFundsBase = rawRequiredShares * stockPrice`
+  - `expectedPeelReturnRate = expectedReturnRate * (rawFundsBase - requiredFunds) / requiredFunds`
+  - `marginPeelReturnRate = marginReturnRate * (rawFundsBase - marginRequiredFunds) / marginRequiredFunds`
+- Guard rule:
+  - if the base spread is not positive, the peel-yield field must remain null
+  - no synthetic zero-fill is allowed
+
+### 96.5 Annualized-return rule
+- `annualizedReturnRate` base is fixed to `marginPeelReturnRate`.
+- Annualization formula is fixed to compound annualization:
+  - `(1 + marginPeelReturnRate / 100)^(252 / estimatedApplyTradingDays) - 1`
+  - outward field remains percentage-style after conversion back to `* 100`
+- `estimatedApplyTradingDays` rule:
+  - if a row already has a future `applyDate`, use truthful trading days from today to `applyDate`
+  - otherwise:
+    - `上市委通过 -> 申购日` uses the median historical trading-day lag
+    - `同意注册 / 注册生效 -> 申购日` uses the median historical trading-day lag
+  - if no truthful sample exists, both `estimatedApplyTradingDays` and `annualizedReturnRate` stay null
+
+### 96.6 Pinning and push-eligibility rule
+- Page pinning is no longer expressed by summary cards.
+- Each row must expose:
+  - `inApplyStage`
+  - `pinPriority`
+  - `pushEligible`
+- `pinPriority` is fixed to:
+  - `0` for apply-stage rows
+  - `1` for non-apply rows with `expectedReturnRate > min_expected_return_rate`
+  - `2` for all other rows
+- `pushEligible = true` only when:
+  - `pinPriority` is `0` or `1`
+- Apply-stage rows must sort ahead of all other rows regardless of annualized return.
+
+### 96.7 Page rendering rule
+- In `presentation/dashboard/dashboard_page.js`:
+  - remove all top summary / source-status / reminder cards for `可转债抢权配售`
+  - remove the second source table
+  - remove detail rendering for this module
+  - render one single paginated table only
+- Visible columns are fixed to:
+  - `正股代码`
+  - `正股名称`
+  - `方案进展`
+  - `进展公告日`
+  - `发行规模`
+  - `总市值`
+  - `发行比例`
+  - `原始所需股数`
+  - `配售股数`
+  - `两融所需股数`
+  - `转股价`
+  - `波动率`
+  - `单位期权价值`
+  - `期权价值`
+  - `所需资金`
+  - `股权登记日`
+  - `预期收益率`
+  - `两融收益率`
+  - `预期收益率去皮`
+  - `两融收益率去皮`
+  - `年化收益率`
+- Visible `转债代码 / 转债名称` and module detail rows are retired in this round.
+- Default table ordering must be:
+  - `pinPriority asc`
+  - then `annualizedReturnRate desc`
+  - then `marginReturnRate desc`
+
+### 96.8 Push markdown rule
+- `notification/styles/cb_rights_issue_markdown.js` must render exactly two groups:
+  - `申购阶段项目`
+  - `预期收益率 > 6% 项目`
+- The second group must exclude rows already included in the first group.
+- Each pushed line must include:
+  - `方案进展`
+  - `进展公告日`
+  - `发行规模`
+  - `总市值`
+  - `发行比例`
+  - `两融所需股数`
+  - `两融收益率`
+  - `两融收益率去皮`
+  - `年化收益率`
+
+### 96.9 Response-shape rule
+- `GET /api/market/cb-rights-issue` outward row fields must include:
+  - `stockMarketValueYi`
+  - `issueScaleYi`
+  - `issueRatio`
+  - `placementShares`
+  - `marginRequiredShares`
+  - `marginRequiredFunds`
+  - `marginReturnRate`
+  - `expectedPeelReturnRate`
+  - `marginPeelReturnRate`
+  - `annualizedReturnRate`
+  - `estimatedApplyTradingDays`
+  - `pinPriority`
+  - `inApplyStage`
+  - `pushEligible`
+- Existing path and envelope remain unchanged.
+
+### 96.10 Regression boundary
+- `volatility250` remains the only live volatility input.
+- Existing push schedule slots remain unchanged.
+- Rows lacking truthful market value or trading-day samples must remain visible, but the related derived fields must degrade to null rather than guessed values.

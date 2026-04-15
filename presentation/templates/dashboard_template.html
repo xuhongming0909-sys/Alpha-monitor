@@ -38,7 +38,7 @@
         --table-cell-padding-x-desktop: 12px;
         --table-font-size-tablet: 13px;
         --table-min-width-subscription: 1180px;
-        --table-min-width-convertible: 1560px;
+        --table-min-width-convertible: 1340px;
         --table-min-width-premium: 1240px;
         --table-min-width-monitor: 1320px;
         --table-min-width-dividend: 1100px;
@@ -429,24 +429,37 @@
 
       .sort-head {
         display: inline-flex;
+        flex-direction: column;
         align-items: center;
-        gap: 8px;
+        justify-content: center;
+        gap: 2px;
         min-height: auto;
         padding: 0;
         background: transparent;
         color: inherit;
+        width: 100%;
+        text-align: center;
+      }
+
+      .sort-head .sort-label {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        width: 100%;
       }
 
       .sort-head .sort-indicator {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 18px;
-        height: 18px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.05);
+        width: 12px;
+        height: 12px;
+        border-radius: 0;
+        background: transparent;
         color: var(--text-faint);
-        font-size: 11px;
+        font-size: 10px;
+        line-height: 1;
       }
 
       .sort-head.active {
@@ -928,6 +941,16 @@
         min-width: var(--table-min-width-convertible);
       }
 
+      table[data-table-kind="convertible"] th,
+      table[data-table-kind="convertible"] td {
+        padding: 8px 6px;
+      }
+
+      table[data-table-kind="convertible"] th,
+      table[data-table-kind="convertible"] td {
+        padding: 8px 9px;
+      }
+
       table[data-table-kind="premium"] {
         min-width: var(--table-min-width-premium);
       }
@@ -1033,47 +1056,10 @@
         min-width: 108px;
       }
 
-      table[data-table-kind="convertible"] th.col-index-sticky {
-        left: 0;
-        z-index: 7;
-        background:
-          linear-gradient(180deg, rgba(30, 33, 44, 0.99), rgba(22, 25, 34, 0.99)),
-          rgba(18, 18, 22, 0.99);
-        box-shadow: 6px 0 14px rgba(0, 0, 0, 0.12);
-      }
-
-      table[data-table-kind="convertible"] td.col-index-sticky {
-        position: sticky;
-        left: 0;
-        z-index: 4;
-        background:
-          linear-gradient(180deg, rgba(22, 25, 34, 0.99), rgba(18, 18, 22, 0.99)),
-          rgba(18, 18, 22, 0.99);
-        box-shadow: 6px 0 14px rgba(0, 0, 0, 0.08);
-      }
-
-      table[data-table-kind="convertible"] th.col-code-sticky {
-        left: 46px;
-        z-index: 6;
-        background:
-          linear-gradient(180deg, rgba(30, 33, 44, 0.985), rgba(22, 25, 34, 0.985)),
-          rgba(18, 18, 22, 0.985);
-        box-shadow: 8px 0 16px rgba(0, 0, 0, 0.15);
-      }
-
-      table[data-table-kind="convertible"] td.col-code-sticky {
-        position: sticky;
-        left: 46px;
-        z-index: 3;
-        background:
-          linear-gradient(180deg, rgba(22, 25, 34, 0.985), rgba(18, 18, 22, 0.985)),
-          rgba(18, 18, 22, 0.985);
-        box-shadow: 8px 0 16px rgba(0, 0, 0, 0.1);
-      }
-
       table[data-table-kind="convertible"] th.col-bond-sticky {
-        left: 130px;
-        z-index: 5;
+        left: 0;
+        z-index: 6;
+        min-width: 114px;
         background:
           linear-gradient(180deg, rgba(30, 33, 44, 0.98), rgba(22, 25, 34, 0.98)),
           rgba(18, 18, 22, 0.98);
@@ -1082,16 +1068,15 @@
 
       table[data-table-kind="convertible"] td.col-bond-sticky {
         position: sticky;
-        left: 130px;
-        z-index: 2;
+        left: 0;
+        z-index: 3;
+        min-width: 114px;
         background:
           linear-gradient(180deg, rgba(22, 25, 34, 0.98), rgba(18, 18, 22, 0.98)),
           rgba(18, 18, 22, 0.98);
         box-shadow: 10px 0 18px rgba(0, 0, 0, 0.12);
       }
 
-      table[data-table-kind="convertible"] tbody tr:not(.detail-row):not(.subscription-row):not(.merger-row-today):nth-child(even) td.col-index-sticky,
-      table[data-table-kind="convertible"] tbody tr:not(.detail-row):not(.subscription-row):not(.merger-row-today):nth-child(even) td.col-code-sticky,
       table[data-table-kind="convertible"] tbody tr:not(.detail-row):not(.subscription-row):not(.merger-row-today):nth-child(even) td.col-bond-sticky {
         background:
           linear-gradient(180deg, rgba(28, 31, 40, 0.98), rgba(23, 25, 33, 0.98)),
@@ -1128,6 +1113,63 @@
         min-width: 112px;
       }
 
+      table[data-table-kind="convertible"] th.col-cb-identity,
+      table[data-table-kind="convertible"] td.col-cb-identity {
+        width: auto;
+        min-width: 104px;
+      }
+
+      table[data-table-kind="convertible"] th.col-cb-quote,
+      table[data-table-kind="convertible"] td.col-cb-quote {
+        width: auto;
+        min-width: 68px;
+      }
+
+      table[data-table-kind="convertible"] th.col-cb-volume,
+      table[data-table-kind="convertible"] td.col-cb-volume {
+        width: auto;
+        min-width: 86px;
+      }
+
+      table[data-table-kind="convertible"] th.col-cb-num,
+      table[data-table-kind="convertible"] td.col-cb-num {
+        width: auto;
+        min-width: 64px;
+      }
+
+      table[data-table-kind="convertible"] th.col-cb-percent,
+      table[data-table-kind="convertible"] td.col-cb-percent {
+        width: auto;
+        min-width: 68px;
+      }
+
+      table[data-table-kind="convertible"] th.col-cb-factor,
+      table[data-table-kind="convertible"] td.col-cb-factor {
+        width: auto;
+        min-width: 72px;
+      }
+
+      table[data-table-kind="convertible"] th.col-cb-market,
+      table[data-table-kind="convertible"] td.col-cb-market {
+        width: auto;
+        min-width: 64px;
+      }
+
+      table[data-table-kind="convertible"] th {
+        white-space: normal;
+      }
+
+      table[data-table-kind="convertible"] th .sort-head {
+        align-items: flex-start;
+      }
+
+      table[data-table-kind="convertible"] th .sort-label {
+        white-space: normal;
+        line-height: 1.02;
+        word-break: break-all;
+        overflow-wrap: anywhere;
+      }
+
       tbody tr {
         transition: background 0.16s ease;
       }
@@ -1156,6 +1198,34 @@
         background:
           linear-gradient(90deg, rgba(255, 85, 102, 0.12), rgba(255, 85, 102, 0.02)),
           rgba(255, 255, 255, 0.014);
+      }
+
+      .cb-rights-issue-row-apply {
+        background:
+          linear-gradient(90deg, rgba(55, 208, 154, 0.16), rgba(55, 208, 154, 0.03)),
+          rgba(255, 255, 255, 0.014);
+      }
+
+      .cb-rights-issue-row-high-return {
+        background:
+          linear-gradient(90deg, rgba(255, 184, 94, 0.16), rgba(255, 184, 94, 0.03)),
+          rgba(255, 255, 255, 0.014);
+      }
+
+      .bond-risk-marker {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 16px;
+        height: 16px;
+        margin-left: 6px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #ff5c5c, #e03131);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1;
+        box-shadow: 0 4px 10px rgba(224, 49, 49, 0.24);
       }
 
       .stage-pill,
@@ -1635,10 +1705,11 @@
           </div>
         </form>
       </section>
+
     </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <script src="/presentation/dashboard/dashboard_page.js?v=20260325-status-refresh-1"></script>
+    <script src="/presentation/dashboard/dashboard_page.js?v=20260416-cb-rights-issue-single-table-2"></script>
   </body>
 </html>

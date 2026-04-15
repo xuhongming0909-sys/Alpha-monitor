@@ -25,9 +25,9 @@ from shared.paths.tool_paths import ensure_scripts_on_path
 ensure_scripts_on_path()
 
 import cb_rights_issue_stock_history_db as history_db
+
 _CONFIG = get_config()
 _FETCH_CONFIG = (((_CONFIG.get("data_fetch") or {}).get("plugins") or {}).get("cb_rights_issue") or {})
-_STRATEGY_CONFIG = (((_CONFIG.get("strategy") or {}).get("cb_rights_issue") or {}))
 
 SOURCE_PAGE_URL = str(_FETCH_CONFIG.get("source_page_url") or "https://www.jisilu.cn/web/data/cb/pre").strip()
 SOURCE_API_URL = str(_FETCH_CONFIG.get("source_api_url") or "https://www.jisilu.cn/webapi/cb/pre/").strip()
@@ -35,7 +35,9 @@ SOURCE_REFERER = str(_FETCH_CONFIG.get("source_referer") or SOURCE_PAGE_URL).str
 SOURCE_TITLE = str(_FETCH_CONFIG.get("source_title") or "集思录可转债预案").strip()
 REQUEST_TIMEOUT_MS = max(5000, int(_FETCH_CONFIG.get("request_timeout_ms") or 20000))
 INLINE_HISTORY_HYDRATE_LIMIT = max(1, int(_FETCH_CONFIG.get("inline_history_hydrate_limit") or 12))
-VOL_WINDOW = max(1, int(_STRATEGY_CONFIG.get("volatility_window") or 60))
+ACTIVE_VOL_WINDOW = 250
+VOLATILITY_FIELD = f"volatility{ACTIVE_VOL_WINDOW}"
+LEGACY_VOLATILITY_ALIAS = "volatility60"
 TRADING_DAYS_PER_YEAR = 252
 
 
@@ -62,9 +64,7 @@ def normalize_date(value: Any) -> str:
     text = str(value or "").strip()
     if not text:
         return ""
-    if len(text) >= 10:
-        return text[:10]
-    return text
+    return text[:10] if len(text) >= 10 else text
 
 
 def infer_market_from_stock_code(stock_code: str) -> str:
@@ -114,17 +114,65 @@ def _load_latest_stock_price_map(stock_codes: Iterable[str]) -> Dict[str, Dict[s
     return result
 
 
+def _normalize_market_value_to_yi(value: Any) -> Optional[float]:
+    market_value = to_float(value)
+    if market_value is None or market_value <= 0:
+        return None
+    if market_value >= 100000:
+        return market_value / 100000000.0
+    return market_value
+
+
+def _load_stock_market_value_map(stock_codes: Iterable[str]) -> Dict[str, Optional[float]]:
+    target_codes = {normalize_stock_code(code) for code in stock_codes if normalize_stock_code(code)}
+    if not target_codes:
+        return {}
+
+    for fetcher in (getattr(ak, "stock_zh_a_spot_em", None), getattr(ak, "stock_zh_a_spot", None)):
+        if fetcher is None:
+            continue
+        try:
+            df = fetcher()
+        except Exception:
+            continue
+        if df is None or df.empty:
+            continue
+
+        code_col = next((name for name in ("\u4ee3\u7801", "code", "symbol") if name in df.columns), None)
+        market_value_col = next(
+            (
+                name
+                for name in ("\u603b\u5e02\u503c", "\u603b\u5e02\u503c(\u5143)", "market_value", "marketValue")
+                if name in df.columns
+            ),
+            None,
+        )
+        if not code_col or not market_value_col:
+            continue
+
+        result: Dict[str, Optional[float]] = {}
+        for _, series in df.iterrows():
+            code = normalize_stock_code(series.get(code_col))
+            if not code or code not in target_codes:
+                continue
+            result[code] = _normalize_market_value_to_yi(series.get(market_value_col))
+        if result:
+            return result
+
+    return {}
+
+
 def _calc_volatility_from_closes(closes: List[float]) -> Optional[float]:
-    if len(closes) < VOL_WINDOW + 1:
+    if len(closes) < ACTIVE_VOL_WINDOW + 1:
         return None
     returns: List[float] = []
     for left, right in zip(closes[:-1], closes[1:]):
         if left <= 0 or right <= 0:
             continue
         returns.append(math.log(right / left))
-    if len(returns) < VOL_WINDOW:
+    if len(returns) < ACTIVE_VOL_WINDOW:
         return None
-    sample = returns[-VOL_WINDOW:]
+    sample = returns[-ACTIVE_VOL_WINDOW:]
     mean_value = sum(sample) / len(sample)
     variance = sum((item - mean_value) ** 2 for item in sample) / len(sample)
     return math.sqrt(variance) * math.sqrt(TRADING_DAYS_PER_YEAR)
@@ -133,10 +181,12 @@ def _calc_volatility_from_closes(closes: List[float]) -> Optional[float]:
 def _load_history_metrics(stock_codes: Iterable[str]) -> Dict[str, Dict[str, Any]]:
     metrics: Dict[str, Dict[str, Any]] = {}
     for stock_code in sorted({normalize_stock_code(code) for code in stock_codes if normalize_stock_code(code)}):
-        closes = history_db.load_recent_closes(stock_code, VOL_WINDOW + 1)
+        closes = history_db.load_recent_closes(stock_code, ACTIVE_VOL_WINDOW + 1)
+        volatility250 = _calc_volatility_from_closes(closes)
         metrics[stock_code] = {
             "closeCount": len(closes),
-            "volatility60": _calc_volatility_from_closes(closes),
+            VOLATILITY_FIELD: volatility250,
+            LEGACY_VOLATILITY_ALIAS: volatility250,
         }
     return metrics
 
@@ -145,13 +195,12 @@ def _hydrate_missing_history(metrics: Dict[str, Dict[str, Any]]) -> Dict[str, An
     missing = [
         code
         for code, item in metrics.items()
-        if not isinstance(item, dict) or item.get("volatility60") is None
+        if not isinstance(item, dict) or item.get(VOLATILITY_FIELD) is None
     ]
     if not missing:
         return {"requested": 0, "success": True}
     if len(missing) > INLINE_HISTORY_HYDRATE_LIMIT:
         return {"requested": len(missing), "success": False, "skipped": "over_inline_limit"}
-    # 这里延迟导入，避免 source.py 与 history_source.py 之间形成循环依赖。
     from data_fetch.cb_rights_issue.history_source import sync_cb_rights_issue_stock_history
 
     return sync_cb_rights_issue_stock_history(target_symbols=missing)
@@ -173,8 +222,28 @@ def _get_risk_free_rate() -> Dict[str, Any]:
     }
 
 
+def _load_trade_calendar_dates() -> List[str]:
+    try:
+        df = ak.tool_trade_date_hist_sina()
+    except Exception:
+        return []
+    if df is None or df.empty:
+        return []
+
+    date_col = next((name for name in ("trade_date", "\u65e5\u671f", "date") if name in df.columns), None)
+    if not date_col:
+        return []
+
+    dates: List[str] = []
+    for value in df[date_col].tolist():
+        text = normalize_date(value)
+        if text:
+            dates.append(text)
+    return sorted({item for item in dates if item})
+
+
 def get_cb_rights_issue_source_snapshot() -> Dict[str, Any]:
-    """抓取固定来源并补充实时价、国债收益率和专用历史库指标。"""
+    """抓取固定来源，并补充实时价、国债收益率、总市值和交易日历。"""
 
     try:
         raw_rows = fetch_fixed_source_rows()
@@ -198,6 +267,8 @@ def get_cb_rights_issue_source_snapshot() -> Dict[str, Any]:
         history_metrics = _load_history_metrics(stock_codes)
 
     latest_price_map = _load_latest_stock_price_map(stock_codes)
+    stock_market_value_map = _load_stock_market_value_map(stock_codes)
+    trade_calendar_dates = _load_trade_calendar_dates()
     try:
         risk_free = _get_risk_free_rate()
     except Exception as exc:
@@ -233,7 +304,8 @@ def get_cb_rights_issue_source_snapshot() -> Dict[str, Any]:
             "stockPriceSource": "tencent" if price_info.get("price") is not None else "jisilu",
             "sourceStockPrice": source_price,
             "convertPrice": to_float(item.get("convert_price")),
-            "volatility60": history_info.get("volatility60"),
+            "volatility250": history_info.get(VOLATILITY_FIELD),
+            "volatility60": history_info.get(LEGACY_VOLATILITY_ALIAS),
             "historyCloseCount": int(history_info.get("closeCount") or 0),
             "rationPerShare": to_float(item.get("ration")),
             "apply10": to_float(item.get("apply10")),
@@ -241,6 +313,8 @@ def get_cb_rights_issue_source_snapshot() -> Dict[str, Any]:
             "recordPrice": to_float(item.get("record_price")),
             "amountYi": to_float(item.get("amount")),
             "cbAmountYi": to_float(item.get("cb_amount")),
+            "issueScaleYi": to_float(item.get("cb_amount")),
+            "stockMarketValueYi": stock_market_value_map.get(stock_code),
             "progress": str(item.get("progress") or "").strip(),
             "progressName": str(item.get("progress_nm") or "").strip(),
             "progressDate": normalize_date(item.get("progress_dt")),
@@ -268,4 +342,5 @@ def get_cb_rights_issue_source_snapshot() -> Dict[str, Any]:
         "treasuryYield10yDate": risk_free.get("date"),
         "treasuryYield10ySource": risk_free.get("source"),
         "hydrateStats": hydrate_stats,
+        "tradeCalendarDates": trade_calendar_dates,
     }

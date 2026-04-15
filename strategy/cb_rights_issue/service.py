@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Optional
+from bisect import bisect_right
+from datetime import datetime
+from statistics import median
+from typing import Any, Dict, List, Optional
 
 from shared.config.script_config import get_config
 from shared.models.service_result import build_success
@@ -13,10 +16,18 @@ _STRATEGY_CONFIG = (((_CONFIG.get("strategy") or {}).get("cb_rights_issue") or {
 
 MIN_EXPECTED_RETURN_RATE = float(_STRATEGY_CONFIG.get("min_expected_return_rate") or 6.0)
 TARGET_BOND_LOTS = max(1, int(_STRATEGY_CONFIG.get("target_bond_lots") or 10))
-LOT_SIZE_SHARES = max(1, int(_STRATEGY_CONFIG.get("lot_size_shares") or 100))
-SHANGHAI_RATIO_FACTOR = float(_STRATEGY_CONFIG.get("shanghai_ratio_factor") or 0.6)
+MARGIN_SHARE_RATIO = float(_STRATEGY_CONFIG.get("margin_share_ratio") or 0.6)
+MARGIN_ROUND_LOT_SHARES = max(1, int(_STRATEGY_CONFIG.get("margin_round_lot_shares") or 50))
 OPTION_TERM_YEARS = float(_STRATEGY_CONFIG.get("option_term_years") or 6.0)
-ELIGIBLE_PROGRESS_KEYWORDS = [str(item or "").strip() for item in (_STRATEGY_CONFIG.get("eligible_progress_keywords") or []) if str(item or "").strip()]
+TRADING_DAYS_PER_YEAR = max(1, int(_STRATEGY_CONFIG.get("annualization_trading_days_per_year") or 252))
+
+APPLY_STAGE_KEYWORDS = tuple(
+    str(item or "").strip()
+    for item in (_STRATEGY_CONFIG.get("apply_stage_keywords") or ["申购", "待发", "发行公告", "网上发行"])
+    if str(item or "").strip()
+)
+REGISTRATION_STAGE_KEYWORDS = ("同意注册", "注册生效")
+LISTING_COMMITTEE_STAGE_KEYWORDS = ("上市委通过",)
 
 
 def _to_float(value: Any) -> Optional[float]:
@@ -33,42 +44,114 @@ def _round(value: Optional[float], digits: int = 4) -> Optional[float]:
     return round(float(value), digits)
 
 
-def _is_stage_eligible(row: Dict[str, Any]) -> bool:
-    progress_name = str(row.get("progressName") or "").strip()
-    if any(keyword and keyword in progress_name for keyword in ELIGIBLE_PROGRESS_KEYWORDS):
+def _normalize_date_text(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return text[:10]
+
+
+def _normalize_trade_calendar(values: Any) -> List[str]:
+    result = sorted({
+        _normalize_date_text(item)
+        for item in (values or [])
+        if _normalize_date_text(item)
+    })
+    return result
+
+
+def _count_trading_days(trade_calendar: List[str], start_date: str, end_date: str) -> Optional[int]:
+    start_text = _normalize_date_text(start_date)
+    end_text = _normalize_date_text(end_date)
+    if not start_text or not end_text or start_text >= end_text or not trade_calendar:
+        return None
+    left = bisect_right(trade_calendar, start_text)
+    right = bisect_right(trade_calendar, end_text)
+    count = right - left
+    return count if count > 0 else None
+
+
+def _add_trading_days(trade_calendar: List[str], start_date: str, trading_days: int) -> str:
+    start_text = _normalize_date_text(start_date)
+    if not start_text or trading_days <= 0 or not trade_calendar:
+        return ""
+    start_index = bisect_right(trade_calendar, start_text)
+    target_index = start_index + trading_days - 1
+    if target_index < 0 or target_index >= len(trade_calendar):
+        return ""
+    return trade_calendar[target_index]
+
+
+def _normalize_progress_sample_group(progress_name: str) -> str:
+    text = str(progress_name or "").strip()
+    if any(keyword in text for keyword in LISTING_COMMITTEE_STAGE_KEYWORDS):
+        return "listing_committee"
+    if any(keyword in text for keyword in REGISTRATION_STAGE_KEYWORDS):
+        return "registration"
+    return ""
+
+
+def _is_apply_stage(row: Dict[str, Any]) -> bool:
+    if _normalize_date_text(row.get("applyDate")):
         return True
-    return bool(str(row.get("applyDate") or "").strip())
+    progress_name = str(row.get("progressName") or "").strip()
+    return any(keyword in progress_name for keyword in APPLY_STAGE_KEYWORDS)
 
 
-def _resolve_required_shares(row: Dict[str, Any]) -> Dict[str, Any]:
-    """计算配售10张所需股数，输出原始值、调整值和最终取整值。"""
+def _build_stage_lag_median_map(rows: List[Dict[str, Any]], trade_calendar: List[str]) -> Dict[str, int]:
+    if not trade_calendar:
+        return {}
 
-    raw_required = _to_float(row.get("rawRequiredShares"))
-    if raw_required is None or raw_required <= 0:
-        return {
-            "requiredSharesRaw": None,
-            "requiredSharesAdjusted": None,
-            "requiredSharesFinal": None,
-            "marketRule": "missing_raw_required_shares",
-        }
-
-    market = str(row.get("market") or "").strip().lower()
-    if market == "sh":
-        # 沪市规则：原始所需股数直接乘 0.6，再按 100 股向上取整。
-        adjusted = raw_required * SHANGHAI_RATIO_FACTOR
-        final_required = int(math.ceil(adjusted / LOT_SIZE_SHARES) * LOT_SIZE_SHARES)
-        market_rule = "shanghai_raw_x_0.6_then_round_100"
-    else:
-        adjusted = raw_required
-        final_required = int(math.ceil(adjusted / LOT_SIZE_SHARES) * LOT_SIZE_SHARES)
-        market_rule = "shenzhen_raw_then_round_100"
-
-    return {
-        "requiredSharesRaw": _round(raw_required, 4),
-        "requiredSharesAdjusted": _round(adjusted, 4),
-        "requiredSharesFinal": final_required,
-        "marketRule": market_rule,
+    samples: Dict[str, List[int]] = {
+        "listing_committee": [],
+        "registration": [],
     }
+    for row in rows:
+        sample_group = _normalize_progress_sample_group(str(row.get("progressName") or ""))
+        progress_date = _normalize_date_text(row.get("progressDate"))
+        apply_date = _normalize_date_text(row.get("applyDate"))
+        if not sample_group or not progress_date or not apply_date:
+            continue
+        gap = _count_trading_days(trade_calendar, progress_date, apply_date)
+        if gap is None or gap <= 0:
+            continue
+        samples[sample_group].append(gap)
+
+    medians: Dict[str, int] = {}
+    for key, values in samples.items():
+        if values:
+            medians[key] = int(round(float(median(values))))
+    return medians
+
+
+def _resolve_estimated_apply_trading_days(
+    row: Dict[str, Any],
+    *,
+    today_text: str,
+    trade_calendar: List[str],
+    stage_lag_median_map: Dict[str, int],
+) -> tuple[Optional[int], str]:
+    apply_date = _normalize_date_text(row.get("applyDate"))
+    if apply_date:
+        return _count_trading_days(trade_calendar, today_text, apply_date), "apply_date"
+
+    sample_group = _normalize_progress_sample_group(str(row.get("progressName") or ""))
+    progress_date = _normalize_date_text(row.get("progressDate"))
+    stage_lag = int(stage_lag_median_map.get(sample_group) or 0)
+    if not sample_group or not progress_date or stage_lag <= 0:
+        return None, ""
+
+    estimated_apply_date = _add_trading_days(trade_calendar, progress_date, stage_lag)
+    if not estimated_apply_date:
+        return None, ""
+    return _count_trading_days(trade_calendar, today_text, estimated_apply_date), f"median:{sample_group}"
+
+
+def _resolve_margin_required_shares(raw_required_shares: Optional[float]) -> Optional[int]:
+    if raw_required_shares is None or raw_required_shares <= 0:
+        return None
+    adjusted = raw_required_shares * MARGIN_SHARE_RATIO
+    return int(math.ceil(adjusted / MARGIN_ROUND_LOT_SHARES) * MARGIN_ROUND_LOT_SHARES)
 
 
 def _norm_cdf(value: float) -> float:
@@ -91,82 +174,169 @@ def _black_scholes_call(spot: float, strike: float, years: float, risk_free_rate
     return (spot * _norm_cdf(d1)) - (strike * math.exp(-risk_free_rate * years) * _norm_cdf(d2))
 
 
-def _build_row(row: Dict[str, Any], risk_free_rate: Optional[float], treasury_yield_10y: Optional[float]) -> Dict[str, Any]:
+def _calc_annualized_return_rate(margin_peel_return_rate: Optional[float], trading_days: Optional[int]) -> Optional[float]:
+    if margin_peel_return_rate is None or trading_days is None or trading_days <= 0:
+        return None
+    base_ratio = margin_peel_return_rate / 100.0
+    if base_ratio <= -1.0:
+        return None
+    annualized_ratio = math.pow(1.0 + base_ratio, TRADING_DAYS_PER_YEAR / float(trading_days)) - 1.0
+    return annualized_ratio * 100.0
+
+
+def _build_row(
+    row: Dict[str, Any],
+    *,
+    risk_free_rate: Optional[float],
+    treasury_yield_10y: Optional[float],
+    trade_calendar: List[str],
+    today_text: str,
+    stage_lag_median_map: Dict[str, int],
+) -> Dict[str, Any]:
     stock_price = _to_float(row.get("stockPrice"))
     convert_price = _to_float(row.get("convertPrice"))
-    volatility60 = _to_float(row.get("volatility60"))
-    required_share_info = _resolve_required_shares(row)
+    volatility = _to_float(row.get("volatility250") if row.get("volatility250") is not None else row.get("volatility60"))
+    raw_required_shares = _to_float(row.get("rawRequiredShares"))
+    placement_shares = raw_required_shares if raw_required_shares and raw_required_shares > 0 else None
+    margin_required_shares = _resolve_margin_required_shares(raw_required_shares)
 
+    issue_scale_yi = _to_float(row.get("issueScaleYi") if row.get("issueScaleYi") is not None else row.get("cbAmountYi"))
+    stock_market_value_yi = _to_float(row.get("stockMarketValueYi"))
+    issue_ratio = None
+    if issue_scale_yi is not None and stock_market_value_yi is not None and stock_market_value_yi > 0:
+        issue_ratio = issue_scale_yi / stock_market_value_yi
+
+    required_funds = None
+    margin_required_funds = None
+    original_funds_baseline = None
+    if stock_price is not None and stock_price > 0 and placement_shares is not None:
+        required_funds = placement_shares * stock_price
+        original_funds_baseline = placement_shares * stock_price
+    if stock_price is not None and stock_price > 0 and margin_required_shares is not None:
+        margin_required_funds = margin_required_shares * stock_price
+
+    option_reference_price = convert_price
     option_strike_price = None
     option_quantity = None
     option_unit_value = None
-    expected_profit = None
-    required_funds = None
-    expected_return_rate = None
-
-    if stock_price and stock_price > 0 and required_share_info["requiredSharesFinal"]:
-        required_funds = required_share_info["requiredSharesFinal"] * stock_price
-
+    option_value = None
     if stock_price and stock_price > 0 and convert_price and convert_price > 0:
-        # URL 页面给出的转股价按 20 日均值代理处理，行权价取它与当前价的较大值。
         option_strike_price = max(stock_price, convert_price)
-        option_quantity = 1000.0 / option_strike_price if option_strike_price > 0 else None
+        option_quantity = (TARGET_BOND_LOTS * 100.0 / option_strike_price) if option_strike_price > 0 else None
 
     if (
-        stock_price and stock_price > 0 and
-        option_strike_price and option_strike_price > 0 and
-        option_quantity and option_quantity > 0 and
-        risk_free_rate is not None and
-        volatility60 is not None and volatility60 > 0
+        stock_price and stock_price > 0
+        and option_strike_price and option_strike_price > 0
+        and option_quantity and option_quantity > 0
+        and risk_free_rate is not None
+        and volatility is not None and volatility > 0
     ):
         option_unit_value = _black_scholes_call(
             stock_price,
             option_strike_price,
             OPTION_TERM_YEARS,
             risk_free_rate,
-            volatility60,
+            volatility,
         )
-        expected_profit = option_unit_value * option_quantity
+        option_value = option_unit_value * option_quantity
 
-    if expected_profit is not None and required_funds and required_funds > 0:
-        expected_return_rate = (expected_profit / required_funds) * 100.0
+    expected_return_rate = None
+    if option_value is not None and required_funds is not None and required_funds > 0:
+        expected_return_rate = option_value / required_funds * 100.0
 
-    stage_eligible = _is_stage_eligible(row)
-    monitor_eligible = bool(
-        stage_eligible and
-        expected_return_rate is not None and
-        expected_return_rate > MIN_EXPECTED_RETURN_RATE
+    margin_return_rate = None
+    if option_value is not None and margin_required_funds is not None and margin_required_funds > 0:
+        margin_return_rate = option_value / margin_required_funds * 100.0
+
+    expected_peel_return_rate = None
+    if (
+        expected_return_rate is not None
+        and original_funds_baseline is not None
+        and required_funds is not None
+        and required_funds > 0
+    ):
+        expected_peel_return_rate = expected_return_rate * ((original_funds_baseline - required_funds) / required_funds)
+
+    margin_peel_return_rate = None
+    if (
+        margin_return_rate is not None
+        and original_funds_baseline is not None
+        and margin_required_funds is not None
+        and margin_required_funds > 0
+    ):
+        margin_peel_return_rate = margin_return_rate * ((original_funds_baseline - margin_required_funds) / margin_required_funds)
+
+    estimated_apply_trading_days, trading_days_source = _resolve_estimated_apply_trading_days(
+        row,
+        today_text=today_text,
+        trade_calendar=trade_calendar,
+        stage_lag_median_map=stage_lag_median_map,
     )
+    annualized_return_rate = _calc_annualized_return_rate(margin_peel_return_rate, estimated_apply_trading_days)
 
-    reason = ""
-    if not stage_eligible:
-        reason = "stage_not_eligible"
-    elif required_funds is None:
-        reason = "missing_required_funds"
-    elif convert_price is None:
-        reason = "missing_convert_price_reference"
-    elif volatility60 is None:
-        reason = "missing_volatility60"
-    elif expected_return_rate is None:
-        reason = "missing_option_metrics"
-    elif expected_return_rate <= MIN_EXPECTED_RETURN_RATE:
-        reason = "expected_return_not_enough"
+    in_apply_stage = _is_apply_stage(row)
+    high_return = bool(expected_return_rate is not None and expected_return_rate > MIN_EXPECTED_RETURN_RATE)
+    pin_priority = 1 if in_apply_stage else (2 if high_return else 3)
+    push_eligible = in_apply_stage or high_return
 
     return {
         **dict(row),
-        **required_share_info,
-        "stageEligible": stage_eligible,
-        "monitorEligible": monitor_eligible,
-        "optionReferencePrice": _round(convert_price, 4),
+        "issueScaleYi": _round(issue_scale_yi, 4),
+        "stockMarketValueYi": _round(stock_market_value_yi, 4),
+        "issueRatio": _round(issue_ratio, 6),
+        "placementShares": _round(placement_shares, 4),
+        "marginRequiredShares": margin_required_shares,
+        "requiredSharesRaw": _round(raw_required_shares, 4),
+        "requiredSharesAdjusted": _round(placement_shares, 4),
+        "requiredSharesFinal": _round(placement_shares, 4),
+        "marginRequiredFunds": _round(margin_required_funds, 4),
+        "requiredFunds": _round(required_funds, 4),
+        "originalFundsBaseline": _round(original_funds_baseline, 4),
+        "marketRule": f"raw_x_{MARGIN_SHARE_RATIO}_then_round_{MARGIN_ROUND_LOT_SHARES}",
+        "stageEligible": in_apply_stage or bool(_normalize_progress_sample_group(str(row.get("progressName") or ""))),
+        "monitorEligible": push_eligible,
+        "optionReferencePrice": _round(option_reference_price, 4),
         "optionStrikePrice": _round(option_strike_price, 4),
         "optionQuantity": _round(option_quantity, 6),
         "optionUnitValue": _round(option_unit_value, 6),
-        "requiredFunds": _round(required_funds, 4),
-        "expectedProfit": _round(expected_profit, 4),
+        "optionValue": _round(option_value, 4),
+        "expectedProfit": _round(option_value, 4),
         "expectedReturnRate": _round(expected_return_rate, 4),
+        "marginReturnRate": _round(margin_return_rate, 4),
+        "expectedPeelReturnRate": _round(expected_peel_return_rate, 4),
+        "marginPeelReturnRate": _round(margin_peel_return_rate, 4),
+        "estimatedApplyTradingDays": estimated_apply_trading_days,
+        "estimatedApplyTradingDaysSource": trading_days_source,
+        "annualizedReturnRate": _round(annualized_return_rate, 4),
         "treasuryYield10y": treasury_yield_10y,
-        "nonEligibleReason": reason,
+        "pinPriority": pin_priority,
+        "inApplyStage": in_apply_stage,
+        "pushEligible": push_eligible,
+        "isHighExpectedReturn": high_return,
     }
+
+
+def _sort_source_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def sort_key(item: Dict[str, Any]) -> tuple[Any, ...]:
+        annualized = _to_float(item.get("annualizedReturnRate"))
+        margin_return = _to_float(item.get("marginReturnRate"))
+        expected_return = _to_float(item.get("expectedReturnRate"))
+        progress_date = _normalize_date_text(item.get("progressDate"))
+        record_date = _normalize_date_text(item.get("recordDate"))
+        return (
+            int(item.get("pinPriority") or 99),
+            1 if annualized is None else 0,
+            999999.0 if annualized is None else -annualized,
+            1 if margin_return is None else 0,
+            999999.0 if margin_return is None else -margin_return,
+            1 if expected_return is None else 0,
+            999999.0 if expected_return is None else -expected_return,
+            progress_date or "9999-99-99",
+            record_date or "9999-99-99",
+            str(item.get("stockCode") or ""),
+        )
+
+    return sorted(rows, key=sort_key)
 
 
 def build_cb_rights_issue_response(fetch_payload: dict, bus_records: list[dict]) -> dict:
@@ -177,31 +347,36 @@ def build_cb_rights_issue_response(fetch_payload: dict, bus_records: list[dict])
 
     risk_free_rate = _to_float(fetch_payload.get("riskFreeRate"))
     treasury_yield_10y = _to_float(fetch_payload.get("treasuryYield10y"))
-    source_rows = [
-        _build_row(dict(record.get("raw") or {}), risk_free_rate, treasury_yield_10y)
+    trade_calendar = _normalize_trade_calendar(fetch_payload.get("tradeCalendarDates"))
+    today_text = datetime.now().date().isoformat()
+    base_rows = [
+        dict(record.get("raw") or {})
         for record in bus_records
-        if record.get("status") == "ok"
+        if record.get("status") == "ok" and isinstance(record.get("raw"), dict)
     ]
-
-    source_rows.sort(
-        key=lambda item: (
-            0 if item.get("monitorEligible") else 1,
-            (999999.0 if item.get("expectedReturnRate") is None else -float(item.get("expectedReturnRate"))),
-            str(item.get("progressDate") or ""),
+    stage_lag_median_map = _build_stage_lag_median_map(base_rows, trade_calendar)
+    source_rows = [
+        _build_row(
+            row,
+            risk_free_rate=risk_free_rate,
+            treasury_yield_10y=treasury_yield_10y,
+            trade_calendar=trade_calendar,
+            today_text=today_text,
+            stage_lag_median_map=stage_lag_median_map,
         )
-    )
-    monitor_list = [item for item in source_rows if item.get("monitorEligible")]
+        for row in base_rows
+    ]
+    source_rows = _sort_source_rows(source_rows)
+    monitor_list = [item for item in source_rows if item.get("pushEligible")]
+
     source_summary = {
         "totalRows": len(source_rows),
-        "eligibleStageCount": sum(1 for item in source_rows if item.get("stageEligible")),
-        "monitorEligibleCount": len(monitor_list),
-        "highReturnCount": sum(
-            1
-            for item in source_rows
-            if (_to_float(item.get("expectedReturnRate")) is not None and float(item.get("expectedReturnRate")) > MIN_EXPECTED_RETURN_RATE)
-        ),
+        "applyStageCount": sum(1 for item in source_rows if item.get("inApplyStage")),
+        "highReturnCount": sum(1 for item in source_rows if item.get("isHighExpectedReturn")),
+        "pushEligibleCount": len(monitor_list),
         "sourceUrl": fetch_payload.get("sourceUrl"),
         "sourceTitle": fetch_payload.get("sourceTitle"),
+        "stageLagMedianMap": stage_lag_median_map,
     }
 
     return build_success(

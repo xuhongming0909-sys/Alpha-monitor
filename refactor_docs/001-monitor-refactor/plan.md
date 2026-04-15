@@ -259,6 +259,73 @@ Acceptance:
 - The homepage remains reachable throughout the repair and verification process.
 ## 14. Phase K: Cloud Runtime Preservation + First-Install Proxy Closure (2026-03-23)
 
+## 87. Phase CB-Call-Spread: Convertible Theoretical Pricing Replace Put Leg With Call Spread (2026-03-30)
+
+Goal: replace the current convertible theoretical-pricing option leg with the newly confirmed strong-redeem call-spread model, and keep docs / backend / dashboard wording aligned in one round.
+
+Plan:
+1. Update `REQUIREMENTS.md` and `SPEC.md` first so the old `bond+call` / `bond+call-put` wording is explicitly retired.
+2. In `data_fetch/convertible_bond/source.py`, replace the current branch pricing with:
+   - long American call at `convertPrice`
+   - short American call at real `redeemTriggerPrice`
+   - net option value floored at `0`
+   - `theoreticalPrice = bondValue + netCallSpread`
+3. Keep the current real `redeemTriggerPrice` resolution rule:
+   - direct upstream field first
+   - fallback to `convertPrice * redeemTriggerRatio`
+4. Require truthful null output when any core pricing input is missing, especially when `redeemTriggerPrice` is absent.
+5. Keep outward main-table fields stable:
+   - `callOptionValue` becomes the net call-spread value
+   - `putOptionValue` stays exposed only for compatibility and becomes `null`
+6. Preserve internal verification fields for debugging:
+   - `longCallOptionValue`
+   - `shortCallOptionValue`
+   - `callSpreadOptionValue`
+   - `callStrike`
+   - `redeemCallStrike`
+   - `pricingFormula`
+7. Update dashboard formula hint text so it explains:
+   - `理论价 = 债底 + 净看涨价差价值`
+   - `净看涨价差价值 = call(转股价) - call(强赎价)`
+   - this wording is later superseded by Phase CI on 2026-03-30
+8. Run targeted verification on the pricing helper and a minimal project check after implementation.
+
+Acceptance:
+- Existing `bond+call` / `bond+call-put` branch logic is no longer active in the live pricing path.
+- Rows with real `redeemTriggerPrice` produce `callOptionValue = max(longCall - shortCall, 0)`.
+- Rows missing `redeemTriggerPrice` now return truthful null `theoreticalPrice / theoreticalPremiumRate`.
+- Dashboard explanatory text matches the new pricing formula.
+- Non-theoretical fields such as `convertValue / premiumRate / weightedDiscountRate / pureBondValue` remain unchanged.
+
+## 15. Phase L: Convertible / Rights-Issue Volatility Standard Switch To 250D HFQ (2026-03-30)
+
+Goal: unify all currently effective convertible-bond theoretical-pricing volatility and cb-rights-issue option-pricing volatility to one truth standard: `250日年化后复权波动率`.
+
+Plan:
+1. Update `REQUIREMENTS.md` and `SPEC.md` first so the active contract stops referring to `60日波动率` as the effective live standard for these two modules.
+2. Change `config.yaml` so:
+   - convertible-bond theoretical pricing uses `primary_vol_window = 250`
+   - convertible-bond volatility windows are centered on `250`
+   - convertible-bond underlying history retention is increased above the `251`-close floor
+   - cb-rights-issue `volatility_window = 250`
+   - cb-rights-issue dedicated stock-history retention is increased above the `251`-close floor
+3. Keep the underlying-stock history source unchanged:
+   - still use real A-share daily `后复权` history
+   - still annualize by trading-day convention
+   - still require at least `window + 1` closes
+4. Update payload shaping and front-end read paths so the visible column/notes switch to `250日波动率`, while compatibility aliases may remain temporarily for older cached rows.
+5. Rebuild the two pricing chains:
+   - convertible-bond theoretical price
+   - cb-rights-issue option value / expected return
+6. Synchronize user-facing strategy notes so other Codex sessions do not keep reading the old `60日波动率` contract.
+
+Acceptance:
+- Convertible-bond theoretical pricing uses `250日年化后复权波动率`.
+- cb-rights-issue expected-return calculation uses `250日年化后复权波动率`.
+- Dashboard visible wording changes from `60日波动率` to `250日波动率` for the affected modules.
+- Local history retention is safely above the `251`-close minimum for both modules.
+- Contracts, config, code, and strategy docs no longer disagree on the active volatility window.
+
 ## 27. Phase X: Dashboard Render Recovery For Template/Script Drift (2026-03-24)
 
 Goal: recover the public dashboard from a full-page render crash caused by template/script tab mismatch.
@@ -505,49 +572,6 @@ Acceptance:
   - redeem / putback / volatility / option / theoretical / maturity-yield fields
   - listing / convert-start / maturity / rating fields
 
-## 22. Phase S: LOF Arbitrage Zero-login MVP (2026-03-23)
-
-Goal: add a first production-safe `LOF濂楀埄` module without destabilizing the existing homepage, while continuing to investigate zero-login IOPV sources in parallel.
-
-Plan:
-1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the new LOF module contract, zero-login scope, and IOPV fallback rules.
-2. Keep the current Node + Python layered architecture:
-   - `data_fetch/lof_arbitrage` only fetches and normalizes Jisilu QDII rows
-   - `strategy/lof_arbitrage` only computes signal basis, fees, and action status
-   - `presentation` only exposes the new API and dashboard tab
-3. Use direct public JSON endpoints as phase-1 primary source:
-   - `/data/qdii/qdii_list/E`
-   - `/data/qdii/qdii_list/A`
-   - `/data/qdii/qdii_list/C`
-4. Do not block phase 1 on official IOPV completeness:
-   - if `iopv` / `iopv_discount_rt` is available, use it as high-confidence signal
-   - else if intraday estimate fields are available, use them as medium-confidence signal
-   - else degrade to NAV premium as low-confidence observation only
-5. Keep Firecrawl out of the hot path in this round:
-   - direct JSON first
-   - Firecrawl only documented as future fallback if the public JSON disappears
-6. Add a new public API `GET /api/market/lof-arbitrage`.
-7. Add a new top-level dashboard tab `LOF濂楀埄` with one phase-1 table, summary cards, and always-visible risk/detail rows.
-8. Keep the module webpage-only in phase 1:
-   - no push integration
-   - no auto-execution
-   - no changes to existing modules beyond adding the new tab and refresh path
-9. Record the ongoing IOPV search status explicitly in the outward payload so the UI can show whether the current zero-login chain has usable IOPV or only NAV fallback.
-
-Acceptance:
-- The homepage still opens normally after the new LOF module is added.
-- `GET /api/market/lof-arbitrage` returns real rows from the zero-login Jisilu QDII endpoints.
-- The `LOF濂楀埄` page shows:
-  - current price
-  - NAV premium
-  - IOPV premium when publicly available
-  - estimate premium when publicly available
-  - signal basis
-  - apply status
-  - action status
-- When IOPV is missing, the page clearly downgrades to observation mode instead of pretending the signal is execution-grade.
-- A single-source failure in one LOF category degrades only that category and does not blank the homepage.
-
 ## 23. Phase T: CB Truth-source Yield + Formula Hint + Column Split Polish (2026-03-23)
 
 Goal: finish the current convertible-bond dense-table round so the visible fields and source truthfulness match the latest user contract.
@@ -598,45 +622,6 @@ Acceptance:
 - Premium-history active contracts remain limited to `AH / AB`.
 - Existing `AH / AB / LOF濂楀埄 / 杞€?/ 鐩戞帶 / 鍒嗙孩 / 浜嬩欢濂楀埄` behavior does not regress.
 
-## 24. Phase U: LOF Authenticated Enrichment + Market Subtabs (2026-03-23)
-
-Goal: upgrade the current `LOF濂楀埄` MVP into a fuller real-data page that is closer to the live Jisilu reading path, while still refusing to fabricate unavailable `IOPV` fields.
-
-Plan:
-1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
-2. Keep the current layered architecture:
-   - `data_fetch/lof_arbitrage` only fetches source rows and cache fallback
-   - `strategy/lof_arbitrage` only computes outward row semantics and overview
-   - `presentation` only renders page structure and columns
-3. Add optional authenticated enhancement on top of the current Jisilu QDII endpoints:
-   - if `data_fetch.plugins.lof_arbitrage.jisilu_cookie` is configured, send it and use the larger logged-in result set
-   - if cookie is missing or invalid, automatically fall back to the public result set
-4. Keep truthfulness strict:
-   - more rows are allowed after login enhancement
-   - `IOPV` / `IOPV婧环鐜嘸 may still stay empty
-   - outward payload and UI must state that clearly instead of inventing values
-5. Expand standardized LOF fields so the page can render the practical long-table view, including:
-   - code / name / issuer
-   - current price / change rate / 鎴愪氦棰?   - 鍦哄唴浠介 / 鍦哄唴鏂板浠介
-   - T-2 鍑€鍊?/ 鍑€鍊兼棩鏈?/ 鍑€鍊兼孩浠?   - IOPV / IOPV婧环
-   - 浼板€?/ 浼板€兼孩浠?   - 鐩稿叧鎸囨暟 / 鎸囨暟娑ㄥ箙
-   - 鐢宠喘璐?/ 鐢宠喘鐘舵€?/ 璧庡洖璐?/ 璧庡洖鐘舵€?/ 绠℃墭璐?   - 瀹樻柟鍩洪噾椤甸摼鎺?/ 闆嗘€濆綍璇︽儏閾炬帴
-6. Refactor the LOF page into visible market subtabs:
-   - `娆х編甯傚満`
-   - `浜氭床甯傚満`
-   - `鍟嗗搧`
-7. Keep the module stable-first:
-   - no push integration
-   - no auto-trading semantics
-   - a single-source failure only degrades the affected subtab
-
-Acceptance:
-- `LOF濂楀埄` can display the larger logged-in dataset when a valid cookie is present, while still working without it.
-- The page exposes more of the real Jisilu fields instead of only the MVP summary view.
-- `娆х編甯傚満 / 浜氭床甯傚満 / 鍟嗗搧` can be switched directly inside the LOF module.
-- `IOPV` fields remain empty when the source truly does not return them, and the UI explains that they are currently unavailable.
-- Homepage stability and other modules remain unaffected.
-
 ## 26. Phase W: Event-arbitrage Detail Text Responsive Width Fix (2026-03-24)
 
 Goal: fix the `浜嬩欢濂楀埄` detail-text layout so A-share `鎽樿` and HK/CN `澶囨敞` adapt to available screen width instead of being squeezed into the left quarter of the detail grid.
@@ -653,38 +638,6 @@ Acceptance:
 - `浜嬩欢濂楀埄` A-share `鎽樿` occupies the usable detail-row width instead of staying compressed on the left.
 - `娓偂濂楀埄` and `涓绉佹湁` `澶囨敞` follow the same full-width responsive behavior.
 - Other detail-grid based modules keep their existing layout.
-
-## 25. Phase V: LOF Estimated-value Completion From Source Change Rate (2026-03-23)
-
-Goal: complete the currently missing actionable LOF estimate fields by deriving them only from real Jisilu source fields, while keeping `IOPV` empty unless the upstream truly returns it.
-
-Plan:
-1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the derived-estimate contract.
-2. Keep the LOF source truth contract strict:
-   - `IOPV` is still direct-source only
-   - `IOPV婧环鐜嘸 is still direct-source only
-   - `浼板€糮 and `浼板€兼孩浠穈 may be derived only when Jisilu already provides `est_val_increase_rt`
-3. Add a deterministic source-based derivation path:
-   - `estimatedValue = navValue * (1 + est_val_increase_rt / 100)`
-   - `estimatedPremiumRate = ((currentPrice / estimatedValue) - 1) * 100`
-4. Persist derivation provenance in the outward payload so the page can explain where the value came from:
-   - direct source
-   - derived from `est_val_increase_rt`
-5. Expand the LOF page so the strategy view is easier to use:
-   - add visible `缁撹`
-   - add visible `淇″彿婧环`
-   - add estimate-source, estimate-time, estimate-change, reference-price, and calculation-tips detail fields
-6. Keep deployment risk low:
-   - no push integration changes
-   - no homepage root-tab changes
-   - no changes to unrelated modules
-
-Acceptance:
-- Rows with real `est_val_increase_rt` now expose `estimatedValue` and `estimatedPremiumRate` instead of leaving the estimate area blank.
-- `IOPV` and `IOPV婧环鐜嘸 remain empty when upstream still does not provide them.
-- LOF main table visibly shows `缁撹` and `淇″彿婧环`.
-- LOF detail area clearly explains whether the estimate is direct-source or derived from Jisilu estimate-change fields.
-- The page remains loadable even if one LOF source category fails.
 
 ## 26. Phase W: CB Yield Removal + Volatility Trust Warning (2026-03-24)
 
@@ -707,69 +660,6 @@ Acceptance:
 - `杞€哄鍒ー page no longer displays `鍒版湡绋庡墠鏀剁泭鐜嘸.
 - `60鏃ユ尝鍔ㄧ巼` and the volatility-derived theoretical metrics are visibly marked as historical/reference values on the page.
 - The current volatility formula and trust boundary are documented.
-## 27. Phase Y: LOF Summary-card Removal + Detail-first Reading Path (2026-03-24)
-
-Goal: simplify the `LOF濂楀埄` page by removing the current top summary-card band and making the long-table detail rows the default supplementary reading path.
-
-Plan:
-1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
-2. Keep the LOF fetch/strategy/API schema unchanged in this round:
-   - `data.overview` may remain in the API for aggregation/debugging
-   - no calculation or classification logic changes
-3. Refine the LOF page structure contract:
-   - remove the visible top summary cards `濂楀埄鍊欓€?/ 浠呰瀵?/ 鏁版嵁閾捐矾`
-   - keep title/status text and market subtabs
-   - keep the long table as the immediate primary reading path
-4. Preserve the current always-visible secondary detail rows under each LOF item so explanatory fields remain directly readable without a separate summary-card strip.
-
-Acceptance:
-- `LOF濂楀埄` no longer renders the visible top summary-card area.
-- The page still shows toolbar status, market subtabs, and the active-market long table.
-- LOF secondary detail rows remain visible and continue to expose estimate/source/risk context.
-
-## 28. Phase Z: LOF Module Cancellation From Homepage (2026-03-24)
-
-Goal: remove `LOF濂楀埄` from the public homepage module set while keeping the rest of the dashboard stable.
-
-Plan:
-1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
-2. Treat this round as a homepage/module-scope cancellation rather than a full backend feature purge:
-   - remove the visible `LOF濂楀埄` root tab
-   - remove homepage startup loading of LOF data
-   - keep unrelated modules unchanged
-3. Stop spending homepage/runtime preload cost on LOF:
-   - dashboard bootstrap no longer requests `lofArb`
-   - server preload no longer includes `lofArb`
-4. Keep the existing LOF backend implementation archived in place for now, but disconnected from the public homepage reading path.
-
-Acceptance:
-- The homepage no longer shows `LOF濂楀埄`.
-- Dashboard initial load no longer requests LOF data.
-- Server preload no longer includes `lofArb`.
-- `杞€哄鍒?/ AH / AB / 鐩戞帶濂楀埄 / 鍒嗙孩鎻愰啋 / 浜嬩欢濂楀埄` remain usable.
-
-## 29. Phase AA: LOF Complete Removal (2026-03-24)
-
-Goal: fully retire `LOF濂楀埄` from the repository and runtime surface instead of only hiding it from the homepage.
-
-Plan:
-1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
-2. Remove all active LOF runtime surfaces:
-   - dashboard render/bind/bootstrap logic
-   - public market route
-   - server dataset registration and preload
-   - `data_dispatch.py` action
-3. Remove all active LOF config contracts from `config.yaml`.
-4. Delete the retired implementation directories:
-   - `data_fetch/lof_arbitrage`
-   - `strategy/lof_arbitrage`
-5. Verify the homepage still works and old LOF route access falls back to normal API 404 behavior.
-
-Acceptance:
-- No active homepage, server, route, or CLI path still references LOF.
-- LOF implementation directories are removed.
-- Homepage and remaining modules continue working.
-
 ## 29. Phase AA: Shared Dashboard Table Readability Upgrade (2026-03-24)
 
 Goal: improve the readability of all dashboard long tables by upgrading shared presentation density, while keeping business meaning, sorting rules, pagination, and data pipelines unchanged.
@@ -1424,6 +1314,7 @@ Plan:
 3. Replace the current derived strike rule in the cb-arb model:
    - stop using `max(bondValue / optionQty, convertPrice)`
    - use `callStrike = convertPrice`
+   - this rule is later superseded by Phase CI on 2026-03-30
 4. Keep the rest of the pricing chain unchanged:
    - real `pureBondValue` still preferred
    - `bond+call` / `bond+call-put` branch rule unchanged
@@ -1535,251 +1426,1443 @@ Acceptance:
 - Ordinary `GET /api/market/convertible-bond-arbitrage` reads no longer wait for underlying-stock history sync.
 - Server-side push scheduling and dataset refresh cadence remain unchanged.
 
-## 55. Phase AU: LOF Arbitrage Restoration With Real Jisilu URLs (2026-03-25)
+## 61. Phase BA: Push Strategy Documentation Sync (2026-03-26)
 
-Goal: restore `LOF套利` as a new independent homepage module based on the real Jisilu LOF / QDII pages the user provided, keep the chain isolated from other modules, and land a first production version with page, API, and independent push.
+Goal: add one current, repository-visible push-strategy document so later Codex
+sessions can quickly understand which push chains exist today, which config
+fields are authoritative, and what the current live timings/status are.
 
 Plan:
-1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the new LOF module contract.
-2. Restore `LOF套利` as a new independent chain instead of reviving the older archived implementation:
-   - `data_fetch/lof_arbitrage` only handles source access, normalization, source fallback, and upstream helper hydration
-   - `strategy/lof_arbitrage` only handles IOPV, premium-rate, pool classification, and push payload semantics
-   - `presentation` only handles route shaping, dashboard rendering, and module footnote
-   - `notification/lof_arbitrage` only handles independent scheduled / instant push
-3. Use the user-provided real Jisilu pages as the authoritative source entry:
-   - `https://www.jisilu.cn/data/lof/#index`
-   - `https://www.jisilu.cn/data/qdii/#qdiie`
-   - `https://www.jisilu.cn/data/qdii/#qdiia`
-4. Implement source access with the shortest truthful path:
-   - Firecrawl first against the provided page URLs when configured
-   - direct JSON fallback to the real page-backed list endpoints discovered from those pages
-   - no fake data, no static sample rows
-5. Restore the homepage root navigation from `7` to `8` tabs by adding `LOF套利`.
-6. Keep the page structure fixed to:
-   - top limited-monitor list
-   - top non-limited-monitor list
-   - one shared main table with internal filters `指数LOF / QDII欧美 / QDII亚洲`
-   - module-local push settings
-   - module footnote
-7. Implement first-round calculation truthfulness:
-   - `溢价率 = (IOPV / 现价) - 1`
-   - `QDII欧美` uses `T-2` NAV with live index/fx correction when resolvable
-   - `指数LOF / QDII亚洲` use `T-1` NAV with source-provided index increase and fx correction
-   - rows missing enough real inputs stay visible but marked non-computable instead of being fabricated
-8. Keep filter and monitoring rules fixed to the approved strategy:
-   - only LOF rows
-   - exclude name containing `ETF`
-   - limited pool: limited apply + cap < `10万` + premium > `1%` + turnover > `100万`
-   - non-limited pool: no limited apply + premium > `5%` or premium < `-5%` + turnover > `100万`
-9. Add independent push:
-   - instant push when a row newly enters either pool
-   - scheduled full-pool push at `13:30`, `14:00`, `14:30`
-   - not merged into existing summary push
+1. Keep this round documentation-only:
+   - no push behavior change
+   - no scheduler code change
+   - no API contract change
+2. Read the real push sources first:
+   - `config.yaml` notification defaults
+   - `start_server.js` scheduler/runtime wiring
+   - push route/view-model files
+   - current live `/api/push/*` responses
+3. Add a new root document `推送设置策略.md` that clearly separates:
+   - code defaults
+   - runtime override files
+   - current live effective settings
+   - main summary push vs 转债折价提醒 vs 抢权配售独立推送 vs LOF 独立推送
+4. Explicitly note the truth hierarchy:
+   - `config.yaml` defines defaults
+   - runtime JSON stores per-environment overrides
+   - live public API is the fastest read path for current cloud truth
 
 Acceptance:
-- Homepage root tabs increase from `7` to `8`, and one visible tab is `LOF套利`.
-- `GET /api/market/lof-arbitrage` returns real data from the approved Jisilu URL chain.
-- The page top area shows only `限购监控池 / 非限监控池` and their core rows.
-- The main table shows the required source fields plus computed `IOPV / 溢价率`, keeps 50-row pagination, and supports internal view switching.
-- Firecrawl may enhance the source path, but a missing Firecrawl key does not block direct truthful fallback.
-- Existing `转债 / AH / AB / 监控 / 分红 / 事件套利 / 可转债抢权配售` behavior does not regress.
+- The repository contains one standalone push-strategy document that can explain
+  current push architecture without re-reading large code sections.
+- The document reflects the current cloud responses and current config defaults
+  separately, avoiding confusion between defaults and environment-local runtime state.
 
-## 56. Phase AV: LOF Premium Formula + Dense Table Adjustment (2026-03-25)
+## 62. Phase BB: Midnight Push Resend Fix (2026-03-26)
 
-Goal: align the live `LOF套利` page with the latest user rule by switching premium-rate semantics to `现价 / IOPV - 1`, removing per-row detail expansion, and making the LOF main table denser so the list fits the page better.
+Goal: stop the cloud runtime from repeatedly sending scheduled push slots between
+`00:00` and `01:00` Shanghai time because midnight is inconsistently interpreted
+as `24:xx` in one scheduler path and `00:xx` in another.
 
 Plan:
-1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the revised LOF formula and table contract.
-2. Keep this round isolated to the LOF module:
-   - no source URL change
-   - no new APIs
-   - no push schedule change
-3. Revise the strategy-layer premium output only:
-   - `溢价率 = (现价 / IOPV - 1) × 100%`
-   - keep the same truthful `IOPV` calculation paths
-   - continue deriving monitor-pool eligibility from the outward `premiumRate` field after the formula switch
-4. Simplify the LOF main table:
-   - remove the per-row detail area entirely
-   - keep business fields directly visible in the main table
-   - merge naturally paired fields into compact multi-line cells where helpful
-5. Preserve shared table mechanics:
-   - 50-row pagination
-   - sorting
-   - search
-   - horizontal overflow fallback
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the midnight-time
+   normalization rule before changing code.
+2. Keep this round tightly scoped to scheduler time parsing:
+   - no push content change
+   - no push time configuration change
+   - no non-push business change
+3. Unify Shanghai-time parsing so all scheduler and runtime-dedup paths use the
+   same normalized hour semantics.
+4. Add an explicit normalization rule:
+   - if a runtime locale returns midnight hour as `24`, the effective scheduler
+     hour must be normalized to `0`
+   - `00:xx` must never be treated as after `08:00` or `14:30`
+5. Ensure this fix applies to all affected timed push paths:
+   - main summary push
+   - cb-rights-issue timed push
+   - LOF timed push
+6. Validate with concrete midnight samples around:
+   - `2026-03-25T16:04:52.773Z`
+   - `2026-03-25T16:59:24.168Z`
+   - `2026-03-25T17:00:24.168Z`
 
 Acceptance:
-- `LOF套利` rows now compute `premiumRate` with `现价 / IOPV - 1` instead of `IOPV / 现价 - 1`.
-- The LOF main table no longer renders row-level detail expansion.
-- The LOF table remains searchable, sortable, and paginated, while fitting common desktop widths better than before.
-- Existing LOF fetch, API, and push routes remain unchanged.
+- Between Shanghai `00:00` and `00:59`, scheduler time is interpreted as `00:xx`,
+  never `24:xx`.
+- Scheduled slots such as `08:00` and `14:30` are not sent during `00:00-01:00`.
+- Push runtime dedup no longer clears same-day sent slots because of mismatched
+  midnight parsing between scheduler and runtime-state code.
 
-## 57. Phase AW: LOF NAV-date Priority + Post-close Premium Fix (2026-03-25)
+## 63. Phase BC: Module Push Runtime Self-healing (2026-03-26)
 
-Goal: keep the live `LOF套利` chain truthful to the latest Jisilu snapshot by making
-the strategy respect the actual `净值日期`, stop re-estimating rows that already have
-same-day NAV, and exclude `暂停申购` samples from both monitor pools.
+Goal: close the remaining gap between main-summary scheduled push and module-local
+scheduled push so `cb_rights_issue` and `lof_arbitrage` can self-heal dirty same-day
+slot records instead of treating raw persisted slot text as absolute truth.
 
 Plan:
-1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, and `LOF套利策略.md` first with the revised LOF post-close and monitor contracts.
-2. Correct the live LOF premium contract back to the currently deployed business meaning:
-   - outward `premiumRate` uses the existing live reading path `溢价率 = (IOPV / 现价 - 1) × 100%`
-   - the older `现价 / IOPV - 1` text is treated as superseded document drift, not as the true production contract
-3. Add a same-day NAV priority rule for `指数LOF / QDII亚洲 / QDII欧美`:
-   - when `navDate == priceDate` and Jisilu already returns `nav_discount_rt`
-   - stop doing T-1 / T-2 extrapolation for that row
-   - reuse the source-provided same-day NAV premium reading instead
-   - outward `iopv` falls back to the same-day `nav` reference so the visible table remains internally consistent
-4. Refine the `QDII欧美` extrapolation path so it follows the real NAV anchor date:
-   - when extrapolation is still needed, choose the index / FX base values whose dates actually match `navDate`
-   - do not blindly anchor every row to a hardcoded `T-2` base if the latest NAV has already advanced to `T-1`
-   - if no exact NAV-date match is available, keep the existing truthful fallback order instead of fabricating a new anchor
-5. Tighten monitor-pool eligibility:
-   - rows with `申购状态 = 暂停申购` must stay visible in the main table
-   - but they must not enter `limitedMonitorRows`
-   - and must not enter `unlimitedMonitorRows`
-   - therefore they also stop participating in LOF instant-push entry detection
-6. Keep this round isolated to the LOF module:
-   - no new source URL
-   - no dashboard tab structure change
-   - no non-LOF formula change
-   - no push-schedule change
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the module-runtime
+   self-healing contract.
+2. Keep this round narrow and push-only:
+   - no push content change
+   - no push time configuration change
+   - no non-push business change
+3. Align `notification/scheduler/module_push_runtime_store.js` with the main push
+   runtime-store rule:
+   - current-day scheduled slot records are valid only when the latest same-day
+     success time proves that the recorded slot is not later than the real success
+     point
+   - otherwise the dirty future slot records must be dropped automatically
+4. Apply the hardened runtime-store behavior to both module-local timed push chains:
+   - `cb_rights_issue`
+   - `lof_arbitrage`
+5. Improve `lof_arbitrage` timed-push logs so cloud diagnosis can see:
+   - runtime self-healing result
+   - `not_due_yet`
+   - `already_sent`
+   - success / failure
 
 Acceptance:
-- Same-day NAV rows no longer show stale extrapolated LOF premiums after the source has already published today’s NAV.
-- `QDII欧美` rows extrapolate from the NAV-aligned base date when such a base is available, so the result tracks the latest NAV snapshot more closely.
-- `暂停申购` rows remain visible in the LOF main table but disappear from both monitor pools and the related push-entry path.
-- Existing `LOF` API shape, dashboard tab, and independent push runtime remain available.
+- `cb_rights_issue` and `lof_arbitrage` no longer trust same-day future slot text
+  blindly after a dirty early success record.
+- Module-local timed push diagnostics become readable from live server logs.
+- Existing module push schedule, payload fields, and API routes remain unchanged.
+- Rows still degrade truthfully to source-estimate / missing-input status when exact external index data is unavailable.
 
-## 59. Phase AX: LOF Europe/US External Market API Enrichment (2026-03-25)
+## 63. Phase BC: Data Refresh Reliability And Status Truthfulness (2026-03-26)
 
-Goal: add one minimal external market-data fallback for `LOF套利 > QDII欧美` so the
-module no longer depends only on Jisilu `cal_tips` plus the small Tencent index map
-when building IOPV inputs.
+Goal: repair the current cloud-runtime freshness failures so the dashboard can again
+be treated as a financial-grade, time-sensitive page instead of a stale-cache viewer.
 
 Plan:
-1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, and `LOF套利策略.md` first with the new external-helper contract.
-2. Keep this round isolated to the LOF fetch chain:
-   - no new dashboard tab
-   - no LOF push schedule change
-   - no AH / AB / convertible behavior change
-3. Add one external helper provider for exact mapped `QDII欧美` indices and FX:
-   - phase-1 provider is `Stooq`
-   - it is used only as a fallback /补数链路, not as the main source list
-4. The fetch layer must support two external补数场景:
-   - fill missing `currentIndexValue`
-   - fill missing nav-date-aligned `baseIndexValue / baseFxValue` when Jisilu did not provide them
-5. Mapping must stay config-driven in `config.yaml`:
-   - provider enable switch
-   - provider URLs / timeout
-   - exact index symbol map
-   - exact FX symbol map
-6. Truth boundary:
-   - only exact configured symbols may enter the full external calculation path
-   - unresolved custom indices keep the existing truthful fallback order
-   - no proxy ETF / guessed symbol may be silently treated as an exact index
-7. First-round target:
-   - recover at least the `恒生指数` row that currently lacks enough helper inputs to compute IOPV
-   - improve other exact-mapped欧美 rows without forcing fake coverage for all custom indices
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the new refresh-reliability contract.
+2. Keep this round tightly scoped to refresh, cache-status, and scheduler truthfulness:
+   - no strategy-formula change
+   - no table-layout change
+   - no push-content change
+3. Repair `cbArb` refresh so the public `可转债套利` dataset no longer blocks on the heavy
+   history-maintenance path during ordinary intraday reads:
+   - page/API read path must keep returning the latest good cache quickly
+   - heavy stock-history sync must stay in explicit maintenance or daily-sync path
+   - forced real-time read must complete within the existing server timeout budget
+4. Correct dashboard freshness semantics:
+   - `servedFromCache` can no longer mean merely “this dataset has a cache file”
+   - resource status must distinguish between “latest successful dataset snapshot”
+     and “fallback cache because refresh failed”
+   - dashboard copy must stop calling today-fresh data a stale snapshot
+5. Harden daily-sync truthfulness:
+   - `runDailySync()` must not mark the day as completed when one or more required
+     datasets failed
+   - failed datasets must remain visible in runtime state / logs
+6. Normalize midnight scheduler time:
+   - Shanghai midnight `24:xx` must be normalized to `00:xx`
+   - `00:00-00:59` must never trigger `08:00 / 14:30` timed sends early
+7. Verify both locally and on the cloud server:
+   - non-`cbArb` force refresh still succeeds
+   - `cbArb` force refresh returns same-day data again
+   - resource-status freshness text matches real update state
+   - midnight scheduler regression is covered by targeted tests
 
 Acceptance:
-- `QDII欧美` rows may use external exact index / FX data when Jisilu helper fields are incomplete.
-- `南方香港LOF` no longer remains stuck in `真实输入不足，未计算 IOPV` when the external HSI + HKD/CNY path is available.
-- Existing rows that already have enough truthful helper inputs continue to work without regression.
-- Rows whose exact external mapping still does not exist remain visible and truthfully fall back to source-estimate or missing-input status.
+- `GET /api/market/convertible-bond-arbitrage?force=1` no longer times out behind the cloud proxy under normal runtime conditions.
+- `runtime_data/shared/market_cache_cbArb.json` updates on `2026-03-26` instead of staying frozen on `2026-03-25`.
+- `GET /api/dashboard/resource-status` stops marking every cached dataset as a stale-cache dataset.
+- The dashboard header no longer claims “当前显示缓存快照” for datasets that were freshly rebuilt and simply persisted to cache.
+- `runDailySync()` only records same-day success after required dataset refreshes actually succeed.
+- Shanghai `00:xx` no longer appears as `24:xx` in timed-push decision logs, and timed slots are not sent early after midnight.
 
-## 58. Phase AX: LOF T-1/T Formula Split + Europe Real-time Anchor Revision (2026-03-25)
+## 64. Phase BE: Dashboard Low-risk Dual-theme Restyle (2026-03-27)
 
-Goal: align the live `LOF套利` implementation with the latest user rule by splitting
-the formula strictly by `净值日期`, keeping `指数LOF / QDII亚洲` on a same-day direct-NAV
-path, and making `QDII欧美` continue to estimate off the latest published NAV plus
-real-time external index / FX inputs.
+Goal: introduce a cleaner, data-first dashboard visual style without changing any
+business logic, API path, table field, push behavior, or refresh contract, so the
+site can move to a simpler data-terminal look while remaining instantly rollbackable.
 
 Plan:
-1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, `LOF套利策略.md`, and the LOF module notes in `config.yaml` first.
-2. Keep the outward premium meaning fixed to the current production contract:
-   - `溢价率 = (IOPV / 现价 - 1) × 100%`
-3. Revise `指数LOF / QDII亚洲` by NAV-date branch:
-   - when `navDate` is `T-1` relative to the current trading day:
-     - `IOPV = T-1日净值 × (1 + 指数涨幅) × (今日汇率 / 基准汇率)`
-   - when `navDate` is the current trading day:
-     - `IOPV = T日净值`
-   - the index change input in both branches remains the source-side Jisilu index-change field
-4. Revise `QDII欧美` so it always estimates off the latest published NAV plus real-time anchors:
-   - when the published NAV is `T-2`, estimate from the `T-2` NAV anchor
-   - when the published NAV has advanced to `T-1`, estimate from the `T-1` NAV anchor
-   - in both cases the strategy must use real-time external market data for:
-     - current index value
-     - current FX value
-   - if a current external quote is unavailable, degrade truthfully to the existing source-estimate fallback instead of fabricating an anchor
-5. Preserve the current monitor constraint:
-   - `暂停申购` rows remain visible in the main table
-   - but remain excluded from both monitor pools and instant-push entry logic
-6. Keep this round isolated to the LOF chain:
-   - no dashboard structure change
-   - no route path change
-   - no non-LOF business change
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the visual-only
+   dual-theme contract before touching code.
+2. Keep this round isolated to the dashboard presentation layer:
+   - no route-path change
+   - no response-shape change except adding one optional UI-config field
+   - no data-fetch / strategy / notification / scheduler behavior change
+3. Add one centralized theme switch in `config.yaml`:
+   - `presentation.dashboard_theme`
+   - supported values:
+     - `classic`
+     - `clean_data`
+4. Extend `GET /api/dashboard/ui-config` to expose the current dashboard theme, so
+   the frontend can switch style without duplicating configuration logic.
+5. Keep the current style as the safe fallback `classic`, and add a new
+   `clean_data` theme that emphasizes:
+   - lighter neutral background
+   - cleaner table-first panels
+   - calmer blue/steel accents
+   - reduced decorative glow
+   - unchanged DOM structure and interaction behavior
+6. Apply the theme on the frontend by attribute/class switching only; do not rewrite
+   page layout or module render logic in this round.
+7. Make rollback trivial:
+   - switching `presentation.dashboard_theme` back to `classic` restores the old
+     appearance without code rollback.
 
 Acceptance:
-- `指数LOF / QDII亚洲` same-day NAV rows now output `IOPV = 当日净值` directly.
-- `指数LOF / QDII亚洲` T-1 NAV rows still use the source Jisilu index-change field and FX adjustment path.
-- `QDII欧美` rows with published `T-1` NAV no longer stay stuck on an older `T-2` reading path.
-- `QDII欧美` rows keep using real-time external current index / FX inputs when available.
-- `暂停申购` rows still stay outside both monitor pools.
+- All existing dashboard tabs, subtabs, sorting, searching, pagination, auto-refresh,
+  push settings, and module rendering continue to behave exactly as before.
+- `GET /api/dashboard/ui-config` returns the current theme name in addition to the
+  existing UI payload.
+- `clean_data` visually changes the dashboard to a cleaner, data-first style without
+  changing any visible business field or interaction semantics.
+- Setting `presentation.dashboard_theme = classic` restores the prior theme without
+  touching any business code.
 
-## 59. Phase AY: LOF Commodity Source Recovery Into Europe/US View (2026-03-25)
+## 65. Phase BE: Convertible Discount Push Session Separation (2026-03-27)
 
-Goal: restore the missing `商品LOF` rows on the live `LOF套利 > QDII欧美` page by
-truthfully reading Jisilu's separate commodity source and merging it into the existing
-Europe/US view without adding a new visible subtab.
+Goal: align `可转债折价推送` with the user-confirmed A-share trading rhythm so the
+module no longer pushes on non-trading days, no longer pushes after 15:00, and no
+longer presents timed monitor pushes and buy/sell instant signals as one blurred channel.
 
 Plan:
-1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the source-recovery contract.
-2. Keep this round isolated to the LOF fetch chain:
-   - no dashboard tab change
-   - no new visible LOF subview
-   - no AH / AB / convertible / monitor behavior change
-3. Extend `data_fetch.plugins.lof_arbitrage` source config with the real commodity source:
-   - page `https://www.jisilu.cn/data/qdii/#qdiic`
-   - api `https://www.jisilu.cn/data/qdii/qdii_list/C`
-4. Fetch `commodity` as an internal source only, then merge its rows into the outward
-   `europe_us` group:
-   - outward page still shows only `指数LOF / QDII欧美 / QDII亚洲`
-   - commodity rows remain tagged with their real source URL for traceability
-5. Aggregate source summary counts truthfully so the `QDII欧美` view count reflects:
-   - original Europe/US rows
-   - plus commodity LOF rows
-6. Keep the existing LOF sample filter unchanged:
-   - still only `LOF`
-   - still exclude `ETF`
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the revised push contract.
+2. Keep this round isolated to the convertible-bond discount push chain:
+   - no AH / AB / LOF push schedule change
+   - no main summary module-selection change
+   - no convertible pricing-formula change in this round
+3. Refine the discount-push session contract:
+   - only run on A-share trading weekdays
+   - valid push windows are fixed to `09:30-11:30` and `13:00-15:00`
+   - after `15:00` no timed monitor push and no buy/sell instant push may be emitted
+4. Keep the two push lanes explicit:
+   - timed monitor-list push remains driven by `monitor_session_times`
+   - buy/sell instant push remains driven by zone-crossing signals
+   - shared scheduler tick is allowed, but runtime status and wording must clearly distinguish the two lanes
+5. Expose the truthful runtime contract to the dashboard:
+   - show monitor schedule slots instead of an ambiguous “监控频率”
+   - show A-share session windows used by instant buy/sell checks
+   - keep recent buy / sell / monitor success and error timestamps separated
 
 Acceptance:
-- Codes shown on Jisilu `商品(刷新)` such as `160216 / 162719 / 162411` appear in the dashboard `QDII欧美` view.
-- No new public LOF subtab is added for commodity-only viewing.
-- `QDII欧美` source-visible counts reflect the merged Europe/US + commodity source total.
-- Existing `指数LOF / QDII亚洲` data and LOF push/runtime behavior do not regress.
+- `可转债折价推送` does not run on weekends or other non-trading weekdays configured as outside-session runtime.
+- No discount push is emitted after `15:00` Shanghai time.
+- Timed monitor pushes still use configured monitor slots, while buy/sell signals remain independent instant events.
+- Push status text no longer makes the two channels look like one periodic task.
 
-## 60. Phase AZ: LOF Premium Formula Re-align To Price Over IOPV (2026-03-26)
+## 66. Phase BF: Dashboard Footer-note + Compact Naming + Dense Top Sections (2026-03-28)
 
-Goal: restore the live `LOF套利` premium field to the user-confirmed reading rule
-`现价 / IOPV - 1`, because the current runtime and notes drifted back to the older
-`IOPV / 现价 - 1` meaning.
+Goal: further compress the dashboard into a more Jisilu-like reading flow by moving
+all page notes to the global page bottom, shrinking root tabs, tightening top summary
+sections, and shortening visible list/module names without changing any data logic.
 
 Plan:
-1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, `LOF套利策略.md`, and the LOF note
-   inside `config.yaml` first.
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the new compact
+   presentation contract.
+2. Keep this round isolated to the dashboard presentation layer:
+   - no API path change
+   - no response-field change
+   - no strategy / fetch / push / scheduler behavior change
+3. Move module notes from each panel body to one shared footer-note area at the very
+   end of the page:
+   - the active tab's note is rendered there
+   - module panels no longer repeat inline note cards
+4. Compress root tabs on desktop into a smaller single-row navigation strip:
+   - shorter labels
+   - smaller height and padding
+   - keep mobile responsive fallback
+5. Make top summary sections denser:
+   - use tighter multi-column summary cards
+   - reduce decorative spacing
+   - avoid vertically stacked “wasted” top blocks where side-by-side grouping is enough
+6. Shorten visible module/list wording toward a Jisilu-style data page tone:
+   - prefer `转债 / AH / AB / LOF / 监控 / 分红 / 事件 / 抢权`
+   - prefer `列表 / 入池 / 来源 / 今日登记 / 前3 / 后3`
+   - do not change any business meaning behind the text
+
+Acceptance:
+- Module notes no longer appear inside each tab panel and instead render in the page footer area.
+- On desktop, root tabs are visibly smaller and remain on one row.
+- Top summary blocks become denser and occupy less vertical space.
+- Visible titles and list labels become shorter without changing data semantics or interaction behavior.
+
+## 68. Phase BH: Table-header Compaction Instead Of Module Renaming (2026-03-28)
+
+Goal: correct the compact-label direction so the dashboard keeps the original module
+names, while the real density optimization happens in table headers, list labels, and
+column widths under each module.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the corrected copy contract.
+2. Revert any unintended shortening of root module names and module titles.
+3. Apply compact wording to list/table headers instead, for example:
+   - `转债代码 -> 代码`
+   - `正股代码 -> 正股码`
+   - `转股价值 -> 转股值`
+   - `近三年分位 -> 分位`
+4. Reduce width pressure in the shared dashboard table CSS:
+   - narrower numeric/date/code columns
+   - tighter sticky-column widths
+   - smaller minimum widths for dense data tables where safe
+5. Keep all changes presentation-only:
+   - no data-field change
+   - no sorting/searching behavior change
+   - no API change
+
+Acceptance:
+- Root module names remain the original business names.
+- Dense tables use shorter column labels and occupy less width.
+- Data density improves mainly through table-header wording and column-width tuning, not through renaming root modules.
+
+## 67. Phase BG: Convertible Premium-only Truthfulness Repair (2026-03-28)
+
+Goal: finish the still-open convertible-bond repair by removing the outward
+`折价率` semantics, correcting live conversion metrics at the source, and aligning
+page/push wording with the user-confirmed `转股溢价率` contract.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round tightly scoped to the convertible-bond chain:
+   - `data_fetch/convertible_bond`
+   - `strategy/convertible_bond`
+   - `start_server.js`
+   - dashboard convertible presentation
+   - convertible discount push wording/runtime view
+3. Repair live source truthfulness:
+   - `convertValue` must always be recomputed from latest `stockPrice` and `convertPrice`
+   - `premiumRate` must always be recomputed from latest `price` and computed `convertValue`
+   - live price-derived fields must stop falling back to previous cached rows
+   - slow caches remain allowed only for history-derived metrics such as volatility, ATR, turnover, and pure-bond-value snapshots
+4. Replace outward `折价率` semantics with `转股溢价率` semantics:
+   - buy zone becomes `premiumRate < -2%`
+   - sell zone becomes `premiumRate > -0.5%`
+   - page, summary card, API wording, and push wording must stop exposing `折价率 / 加权折价率`
+5. Adjust the convertible main table readability contract:
+   - sticky columns become `序号 + 转债名称`
+   - `转债代码` remains visible but no longer sticky and no longer sits before the name in the frozen area
+6. Verify the concrete bad sample after the fix:
+   - `118025 奕瑞转债`
+   - `stockPrice = 106.02`
+   - `convertPrice = 114.97`
+   - expected `convertValue ≈ 92.215`
+7. After local verification, deploy to cloud and force-refresh the public API/page.
+8. If public `cbArb force` still exceeds the proxy window, add one proxy-safe soft timeout:
+   - return the latest last-good snapshot instead of `504`
+   - keep the real refresh task running in background
+
+Acceptance:
+- `GET /api/market/convertible-bond-arbitrage?force=1` returns `118025.convertValue`
+  close to `92.215` instead of the previous bad `499.89`.
+- Convertible public rows no longer expose visible `折价率 / 加权折价率` fields or wording.
+- Buy/sell push reasoning uses `转股溢价率` thresholds instead of `折价率`.
+- Convertible table sticky columns are `序号 + 转债名称`.
+- The cloud page and API both reflect the corrected same-day snapshot after deploy.
+
+## 70. Phase BJ: Dashboard Visual Experiment Rollback (2026-03-28)
+
+Goal: roll the dashboard back to the pre-restyle presentation baseline after the
+compact-theme experiment was rejected, while keeping all business logic, data fields,
+APIs, and push behavior unchanged.
+
+Plan:
+1. Revert dashboard presentation from the experimental visual path back to the
+   original classic reading mode.
+2. Remove the active use of:
+   - `clean_data` theme presentation
+   - shared page-bottom footnote rendering
+   - compact list titles such as `主表 / 入池 / 来源 / 观察`
+   - compressed table-header wording introduced only for the visual experiment
+3. Restore the earlier visible behavior:
+   - inline module notes remain inside each module
+   - original table/list titles return
+   - original table density, sticky-column layout, and width guidance return
+4. Keep rollback strictly presentation-only:
+   - no fetch / strategy / notification / scheduler changes
+   - no API path or response-shape changes
+
+Acceptance:
+- The dashboard visually returns to the pre-restyle baseline.
+- Business functions remain available and unchanged.
+- Documentation no longer treats the rejected visual experiment as the effective contract.
+
+## 71. Phase BK: Convertible Frozen-column Correction + Weighted Discount Restore (2026-03-28)
+
+Goal: finish the still-open convertible-bond follow-up requested in the latest user review:
+1. the frozen columns must be exactly `序号 + 转债名称`
+2. `转债代码` must no longer stay frozen and no longer sit immediately behind the frozen name column
+3. `加权折价率` must be restored, but its underlying discount basis must switch to `-转股溢价率`
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first with the corrected live contract.
+2. Keep this round isolated to the convertible-bond chain:
+   - `strategy/convertible_bond`
+   - `start_server.js`
+   - `presentation/dashboard/dashboard_page.js`
+   - `presentation/templates/dashboard_template.html`
+   - convertible push wording/output where needed
+3. Restore the weighted-discount strategy metric on the shortest path:
+   - internal `discountRate = -premiumRate`
+   - `weightedDiscountRate = discountRate * atrCoefficient * sellPressureCoefficient * boardCoefficient`
+   - keep `转股溢价率` as the main truth field
+4. Keep raw `折价率` out of the main user-facing table, but allow `加权折价率` to return as a user-facing auxiliary strategy field.
+5. Reorder the convertible main table so the only frozen columns are:
+   - `序号`
+   - `转债名称`
+   and move `转债代码` out of the frozen area.
+6. Re-verify locally, then deploy to cloud and confirm the public page/API reflect the corrected table structure and weighted metric.
+
+Acceptance:
+- Convertible frozen columns are exactly `序号 + 转债名称`.
+- `转债代码` is still visible but no longer frozen and no longer placed directly after the frozen name column.
+- `weightedDiscountRate` is restored in strategy output and public API.
+- `weightedDiscountRate` is calculated from `discountRate = -premiumRate`, not from the retired old discount source.
+- Public page and cloud API both reflect the corrected contract after deploy.
+
+## 72. Phase BL: Convertible Main-table Compaction (2026-03-28)
+
+Goal: reduce the width pressure of the convertible main table without changing the
+backend truth fields, so the page keeps the key pricing view but no longer tries to
+show every auxiliary field at once.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the convertible presentation path:
+   - `presentation/dashboard/dashboard_page.js`
+   - `presentation/templates/dashboard_template.html`
+3. Compact the main table by:
+   - shortening visible labels to concise names, target `<= 4` Chinese characters where practical
+   - merging naturally paired values into one cell where that improves width:
+     - `转债价 = 现价 + 涨幅`
+     - `正股 = 名称 + 代码`
+     - `正股价 = 现价 + 涨幅`
+     - `正股成交 = 20日均额 + 5日均额`
+   - keeping search ability, but removing separate clear/hint clutter from the convertible search bar
+4. Remove the following from the convertible main table while keeping them in the backend payload:
+   - `listingDate`
+   - `convertStartDate`
+   - `maturityDate`
+   - `optionTheoreticalValue`
+   - `theoreticalPrice`
+5. Add one compact visible term field:
+   - `剩余期` from `remainingYears`
+6. Keep only `理论溢` as the visible theoretical-pricing field in the main table.
+
+Acceptance:
+- Convertible main table is visibly narrower than before.
+- Visible column labels are shortened and avoid long phrases such as `正股20日均额(亿)`.
+- `上市日 / 转股起始日 / 到期日 / 期权理论价值 / 理论价值` no longer appear in the main table.
+- `剩余期` becomes the single visible term field.
+- `理论溢` remains visible; `期权理论价值 / 理论价值` remain backend-only.
+
+## 73. Phase BM: LOF RMB-aligned Index-change Definition (2026-03-28)
+
+Goal: correct the dashboard meaning of `相关指数涨幅` in `LOF套利` so the visible
+change rate is no longer the raw upstream index field, but the real
+RMB-priced change aligned to the row's `净值日期`.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the LOF strategy/output and LOF page presentation:
+   - `strategy/lof_arbitrage/service.py`
+   - `presentation/dashboard/dashboard_page.js`
+3. Keep the current IOPV branches unchanged, but add one outward derived field:
+   - `navAlignedIndexChangeRate = (iopv / nav - 1) * 100`
+4. Use the new field as the page definition of `相关指数涨幅`:
+   - it is always relative to the row `净值日期`
+   - it is the RMB-priced change after index and FX adjustment
+   - for same-day NAV direct rows, the outward change is `0%`
+5. Do not repurpose the raw source-normalized `indexIncreaseRate` as the visible page
+   field anymore; it may remain in the backend row for diagnostics only.
+
+Acceptance:
+- `LOF套利` page no longer shows the raw upstream `indexIncreaseRate` as the visible
+  `相关指数涨幅`.
+- The visible change rate is consistent with:
+  - `IOPV = 净值日净值 × (1 + 涨跌幅)`
+  - equivalently `涨跌幅 = iopv / nav - 1`
+- `指数LOF / QDII亚洲` rows both use the RMB-adjusted, nav-date-aligned visible result, even though
+  their internal IOPV branch still relies on the existing source increase path.
+
+## 74. Phase BN: Convertible Main-table Label + Frozen-column Follow-up (2026-03-30)
+
+Goal: finish the latest user-reviewed convertible-table follow-up without touching the
+backend pricing chain, so the page becomes denser and easier to scan while keeping the
+same truth fields.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the convertible dashboard presentation path:
+   - `presentation/dashboard/dashboard_page.js`
+   - `presentation/templates/dashboard_template.html`
+3. Replace the frozen-column contract:
+   - remove the visible `序号` column
+   - merge `转债名称 + 转债代码` into one frozen identity column
+   - make that merged `转债名称` column the only frozen column
+4. Upgrade three pricing cells from single-value to dual-value display:
+   - `转股溢价 = 溢价金额 + 溢价率`
+   - `加权折价 = 折价金额 + 加权折价率`
+   - `理论溢价 = 理论溢价金额 + 理论溢价率`
+5. Align the visible copy with the latest user wording:
+   - `纯债价 -> 纯债价值`
+   - `规模 -> 剩余规模`
+   - `60波动 -> 波动率`
+   - `剩余期 -> 剩余期限`
+6. Re-verify locally, then sync the dashboard changes to cloud if the repo checks pass.
+
+Acceptance:
+- The convertible main table no longer shows a visible `序号` column.
+- The left frozen area contains only one merged `转债名称` identity column with
+  `名称 + 代码` stacked in the same cell.
+- Horizontal scrolling no longer leaves a separate frozen index column behind.
+- `转股溢价 / 加权折价 / 理论溢价` each render as a compact two-line cell with
+  amount first and rate second.
+- The visible labels read exactly:
+  - `转股溢价`
+  - `加权折价`
+  - `纯债价值`
+  - `理论溢价`
+  - `剩余规模`
+  - `波动率`
+  - `剩余期限`
+
+## 75. Phase BO: Premium-only Weighted Discount Cleanup + Convertible Sort Narrowing (2026-03-30)
+
+Goal: finish the next convertible-bond cleanup requested in the latest review so the
+page and strategy stop reintroducing a standalone `折价率` concept, every normal row
+can show a weighted-discount result, and the table only keeps the few sort handles
+the user actually wants.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to:
+   - `strategy/convertible_bond/service.js`
+   - `presentation/dashboard/dashboard_page.js`
+3. Remove the outward `discountRate` concept from this round's live contract:
+   - weighted-discount logic must directly use `-premiumRate`
+   - row enrichment must stop returning a standalone `discountRate` field
+4. Extend weighted-discount calculation from “only low-premium rows” to the full
+   convertible table:
+   - signed base stays `-premiumRate`
+   - coefficient magnitude uses `abs(-premiumRate)` where a non-negative anchor ratio
+     is required
+5. Make the three dual-value pricing cells percentage-first:
+   - `转股溢价`: main line = `premiumRate`
+   - `理论溢价`: main line = `theoreticalPremiumRate`
+   - `加权折价`: main line = `weightedDiscountRate`
+   - secondary line keeps the amount text
+6. Insert the factor columns before `加权折价`:
+   - `ATR系数/ATR%`
+   - `抛压系数`
+   - `市场`
+7. Narrow convertible sorting to:
+   - `加权折价`
+   - `理论溢价`
+   - `双低`
+   and remove the other sort handles.
+
+Acceptance:
+- The live convertible strategy no longer returns or documents a standalone `discountRate`
+  user-facing concept for this round.
+- `weightedDiscountRate` is computed for the full table whenever the needed factor inputs exist,
+  not only for the old low-premium monitor subset.
+- `转股溢价 / 理论溢价 / 加权折价` display percentage first and amount second.
+- `ATR系数/ATR% / 抛压系数 / 市场` appear before `加权折价` in the main table.
+- The convertible main table only exposes sorting for `加权折价 / 理论溢价 / 双低`.
+
+## 76. Phase BP: Cloud-only Web Entry Cleanup + Server-first Workflow (2026-03-30)
+
+Goal: stop treating this repository as a local-web delivery target and converge the
+operator workflow to one official path: update cloud server only, keep the cloud
+dashboard as the single formal access surface, and delete local-webpage residues that
+are no longer part of the live runtime.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to cloud-entry semantics, operator tooling, and residue cleanup:
+   - do not change the live dashboard template/render chain used by the cloud server
+   - do not change public API paths
+   - do not change strategy/fetch/push business logic
+3. Treat the formal live web chain as only:
+   - `start_server.js`
+   - `presentation/templates/dashboard_template.html`
+   - `presentation/dashboard/dashboard_page.js`
+   - configured `deployment.public_base_url`
+4. Remove local-only / duplicate web-entry residues that are not part of the live chain,
+   such as:
+   - root `index.html` local/cloud guidance page
+   - unreferenced `remote_dashboard_template.html`
+   - unreferenced `remote_dashboard_page.js`
+   - Windows local firewall helper scripts that only existed for local port exposure
+5. Change default verification semantics from loopback-first to cloud-first:
+   - `npm run check`
+   - `npm run check:health`
+   should prefer configured public URL / cloud URL, while still allowing explicit override.
+6. Update runbook/quickstart wording so future sessions no longer treat local webpage access
+   as a parallel official path.
+7. Sync the resulting change set to the cloud server and verify the public homepage and
+   public `/api/health`.
+
+Acceptance:
+- The repository documents the cloud server as the only official operator-facing web entry.
+- Local duplicate dashboard mirror files are removed when they are not part of the live chain.
+- Default health/smoke checks no longer assume `127.0.0.1:5000` as the primary target.
+- The cloud homepage and cloud `/api/health` remain reachable after deployment.
+
+## 77. Phase BQ: Convertible Premium-Rate Sort Restore (2026-03-30)
+
+Goal: restore the user-requested `转股溢价` sort handle in the convertible main table
+without reopening the broader sortable-surface cleanup from the previous round.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the convertible main-table sorting contract:
+   - do not change fetch logic
+   - do not change weighted-discount formula
+   - do not change push, summary, or API payload semantics
+3. Promote the live sortable-column contract from three columns to four columns:
+   - `转股溢价`
+   - `加权折价`
+   - `理论溢价`
+   - `双低`
+4. Implement the change only in the convertible dashboard column definition by restoring:
+   - `sortable: true`
+   - numeric sort
+   - `premiumRate` as the sort value
+5. Re-run local checks and sync the updated page bundle to the cloud server.
+
+Acceptance:
+- The convertible main table header for `转股溢价` is clickable again.
+- `转股溢价` sorts by `premiumRate` numeric value rather than display text.
+- Existing sort handles for `加权折价 / 理论溢价 / 双低` remain unchanged.
+- No other module or API contract changes in this round.
+
+## 78. Phase BR: Convertible Remaining-Term Year Unit + Force-Redeem Highlight (2026-03-30)
+
+Goal: align the convertible main table with the latest operator requirement so
+`剩余期限` always renders in `年`, and bonds that have already published a force-redeem
+status are visually highlighted in yellow on the page.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the convertible presentation chain:
+   - no formula changes
+   - no push changes
+   - no new fetch source introduction
+3. Normalize the `剩余期限` display rule:
+   - keep using the existing source field `remainingYears`
+   - stop switching to month display for short remaining terms
+   - render all values in `年`
+4. Add a dedicated front-end row highlight rule for published force-redeem items:
+   - use yellow as the visual cue
+   - only highlight rows whose force-redeem status is affirmative and not terminal
+5. Surface the source truth clearly in the implementation notes:
+   - the current force-redeem status field continues to come from the existing
+     Eastmoney convertible-bond bulk source field `IS_REDEEM`
+6. Re-run local checks and sync the updated assets to the cloud server.
+
+Acceptance:
+- `剩余期限` in the convertible main table always shows year units such as `0.42年`.
+- Convertible rows with an affirmative published force-redeem status are highlighted yellow.
+- Completed/delisted terminal statuses are not re-highlighted by this new UI rule.
+- The round does not alter formulas, APIs, or push behavior.
+
+## 79. Phase BS: LOF Push Simplification To One 14:00 Full Push (2026-03-30)
+
+Goal: simplify the LOF push chain to one fixed trading-day full push at `14:00`
+and retire the old entry-based instant path plus the extra afternoon slots.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, and the dashboard API contract first.
+2. Keep this round isolated to the LOF notification chain and its dashboard settings card:
+   - no LOF market-data formula change
+   - no non-LOF push behavior change
+3. Retire the old LOF instant-push behavior completely:
+   - no more new-entry detection
+   - no more instant success/error state in the outward dashboard wording
+4. Reduce the LOF scheduled push contract to one fixed slot:
+   - trading days only
+   - `14:00`
+   - full current monitor-pool payload only
+5. Migrate existing runtime config/state away from the old `13:30 / 14:00 / 14:30`
+   schedule so the cloud server does not continue using stale stored times.
+6. Simplify the LOF dashboard push card to match the new fixed behavior and remove the
+   old three-time editable form.
+7. Re-run local checks and sync the change set to the cloud server.
+
+Acceptance:
+- LOF no longer sends new-entry instant pushes.
+- LOF scheduled push runs only once on trading days at `14:00`.
+- The LOF dashboard push card no longer describes or exposes the retired instant/triple-slot behavior.
+- Existing AH / AB / 转债 / 抢权 / 分红 / 事件套利 push chains remain unchanged.
+
+## 80. Phase BT: Convertible Force-Redeem Public Field Fix (2026-03-30)
+
+Goal: fix the remaining gap in the convertible page so force-redeem highlighting can
+actually work on the live page by exposing the needed real fields through the public
+cb-arbitrage payload, while keeping completed force-redeem bonds filtered out.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, and the dashboard API contract first.
+2. Keep this round isolated to the convertible public payload and page read path:
+   - no LOF change
+   - no formula change
+   - no push change
+3. Clarify the live business rule:
+   - `已公告强赎、但未终止上市` => yellow highlight
+   - `已完成强赎 / 已终止上市 / 已摘牌` => remove from the live list
+4. Expose the real source fields needed by the page:
+   - `forceRedeemStatus`
+   - `delistDate`
+   - `ceaseDate`
+5. Re-run checks and sync to the cloud server.
+
+Acceptance:
+- Convertible public rows expose the force-redeem status/date fields needed by the page.
+- The page can highlight active force-redeem rows when the source provides that status.
+- Completed force-redeem bonds remain removed from the live table instead of being highlighted.
+
+## 79. Phase BS: Pure-bond Truthfulness + Sort Stability + 250D Volatility Readiness (2026-03-30)
+
+Goal: finish three tightly related corrections in the convertible and cb-rights-issue
+chains without changing outward business modules:
+1. pure-bond value in theoretical pricing must use only the upstream API value and must
+   stop falling back to local discounted self-calculation;
+2. dashboard table sorting must stop causing visible horizontal jump-back to the first
+   column;
+3. the active volatility standard must be truly enforced as `250日后复权年化波动率`,
+   and the history-sync/default-retention chain must no longer quietly retain old 60-day
+   assumptions when config or database state is stale.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to:
+   - `data_fetch/convertible_bond/source.py`
+   - `data_fetch/convertible_bond/history_source.py`
+   - `data_fetch/cb_rights_issue/source.py`
+   - `data_fetch/cb_rights_issue/history_source.py`
+   - `tools/cb_rights_issue_stock_history_db.py`
+   - `presentation/dashboard/dashboard_page.js`
+3. Pure-bond truthfulness:
+   - theoretical pricing may only use `pureBondValue` returned by the upstream pure-bond API
+   - if upstream pure-bond value is missing, `bondValue/theoreticalPrice/theoreticalPremiumRate`
+     must degrade truthfully instead of using local discounted fallback
+4. Sort stability:
+   - preserve current table horizontal scroll position when clicking sortable headers
+   - prevent sort interaction from visually jumping the user back to the first column
+5. 250-day volatility readiness:
+   - keep `250` as the only active volatility window default
+   - remove remaining source/history defaults that still assume `60`
+   - verify current DB row counts for both convertible and cb-rights-issue history stores
+   - if current DB does not yet satisfy 250-day minimum, report it truthfully and trigger
+     the necessary history sync on the live server
+6. Re-run checks, sync to cloud, and verify the public page/API plus history-db readiness.
+
+Acceptance:
+- Theoretical pricing no longer self-computes bond floor when upstream pure-bond value is absent.
+- Sorting a wide dashboard table no longer jumps horizontal view back to the left edge.
+- Active code defaults and runtime wording consistently use 250-day HFQ annualized volatility.
+- DB verification clearly states whether 251-close minimum is currently satisfied, and the
+  cloud server is brought to the correct history-sync state.
+
+## 81. Phase BU: Pure-bond Cache Wireback Fix (2026-03-30)
+
+Goal: restore truthful `纯债价值` display on the live convertible page after the
+previous round removed the local fallback but left the upstream pure-bond daily cache
+unwired from the normal read path.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the convertible pure-bond read chain:
+   - no formula expansion
+   - no push change
+   - no non-convertible module change
+3. Reconnect the existing upstream pure-bond loader to the daily aux-cache path:
+   - normal read path must load `pureBondMap` via the existing Eastmoney pure-bond source
+   - if same-day fetch succeeds, cache it and expose it to outward rows
+   - if same-day fetch fails, truthfully fall back only to previously cached real upstream values
+4. Remove stale wording that still mentions the retired local discounted fallback.
+5. Re-run checks, deploy cloud-only, and verify that the public convertible payload/page
+   shows restored `pureBondValue` where the upstream source provides it.
+
+Acceptance:
+- Live `/api/market/convertible-bond-arbitrage` rows recover truthful `pureBondValue` values.
+- The page `纯债价值` column no longer stays blank for bonds whose upstream pure-bond value exists.
+- No local discounted fallback is reintroduced.
+
+## 83. Phase BW: Convertible Full-column Sort + Compact Widths (2026-03-30)
+
+Goal: improve the convertible main-table scanning experience without changing the
+backend truth fields, by restoring sort interaction across all visible convertible
+columns and tightening column widths so the table follows content width more closely.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the convertible dashboard presentation path:
+   - `presentation/dashboard/dashboard_page.js`
+   - `presentation/templates/dashboard_template.html`
+3. Expand the convertible sort contract:
+   - every visible convertible main-table column gets a sortable header
+   - sort value should follow the column's primary displayed field
+   - header affordance changes to a compact arrow-above-label style
+4. Tighten convertible width rules:
+   - use narrower convertible-specific column classes instead of broad shared widths
+   - let identity / quote / factor / numeric columns shrink closer to their visible content
+   - keep horizontal scrolling available, but remove unnecessary width padding
+5. Re-run front-end syntax checks and summarize the result.
+
+Acceptance:
+- All visible convertible main-table headers are sortable.
+- Sort headers show a compact arrow indicator above the label.
+- Convertible columns are visibly narrower and closer to content width than before.
+- No backend formula, API field, or push behavior changes in this round.
+
+## 86. Phase BZ: CB-rights-issue 250D Volatility Enforcement + DB Repair (2026-03-30)
+
+Goal: repair the cb-rights-issue chain so it truly uses `250日后复权年化波动率`
+as the only live pricing input, and bring the dedicated stock-history database to a
+real `>=251`-close ready state.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the cb-rights-issue chain:
+   - `data_fetch/cb_rights_issue/source.py`
+   - `data_fetch/cb_rights_issue/history_source.py`
+   - `strategy/cb_rights_issue/service.py`
+   - dedicated history DB/runtime state
+3. Enforce the live 250D rule:
+   - outward/source rows must compute and expose `volatility250`
+   - old `volatility60` may remain only as a compatibility alias that mirrors the 250D value
+   - strategy pricing must stop using a real old-60-day fallback
+4. Repair the database:
+   - inspect current dedicated history DB row-count coverage
+   - run the required full sync so symbols with enough listing history reach `>=251` closes
+   - keep truthful exceptions only for genuinely short-listed symbols
+5. Re-verify local/cloud results and summarize the final coverage.
+
+Acceptance:
+- `cb_rights_issue` pricing uses `250日后复权年化波动率` as the only real live input.
+- Rows no longer price from a real old 60-day volatility value.
+- The dedicated history DB is brought to `>=251`-close readiness wherever listing history allows.
+- Cloud API rows for eligible names recover truthful `volatility250` and aligned收益率.
+
+## 82. Phase BV: Convertible Strong-redeem Page Truthfulness + Theoretical-premium 250D Repair (2026-03-30)
+
+Goal: fix the last two visible convertible-page regressions without changing unrelated
+modules:
+1. active strong-redeem rows must highlight correctly, while terminal rows such as
+   completed/delisted bonds still stay out of the live list;
+2. `理论溢价率` must again display truthful values under the current `250日后复权波动率`
+   standard instead of degrading broadly to blank because the pure-bond input/cache chain
+   or public-row shaping is incomplete.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the convertible read/display chain:
+   - `data_fetch/convertible_bond/source.py`
+   - `strategy/convertible_bond/service.js`
+   - `presentation/dashboard/dashboard_page.js`
+   - `start_server.js`
+3. Clarify the strong-redeem truth rule:
+   - `已公告强赎、但尚未停牌/摘牌/终止上市` => yellow highlight
+   - `已停牌 / 已摘牌 / 已终止上市 / 已完成强赎` => remove from the live list, not highlight
+   - if `海优转债` is already terminal in the real source, the correct live behavior remains
+     “not present” rather than “yellow-highlighted”
+4. Repair the theoretical-premium live chain under the active 250D standard:
+   - outward `theoreticalPrice / theoreticalPremiumRate` continue to depend on real
+     `pureBondValue + 250日后复权波动率`
+   - same-day pure-bond daily cache must be reused correctly on the normal read path
+   - rows with available truthful inputs must recover visible `理论溢价率`
+   - rows lacking truthful pure-bond input must still show `--`
+5. Keep the page wording aligned with the live rule:
+   - `波动率` display for this chain remains `250日后复权年化波动率`
+   - formula/explain text must not imply the retired 60-day standard
+6. Re-run checks, sync to the cloud server, and verify the public API/page.
+
+Acceptance:
+- Live page/API do not keep terminal strong-redeem rows such as completed `海优转债` in the
+  convertible table.
+- Active non-terminal strong-redeem rows can still be highlighted yellow.
+- Live rows with truthful pure-bond + 250D volatility inputs recover `theoreticalPremiumRate`.
+- Rows missing truthful pure-bond input continue to show `--`, with no fake fallback.
+
+## 84. Phase BX: Custom Monitor Precision To Three Decimals (2026-03-30)
+
+Goal: make the `监控套利 / 自定义监控` module numerically consistent by unifying
+its calculated outputs and user-facing display precision to `小数点后三位`, without
+changing formulas or touching other arbitrage modules.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the custom-monitor chain:
+   - `strategy/custom_monitor/service.js`
+   - `presentation/dashboard/dashboard_page.js`
+   - `notification/styles/markdown_style.js`
+3. Unify calculation/output precision:
+   - monitor derived numeric fields should round to `3` decimals
+   - this applies to monitor-side price / payout / spread / yield outputs
+4. Unify outward display precision:
+   - monitor tab table values show `3` decimals
+   - monitor detail panel and formula text show `3` decimals
+   - timed summary markdown for `自定义监控（全量）` shows `3`-decimal yield rates
+5. Keep the round narrow:
+   - no formula change
+   - no config change
+   - no AH / AB / 转债 / LOF / 分红 / 事件套利 display change
+6. Re-run the relevant syntax checks and summarize the result.
+
+Acceptance:
+- `监控套利` module derived outputs are rounded/displayed to `3` decimals.
+- Table, detail panel, and summary markdown stay consistent with one another.
+- No non-monitor module precision changes regress in this round.
+
+## 85. Phase BY: Convertible Force-redeem Status Column + Bright Highlight Fix (2026-03-30)
+
+Goal: fix the false-positive convertible strong-redeem highlighting and add a dedicated
+`强赎状态` column at the far right of the convertible table, while keeping the change
+isolated to the convertible read/display chain.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to:
+   - `data_fetch/convertible_bond/source.py`
+   - `presentation/dashboard/dashboard_page.js`
+   - `presentation/templates/dashboard_template.html`
+   - `start_server.js`
+3. Retire the wrong highlight input:
+   - stop using raw `IS_REDEEM`/`isRedeem` as if it were a published strong-redeem state
+   - derive outward `forceRedeemStatus` from stronger real clues such as notice dates and terminal dates
+4. Add a dedicated convertible trailing column:
+   - `强赎状态`
+   - place it at the far right / final visible column
+   - show the derived status text and, when available, its notice date
+5. Tighten the page highlight rule:
+   - highlight only rows whose outward derived status clearly means active published strong redeem
+   - terminal/delisted rows must not highlight
+6. Refresh the row color to a brighter yellow, avoiding the previous dull yellow-brown tone.
+7. Re-run syntax checks, sync the server, and verify the live page/API.
+
+Acceptance:
+- Convertible page no longer highlights nearly all rows.
+- `强赎状态` appears as the final convertible table column.
+- Active strong-redeem rows use a bright yellow highlight.
+- The page reads the corrected derived status instead of the raw all-`是` flag.
+
+## 86. Phase BZ: Convertible Put-option Strike Fixed To Force-redeem Price (2026-03-30)
+
+Goal: update the convertible theoretical-pricing chain so the put-option leg is
+actually priced using `强赎价 / redeemTriggerPrice` whenever that real input exists,
+instead of silently dropping the put leg when the stock is below the trigger.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the convertible theoretical-pricing path:
+   - `data_fetch/convertible_bond/source.py`
+   - `presentation/dashboard/dashboard_page.js`
+3. Clarify the live pricing rule:
+   - put-option strike remains `redeemTriggerPrice`
+   - if a truthful `redeemTriggerPrice` exists, the put leg must be priced and deducted
+   - do not zero out the put leg merely because current stock price is below the trigger
+4. Update outward pricing-formula text to match the new live rule.
+5. Re-run checks and verify with a concrete bond such as `福22转债`.
+
+Acceptance:
+- Convertible rows with a real `redeemTriggerPrice` can produce non-zero `putOptionValue`.
+- `theoreticalPrice` and `theoreticalPremiumRate` reflect the deducted put leg.
+- Page explanation text matches the implemented formula.
+
+## 91. Phase CE: Convertible Pure-bond Premium Dual-value Column (2026-03-30)
+
+Goal: adjust the convertible main table so the former `纯债价值` column becomes a
+dual-value `纯债溢价` column that follows the user-defined ratio
+`转债价格 / 纯债价值 - 1`, with sorting driven by that ratio while keeping the change
+isolated to front-end presentation.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to `presentation/dashboard/dashboard_page.js`.
+3. Replace the old single-value read rule:
+   - rename the visible column from `纯债价值` to `纯债溢价`
+   - first-line primary value = `转债价格 / 纯债价值 - 1`
+   - second-line secondary value = `纯债价值`
+4. Sort the column by the primary ratio value, not by pure-bond value.
+5. Do not change:
+   - fetch logic
+   - API payload shape
+   - pricing formulas
+   - non-convertible modules
+6. Re-run front-end syntax checks and sync to the cloud server.
+
+Acceptance:
+- Convertible main table shows `纯债溢价` instead of `纯债价值`.
+- The cell displays both `纯债溢价率` and `纯债价值`.
+- Clicking the header sorts by `转债价格 / 纯债价值 - 1`.
+
+## 92. Phase CF: Convertible Force-redeem Marker Simplification (2026-03-30)
+
+Goal: retire the current yellow full-row force-redeem highlight and simplify the
+operator-facing expression into a red exclamation marker placed immediately after the
+convertible bond name, with a truthful reason line such as strong-redeem date or
+maturity redeem information.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to:
+   - `start_server.js`
+   - `presentation/dashboard/dashboard_page.js`
+   - `presentation/templates/dashboard_template.html`
+3. Retire the current page expression:
+   - remove the yellow row highlight
+   - remove the dedicated trailing `强赎状态` column from the convertible table
+4. Add a compact name-cell risk marker:
+   - when the row is an active force-redeem item, append a red `!` marker after `转债名称`
+   - the same name cell must show a truthful secondary reason line built only from real exposed fields
+5. The reason line must reuse real fields only:
+   - strong-redeem status + notice date from `forceRedeemStatus / forceRedeemNoticeDate`
+   - maturity reminder from `maturityDate / maturityRedeemPrice`
+   - if `maturityRedeemPrice` is missing, omit the price segment truthfully
+6. Keep current business boundaries unchanged:
+   - active force-redeem rows may still appear in the main table
+   - top summaries / push exclusions keep their current active-force-redeem filter
+   - no new data source is introduced
+7. Expose `maturityRedeemPrice` through the existing public row shape so the page can render the truthful reason text.
+8. Re-run front-end checks, sync the cloud server, and verify the public page.
+
+Acceptance:
+- Convertible rows no longer use yellow full-row highlighting.
+- The dedicated `强赎状态` column is removed from the main convertible table.
+- Active force-redeem rows show a red exclamation marker after the bond name.
+- The bond-name secondary text truthfully shows strong-redeem and/or maturity information when real fields exist.
+
+## 87. Phase CA: CB-rights-issue Web-visible 250D Sync + Cache Bust (2026-03-30)
+
+Goal: close the last operator-visible gap after the cb-rights-issue backend switched to
+true `250日后复权年化波动率`, so the public dashboard page no longer shows stale `60 日`
+wording and the browser is forced to fetch the updated front-end bundle.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the dashboard presentation layer for `可转债抢权配售`:
+   - `presentation/dashboard/dashboard_page.js`
+   - `presentation/templates/dashboard_template.html`
+3. Do not change:
+   - pricing formula
+   - API path
+   - response payload shape
+   - push schedule
+   - any non-cb-rights-issue module behavior
+4. Align the visible page wording with the already-active backend truth:
+   - replace the remaining `60 日波动率` explanatory text with `250日波动率`
+   - keep the copy consistent with the dedicated history-DB rule and `>=251` close requirement
+5. Force the browser to pick up the refreshed dashboard bundle by bumping the dashboard script version query in the template.
+6. Sync the changed front-end files to the cloud server and verify:
+   - public homepage serves the new template
+   - cb-rights-issue panel visible text reflects `250日波动率`
+   - public API continues returning the already-fixed `volatility250`
+
+Acceptance:
+- The public cb-rights-issue page no longer shows stale `60 日波动率` wording.
+- The dashboard template references a new front-end bundle version token so browser cache does not mask the change.
+- No cb-rights-issue calculation or API contract regresses in this round.
+
+## 88. Phase CB: Convertible Theoretical-option Columns Expansion (2026-03-30)
+
+Goal: extend the convertible main table right after `理论溢价` with three operator-facing
+derived columns so the page can directly compare:
+- theoretical option value
+- implied option value
+- their difference
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the convertible dashboard presentation layer:
+   - `presentation/dashboard/dashboard_page.js`
+   - `presentation/templates/dashboard_template.html`
+3. Do not change:
+   - fetch logic
+   - theoretical-pricing formula
+   - public API path
+   - push behavior
+4. Reuse existing truthful fields only:
+   - `callOptionValue` / `putOptionValue` / `pricingFormula`
+   - `price`
+   - `pureBondValue`
+5. Add three visible columns after `理论溢价`:
+   - `理论期权价值`
+   - `隐含期权价值`
+   - `期权折价率`
+6. Fix their live read rules:
+   - `理论期权价值 =` existing theoretical option value already implied by the pricing chain
+   - `隐含期权价值 = 转债价格 - 纯债价值`
+   - `期权折价率 = 隐含期权价值 / 理论期权价值 - 1`
+7. Keep the new columns sortable and bump the dashboard bundle token so browsers fetch the new page code after deployment.
+
+Acceptance:
+- The convertible main table shows the three new columns immediately after `理论溢价`.
+- The three new columns are computed from existing truthful fields and do not require API expansion.
+- Sorting and existing convertible fields continue working.
+
+## 89. Phase CC: Convertible Option-discount-rate Definition Correction (2026-03-30)
+
+Goal: correct the just-added convertible option comparison column again so it matches the
+latest user definition:
+`期权折价率 = 隐含期权价值 / 理论期权价值 - 1`
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the convertible dashboard presentation layer:
+   - `presentation/dashboard/dashboard_page.js`
+   - `presentation/templates/dashboard_template.html`
+3. Do not change:
+   - fetch logic
+   - theoretical-pricing formula
+   - API payload shape
+   - push behavior
+4. Replace the read rule only:
+   - `理论期权价值` unchanged
+   - `隐含期权价值` unchanged
+   - rename `期权比例` to `期权折价率`
+   - `期权折价率 = 隐含期权价值 / 理论期权价值 - 1`
+5. When `理论期权价值` is `0` or missing, keep the cell empty truthfully.
+6. Bump the dashboard bundle token again and sync to the cloud server.
+
+Acceptance:
+- The live page no longer shows the old `期权比例` label.
+- The live page computes `期权折价率` as `隐含期权价值 / 理论期权价值 - 1`.
+- Existing convertible columns and sorting remain usable.
+
+## 90. Phase CD: Convertible Summary / Push Force-redeem Exclusion (2026-03-30)
+
+Goal: exclude active force-redeem convertibles from the operator-facing convertible
+top summaries and related push lists, while keeping those rows visible in the main
+convertible table.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to summary / push selection only:
+   - `strategy/convertible_bond/service.js`
+   - `start_server.js`
+   - `presentation/dashboard/dashboard_page.js`
+3. Do not change:
+   - main table membership
+   - pricing formula
+   - API route paths
+   - non-convertible modules
+4. Add one shared active-force-redeem exclusion rule:
+   - rows with active published force-redeem semantics are excluded from:
+     - convertible top summaries
+     - main summary convertible markdown picks
+     - convertible discount monitor / signal push lists
+   - terminal/delisted rows remain governed by the existing terminal filter
+5. Keep the main table unchanged:
+   - active force-redeem rows may still remain visible in the live convertible table
+   - they are only excluded from the summary/push candidate sets
+6. Sync to cloud and verify with at least one known strong-redeem sample.
+
+Acceptance:
+- Convertible page top summary cards no longer include active force-redeem rows.
+- Main summary push no longer picks active force-redeem rows for convertible highlights.
+- Convertible independent push chains also skip active force-redeem rows.
+- Main convertible table still shows those rows when they are otherwise live.
+
+## 91. Phase CE: Convertible Option-discount Cell Adds Option Gap (2026-03-30)
+
+Goal: keep the existing convertible option columns and pricing formula unchanged, but make the `期权折价率` cell more useful by also showing the option-value gap below the rate.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to dashboard presentation files:
+   - `presentation/dashboard/dashboard_page.js`
+   - `presentation/templates/dashboard_template.html`
+3. Do not change:
+   - fetch logic
+   - theoretical-pricing formula
+   - API payload shape
+   - push behavior
+4. Keep existing reads unchanged:
+   - `理论期权价值`
+   - `隐含期权价值`
+   - `期权折价率`
+5. Add one new derived display-only helper:
+   - `期权价差 = 理论期权价值 - 隐含期权价值`
+6. Render the `期权折价率` column as a compact stacked cell:
+   - first line: `期权折价率`
+   - second line: `期权价差`
+7. Keep sorting on the column bound to `期权折价率`, not the rendered text.
+8. Bump the dashboard bundle token and sync to the cloud server.
+
+Acceptance:
+- The live `期权折价率` column shows both the rate and the option gap.
+- `期权价差` uses `理论期权价值 - 隐含期权价值`.
+- Existing convertible columns, formulas, and sort behavior remain usable.
+
+## 92. Phase CF: Convertible Summary Push And Top-card Filter Tightening (2026-03-30)
+
+Goal: tighten the convertible regular-summary candidate set for both the top summary cards and the timed main push, while leaving the low-premium monitor and its own push chain unchanged.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Add one shared convertible summary helper in `strategy/convertible_bond/service.js` for:
+   - exclude active force-redeem rows
+   - exclude rows with `remainingYears > 1`
+   - exclude non-live / terminal rows through the existing delist-expiry gate
+3. Reuse that helper in:
+   - `start_server.js` convertible summary shaping
+   - `notification/styles/markdown_style.js` timed main summary section
+4. Keep the low-premium monitor chain unchanged:
+   - do not change buy/sell thresholds
+   - do not change timed monitor push
+   - do not change discount monitor summary
+5. Narrow the timed main summary convertible content to two fixed groups:
+   - `双低前3`
+   - `理论溢价率前3`
+6. Add `期权折价率` text to the timed main summary theoretical-premium rows.
+7. Keep the dashboard top cards aligned with the same summary-eligible row set.
+
+Acceptance:
+- Top convertible summary cards exclude active force-redeem rows, rows with more than one year remaining, and terminal/non-live rows.
+- Timed main summary push uses the same filter.
+- Timed main summary push convertible section shows only `双低前3` and `理论溢价率前3`.
+- Theoretical-premium push rows include `期权折价率`.
+- Low-premium monitor list and low-premium monitor push remain unchanged.
+
+## 95. Phase CG: Convertible Summary Time-filter Removal (2026-03-30)
+
+Goal: remove the just-added `remainingYears` time gate from convertible top summaries and the timed main summary push, while keeping the active force-redeem and terminal-row exclusions unchanged.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this rollback isolated to the regular-summary candidate path:
+   - `strategy/convertible_bond/service.js`
+   - `start_server.js`
+   - `notification/styles/markdown_style.js`
+   - `presentation/dashboard/dashboard_page.js`
+3. Retain only two shared summary exclusions:
+   - active force-redeem rows
+   - terminal / non-live rows through existing sanitation
+4. Remove the `remainingYears <= 1` requirement from:
+   - top summary cards
+   - timed main summary push
+5. Keep unchanged:
+   - low-premium monitor and its push path
+   - timed summary convertible content structure
+   - theoretical row `期权折价率` text
+
+Acceptance:
+- Convertible top summary cards no longer exclude rows solely because `remainingYears > 1`.
+- Timed main summary push uses the same no-time-gate candidate set.
+- Active force-redeem and terminal rows still stay excluded from those regular summaries.
+- Low-premium monitor list and low-premium monitor push remain unchanged.
+
+
+Goal: remove all retired overseas LOF behavior from the live LOF module without taking
+down the remaining LOF page or other modules.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, and the dashboard API contract first.
 2. Keep this round isolated to the LOF chain:
-   - no source URL change
-   - no new API route
-   - no dashboard structure change
-3. Revise only the outward premium semantics:
-   - `premiumRate = (price / iopv - 1) * 100`
-   - `iopv` calculation paths themselves remain unchanged
-4. Keep monitor-pool logic attached to the same outward `premiumRate` field after the
-   formula switch, so page and push keep one definition.
-5. Ensure visible notes and strategy docs stop describing the old formula.
+   - `config.yaml`
+   - `data_fetch/lof_arbitrage/source.py`
+   - `strategy/lof_arbitrage/service.py`
+   - `presentation/routes/market_routes.js`
+   - `presentation/dashboard/dashboard_page.js`
+   - `LOF套利策略.md`
+3. Remove all historical overseas group wiring:
+   - LOF visible groups become only `index` and `asia`
+   - LOF default group becomes `index`
+4. Keep the remaining module behavior intact:
+   - `GET /api/market/lof-arbitrage` path remains unchanged
+   - limited/unlimited monitor pools continue working on the remaining rows
+   - LOF independent push path remains available
+5. Re-run repo searches and minimal checks, then sync to the cloud server and verify the
+   public page/API.
 
 Acceptance:
-- `strategy/lof_arbitrage/service.py` computes `premiumRate` as `现价 / IOPV - 1`.
-- LOF page notes and strategy docs no longer claim `IOPV / 现价 - 1`.
-- Returned rows show positive values when `现价 > IOPV`, and negative values when `现价 < IOPV`.
+- The live LOF page exposes only `指数LOF` and `QDII亚洲`.
+- Remaining `指数LOF / QDII亚洲` page, API, and push behavior keep working.
+
+## 92. Phase CF: Subscription Footnote Removal (2026-03-30)
+
+Goal: remove the explanatory footnote block from the top `股债打新` section while keeping
+all main-tab module footnotes unchanged.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to the dashboard presentation-config path:
+   - `config.yaml`
+3. Remove the active `presentation.dashboard_module_notes.subscription` content so the
+   shared footnote renderer naturally hides the entire card for the subscription section.
+4. Do not change:
+   - subscription data source
+   - subscription table fields
+   - same-day stage judgment
+   - other module footnotes
+5. Re-parse config, sync to the cloud server, and verify the homepage top section no
+   longer shows the subscription note block.
+
+Acceptance:
+- `股债打新` no longer renders a `页面注释` block.
+- Other modules still keep their current footnotes.
+- No subscription table/API behavior regresses.
+
+## 93. Phase CG: Convertible Weighted-discount Factor Simplification (2026-03-30)
+
+Goal: simplify the live `可转债套利` weighted-discount factor chain so the ATR and sell-
+pressure coefficients use the user-specified direct formulas, while keeping the market
+coefficient, page structure, API path, and push chain unchanged.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first, and sync the strategy note
+   document `可转债折价策略.md`.
+2. Keep this round isolated to the convertible discount-strategy chain:
+   - `strategy/convertible_bond/service.js`
+   - `presentation/dashboard/dashboard_page.js`
+   - related live docs only
+3. Replace the active factor definitions with:
+   - `atrCoefficient = stockAtr20Pct`
+   - `sellPressureCoefficient = stockAvgTurnoverAmount20Yi / remainingSizeYi`
+   - `boardCoefficient` stays on the current board-mapping rule
+4. Recompute:
+   - `weightedDiscountRate = (-premiumRate) * atrCoefficient * sellPressureCoefficient * boardCoefficient`
+5. Keep public path and visible field names stable:
+   - `GET /api/market/convertible-bond-arbitrage` stays unchanged
+   - `ATR系数/ATR% / 抛压系数 / 市场 / 加权折价` columns stay visible
+6. Update the factor-column helper text so the sell-pressure secondary line reflects the
+   new `成交额 / 剩余规模` direction.
+7. Run minimal checks, then sync to the cloud server and verify service/API health.
+
+Acceptance:
+- This phase's ATR direct-equals rule is later superseded by Phase CH in the same day.
+- The live `抛压系数` equals `20日均成交额 / 剩余规模`.
+- `市场系数` remains unchanged.
+- `加权折价率` is recomputed with the new direct coefficients.
+- Convertible page, API path, and push chain remain available after deployment.
+
+## 94. Phase CH: Convertible ATR-coefficient Definition Reset (2026-03-30)
+
+Goal: keep the simplified sell-pressure rule and the existing market coefficient, but
+reset the live `ATR系数` definition to the user-specified ratio:
+`转股溢价率绝对值 / ATR百分比`.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first, and sync
+   `可转债折价策略.md`.
+2. Keep this round isolated to the convertible weighted-discount path:
+   - `strategy/convertible_bond/service.js`
+   - convertible strategy docs
+   - optional dashboard wording only if needed for accuracy
+3. Replace the live ATR-coefficient rule with:
+   - `stockAtr20Pct = stockAtr20 / stockPrice * 100`
+   - `atrCoefficient = abs(-premiumRate) / stockAtr20Pct`
+4. Keep unchanged:
+   - `sellPressureCoefficient = stockAvgTurnoverAmount20Yi / remainingSizeYi`
+   - current board coefficient mapping
+   - `weightedDiscountRate = (-premiumRate) * atrCoefficient * sellPressureCoefficient * boardCoefficient`
+5. Run minimal checks, then sync to the cloud server and verify the API.
+
+Acceptance:
+- The live `atrCoefficient` no longer equals `stockAtr20Pct`.
+- The live `atrCoefficient` equals `abs(-premiumRate) / stockAtr20Pct`.
+- `sellPressureCoefficient`, `boardCoefficient`, and API path remain unchanged.
+- Convertible page and push chain remain usable after deployment.
+
+## 95. Phase CI: Convertible Long-call Strike Reset To Max Rule (2026-03-30)
+
+Goal: correct the live convertible theoretical-pricing rule so the long-call strike is no
+longer fixed to `转股价`, but instead uses the higher value between `转股价` and
+`纯债价值 / 对应股数`.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first, and sync
+   `可转债折价策略.md`.
+2. Keep this round isolated to the convertible theoretical-pricing path:
+   - `data_fetch/convertible_bond/source.py`
+   - `presentation/dashboard/dashboard_page.js`
+   - related pricing docs only
+3. Replace the live long-call strike rule with:
+   - `optionQty = 100 / convertPrice`
+   - `bondFloorStrike = pureBondValue / optionQty`
+   - `longCallStrike = max(convertPrice, bondFloorStrike)`
+4. Keep unchanged:
+   - short-call strike still uses `redeemTriggerPrice`
+   - option model stays `american_binomial`
+   - `theoreticalPrice = bondValue + max(longCallValue - shortCallValue, 0)`
+5. Update the dashboard formula hint so it no longer claims
+   `call(转股价) - call(强赎价)` when the true long strike may be higher.
+6. Re-run minimal checks, then sync to the cloud server and verify sample bonds such as
+   `123049` reflect the new strike rule.
+
+Acceptance:
+- The live `callStrike*` fields no longer blindly equal `convertPrice`.
+- The live long-call strike equals `max(convertPrice, pureBondValue / optionQty)`.
+- The page formula hint and docs describe the new strike rule truthfully.
+- Convertible page and API remain available after deployment.
+
+## 94. Phase CH: Convertible Header Wrap + Width Compression (2026-03-30)
+
+Goal: keep the convertible table fields unchanged, but stop long header labels from
+expanding column widths by allowing controlled multi-line header text and slightly
+compressing convertible column widths.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, and `SPEC.md` first.
+2. Keep this round isolated to dashboard presentation files:
+   - `presentation/dashboard/dashboard_page.js`
+   - `presentation/templates/dashboard_template.html`
+3. Do not change:
+   - convertible data fields
+   - sort semantics
+   - API payload shape
+   - non-convertible modules
+4. Add a header rendering contract so convertible columns may provide explicit multi-line
+   header HTML such as:
+   - `隐含期<br>权价值`
+   - `期权<br>折价率`
+5. Apply the wrap behavior only to convertible table headers and keep body cells on the
+   current compact single-line layout.
+6. Reduce convertible header/cell horizontal padding and selected convertible min-widths
+   so the page becomes denser without breaking readability.
+7. Re-run front-end checks and sync to the cloud server.
+
+Acceptance:
+- Long convertible headers wrap to multiple lines instead of forcing wider columns.
+- The convertible table becomes visibly narrower/denser than before.
+- Sort buttons and sort behavior remain usable.
+
+## 96. Phase CJ: CB-rights-issue Single-table Yield Rebase + In-list Pinning (2026-04-16)
+
+Goal: rebuild the live `可转债抢权配售` page into one dense main table, switch
+the issue-ratio and margin-share rules to the latest user definition, and narrow the
+independent push to only the two list-priority groups.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, and `可转债抢权配售策略.md` first.
+2. Keep this round isolated to the cb-rights-issue chain:
+   - `data_fetch/cb_rights_issue/source.py`
+   - `strategy/cb_rights_issue/service.py`
+   - `presentation/dashboard/dashboard_page.js`
+   - `notification/styles/cb_rights_issue_markdown.js`
+   - `notification/cb_rights_issue/service.js`
+3. Replace the live issue-ratio rule:
+   - `总市值` comes from real-time stock API
+   - `发行比例 = 发行规模 / 总市值`
+   - do not continue using required-share reverse inference as the public ratio rule
+4. Replace the live share/fund rules:
+   - `配售股数 = 原始所需股数`
+   - `两融所需股数 = ceil((原始所需股数 * 0.6) / 50) * 50`
+   - `所需资金 = 配售股数 * 正股现价`
+   - `两融所需资金 = 两融所需股数 * 正股现价`
+5. Replace the page structure:
+   - remove all top summary / status / reminder cards
+   - remove the second source table
+   - render one dense main table only
+   - remove the detail panel path
+6. Add in-list pinning only:
+   - first pin `进入申购阶段`
+   - then pin `预期收益率 > 6%`
+   - keep the rest below
+7. Narrow the independent push to two non-overlapping groups:
+   - apply-stage rows first
+   - then non-apply rows with `预期收益率 > 6%`
+   - push text must include `两融收益率` and `两融收益率去皮`
+8. Run minimal checks after implementation.
+
+Acceptance:
+- The live cb-rights-issue page no longer shows summary cards or a second source table.
+- `发行比例` reads as `发行规模 / 总市值` using real API market value.
+- `两融所需股数` follows the new `原始股数 * 0.6 -> 50股向上取整` rule.
+- The visible list is pinned by apply-stage first, then `预期收益率 > 6%`.
+- Independent push only covers those two groups and includes margin yield metrics.
