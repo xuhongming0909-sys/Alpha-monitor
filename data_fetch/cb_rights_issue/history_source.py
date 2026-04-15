@@ -32,11 +32,11 @@ _FETCH_CONFIG = (((_CONFIG.get("data_fetch") or {}).get("plugins") or {}).get("c
 
 LOOKBACK_DAYS = max(120, int(_FETCH_CONFIG.get("history_lookback_days") or 420))
 MAX_WORKERS = max(1, int(_FETCH_CONFIG.get("max_history_sync_workers") or 8))
-VOL_WINDOW = max(1, int((((_CONFIG.get("strategy") or {}).get("cb_rights_issue") or {}).get("volatility_window") or 60)))
+VOL_WINDOW = 250
 REQUIRED_CLOSE_ROWS = VOL_WINDOW + 1
 STOCK_HISTORY_RETENTION_ROWS = max(
     REQUIRED_CLOSE_ROWS + 20,
-    int(_FETCH_CONFIG.get("stock_history_retention_rows") or 90),
+    int(_FETCH_CONFIG.get("stock_history_retention_rows") or 320),
 )
 
 

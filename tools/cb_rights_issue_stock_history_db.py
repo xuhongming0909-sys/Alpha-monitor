@@ -126,7 +126,7 @@ def upsert_price_rows(symbol: str, rows: Iterable[Dict], source: str) -> int:
     return len(prepared)
 
 
-def load_recent_closes(symbol: str, min_rows: int = 61) -> List[float]:
+def load_recent_closes(symbol: str, min_rows: int = 251) -> List[float]:
     normalized_symbol = str(symbol or "").strip()
     if not normalized_symbol:
         return []
@@ -180,7 +180,7 @@ def upsert_symbol_universe(symbol: str, status: str = "active", note: str = "") 
         )
 
 
-def prune_to_recent_rows(max_rows_per_symbol: int = 90) -> int:
+def prune_to_recent_rows(max_rows_per_symbol: int = 320) -> int:
     max_rows = max(1, int(max_rows_per_symbol))
     with connect() as conn:
         removed_rows = conn.execute(
