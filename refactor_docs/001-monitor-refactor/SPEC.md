@@ -4587,3 +4587,41 @@ untime_data/shared/cb_discount_strategy_state.json
 ### 98.4 Acceptance
 - A live row such as `金杨精密 / 金杨转债` renders `issueScaleYi = 9.8`.
 - The public page shows no `年化收益率` column anywhere inside cb-rights-issue subtabs.
+
+## 99. Phase CM: CB-rights-issue Monitoring Retirement (2026-04-17)
+
+- This round changes:
+  - `strategy/cb_rights_issue/service.py`
+  - `presentation/dashboard/dashboard_page.js`
+  - `refactor_docs/001-monitor-refactor/contracts/dashboard-api-contract.md`
+  - related live docs only
+- This round does not change:
+  - cb-rights-issue route path
+  - cb-rights-issue source fetch inputs
+  - cb-rights-issue phase grouping rule
+
+### 99.1 Page-expression retirement rule
+- The cb-rights-issue page must now express the feature only through the three phase groups:
+  - `申购阶段`
+  - `埋伏阶段`
+  - `等待阶段`
+- The page must not render:
+  - `推送候选`
+  - `独立推送`
+  - any monitor-pool summary wording
+
+### 99.2 Compatibility response rule
+- `GET /api/market/cb-rights-issue` may keep the existing `monitorList` field for compatibility.
+- Effective live semantic is now:
+  - `monitorList = []`
+  - `pushEligibleCount = 0`
+- Existing compatibility fields such as `pushEligible`, `monitorEligible`, and `pinPriority` may remain in the row shape, but they no longer represent an active monitoring workflow for this module.
+
+### 99.3 Push-dormant rule
+- The independent push service stays wired for compatibility but must naturally skip delivery because `monitorList` is empty.
+- No new page control for cb-rights-issue push settings should remain visible after this round.
+
+### 99.4 Acceptance
+- The public cb-rights-issue page shows only the three phase groups and their tables.
+- The public page contains no `推送候选` or `独立推送`.
+- `GET /api/market/cb-rights-issue` returns an empty `monitorList`.

@@ -321,8 +321,8 @@ def _build_row(
 
     in_apply_stage = _is_apply_stage(row)
     high_return = bool(expected_return_rate is not None and expected_return_rate > MIN_EXPECTED_RETURN_RATE)
-    pin_priority = 1 if in_apply_stage else (2 if high_return else 3)
-    push_eligible = in_apply_stage or high_return
+    pin_priority = None
+    push_eligible = False
 
     return {
         **dict(row),
@@ -339,7 +339,7 @@ def _build_row(
         "originalFundsBaseline": _round(original_funds_baseline, 4),
         "marketRule": f"raw_x_{MARGIN_SHARE_RATIO}_then_round_{MARGIN_ROUND_LOT_SHARES}",
         "stageEligible": in_apply_stage or bool(_normalize_progress_sample_group(str(row.get("progressName") or ""))),
-        "monitorEligible": push_eligible,
+        "monitorEligible": False,
         "optionReferencePrice": _round(option_reference_price, 4),
         "optionStrikePrice": _round(option_strike_price, 4),
         "optionQuantity": _round(option_quantity, 6),
@@ -356,7 +356,7 @@ def _build_row(
         "treasuryYield10y": treasury_yield_10y,
         "pinPriority": pin_priority,
         "inApplyStage": in_apply_stage,
-        "pushEligible": push_eligible,
+        "pushEligible": False,
         "isHighExpectedReturn": high_return,
     }
 
@@ -412,13 +412,13 @@ def build_cb_rights_issue_response(fetch_payload: dict, bus_records: list[dict])
         for row in base_rows
     ]
     source_rows = _sort_source_rows(source_rows)
-    monitor_list = [item for item in source_rows if item.get("pushEligible")]
+    monitor_list: List[Dict[str, Any]] = []
 
     source_summary = {
         "totalRows": len(source_rows),
         "applyStageCount": sum(1 for item in source_rows if item.get("inApplyStage")),
         "highReturnCount": sum(1 for item in source_rows if item.get("isHighExpectedReturn")),
-        "pushEligibleCount": len(monitor_list),
+        "pushEligibleCount": 0,
         "sourceUrl": fetch_payload.get("sourceUrl"),
         "sourceTitle": fetch_payload.get("sourceTitle"),
         "stageLagMedianMap": stage_lag_median_map,

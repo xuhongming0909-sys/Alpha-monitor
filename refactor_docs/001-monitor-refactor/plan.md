@@ -2936,3 +2936,35 @@ Acceptance:
 - A row like `金杨精密 / 金杨转债` now exposes `issueScaleYi = 9.8` instead of `21.49`.
 - The public page no longer shows a visible `年化收益率` column in any cb-rights-issue subtab.
 - Existing API field names and push path remain available after deployment.
+
+## 99. Phase CM: CB-rights-issue Monitoring Retirement (2026-04-17)
+
+Goal: retire the old cb-rights-issue monitoring semantics and keep only the current
+three phase groups as the visible product expression.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, and `可转债抢权配售策略.md` first.
+2. Keep this round isolated to:
+   - `strategy/cb_rights_issue/service.py`
+   - `presentation/dashboard/dashboard_page.js`
+   - `refactor_docs/001-monitor-refactor/contracts/dashboard-api-contract.md`
+   - related live docs only
+3. Remove visible monitoring expressions from the cb-rights-issue page:
+   - no `推送候选`
+   - no `独立推送` card
+   - no old monitor-pool wording
+4. Keep only the three live phase groups:
+   - `申购阶段`
+   - `埋伏阶段`
+   - `等待阶段`
+5. Retire monitor semantics in the outward dataset while keeping compatibility:
+   - `monitorList` remains present but empty
+   - `pushEligibleCount = 0`
+   - existing compatibility fields may remain, but must no longer drive active monitoring behavior
+6. Let the existing push service self-disable naturally by reading the empty `monitorList`.
+7. Run minimal checks, push to `main`, deploy to cloud, and verify the public page/API.
+
+Acceptance:
+- The public cb-rights-issue page shows only the three phase groups and their tables.
+- The page no longer renders `推送候选` or `独立推送`.
+- `GET /api/market/cb-rights-issue` still returns `monitorList`, but it is empty.

@@ -72,7 +72,7 @@ const TAB_PRIMARY_RESOURCE_KEYS = Object.freeze({
   monitor: ['monitor'],
   dividend: ['dividend'],
   merger: ['merger'],
-  'cb-rights-issue': ['cbRightsIssue', 'cbRightsIssuePushConfig'],
+  'cb-rights-issue': ['cbRightsIssue'],
 });
 const DATASET_STATUS_RESOURCE_KEYS = Object.freeze(['exchangeRate', 'ipo', 'bonds', 'cbArb', 'ah', 'ab', 'lofArb', 'merger', 'cbRightsIssue']);
 const MONITOR_MARKET_OPTIONS = ['A', 'H', 'B'];
@@ -1006,11 +1006,6 @@ function readCbRightsIssueRebuildStatus() {
   return dataset?.rebuildStatus && typeof dataset.rebuildStatus === 'object' ? dataset.rebuildStatus : {};
 }
 
-function readCbRightsIssuePushConfigViewModel() {
-  const payload = readResourceObject('cbRightsIssuePushConfig');
-  return payload?.data && typeof payload.data === 'object' ? payload.data : {};
-}
-
 function readLofArbDataset() {
   const payload = readResourceObject('lofArb');
   return payload?.data && typeof payload.data === 'object' ? payload.data : {};
@@ -1192,13 +1187,6 @@ function bindEvents() {
     if (lofArbPushForm) {
       event.preventDefault();
       void saveLofArbPushConfig(lofArbPushForm);
-      return;
-    }
-
-    const cbRightsIssuePushForm = event.target.closest('#cb-rights-issue-push-form');
-    if (cbRightsIssuePushForm) {
-      event.preventDefault();
-      void saveCbRightsIssuePushConfig(cbRightsIssuePushForm);
       return;
     }
 
@@ -1433,7 +1421,6 @@ function buildActiveTabLoadTasks(options = {}) {
   if (state.activeTab === 'cb-rights-issue') {
     return [
       loadResource('cbRightsIssue', ENDPOINTS.cbRightsIssue, renderEverything, { force: forceMarket, background }),
-      loadResource('cbRightsIssuePushConfig', ENDPOINTS.cbRightsIssuePushConfig, renderEverything, { background }),
     ];
   }
   return [];
@@ -2020,41 +2007,6 @@ async function savePushConfig() {
   } finally {
     state.savingPush = false;
     renderPushSettings();
-  }
-}
-
-async function saveCbRightsIssuePushConfig(form) {
-  const config = readCbRightsIssuePushConfigViewModel();
-  const formData = new FormData(form);
-  const time1 = String(formData.get('time1') || '').trim();
-  const time2 = String(formData.get('time2') || '').trim();
-
-  if (!time1 || !time2) {
-    showToast('抢权配售推送时间需要完整填写', true);
-    return;
-  }
-
-  state.savingCbRightsIssuePush = true;
-  renderCbRightsIssuePanel();
-  try {
-    const payload = await fetchJson(ENDPOINTS.cbRightsIssuePushConfig, {
-      method: 'POST',
-      body: JSON.stringify({
-        enabled: config.enabled !== false,
-        times: [time1, time2],
-      }),
-    });
-    state.resources.cbRightsIssuePushConfig.status = 'ready';
-    state.resources.cbRightsIssuePushConfig.data = payload;
-    state.resources.cbRightsIssuePushConfig.error = null;
-    showToast('抢权配售推送时间已保存');
-  } catch (error) {
-    state.resources.cbRightsIssuePushConfig.status = 'error';
-    state.resources.cbRightsIssuePushConfig.error = error;
-    showToast(error.message || '抢权配售推送时间保存失败', true);
-  } finally {
-    state.savingCbRightsIssuePush = false;
-    renderCbRightsIssuePanel();
   }
 }
 
@@ -3693,56 +3645,6 @@ function renderLofArbPanel() {
   `;
 }
 
-function buildCbRightsIssuePushStateText() {
-  const config = readCbRightsIssuePushConfigViewModel();
-  const deliveryStatus = config?.deliveryStatus && typeof config.deliveryStatus === 'object' ? config.deliveryStatus : {};
-  const times = Array.isArray(config?.times) ? config.times.filter(Boolean) : [];
-  const parts = [
-    times.length ? `时间 ${times.join(' / ')}` : '时间 --',
-    deliveryStatus.webhookConfigured ? 'Webhook已配置' : 'Webhook未配置',
-    deliveryStatus.schedulerEnabled === false
-      ? (deliveryStatus.schedulerDisabledReason === 'loopback_public_base_url' ? '本地运行已禁用服务端推送调度' : '服务端调度已关闭')
-      : '',
-    deliveryStatus.lastSuccessAt ? `最近成功 ${formatDate(deliveryStatus.lastSuccessAt)}` : '',
-    deliveryStatus.lastError ? `最近失败 ${String(deliveryStatus.lastError).slice(0, 80)}` : '',
-  ].filter(Boolean);
-  return parts.join(' / ');
-}
-
-function renderCbRightsIssuePushCard() {
-  const config = readCbRightsIssuePushConfigViewModel();
-  const times = Array.isArray(config?.times) ? config.times : ['08:00', '14:30'];
-  const loading = state.resources.cbRightsIssuePushConfig.status === 'loading' && !state.resources.cbRightsIssuePushConfig.data;
-  const disabled = state.savingCbRightsIssuePush || loading;
-
-  return `
-    <div class="list-card">
-      <div class="module-toolbar">
-        <div>
-          <h3>独立推送</h3>
-          <div class="section-note">该模块独立于总推送，默认仅推送申购阶段项目，以及预期收益率大于 6% 的非申购阶段项目。</div>
-        </div>
-        <div class="panel-meta">
-          <span>${escapeHtml(buildCbRightsIssuePushStateText() || '正在读取推送状态')}</span>
-        </div>
-      </div>
-      <form id="cb-rights-issue-push-form" class="push-form">
-        <div class="input-group">
-          <label for="cb-rights-issue-push-time-1">推送时间 1</label>
-          <input id="cb-rights-issue-push-time-1" name="time1" type="time" value="${escapeHtml(times[0] || '')}" ${disabled ? 'disabled' : ''} />
-        </div>
-        <div class="input-group">
-          <label for="cb-rights-issue-push-time-2">推送时间 2</label>
-          <input id="cb-rights-issue-push-time-2" name="time2" type="time" value="${escapeHtml(times[1] || '')}" ${disabled ? 'disabled' : ''} />
-        </div>
-        <div class="button-row inline">
-          <button type="submit" class="btn-primary" ${disabled ? 'disabled' : ''}>保存</button>
-        </div>
-      </form>
-    </div>
-  `;
-}
-
 function buildCbRightsIssueColumns(options = {}) {
   const includeRecordDate = Boolean(options.includeRecordDate);
   const columns = [
@@ -3819,13 +3721,13 @@ function renderCbRightsIssuePanel() {
       <div class="module-toolbar">
         <div>
           <div class="tab-title">可转债抢权配售</div>
-          <div class="section-note">页面按申购阶段、埋伏阶段、等待阶段拆分展示；正股名称仅展示名称本身，不再用置顶高亮或收益率徽标表达优先级。</div>
+          <div class="section-note">页面只保留申购阶段、埋伏阶段、等待阶段三组，按阶段查看即可，不再附带独立监控表达。</div>
         </div>
         <div class="panel-meta">
           <span>固定源总数 ${escapeHtml(formatInt(summary.totalRows))}</span>
           <span>申购阶段 ${escapeHtml(formatInt(summary.applyStageCount))}</span>
-          <span>收益率&gt;6% ${escapeHtml(formatInt(summary.highReturnCount))}</span>
-          <span>推送候选 ${escapeHtml(formatInt(summary.pushEligibleCount))}</span>
+          <span>埋伏阶段 ${escapeHtml(formatInt(subviewCounts.ambush))}</span>
+          <span>等待阶段 ${escapeHtml(formatInt(subviewCounts.wait))}</span>
           <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('cbRightsIssue') || rebuildStatus.lastRebuildAt))}</span>
           <span>${escapeHtml(readFreshnessText('cbRightsIssue'))}</span>
         </div>
