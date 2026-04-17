@@ -3774,6 +3774,7 @@ function buildCbRightsIssueColumns(options = {}) {
   ];
   if (includeMarginColumns) {
     columns.splice(9, 0, { key: 'marginRequiredShares', label: '两融所需股数', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.marginRequiredShares), render: (row) => formatInt(row.marginRequiredShares) });
+    columns.splice(10, 0, { key: 'marginRequiredFunds', label: '两融所需资金', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.marginRequiredFunds), render: (row) => toNumber(row.marginRequiredFunds) === null ? '--' : `¥${formatNumber(row.marginRequiredFunds, 2)}` });
   }
   if (includeRecordDate) {
     columns.push({

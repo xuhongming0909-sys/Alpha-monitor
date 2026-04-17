@@ -36,22 +36,30 @@ function createCbRightsIssuePushService(options = {}) {
 
   async function pushNow() {
     const payload = await readPayload();
-    if (!payload.monitorList.length) {
-      return { success: false, skipped: true, reason: "empty_monitor_list", total: 0 };
+    const sh = getShanghaiParts();
+    const tomorrow = (() => {
+      const base = Date.parse(`${sh.date}T00:00:00+08:00`);
+      if (!Number.isFinite(base)) return "";
+      return new Date(base + (24 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+    })();
+    const built = buildMarkdown(payload, { today: sh.date, tomorrow });
+    const markdown = typeof built === "string" ? built : built?.markdown || "";
+    const total = Number(typeof built === "string" ? payload.sourceRows.length : built?.total) || 0;
+    if (!markdown || total <= 0) {
+      return { success: false, skipped: true, reason: "empty_push_rows", total: 0 };
     }
     if (!isDeliveryAvailable()) {
-      return { success: true, skipped: true, reason: "delivery_not_configured", total: payload.monitorList.length };
+      return { success: true, skipped: true, reason: "delivery_not_configured", total };
     }
 
     const attemptAt = nowIso();
     runtimeStore.setAttempt(attemptAt);
     runtimeStore.save();
     try {
-      const markdown = buildMarkdown(payload, { maxItems: 10 });
       await sendMarkdown(markdown);
       runtimeStore.setSuccess(attemptAt);
       runtimeStore.save();
-      return { success: true, skipped: false, total: payload.monitorList.length, attemptAt };
+      return { success: true, skipped: false, total, attemptAt };
     } catch (error) {
       runtimeStore.setError(attemptAt, error?.message || error);
       runtimeStore.save();

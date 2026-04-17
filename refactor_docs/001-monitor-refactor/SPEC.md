@@ -4712,6 +4712,85 @@ untime_data/shared/cb_discount_strategy_state.json
 - After entering either market tab, the user can see three vertically stacked phase tables without another phase-tab switch.
 - `深市` tables do not visibly render `两融收益率 / 预期收益率去皮 / 两融收益率去皮`.
 
+## 103. Phase CP: CB-rights-issue SH Margin-funds Column + Shanghai-only Push Rewrite (2026-04-17)
+
+- This round changes:
+  - `presentation/dashboard/dashboard_page.js`
+  - `notification/cb_rights_issue/service.js`
+  - `notification/styles/cb_rights_issue_markdown.js`
+  - related live docs only
+- This round does not change:
+  - `GET /api/market/cb-rights-issue` response envelope
+  - cb-rights-issue pricing formulas
+  - push schedule times
+  - Shenzhen phase-grouping rule
+
+### 103.1 Shanghai page column rule
+- In `presentation/dashboard/dashboard_page.js > buildCbRightsIssueColumns()`:
+  - all `沪市` phase tables must additionally show `两融所需资金`
+  - outward field source is the existing truthful `marginRequiredFunds`
+  - semantic formula remains:
+    - `两融所需资金 = 两融所需股数 × 最新股价`
+- `深市` tables must not show this column in this round.
+
+### 103.2 Push source rule
+- The independent cb-rights-issue push path must no longer depend on `monitorList`.
+- In `notification/cb_rights_issue/service.js`:
+  - `pushNow()` must build its push payload from truthful `sourceRows`
+  - if the resolved Shanghai push row set is empty, skip with an empty-data reason
+- Compatibility response rule remains unchanged:
+  - `GET /api/market/cb-rights-issue` may still keep `monitorList = []`
+
+### 103.3 Shanghai-only push rule
+- Only `沪市` rows may participate in cb-rights-issue independent push.
+- `深市` rows must be excluded from both:
+  - apply-stage push
+  - ambush-stage push
+- This round does not require deleting Shenzhen fields from the API; exclusion is push-only.
+
+### 103.4 Apply-stage push filter rule
+- Shanghai apply-stage push membership is fixed to:
+  - `market = sh`
+  - `inApplyStage = true`
+  - `recordDate = today` or `recordDate = tomorrow` in Shanghai calendar
+- Suggested date helpers may normalize to `YYYY-MM-DD` first, then compare against:
+  - `today = getShanghaiParts().date`
+  - `tomorrow = today + 1 day`
+
+### 103.5 Ambush-stage push filter rule
+- Shanghai ambush-stage push membership is fixed to:
+  - `market = sh`
+  - not `inApplyStage`
+  - stage semantic in `上市委通过 / 同意注册 / 注册生效`
+  - `expectedReturnRate > 6`
+- All rows matching the rule must be pushed; no top-N truncation is allowed in this round.
+
+### 103.6 Push text rule
+- `notification/styles/cb_rights_issue_markdown.js` must no longer emit the old titled markdown block.
+- The message should be data-first and title-free:
+  - no `# 可转债抢权配售监控`
+  - no summary line such as `更新 xx`
+  - no source-page footer
+- Minimal plain section labels are allowed only to distinguish the two groups:
+  - `申购阶段`
+  - `埋伏阶段`
+- Apply-stage row line format is fixed to:
+  - `名称 股权登记日 两融所需股数 两融所需资金 发行比例 两融收益率去皮`
+- Ambush-stage row line format is fixed to:
+  - `名称 方案进展 进展公告日 两融所需股数 两融所需资金 发行比例 两融收益率去皮`
+- Example:
+  - `斯达半导 2026-4-15 100股 ￥9950 6.3% +2.21%`
+
+### 103.7 Schedule stability rule
+- `notification.cb_rights_issue.default_times` stays unchanged in this round.
+- Existing `trading_days_only` semantics stay unchanged.
+
+### 103.8 Acceptance
+- `沪市` phase tables visibly include `两融所需资金`.
+- A manual/scheduled cb-rights-issue push contains Shanghai rows only.
+- Apply-stage push includes only Shanghai rows whose `recordDate` is today or tomorrow.
+- Ambush-stage push includes all Shanghai ambush rows with the new compact line format.
+
 ## 101. Convertible Summary Card Metric Truthfulness Spec (2026-04-17)
 
 - This round changes only:
