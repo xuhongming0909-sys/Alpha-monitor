@@ -370,7 +370,8 @@ def get_cb_rights_issue_source_snapshot() -> Dict[str, Any]:
             "recordPrice": to_float(item.get("record_price")),
             "amountYi": to_float(item.get("amount")),
             "cbAmountYi": to_float(item.get("cb_amount")),
-            "issueScaleYi": to_float(item.get("cb_amount")),
+            # 发行规模取真实发行额字段，不能继续把 cb_amount 冒充为公开发行规模。
+            "issueScaleYi": to_float(item.get("amount")),
             "stockMarketValueYi": stock_market_value_map.get(stock_code),
             "progress": str(item.get("progress") or "").strip(),
             "progressName": str(item.get("progress_nm") or "").strip(),

@@ -4550,3 +4550,40 @@ untime_data/shared/cb_discount_strategy_state.json
 - `正股名称` cells no longer contain a second line.
 - The previous pinning highlight expression disappears.
 - `股权登记日` appears only in `申购阶段`.
+
+## 98. Phase CL: CB-rights-issue Issue-Scale Fix + Annualized Column Removal (2026-04-17)
+
+- This round changes:
+  - `data_fetch/cb_rights_issue/source.py`
+  - `strategy/cb_rights_issue/service.py`
+  - `presentation/dashboard/dashboard_page.js`
+  - related live docs only
+- This round does not change:
+  - cb-rights-issue route path
+  - cb-rights-issue response envelope
+  - cb-rights-issue push grouping
+
+### 98.1 Issue-scale semantic rule
+- The truthful live issue-scale source is `amount / amountYi`.
+- `issueScaleYi` must therefore mirror `amountYi`, not `cbAmountYi`.
+- `cbAmountYi` may remain in the outward row for compatibility, but it is no longer the public `发行规模` field.
+- Strategy fallback order is fixed to:
+  - `issueScaleYi`
+  - `amountYi`
+  - `cbAmountYi`
+
+### 98.2 Derived-ratio rule
+- `issueRatio = issueScaleYi / stockMarketValueYi` remains unchanged as a formula.
+- Only the numerator source changes to the truthful issue size above.
+
+### 98.3 Page-visible annualized-column rule
+- The three cb-rights-issue subtabs must not show a visible `年化收益率` column:
+  - `申购阶段`
+  - `埋伏阶段`
+  - `等待阶段`
+- `annualizedReturnRate` may remain present in the API for compatibility and non-page uses.
+- Any default front-end sort for a tab must use a still-visible column after this removal.
+
+### 98.4 Acceptance
+- A live row such as `金杨精密 / 金杨转债` renders `issueScaleYi = 9.8`.
+- The public page shows no `年化收益率` column anywhere inside cb-rights-issue subtabs.

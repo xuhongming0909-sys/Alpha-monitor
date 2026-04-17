@@ -117,7 +117,7 @@ const TABLE_DEFAULTS = {
   merger: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   lofArb: { sortKey: 'premiumRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   cbRightsIssueApply: { sortKey: 'recordDate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
-  cbRightsIssueAmbush: { sortKey: 'annualizedReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  cbRightsIssueAmbush: { sortKey: 'marginReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   cbRightsIssueWait: { sortKey: 'progressDate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   eventArbHk: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   eventArbCn: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
@@ -3774,7 +3774,6 @@ function buildCbRightsIssueColumns(options = {}) {
     { key: 'marginReturnRate', label: '两融收益率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.marginReturnRate), className: (row) => statusClass(row.marginReturnRate), render: (row) => formatPercent(row.marginReturnRate, 2) },
     { key: 'expectedPeelReturnRate', label: '预期收益率去皮', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.expectedPeelReturnRate), className: (row) => statusClass(row.expectedPeelReturnRate), render: (row) => formatPercent(row.expectedPeelReturnRate, 2) },
     { key: 'marginPeelReturnRate', label: '两融收益率去皮', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.marginPeelReturnRate), className: (row) => statusClass(row.marginPeelReturnRate), render: (row) => formatPercent(row.marginPeelReturnRate, 2) },
-    { key: 'annualizedReturnRate', label: '年化收益率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.annualizedReturnRate), className: (row) => statusClass(row.annualizedReturnRate), render: (row) => formatPercent(row.annualizedReturnRate, 2) },
   ];
   if (includeRecordDate) {
     columns.splice(16, 0, {

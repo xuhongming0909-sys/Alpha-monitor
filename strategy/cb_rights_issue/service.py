@@ -241,7 +241,11 @@ def _build_row(
     placement_shares = raw_required_shares if raw_required_shares and raw_required_shares > 0 else None
     margin_required_shares = _resolve_margin_required_shares(raw_required_shares)
 
-    issue_scale_yi = _to_float(row.get("issueScaleYi") if row.get("issueScaleYi") is not None else row.get("cbAmountYi"))
+    issue_scale_yi = _to_float(
+        row.get("issueScaleYi")
+        if row.get("issueScaleYi") is not None
+        else (row.get("amountYi") if row.get("amountYi") is not None else row.get("cbAmountYi"))
+    )
     stock_market_value_yi = _to_float(row.get("stockMarketValueYi"))
     issue_ratio = None
     if issue_scale_yi is not None and stock_market_value_yi is not None and stock_market_value_yi > 0:

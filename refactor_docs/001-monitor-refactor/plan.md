@@ -2905,3 +2905,34 @@ Acceptance:
 - The old pin badges/highlight expression disappears from the page.
 - `申购阶段` keeps `股权登记日`, while the other two subtabs do not show it.
 - Public API and independent push remain available after deployment.
+
+## 98. Phase CL: CB-rights-issue Issue-Scale Fix + Annualized Column Removal (2026-04-17)
+
+Goal: correct the live `发行规模` semantic back to the truthful source field, and remove
+the visible `年化收益率` column from all cb-rights-issue subtabs.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, and `可转债抢权配售策略.md` first.
+2. Keep this round isolated to:
+   - `data_fetch/cb_rights_issue/source.py`
+   - `strategy/cb_rights_issue/service.py`
+   - `presentation/dashboard/dashboard_page.js`
+   - related live docs only
+3. Correct the issue-scale mapping:
+   - live source row `amount / amountYi` is the truthful `发行规模`
+   - `cb_amount / cbAmountYi` must no longer be exposed as `issueScaleYi`
+   - strategy fallback must prefer `issueScaleYi -> amountYi -> cbAmountYi`
+4. Keep the outward field name unchanged for compatibility:
+   - `issueScaleYi` still exists
+   - only its semantic source changes to truthful issue size
+5. Remove the visible `年化收益率` column from all three subtabs:
+   - `申购阶段`
+   - `埋伏阶段`
+   - `等待阶段`
+6. Replace the ambush-tab default sort with a still-visible yield column after removal.
+7. Run minimal checks, push to `main`, deploy to cloud, and verify the public page/API.
+
+Acceptance:
+- A row like `金杨精密 / 金杨转债` now exposes `issueScaleYi = 9.8` instead of `21.49`.
+- The public page no longer shows a visible `年化收益率` column in any cb-rights-issue subtab.
+- Existing API field names and push path remain available after deployment.
