@@ -2150,7 +2150,7 @@ untime_data/shared/cb_discount_strategy_state.json and must not reuse the old ev
 - `发行规模` 继续使用当前真实源字段 `cb_amount / cbAmountYi`。
 - 股数与资金口径正式收口为：
   - `原始所需股数 = rawRequiredShares`
-  - `配售股数 = 原始所需股数`
+  - `配售股数 = ceil((原始所需股数 × 0.6) / 100) × 100`
   - `两融所需股数 = ceil((原始所需股数 × 0.6) / 50) × 50`
   - `所需资金 = 配售股数 × 当前股价`
   - `两融所需资金 = 两融所需股数 × 当前股价`

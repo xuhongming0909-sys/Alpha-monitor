@@ -44,6 +44,7 @@ def normalize_cb_rights_issue_snapshot(payload: dict) -> list[dict]:
                     "apply_date": item.get("applyDate"),
                     "record_date": item.get("recordDate"),
                     "list_date": item.get("listDate"),
+                    "volatility250": item.get("volatility250"),
                     "volatility60": item.get("volatility60"),
                 },
                 raw=dict(item),

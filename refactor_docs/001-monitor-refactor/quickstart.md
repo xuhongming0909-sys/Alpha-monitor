@@ -11,13 +11,21 @@ npm install
 
 3. Copy `.env.example` to `.env` when local secrets are required.
 
+## Official verification path
+
+Official update/view path is cloud-first:
+
+1. sync code to the cloud server
+2. verify the public homepage
+3. verify the public `/api/health`
+
 ## Development-only local start
 
 ```powershell
 npm run dev
 ```
 
-Open `http://127.0.0.1:5000` only for development verification.
+Open `http://127.0.0.1:5000` only for temporary debugging when needed.
 
 Official runtime access must use the cloud public URL configured in `config.yaml > deployment.public_base_url`.
 
@@ -69,7 +77,7 @@ npm run check:boundaries
 
 ## Cloud rollout checklist
 
-1. Update `config.yaml` for the real server URL and reverse proxy mode.
+1. Update `config.yaml` / remote `.env` for the real server URL and reverse proxy mode.
 2. Install the managed service:
 
 ```bash

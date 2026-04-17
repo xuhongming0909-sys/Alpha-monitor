@@ -2,7 +2,7 @@
 
 /**
  * 上海时区时间工具。
- * 这里统一处理交易日、交易时段、日期normalizer和截止时间判断。
+ * 这里统一处理交易日、交易时段、日期标准化和截止时间判断。
  */
 
 const SHANGHAI_TIMEZONE = "Asia/Shanghai";
@@ -27,7 +27,7 @@ function getShanghaiParts(date = new Date()) {
   const parts = Object.fromEntries(formatter.formatToParts(date).map((item) => [item.type, item.value]));
   const weekdayMap = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0 };
   const rawHour = Number(parts.hour || 0);
-  // 部分 Node/ICU 运行环境会把上海时间午夜格式化成 24:xx，这里统一归一为 00:xx。
+  // 部分 Node/ICU 运行环境会把上海时间午夜格式化成 24:xx，这里统一归一成 00:xx。
   const normalizedHour = rawHour === 24 ? 0 : rawHour;
 
   return {
@@ -97,5 +97,3 @@ module.exports = {
   isTradingSession,
   isAfterCutoff,
 };
-
-

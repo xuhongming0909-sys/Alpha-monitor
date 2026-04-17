@@ -6,8 +6,18 @@
 - Official user access: configured public URL
 - Official process hosting: cloud `systemd` + reverse proxy
 - Local `npm run dev` is development validation only and is not an operator-facing access path
+- Local webpage residues on this machine are not an official delivery or viewing path
 
-## 2. Development-only local checks
+## 2. Default Verification Path
+
+- Default verification target: configured cloud public URL
+- Loopback/localhost verification is fallback debugging only
+- Official sequence:
+  1. update code
+  2. sync/deploy to cloud server
+  3. verify public homepage and public `/api/health`
+
+## 2A. Development-only local checks
 
 - Start: `npm run dev`
 - Health check: `npm run check:health`
@@ -113,7 +123,6 @@ sudo bash tools/deploy/install_caddy_site.sh YOUR_DOMAIN_OR_IP 5000
 7. Verify:
 
 ```bash
-curl http://127.0.0.1:5000/api/health
 curl http://YOUR_PUBLIC_HOST/api/health
 ```
 
@@ -234,10 +243,11 @@ After deployment, all of the following must pass:
 If the site is not reachable:
 
 1. Check `systemd` status first
-2. Check local `http://127.0.0.1:5000/api/health`
+2. Check public `/api/health`
 3. Check reverse proxy status
 4. Check cloud security group and server firewall
 5. Check runtime logs in `runtime_logs/`
+6. Check local `http://127.0.0.1:5000/api/health` only when isolating reverse-proxy or bind issues
 
 Recommended one-shot diagnosis:
 

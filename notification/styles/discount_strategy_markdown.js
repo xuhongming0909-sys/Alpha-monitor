@@ -17,7 +17,7 @@ function pctText(value, digits = 2) {
 }
 
 /**
- * 三类折价策略推送模板统一在这里收口，保证页面与推送字段口径一致。
+ * 低溢价策略推送模板统一在这里收口，保证页面与推送字段口径一致。
  */
 function buildConvertibleBondDiscountMarkdown(signalType, items, options = {}) {
   const list = Array.isArray(items) ? items : [];
@@ -25,13 +25,13 @@ function buildConvertibleBondDiscountMarkdown(signalType, items, options = {}) {
     options.generatedAtText || new Date().toLocaleString("zh-CN", { hour12: false })
   ).trim();
   const titles = {
-    buy: "可转债折价买入提醒",
-    sell: "可转债折价卖出提醒",
-    monitor: "可转债折价监控",
+    buy: "可转债低溢价买入提醒",
+    sell: "可转债转股溢价率卖出提醒",
+    monitor: "可转债低溢价监控",
   };
   const subtitleMap = {
-    buy: "触发条件：折价率进入买入区",
-    sell: "触发条件：折价率进入卖出区",
+    buy: "触发条件：转股溢价率低于买入阈值",
+    sell: "触发条件：转股溢价率回到卖出阈值上方",
     monitor: "当前监控名单",
   };
 
@@ -48,18 +48,22 @@ function buildConvertibleBondDiscountMarkdown(signalType, items, options = {}) {
   }
 
   list.forEach((item) => {
+    const weightedText = pctText(item.weightedDiscountRate);
+    const premiumText = pctText(item.premiumRate);
+    const convertValueText = toNum(item.convertValue)?.toFixed(2) ?? "--";
+
     if (signalType === "monitor") {
       lines.push(
-        `- ${pickText(item.bondName)} ${pickText(item.code)} | 折价率 ${pctText(item.discountRate)} | 加权折价率 ${pctText(item.weightedDiscountRate)}`
+        `- ${pickText(item.bondName)} ${pickText(item.code)} | 转股溢价率 ${premiumText} | 加权折价率 ${weightedText} | 转股价值 ${convertValueText}`
       );
       return;
     }
 
     lines.push(
-      `- ${pickText(item.bondName)} ${pickText(item.code)} | ${pickText(item.stockName)} ${pickText(item.stockCode)} | 折价率 ${pctText(item.discountRate)} | 加权折价率 ${pctText(item.weightedDiscountRate)}`
+      `- ${pickText(item.bondName)} ${pickText(item.code)} | ${pickText(item.stockName)} ${pickText(item.stockCode)} | 转股溢价率 ${premiumText} | 加权折价率 ${weightedText} | 转股价值 ${convertValueText}`
     );
     lines.push(
-      `  ATR系数 ${toNum(item.atrCoefficient)?.toFixed(2) ?? "--"} | 抛压系数 ${toNum(item.sellPressureCoefficient)?.toFixed(2) ?? "--"} | 板块 ${pickText(item.boardType)} | ${pickText(item.reason)}`
+      `  正股现价 ${toNum(item.stockPrice)?.toFixed(2) ?? "--"} | 板块 ${pickText(item.boardType)} | ${pickText(item.reason)}`
     );
   });
 

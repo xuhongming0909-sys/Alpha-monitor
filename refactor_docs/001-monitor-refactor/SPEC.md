@@ -4383,12 +4383,17 @@ untime_data/shared/cb_discount_strategy_state.json
 - In `strategy/cb_rights_issue/service.py`, outward row fields must follow:
   - `issueScaleYi = cbAmountYi`
   - `issueRatio = issueScaleYi / stockMarketValueYi`
-  - `placementShares = rawRequiredShares`
+  - `placementShares = ceil((rawRequiredShares * 0.6) / 100) * 100`
   - `marginRequiredShares = ceil((rawRequiredShares * 0.6) / 50) * 50`
   - `requiredFunds = placementShares * stockPrice`
   - `marginRequiredFunds = marginRequiredShares * stockPrice`
+  - `originalFundsBaseline = rawRequiredShares * stockPrice`
   - `expectedReturnRate = expectedProfit / requiredFunds * 100`
   - `marginReturnRate = expectedProfit / marginRequiredFunds * 100`
+- Config entries:
+  - `config.yaml > strategy.cb_rights_issue.expected_round_lot_shares = 100`
+  - `config.yaml > strategy.cb_rights_issue.margin_round_lot_shares = 50`
+  - `config.yaml > strategy.cb_rights_issue.margin_share_ratio = 0.6`
 - Guard rule:
   - if any denominator is missing or `<= 0`, the corresponding ratio field must stay null
 
@@ -4397,6 +4402,8 @@ untime_data/shared/cb_discount_strategy_state.json
   - `rawFundsBase = rawRequiredShares * stockPrice`
   - `expectedPeelReturnRate = expectedReturnRate * (rawFundsBase - requiredFunds) / requiredFunds`
   - `marginPeelReturnRate = marginReturnRate * (rawFundsBase - marginRequiredFunds) / marginRequiredFunds`
+- Both peel-yield formulas follow the same structural pattern:
+  - `peelReturn = baseReturn × (originalCost − adjustedCost) / adjustedCost`
 - Guard rule:
   - if the base spread is not positive, the peel-yield field must remain null
   - no synthetic zero-fill is allowed

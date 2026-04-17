@@ -11,7 +11,7 @@ from shared.models.service_result import build_success
 _CONFIG = get_config()
 _STRATEGY_CONFIG = (((_CONFIG.get("strategy") or {}).get("lof_arbitrage") or {}))
 
-DEFAULT_GROUP = str(_STRATEGY_CONFIG.get("default_group") or "europe_us").strip() or "europe_us"
+DEFAULT_GROUP = str(_STRATEGY_CONFIG.get("default_group") or "index").strip() or "index"
 LIMITED_APPLY_CAP_AMOUNT = float(_STRATEGY_CONFIG.get("limited_apply_cap_amount") or 100000)
 LIMITED_PREMIUM_RATE_THRESHOLD = float(_STRATEGY_CONFIG.get("limited_premium_rate_threshold") or 1.0)
 UNLIMITED_ABS_PREMIUM_RATE_THRESHOLD = float(_STRATEGY_CONFIG.get("unlimited_abs_premium_rate_threshold") or 5.0)
@@ -19,7 +19,6 @@ MIN_TURNOVER_WAN = float(_STRATEGY_CONFIG.get("min_turnover_wan") or 100.0)
 
 GROUP_LABELS = {
     "index": "指数LOF",
-    "europe_us": "QDII欧美",
     "asia": "QDII亚洲",
 }
 
@@ -48,6 +47,14 @@ def _calc_premium_rate(iopv: Optional[float], price: Optional[float]) -> Optiona
     if iopv is None or iopv <= 0 or price is None or price <= 0:
         return None
     return (price / iopv - 1.0) * 100.0
+
+
+def _calc_nav_aligned_index_change_rate(nav: Optional[float], iopv: Optional[float]) -> Optional[float]:
+    """页面展示口径：相对净值日期、按人民币折算后的实际涨跌幅。"""
+
+    if nav is None or nav <= 0 or iopv is None or iopv <= 0:
+        return None
+    return (iopv / nav - 1.0) * 100.0
 
 
 def _resolve_time_note(group_key: str) -> str:
@@ -106,7 +113,7 @@ def _calc_iopv(row: Dict[str, Any]) -> Dict[str, Any]:
             "premiumRate": _calc_premium_rate(source_iopv, price),
         }
 
-    if group_key in {"index", "asia"} and nav is not None and nav > 0 and _is_same_day_nav(row):
+    if nav is not None and nav > 0 and _is_same_day_nav(row):
         return {
             "iopv": nav,
             "calcMode": "same_day_nav_direct",
@@ -131,38 +138,6 @@ def _calc_iopv(row: Dict[str, Any]) -> Dict[str, Any]:
                 "iopv": iopv,
                 "calcMode": "t1_nav_index_fx",
                 "calcStatus": "按 T-1 净值、集思录指数涨跌幅与汇率修正",
-                "premiumRate": _calc_premium_rate(iopv, price),
-            }
-
-    if group_key == "europe_us":
-        current_index_value = _to_float(row.get("currentIndexValue"))
-        base_index_value = _pick_anchor_value(
-            nav_date,
-            [
-                (row.get("midIndexDate"), row.get("midIndexValue")),
-                (row.get("baseIndexDate"), row.get("baseIndexValue")),
-            ],
-        )
-        base_fx_value = _pick_anchor_value(
-            nav_date,
-            [
-                (row.get("midFxDate"), row.get("midFxValue")),
-                (row.get("baseFxDate"), row.get("baseFxValue")),
-            ],
-        ) or (1.0 if currency == "CNY" else None)
-
-        if (
-            nav is not None and nav > 0 and
-            current_index_value is not None and current_index_value > 0 and
-            base_index_value is not None and base_index_value > 0 and
-            current_fx_rate is not None and current_fx_rate > 0 and
-            base_fx_value is not None and base_fx_value > 0
-        ):
-            iopv = nav * (current_index_value / base_index_value) * (current_fx_rate / base_fx_value)
-            return {
-                "iopv": iopv,
-                "calcMode": "nav_date_aligned_index_fx",
-                "calcStatus": "按净值日期对齐后的指数与汇率修正",
                 "premiumRate": _calc_premium_rate(iopv, price),
             }
 
@@ -194,6 +169,8 @@ def _calc_iopv(row: Dict[str, Any]) -> Dict[str, Any]:
 def _build_row(row: Dict[str, Any]) -> Dict[str, Any]:
     calc = _calc_iopv(row)
     premium_rate = _to_float(calc.get("premiumRate"))
+    nav_value = _to_float(row.get("nav"))
+    iopv_value = _to_float(calc.get("iopv"))
     turnover_wan = _to_float(row.get("turnoverWan"))
     limited_apply = bool(row.get("limitedApply"))
     apply_limit_amount = _to_float(row.get("applyLimitAmount"))
@@ -217,8 +194,9 @@ def _build_row(row: Dict[str, Any]) -> Dict[str, Any]:
     return {
         **dict(row),
         "groupLabel": GROUP_LABELS.get(str(row.get("marketGroup") or "").strip(), str(row.get("marketGroup") or "--")),
-        "iopv": _round(_to_float(calc.get("iopv")), 4),
+        "iopv": _round(iopv_value, 4),
         "premiumRate": _round(premium_rate, 4),
+        "navAlignedIndexChangeRate": _round(_calc_nav_aligned_index_change_rate(nav_value, iopv_value), 4),
         "calcMode": calc.get("calcMode"),
         "calcStatus": calc.get("calcStatus"),
         "timeNote": _resolve_time_note(str(row.get("marketGroup") or "").strip()),
@@ -227,7 +205,7 @@ def _build_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "turnoverWan": _round(turnover_wan, 4),
         "shareAmountWan": _round(_to_float(row.get("shareAmountWan")), 4),
         "shareAmountIncreaseWan": _round(_to_float(row.get("shareAmountIncreaseWan")), 4),
-        "nav": _round(_to_float(row.get("nav")), 4),
+        "nav": _round(nav_value, 4),
         "price": _round(_to_float(row.get("price")), 4),
         "changeRate": _round(_to_float(row.get("changeRate")), 4),
         "indexIncreaseRate": _round(_to_float(row.get("indexIncreaseRate")), 4),
@@ -242,7 +220,7 @@ def _sort_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return sorted(
         rows,
         key=lambda item: (
-            {"europe_us": 0, "asia": 1, "index": 2}.get(str(item.get("marketGroup") or ""), 9),
+            {"index": 0, "asia": 1}.get(str(item.get("marketGroup") or ""), 9),
             999999.0 if item.get("premiumRate") is None else -abs(float(item.get("premiumRate"))),
             str(item.get("code") or ""),
         ),
@@ -275,12 +253,10 @@ def build_lof_arbitrage_response(fetch_payload: dict, bus_records: list[dict]) -
     source_summary["computedRows"] = sum(1 for item in rows if item.get("iopv") is not None)
     source_summary["limitedMonitorCount"] = len(limited_rows)
     source_summary["unlimitedMonitorCount"] = len(unlimited_rows)
-
     return build_success(
         {
             "groups": [
                 {"key": "index", "label": "指数LOF"},
-                {"key": "europe_us", "label": "QDII欧美"},
                 {"key": "asia", "label": "QDII亚洲"},
             ],
             "defaultGroup": fetch_payload.get("defaultGroup") or DEFAULT_GROUP,

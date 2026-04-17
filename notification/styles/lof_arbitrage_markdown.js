@@ -20,7 +20,7 @@ function buildRowLine(row = {}) {
     `申购 ${row.applyStatusText || row.applyStatus || "--"}`,
     `申购费 ${formatPercent(row.applyFee)}`,
     `赎回费 ${formatPercent(row.redeemFee)}`,
-    `时间 ${row.timeNote || "--"}`,
+    `时点 ${row.timeNote || "--"}`,
   ].join(" | ");
 }
 
@@ -33,15 +33,13 @@ function buildSection(title, rows, maxItems) {
 }
 
 function buildLofArbitrageMarkdown(payload = {}, options = {}) {
-  const mode = String(options.mode || "scheduled").trim() || "scheduled";
   const maxItems = Math.max(1, Number(options.maxItems) || 20);
-  const limitedRows = Array.isArray(options.limitedRows) ? options.limitedRows : (payload.limitedMonitorRows || []);
-  const unlimitedRows = Array.isArray(options.unlimitedRows) ? options.unlimitedRows : (payload.unlimitedMonitorRows || []);
-  const title = mode === "instant" ? "LOF套利新入池提醒" : "LOF套利监控池全量推送";
+  const limitedRows = Array.isArray(payload.limitedMonitorRows) ? payload.limitedMonitorRows : [];
+  const unlimitedRows = Array.isArray(payload.unlimitedMonitorRows) ? payload.unlimitedMonitorRows : [];
   const updateTime = payload.updateTime || payload.rebuildStatus?.lastRebuildAt || "--";
 
   return [
-    `# ${title}`,
+    "# LOF套利全量推送",
     `更新时间：${updateTime}`,
     `限购监控池：${limitedRows.length} 只`,
     `非限购监控池：${unlimitedRows.length} 只`,
@@ -55,4 +53,3 @@ function buildLofArbitrageMarkdown(payload = {}, options = {}) {
 module.exports = {
   buildLofArbitrageMarkdown,
 };
-

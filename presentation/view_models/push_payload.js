@@ -1,6 +1,6 @@
 "use strict";
 
-function buildPushConfigResponse(config, runtimeState = {}, deliveryStatus = {}, discountStrategyStatus = {}) {
+function buildPushConfigResponse(config, runtimeState = {}, deliveryStatus = {}, premiumMonitorStatus = {}) {
   const modules = (config?.modules && typeof config.modules === "object") ? config.modules : {};
   const selectedModules = Object.entries(modules)
     .filter(([, enabled]) => Boolean(enabled))
@@ -10,7 +10,7 @@ function buildPushConfigResponse(config, runtimeState = {}, deliveryStatus = {},
     ...config,
     times: config?.times,
     lastMainPushDate: runtimeState?.lastMainPushDate || null,
-    discountStrategyStatus,
+    premiumMonitorStatus,
     deliveryStatus: {
       webhookConfigured: Boolean(deliveryStatus?.webhookConfigured),
       pushHtmlUrlConfigured: Boolean(deliveryStatus?.pushHtmlUrlConfigured),

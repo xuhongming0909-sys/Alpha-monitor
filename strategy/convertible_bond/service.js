@@ -90,7 +90,7 @@ const DEFAULT_BOARD_COEFFICIENTS = {
 };
 
 /**
- * 折价策略的锚点必须来自明确数值，避免页面、推送、调度各自兜底。
+ * 低溢价策略的锚点必须来自明确数值，避免页面、推送、调度各自兜底。
  */
 function normalizeAnchorPoints(points, fallback) {
   const source = Array.isArray(points) && points.length ? points : fallback;
@@ -145,7 +145,7 @@ function hasPassedConvertStart(row) {
   return Number.isFinite(timestamp) ? timestamp <= Date.now() : false;
 }
 
-function compareDiscountMonitorRows(a, b) {
+function comparePremiumMonitorRows(a, b) {
   const compareDesc = (left, right) => {
     const aValue = toNum(left);
     const bValue = toNum(right);
@@ -154,14 +154,22 @@ function compareDiscountMonitorRows(a, b) {
     if (bValue === null) return -1;
     return bValue - aValue;
   };
+  const compareAsc = (left, right) => {
+    const aValue = toNum(left);
+    const bValue = toNum(right);
+    if (aValue === null && bValue === null) return 0;
+    if (aValue === null) return 1;
+    if (bValue === null) return -1;
+    return aValue - bValue;
+  };
 
   const weightedDiff = compareDesc(a?.weightedDiscountRate, b?.weightedDiscountRate);
   if (weightedDiff !== 0) return weightedDiff;
 
-  const discountDiff = compareDesc(a?.discountRate, b?.discountRate);
-  if (discountDiff !== 0) return discountDiff;
+  const premiumDiff = compareAsc(a?.premiumRate, b?.premiumRate);
+  if (premiumDiff !== 0) return premiumDiff;
 
-  const atrDiff = compareDesc(a?.atrCoefficient, b?.atrCoefficient);
+  const atrDiff = (toNum(b?.atrCoefficient) ?? Number.NEGATIVE_INFINITY) - (toNum(a?.atrCoefficient) ?? Number.NEGATIVE_INFINITY);
   if (atrDiff !== 0) return atrDiff;
 
   return String(a?.code || "").localeCompare(String(b?.code || ""), "zh-CN");
@@ -169,10 +177,8 @@ function compareDiscountMonitorRows(a, b) {
 
 function buildDiscountStrategyOptions(options = {}) {
   return {
-    buyThreshold: toNum(options.buyThreshold) ?? 2,
-    sellThreshold: toNum(options.sellThreshold) ?? 0.5,
-    atrAnchors: normalizeAnchorPoints(options.atrAnchors, DEFAULT_ATR_ANCHORS),
-    sellPressureAnchors: normalizeAnchorPoints(options.sellPressureAnchors, DEFAULT_SELL_PRESSURE_ANCHORS),
+    buyThreshold: toNum(options.buyThreshold) ?? -2,
+    sellThreshold: toNum(options.sellThreshold) ?? -0.5,
     boardCoefficients: normalizeBoardCoefficients(options.boardCoefficients),
     nowIsoText: String(options.nowIsoText || new Date().toISOString()),
     todayDate: String(options.todayDate || todayShanghaiDate()),
@@ -180,56 +186,56 @@ function buildDiscountStrategyOptions(options = {}) {
 }
 
 /**
- * 折价策略只做真实字段派生，不负责推送和持久化。
+ * 低溢价策略只做真实字段派生，不负责推送和持久化。
  */
 function enrichDiscountStrategyRow(row, options = {}) {
   const config = buildDiscountStrategyOptions(options);
-  const premiumRate = toNum(row?.premiumRate);
-  const stockPrice = toNum(row?.stockPrice);
-  const stockAtr20 = toNum(row?.stockAtr20);
-  const remainingSizeYi = toNum(row?.remainingSizeYi);
-  const stockAvgTurnoverAmount20Yi = toNum(row?.stockAvgTurnoverAmount20Yi);
-  const discountRate = premiumRate === null ? null : -premiumRate;
-  const hasPositiveDiscount = discountRate !== null && discountRate > 0;
+  const {
+    discountRate: _legacyDiscountRate,
+    lowPremiumMagnitude: _legacyLowPremiumMagnitude,
+    ...baseRow
+  } = row || {};
+  const premiumRate = toNum(baseRow?.premiumRate);
+  const stockPrice = toNum(baseRow?.stockPrice);
+  const stockAtr20 = toNum(baseRow?.stockAtr20);
+  const remainingSizeYi = toNum(baseRow?.remainingSizeYi);
+  const stockAvgTurnoverAmount20Yi = toNum(baseRow?.stockAvgTurnoverAmount20Yi);
+  const negativePremiumRate = premiumRate === null ? null : (-premiumRate);
+  const premiumMagnitude = negativePremiumRate === null ? null : Math.abs(negativePremiumRate);
   const stockAtr20Pct = (stockPrice !== null && stockPrice > 0 && stockAtr20 !== null)
     ? (stockAtr20 / stockPrice) * 100
     : null;
-  const atrRatio = (hasPositiveDiscount && stockAtr20Pct !== null && stockAtr20Pct > 0)
-    ? discountRate / stockAtr20Pct
+  const atrRatio = (premiumMagnitude !== null && stockAtr20Pct !== null && stockAtr20Pct > 0)
+    ? premiumMagnitude / stockAtr20Pct
     : null;
-  const atrCoefficient = interpolateByAnchors(atrRatio, config.atrAnchors, DEFAULT_ATR_ANCHORS);
+  const atrCoefficient = atrRatio;
   const sellPressureRatio = (
     remainingSizeYi !== null &&
     stockAvgTurnoverAmount20Yi !== null &&
-    stockAvgTurnoverAmount20Yi > 0
+    remainingSizeYi > 0
   )
-    ? remainingSizeYi / stockAvgTurnoverAmount20Yi
+    ? stockAvgTurnoverAmount20Yi / remainingSizeYi
     : null;
-  const sellPressureCoefficient = interpolateByAnchors(
-    sellPressureRatio,
-    config.sellPressureAnchors,
-    DEFAULT_SELL_PRESSURE_ANCHORS
-  );
+  const sellPressureCoefficient = sellPressureRatio;
   const boardType = normalizeBoardType(row?.stockCode);
   const boardCoefficient = toNum(config.boardCoefficients[boardType]);
   const weightedDiscountRate = (
-    hasPositiveDiscount &&
+    negativePremiumRate !== null &&
     atrCoefficient !== null &&
     sellPressureCoefficient !== null &&
     boardCoefficient !== null
   )
-    ? discountRate * atrCoefficient * sellPressureCoefficient * boardCoefficient
+    ? negativePremiumRate * atrCoefficient * sellPressureCoefficient * boardCoefficient
     : null;
   const buyZoneActive = Boolean(
-    discountRate !== null &&
-    discountRate > config.buyThreshold &&
+    premiumRate !== null &&
+    premiumRate < config.buyThreshold &&
     hasPassedConvertStart(row)
   );
-  const sellZoneActive = Boolean(discountRate !== null && discountRate < config.sellThreshold);
+  const sellZoneActive = Boolean(premiumRate !== null && premiumRate > config.sellThreshold);
 
   return {
-    ...row,
-    discountRate,
+    ...baseRow,
     stockAtr20Pct,
     atrRatio,
     atrCoefficient,
@@ -254,15 +260,18 @@ function normalizeDiscountStrategyState(input = {}) {
 
 function buildDiscountMonitorSummaryItems(rows) {
   return [...rows]
-    .sort(compareDiscountMonitorRows)
+    .sort(comparePremiumMonitorRows)
     .map((row) => ({
       code: pickText(row.code),
       bondName: pickText(row.bondName),
       stockCode: pickText(row.stockCode),
       stockName: pickText(row.stockName),
-      discountRate: row.discountRate,
+      convertValue: row.convertValue,
+      premiumRate: row.premiumRate,
       weightedDiscountRate: row.weightedDiscountRate,
+      stockAtr20Pct: row.stockAtr20Pct,
       atrCoefficient: row.atrCoefficient,
+      sellPressureRatio: row.sellPressureRatio,
       sellPressureCoefficient: row.sellPressureCoefficient,
       boardType: row.boardType,
       boardCoefficient: row.boardCoefficient,
@@ -279,19 +288,22 @@ function buildDiscountSignal(row, signalType) {
     price: row.price,
     stockPrice: row.stockPrice,
     stockChangePercent: row.stockChangePercent,
-    discountRate: row.discountRate,
+    convertValue: row.convertValue,
+    premiumRate: row.premiumRate,
     weightedDiscountRate: row.weightedDiscountRate,
+    stockAtr20Pct: row.stockAtr20Pct,
     atrCoefficient: row.atrCoefficient,
+    sellPressureRatio: row.sellPressureRatio,
     sellPressureCoefficient: row.sellPressureCoefficient,
     boardType: row.boardType,
     reason: signalType === "buy"
-      ? "折价率进入买入区"
-      : "折价率进入卖出区",
+      ? "转股溢价率进入低溢价买入区"
+      : "转股溢价率回到卖出区",
   };
 }
 
 /**
- * 这里统一产出折价策略快照：
+ * 这里统一产出低溢价策略快照：
  * 1. enrichedRows 给页面与接口使用
  * 2. buySignals / sellSignals 给推送服务使用
  * 3. nextState 只描述下一状态，不在这里直接写文件
@@ -299,17 +311,18 @@ function buildDiscountSignal(row, signalType) {
 function buildConvertibleBondDiscountSnapshot(rows, runtimeState = {}, options = {}) {
   const config = buildDiscountStrategyOptions(options);
   const cleanRows = sanitizeCbArbRows(rows).map((row) => enrichDiscountStrategyRow(row, config));
+  const pushEligibleRows = cleanRows.filter((row) => !isCbArbRowActiveForceRedeem(row));
   const previousState = normalizeDiscountStrategyState(runtimeState);
   const previousMonitorMap = { ...previousState.monitorMap };
   const previousSignalStateMap = { ...previousState.signalStateMap };
-  const rowMap = new Map(cleanRows.map((row) => [pickText(row.code), row]));
+  const rowMap = new Map(pushEligibleRows.map((row) => [pickText(row.code), row]));
   const nextMonitorMap = { ...previousMonitorMap };
   const nextSignalStateMap = {};
   const buySignals = [];
   const sellSignals = [];
   const isBootstrap = !previousState.initializedDate;
 
-  cleanRows.forEach((row) => {
+  pushEligibleRows.forEach((row) => {
     const code = pickText(row.code);
     if (!code) return;
     const previousSignalState = previousSignalStateMap[code] || {};
@@ -354,7 +367,7 @@ function buildConvertibleBondDiscountSnapshot(rows, runtimeState = {}, options =
     ...row,
     isDiscountMonitorActive: activeCodes.has(pickText(row.code)),
   }));
-  const monitorRows = enrichedRows.filter((row) => activeCodes.has(pickText(row.code)));
+  const monitorRows = pushEligibleRows.filter((row) => activeCodes.has(pickText(row.code)));
   const monitorItems = buildDiscountMonitorSummaryItems(monitorRows);
 
   return {
@@ -362,7 +375,7 @@ function buildConvertibleBondDiscountSnapshot(rows, runtimeState = {}, options =
     buySignals,
     sellSignals,
     isBootstrap,
-    discountMonitorSummary: {
+    premiumMonitorSummary: {
       count: monitorItems.length,
       items: monitorItems,
     },
@@ -375,21 +388,25 @@ function buildConvertibleBondDiscountSnapshot(rows, runtimeState = {}, options =
   };
 }
 
-function isTerminalZeroTurnoverRow(row) {
+function isTerminalZeroTurnoverRow(row, today = todayShanghaiDate()) {
   if (!row || typeof row !== "object") return false;
-  const turnover = Number(row.turnoverAmountYi);
-  if (!Number.isFinite(turnover) || turnover > 0) return false;
+  const turnover = toNum(row.turnoverAmountYi);
+  const hasZeroTurnover = turnover !== null && turnover <= 0;
 
   const ceaseDate = normalizeComparableDate(row.ceaseDate);
   const delistDate = normalizeComparableDate(row.delistDate);
-  if (ceaseDate || delistDate) return true;
+  if (hasZeroTurnover && ((ceaseDate && ceaseDate <= today) || (delistDate && delistDate <= today))) {
+    return true;
+  }
 
   const remainingYears = Number(row.remainingYears);
   const maturityDate = normalizeComparableDate(row.maturityDate);
-  if (maturityDate && Number.isFinite(remainingYears) && remainingYears <= 0.02) return true;
+  if (hasZeroTurnover && maturityDate && Number.isFinite(remainingYears) && remainingYears <= 0.02) {
+    return true;
+  }
 
   const forceRedeemStatus = String(row.forceRedeemStatus || "").trim();
-  return /(完成|摘牌|终止|退市|赎回)/.test(forceRedeemStatus);
+  return /(完成强赎|强赎完成|完成赎回|赎回完成|摘牌|终止|退市|停止交易)/.test(forceRedeemStatus);
 }
 
 function isCbArbRowDelistedOrExpired(row, today = todayShanghaiDate()) {
@@ -409,6 +426,15 @@ function isCbArbRowDelistedOrExpired(row, today = todayShanghaiDate()) {
   return Boolean(maturityDate && maturityDate < today);
 }
 
+function isCbArbRowActiveForceRedeem(row) {
+  if (!row || typeof row !== "object") return false;
+  const status = String(row.forceRedeemStatus || "").trim();
+  if (!status) return false;
+  if (/(不强赎|暂不强赎|不提前赎回|不赎回)/.test(status)) return false;
+  if (/(完成强赎|强赎完成|完成赎回|赎回完成|摘牌|终止|退市|停止交易)/.test(status)) return false;
+  return /(已公告强赎|强赎进行中|实施赎回|公告赎回)/.test(status);
+}
+
 function sanitizeCbArbRows(rows) {
   const today = todayShanghaiDate();
   const map = new Map();
@@ -424,8 +450,24 @@ function sanitizeCbArbRows(rows) {
   return Array.from(map.values());
 }
 
+/**
+ * 转债顶部摘要与定时主推送共用这一套候选规则，避免页面前三与推送口径再次分叉。
+ * 当前只收口两类排除：终态/非 live、活跃强赎；不再额外做剩余期限时间门槛。
+ */
+function isCbArbSummaryEligibleRow(row, today = todayShanghaiDate()) {
+  if (!row || typeof row !== "object") return false;
+  if (!isValidCbArbRow(row)) return false;
+  if (isCbArbRowDelistedOrExpired(row, today)) return false;
+  if (isCbArbRowActiveForceRedeem(row)) return false;
+  return true;
+}
+
+function selectCbArbSummaryRows(rows, today = todayShanghaiDate()) {
+  return sanitizeCbArbRows(rows).filter((row) => isCbArbSummaryEligibleRow(row, today));
+}
+
 function cbArbOpportunitySets(rows) {
-  const cleanRows = sanitizeCbArbRows(rows);
+  const cleanRows = selectCbArbSummaryRows(rows);
   const formatDate = (value) => String(value || "").trim();
   const hasPassedConvertStart = (row) => {
     const text = formatDate(row.convertStartDate || row.convertStartDateTime);
@@ -556,6 +598,9 @@ function buildConvertibleBondAlertCandidates(rows, options = {}) {
 
 module.exports = {
   sanitizeCbArbRows,
+  isCbArbRowActiveForceRedeem,
+  isCbArbSummaryEligibleRow,
+  selectCbArbSummaryRows,
   cbArbOpportunitySets,
   buildConvertibleBondDiscountSnapshot,
   enrichDiscountStrategyRow,

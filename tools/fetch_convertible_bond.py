@@ -941,7 +941,7 @@ def _build_theoretical_metrics(row: Dict[str, Any], risk_free_rate: float) -> Di
     remaining_years = _to_float(row.get("remainingYears"))
 
     market_pure_bond = _to_float(row.get("pureBondValue"))
-    bond_value = market_pure_bond if market_pure_bond is not None else _bond_floor_value(risk_free_rate, remaining_years)
+    bond_value = market_pure_bond
     option_qty = None
     if convert_price and convert_price > 0:
         option_qty = 100.0 / convert_price
@@ -963,10 +963,13 @@ def _build_theoretical_metrics(row: Dict[str, Any], risk_free_rate: float) -> Di
         )
         else "unknown"
     )
-    pricing_formula = "bond+call" if is_below_redeem_trigger else "bond+call-put"
+    # 强赎后的上方收益按“双看涨价差”收口：
+    # 多一份转股价看涨期权，空一份强赎价看涨期权；
+    # 缺少真实强赎价时，理论价值保持为空，不再退回旧的单看涨/看涨减看跌分支。
+    pricing_formula = "bond+callspread"
 
     result: Dict[str, Optional[float]] = {
-        "bondValue": round(bond_value, 4),
+        "bondValue": round(bond_value, 4) if bond_value is not None else None,
         "optionQty": round(option_qty, 6) if option_qty else None,
         "isStockBelowRedeemTrigger": bool(is_below_redeem_trigger),
         "pricingBucket": pricing_bucket,
@@ -976,26 +979,37 @@ def _build_theoretical_metrics(row: Dict[str, Any], risk_free_rate: float) -> Di
     for window in VOL_WINDOWS:
         vol = _to_float(row.get(f"volatility{window}"))
         call_strike = None
-        put_strike = None
+        redeem_call_strike = None
         theoretical = None
         call_value = None
         put_value = None
+        long_call_value = None
+        short_call_value = None
+        call_spread_value = None
         gap = None
         premium_rate = None
 
         if option_qty and option_qty > 0 and convert_price and convert_price > 0:
-            call_strike = max(bond_value / option_qty, convert_price)
-            put_strike = redeem_trigger_price if redeem_trigger_price and redeem_trigger_price > 0 else None
-            if spot is not None and vol is not None and remaining_years is not None:
-                call_unit = _american_option_binomial(spot, call_strike, remaining_years, risk_free_rate, vol, "call")
-                call_value = call_unit * option_qty
-                if put_strike is not None and not is_below_redeem_trigger:
-                    put_unit = _american_option_binomial(spot, put_strike, remaining_years, risk_free_rate, vol, "put")
-                    put_value = put_unit * option_qty
-                else:
-                    put_value = 0.0
+            call_strike = convert_price
+            redeem_call_strike = redeem_trigger_price if redeem_trigger_price and redeem_trigger_price > 0 else None
+            if (
+                bond_value is not None
+                and spot is not None
+                and vol is not None
+                and remaining_years is not None
+                and redeem_call_strike is not None
+            ):
+                long_call_unit = _american_option_binomial(spot, call_strike, remaining_years, risk_free_rate, vol, "call")
+                short_call_unit = _american_option_binomial(
+                    spot, redeem_call_strike, remaining_years, risk_free_rate, vol, "call"
+                )
+                long_call_value = long_call_unit * option_qty
+                short_call_value = short_call_unit * option_qty
+                call_spread_value = max(long_call_value - short_call_value, 0.0)
+                call_value = call_spread_value
+                put_value = None
 
-                theoretical = bond_value + call_value - (put_value or 0.0)
+                theoretical = bond_value + call_spread_value
                 if market_price is not None:
                     gap = theoretical - market_price
                     if market_price != 0:
@@ -1003,9 +1017,17 @@ def _build_theoretical_metrics(row: Dict[str, Any], risk_free_rate: float) -> Di
 
         suffix = str(window)
         result[f"callStrike{suffix}"] = round(call_strike, 4) if call_strike is not None else None
-        result[f"putStrike{suffix}"] = round(put_strike, 4) if put_strike is not None else None
+        result[f"redeemCallStrike{suffix}"] = (
+            round(redeem_call_strike, 4) if redeem_call_strike is not None else None
+        )
+        result[f"putStrike{suffix}"] = None
+        result[f"longCallOptionValue{suffix}"] = round(long_call_value, 4) if long_call_value is not None else None
+        result[f"shortCallOptionValue{suffix}"] = round(short_call_value, 4) if short_call_value is not None else None
+        result[f"callSpreadOptionValue{suffix}"] = (
+            round(call_spread_value, 4) if call_spread_value is not None else None
+        )
         result[f"callOptionValue{suffix}"] = round(call_value, 4) if call_value is not None else None
-        result[f"putOptionValue{suffix}"] = round(put_value, 4) if put_value is not None else None
+        result[f"putOptionValue{suffix}"] = None
         result[f"theoreticalPrice{suffix}"] = round(theoretical, 4) if theoretical is not None else None
         result[f"theoreticalGap{suffix}"] = round(gap, 4) if gap is not None else None
         result[f"theoreticalPremiumRate{suffix}"] = round(premium_rate, 4) if premium_rate is not None else None
@@ -1492,8 +1514,13 @@ def get_bond_cb_data() -> Dict[str, Any]:
             row[f"annualizedVolatility{suffix}"] = row.get(f"volatility{suffix}")
             row[f"bondEquityYield{suffix}"] = row.get(f"theoreticalPremiumRate{suffix}")
         row["annualizedVolatility"] = row.get(f"volatility{PRIMARY_VOL_WINDOW}")
+        row["callStrike"] = row.get(f"callStrike{PRIMARY_VOL_WINDOW}")
+        row["redeemCallStrike"] = row.get(f"redeemCallStrike{PRIMARY_VOL_WINDOW}")
+        row["longCallOptionValue"] = row.get(f"longCallOptionValue{PRIMARY_VOL_WINDOW}")
+        row["shortCallOptionValue"] = row.get(f"shortCallOptionValue{PRIMARY_VOL_WINDOW}")
+        row["callSpreadOptionValue"] = row.get(f"callSpreadOptionValue{PRIMARY_VOL_WINDOW}")
         row["callOptionValue"] = row.get(f"callOptionValue{PRIMARY_VOL_WINDOW}")
-        row["putOptionValue"] = row.get(f"putOptionValue{PRIMARY_VOL_WINDOW}")
+        row["putOptionValue"] = None
         row["theoreticalPrice"] = row.get(f"theoreticalPrice{PRIMARY_VOL_WINDOW}")
         row["theoreticalPremiumRate"] = row.get(f"theoreticalPremiumRate{PRIMARY_VOL_WINDOW}")
         row["bondEquityYield"] = row.get(f"theoreticalPremiumRate{PRIMARY_VOL_WINDOW}")
@@ -1536,12 +1563,12 @@ def get_bond_cb_data() -> Dict[str, Any]:
         "treasuryYield10yDate": risk_free["date"],
         "treasuryYield10ySource": risk_free["source"],
         "assumptions": {
-            "bondValue": "pure_bond_value_from_bond_zh_cov_value_analysis_or_discount_floor",
+            "bondValue": "pure_bond_value_from_upstream_api_only",
             "issuePrice": 100,
             "volatilityWindows": list(VOL_WINDOWS),
             "primaryWindow": 60,
             "optionModel": "american_binomial",
-            "formula": "if stockPrice<redeemTriggerPrice then theoretical=bondValue+americanCall else theoretical=bondValue+americanCall-americanPut(redeemTriggerStrike)",
+            "formula": "theoretical=bondValue+max(americanCall(convertStrike)-americanCall(redeemTriggerStrike),0)",
         },
     }
 

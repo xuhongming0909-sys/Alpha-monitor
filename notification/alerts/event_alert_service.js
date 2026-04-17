@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * 折价策略推送服务：
+ * 低溢价策略推送服务：
  * 1. 读取最新可转债结果
  * 2. 调用策略层生成买入/卖出/监控名单快照
  * 3. 负责发送与运行态记录
@@ -35,6 +35,86 @@ function createEventAlertService(options = {}) {
         .map((item) => String(item || "").trim())
         .filter((item) => /^\d{2}:\d{2}$/.test(item) && parsePushMinutes(item) !== null)
     )).sort((a, b) => (parsePushMinutes(a) ?? 0) - (parsePushMinutes(b) ?? 0));
+  }
+
+  function normalizeSessionWindows(items) {
+    return Array.from(new Set(
+      (Array.isArray(items) ? items : [])
+        .map((item) => String(item || "").trim())
+        .filter((item) => /^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$/.test(item))
+        .map((item) => item.replace(/\s+/g, ""))
+    ))
+      .map((item) => {
+        const [startText, endText] = item.split("-");
+        const startMinutes = parsePushMinutes(startText);
+        const endMinutes = parsePushMinutes(endText);
+        if (startMinutes === null || endMinutes === null || startMinutes >= endMinutes) return null;
+        return {
+          text: `${startText}-${endText}`,
+          startMinutes,
+          endMinutes,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function isTradingWeekday(parts) {
+    return Number(parts?.weekday) >= 1 && Number(parts?.weekday) <= 5;
+  }
+
+  function isInsideSessionWindows(nowMinutes, windows) {
+    return windows.some((item) => nowMinutes >= item.startMinutes && nowMinutes <= item.endMinutes);
+  }
+
+  /**
+   * 可转债低溢价推送遵循 A 股交易日和交易时段。
+   * 这里独立判定，避免把其他模块的更宽交易窗口误带到折价推送里。
+   */
+  function shouldRunDiscountPush(strategyConfig, force = false) {
+    if (force) {
+      return {
+        allowed: true,
+        reason: "forced",
+        shanghaiParts: getShanghaiParts(new Date()),
+        nowMinutes: null,
+        sessionWindows: normalizeSessionWindows(strategyConfig?.sessionWindows),
+      };
+    }
+
+    const shanghaiParts = getShanghaiParts(new Date());
+    const sessionWindows = normalizeSessionWindows(strategyConfig?.sessionWindows);
+    const nowMinutes = (Number(shanghaiParts?.hour) * 60) + Number(shanghaiParts?.minute);
+    const tradingDaysOnly = strategyConfig?.tradingDaysOnly !== false;
+    const latestSessionEnd = sessionWindows.reduce(
+      (max, item) => Math.max(max, Number(item?.endMinutes) || 0),
+      0
+    );
+
+    if (tradingDaysOnly && !isTradingWeekday(shanghaiParts)) {
+      return { allowed: false, reason: "outside_trading_weekday", shanghaiParts, nowMinutes, sessionWindows };
+    }
+    if (latestSessionEnd > 0 && nowMinutes >= latestSessionEnd) {
+      return { allowed: false, reason: "outside_discount_session", shanghaiParts, nowMinutes, sessionWindows };
+    }
+    if (sessionWindows.length && !isInsideSessionWindows(nowMinutes, sessionWindows)) {
+      return { allowed: false, reason: "outside_discount_session", shanghaiParts, nowMinutes, sessionWindows };
+    }
+    if (!sessionWindows.length && !isTradingSession(new Date())) {
+      return { allowed: false, reason: "outside_trading_session_fallback", shanghaiParts, nowMinutes, sessionWindows };
+    }
+
+    return { allowed: true, reason: "ok", shanghaiParts, nowMinutes, sessionWindows };
+  }
+
+  function collectDueMonitorSlots(scheduleTimes, sentTimes, nowMinutes, sessionWindows) {
+    return scheduleTimes.filter((item) => {
+      const targetMinutes = parsePushMinutes(item);
+      if (targetMinutes === null) return false;
+      if (Array.isArray(sentTimes) && sentTimes.includes(item)) return false;
+      if (targetMinutes > nowMinutes) return false;
+      if (sessionWindows.length && !isInsideSessionWindows(targetMinutes, sessionWindows)) return false;
+      return true;
+    });
   }
 
   async function sendSignalBatch(signalType, items) {
@@ -101,15 +181,16 @@ function createEventAlertService(options = {}) {
 
   async function pushConvertibleBondAlerts(input = {}) {
     const force = Boolean(input.force);
-    if (!force && !isTradingSession(new Date())) {
+    const strategyConfig = getDiscountStrategyConfig();
+    const sessionDecision = shouldRunDiscountPush(strategyConfig, force);
+    if (!sessionDecision.allowed) {
       return {
         sent: false,
         skipped: true,
-        reason: "outside_trading_session",
+        reason: sessionDecision.reason,
       };
     }
 
-    const strategyConfig = getDiscountStrategyConfig();
     const datasets = await collectAlertDatasets();
     const rows = Array.isArray(datasets?.cbArb?.data) ? datasets.cbArb.data : [];
     const snapshot = buildDiscountSnapshot(rows, discountRuntimeStore.getState(), {
@@ -119,7 +200,7 @@ function createEventAlertService(options = {}) {
       sellPressureAnchors: strategyConfig.sellPressureAnchors,
       boardCoefficients: strategyConfig.boardCoefficients,
       nowIsoText: nowIso(),
-      todayDate: getShanghaiParts().date,
+      todayDate: sessionDecision.shanghaiParts?.date || getShanghaiParts().date,
     });
 
     discountRuntimeStore.replaceStrategyState(snapshot.nextState);
@@ -132,26 +213,22 @@ function createEventAlertService(options = {}) {
         reason: "bootstrap_seed_only",
         buyCount: snapshot.buySignals.length,
         sellCount: snapshot.sellSignals.length,
-        monitorCount: snapshot.discountMonitorSummary.count,
+        monitorCount: snapshot.premiumMonitorSummary.count,
       };
     }
 
     const buyResult = await sendSignalBatch("buy", snapshot.buySignals);
     const sellResult = await sendSignalBatch("sell", snapshot.sellSignals);
 
-    const sh = getShanghaiParts();
-    const nowMinutes = (sh.hour * 60) + sh.minute;
+    const sh = sessionDecision.shanghaiParts || getShanghaiParts();
+    const nowMinutes = Number.isFinite(sessionDecision.nowMinutes) ? sessionDecision.nowMinutes : ((sh.hour * 60) + sh.minute);
     const scheduleTimes = normalizeScheduleTimes(strategyConfig.monitorSessionTimes);
     const sentTimes = discountRuntimeStore.getMonitorPushRecord(sh.date);
-    const dueSlots = scheduleTimes.filter((item) => {
-      const targetMinutes = parsePushMinutes(item);
-      if (targetMinutes === null) return false;
-      return targetMinutes <= nowMinutes && !sentTimes.includes(item);
-    });
+    const dueSlots = collectDueMonitorSlots(scheduleTimes, sentTimes, nowMinutes, sessionDecision.sessionWindows || []);
 
     let monitorResult = { sent: false, sentCount: 0, skipped: true, reason: "not_due" };
     if (dueSlots.length) {
-      monitorResult = await sendMonitorBatch(snapshot.discountMonitorSummary.items, sh.date, dueSlots);
+      monitorResult = await sendMonitorBatch(snapshot.premiumMonitorSummary.items, sh.date, dueSlots);
     }
 
     pushRuntimeStore.save();
@@ -160,7 +237,7 @@ function createEventAlertService(options = {}) {
       buyResult,
       sellResult,
       monitorResult,
-      monitorCount: snapshot.discountMonitorSummary.count,
+      monitorCount: snapshot.premiumMonitorSummary.count,
     };
   }
 

@@ -42,6 +42,7 @@ def normalize_convertible_bond_snapshot(payload: dict) -> list[dict]:
                     "convert_price": item.get("convertPrice"),
                     "convert_value": item.get("convertValue"),
                     "premium_rate": item.get("premiumRate"),
+                    "volatility250": item.get("volatility250"),
                     "theoretical_premium_rate": item.get("theoreticalPremiumRate"),
                     "double_low": item.get("doubleLow"),
                     "remaining_years": item.get("remainingYears"),

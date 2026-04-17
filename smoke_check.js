@@ -1,4 +1,27 @@
-const DEFAULT_BASE_URL = process.env.ALPHA_MONITOR_BASE_URL || `http://127.0.0.1:${process.env.PORT || 5000}`;
+const { getConfig } = require('./shared/config/node_config');
+
+function normalizeBaseUrl(value) {
+  const text = String(value || '').trim();
+  if (/^\$\{.+\}$/.test(text)) return '';
+  return text ? text.replace(/\/+$/, '') : '';
+}
+
+function resolveDefaultBaseUrl() {
+  const explicit = normalizeBaseUrl(process.env.ALPHA_MONITOR_BASE_URL || process.env.PUBLIC_BASE_URL);
+  if (explicit) return explicit;
+
+  const config = getConfig();
+  const port = Number(config?.app?.port || process.env.PORT || 5000);
+  const publicBaseUrl = normalizeBaseUrl(config?.deployment?.public_base_url);
+  if (publicBaseUrl) return publicBaseUrl;
+
+  const serverBaseUrl = normalizeBaseUrl(config?.app?.server_base_url);
+  if (serverBaseUrl) return serverBaseUrl;
+
+  return `http://127.0.0.1:${port}`;
+}
+
+const DEFAULT_BASE_URL = resolveDefaultBaseUrl();
 
 async function fetchJson(url) {
   const response = await fetch(url);

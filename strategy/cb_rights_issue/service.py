@@ -19,6 +19,7 @@ MIN_EXPECTED_RETURN_RATE = float(_STRATEGY_CONFIG.get("min_expected_return_rate"
 TARGET_BOND_LOTS = max(1, int(_STRATEGY_CONFIG.get("target_bond_lots") or 10))
 MARGIN_SHARE_RATIO = float(_STRATEGY_CONFIG.get("margin_share_ratio") or 0.6)
 MARGIN_ROUND_LOT_SHARES = max(1, int(_STRATEGY_CONFIG.get("margin_round_lot_shares") or 50))
+EXPECTED_ROUND_LOT_SHARES = max(1, int(_STRATEGY_CONFIG.get("expected_round_lot_shares") or 100))
 OPTION_TERM_YEARS = float(_STRATEGY_CONFIG.get("option_term_years") or 6.0)
 TRADING_DAYS_PER_YEAR = max(1, int(_STRATEGY_CONFIG.get("annualization_trading_days_per_year") or 252))
 
@@ -188,6 +189,13 @@ def _resolve_estimated_apply_trading_days(
     return _count_trading_days(trade_calendar, today_text, estimated_apply_date), f"median:{sample_group}"
 
 
+def _resolve_expected_required_shares(raw_required_shares: Optional[float]) -> Optional[int]:
+    if raw_required_shares is None or raw_required_shares <= 0:
+        return None
+    adjusted = raw_required_shares * MARGIN_SHARE_RATIO
+    return int(math.ceil(adjusted / EXPECTED_ROUND_LOT_SHARES) * EXPECTED_ROUND_LOT_SHARES)
+
+
 def _resolve_margin_required_shares(raw_required_shares: Optional[float]) -> Optional[int]:
     if raw_required_shares is None or raw_required_shares <= 0:
         return None
@@ -238,7 +246,7 @@ def _build_row(
     convert_price = _to_float(row.get("convertPrice"))
     volatility = _to_float(row.get("volatility250") if row.get("volatility250") is not None else row.get("volatility60"))
     raw_required_shares = _to_float(row.get("rawRequiredShares"))
-    placement_shares = raw_required_shares if raw_required_shares and raw_required_shares > 0 else None
+    placement_shares = _resolve_expected_required_shares(raw_required_shares)
     margin_required_shares = _resolve_margin_required_shares(raw_required_shares)
 
     issue_scale_yi = _to_float(
@@ -254,9 +262,10 @@ def _build_row(
     required_funds = None
     margin_required_funds = None
     original_funds_baseline = None
+    if stock_price is not None and stock_price > 0 and raw_required_shares is not None and raw_required_shares > 0:
+        original_funds_baseline = raw_required_shares * stock_price
     if stock_price is not None and stock_price > 0 and placement_shares is not None:
         required_funds = placement_shares * stock_price
-        original_funds_baseline = placement_shares * stock_price
     if stock_price is not None and stock_price > 0 and margin_required_shares is not None:
         margin_required_funds = margin_required_shares * stock_price
 
@@ -337,7 +346,7 @@ def _build_row(
         "marginRequiredFunds": _round(margin_required_funds, 4),
         "requiredFunds": _round(required_funds, 4),
         "originalFundsBaseline": _round(original_funds_baseline, 4),
-        "marketRule": f"raw_x_{MARGIN_SHARE_RATIO}_then_round_{MARGIN_ROUND_LOT_SHARES}",
+        "marketRule": f"raw_x_{MARGIN_SHARE_RATIO}_expected_round_{EXPECTED_ROUND_LOT_SHARES}_margin_round_{MARGIN_ROUND_LOT_SHARES}",
         "stageEligible": in_apply_stage or bool(_normalize_progress_sample_group(str(row.get("progressName") or ""))),
         "monitorEligible": False,
         "optionReferencePrice": _round(option_reference_price, 4),

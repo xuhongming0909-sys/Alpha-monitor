@@ -1,7 +1,7 @@
 "use strict";
 
 const { collectTodaySubscriptionEvents } = require("../../strategy/subscription/service");
-const { cbArbOpportunitySets } = require("../../strategy/convertible_bond/service");
+const { selectCbArbSummaryRows } = require("../../strategy/convertible_bond/service");
 
 /**
  * 企业微信 Markdown 长度有限，这里统一做裁剪。
@@ -107,30 +107,63 @@ function buildPremiumRows(rows, prefix, topCount) {
   return picked;
 }
 
-function buildCbSummaryLines(rows, options = {}) {
-  const topCount = Math.max(1, Number(options.cbTopN) || 4);
-  const rowMap = new Map((Array.isArray(rows) ? rows : []).map((row) => [pickText(row.code), row]));
-  const sets = cbArbOpportunitySets(rows);
-  const categoryMap = {
-    double_low: "doubleLow",
-    theoretical_yield: "theoPremium",
-    putback_arbitrage: "redeem",
-    limit_up_arbitrage: "limitUp",
-    conversion_arbitrage: "convert",
-    delisting_game: "delist",
-  };
-  const categoryOrder = Array.isArray(options.pushCategories) && options.pushCategories.length
-    ? options.pushCategories
-    : Object.keys(categoryMap);
+function computeOptionTheoreticalValue(row) {
+  const callValue = toNum(row?.callOptionValue);
+  const putValue = toNum(row?.putOptionValue);
+  const pricingFormula = String(row?.pricingFormula || "").trim();
+  if (pricingFormula === "bond+callspread" && callValue !== null) {
+    return callValue;
+  }
+  if (callValue !== null || putValue !== null) {
+    return (callValue ?? 0) - (putValue ?? 0);
+  }
+  const theoreticalPrice = toNum(row?.theoreticalPrice);
+  const pureBondValue = toNum(row?.pureBondValue);
+  if (theoreticalPrice === null || pureBondValue === null) return null;
+  return theoreticalPrice - pureBondValue;
+}
 
-  const flattened = [];
-  categoryOrder.forEach((category) => {
-    const key = categoryMap[category];
-    const list = Array.isArray(sets[key]) ? sets[key] : [];
-    list.forEach((item) => flattened.push(item));
-  });
+function computeImplicitOptionValue(row) {
+  const price = toNum(row?.price);
+  const pureBondValue = toNum(row?.pureBondValue);
+  if (price === null || pureBondValue === null) return null;
+  return price - pureBondValue;
+}
+
+function computeOptionDiscountRate(row) {
+  const theoreticalOptionValue = computeOptionTheoreticalValue(row);
+  const implicitOptionValue = computeImplicitOptionValue(row);
+  if (theoreticalOptionValue === null || implicitOptionValue === null) return null;
+  if (theoreticalOptionValue === 0) return null;
+  return (implicitOptionValue / theoreticalOptionValue - 1) * 100;
+}
+
+function buildCbSummaryLines(rows, options = {}) {
+  const topCount = 3;
+  const summaryRows = selectCbArbSummaryRows(rows);
+  const doubleLowRows = topN(
+    summaryRows.filter((row) => toNum(row.doubleLow) !== null),
+    topCount,
+    (a, b) => (toNum(a.doubleLow) ?? Number.POSITIVE_INFINITY) - (toNum(b.doubleLow) ?? Number.POSITIVE_INFINITY)
+  );
+  const theoryRows = topN(
+    summaryRows.filter((row) => toNum(row.theoreticalPremiumRate) !== null),
+    topCount,
+    (a, b) => (toNum(b.theoreticalPremiumRate) ?? Number.NEGATIVE_INFINITY) - (toNum(a.theoreticalPremiumRate) ?? Number.NEGATIVE_INFINITY)
+  );
 
   const picked = [];
+  doubleLowRows.forEach((row) => {
+    picked.push(
+      `- 双低前三名 | ${pickText(row.bondName)} ${pickText(row.code)} | 双低 ${priceText(row.doubleLow)} | 转股溢价 ${pctText(row.premiumRate)} | 转股价值 ${priceText(row.convertValue)} | 现价 ${priceText(row.price)}`
+    );
+  });
+  theoryRows.forEach((row) => {
+    picked.push(
+      `- 理论溢价率前三名 | ${pickText(row.bondName)} ${pickText(row.code)} | 理论溢价 ${pctText(row.theoreticalPremiumRate)} | 期权折价率 ${pctText(computeOptionDiscountRate(row))} | 双低 ${priceText(row.doubleLow)} | 现价 ${priceText(row.price)}`
+    );
+  });
+  return picked;
   const seen = new Set();
   for (const item of flattened) {
     if (!item?.code || seen.has(item.code)) continue;
@@ -151,6 +184,7 @@ function buildSubscriptionLines(input, todayText) {
 }
 
 function buildMonitorLines(monitors) {
+  return buildMonitorLinesPrecise(monitors);
   return (Array.isArray(monitors) ? monitors : []).map((item) => {
     const stock = toNum(item.stockYieldRate);
     const cash = toNum(item.cashYieldRate);
@@ -158,6 +192,17 @@ function buildMonitorLines(monitors) {
       ? Math.max(stock, cash)
       : Number.isFinite(stock) ? stock : cash;
     return `- ${pickText(item.name)} | 换股 ${pctText(stock)} | 现金 ${pctText(cash)} | 最大 ${pctText(maxYield)}`;
+  });
+}
+
+function buildMonitorLinesPrecise(monitors) {
+  return (Array.isArray(monitors) ? monitors : []).map((item) => {
+    const stock = toNum(item.stockYieldRate);
+    const cash = toNum(item.cashYieldRate);
+    const maxYield = Number.isFinite(stock) && Number.isFinite(cash)
+      ? Math.max(stock, cash)
+      : Number.isFinite(stock) ? stock : cash;
+    return `- ${pickText(item.name)} | 换股 ${pctText(stock, 3)} | 现金 ${pctText(cash, 3)} | 最大 ${pctText(maxYield, 3)}`;
   });
 }
 

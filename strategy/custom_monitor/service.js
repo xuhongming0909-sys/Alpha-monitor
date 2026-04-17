@@ -1,6 +1,8 @@
 "use strict";
 
-function round(value, digits = 4) {
+const MONITOR_DECIMALS = 3;
+
+function round(value, digits = MONITOR_DECIMALS) {
   if (!Number.isFinite(value)) return null;
   const scale = 10 ** digits;
   return Math.round(value * scale) / scale;
@@ -81,16 +83,16 @@ function recalculateMonitor(monitor, rates, nowIso = () => new Date().toISOStrin
 
   return {
     ...monitor,
-    acquirerPrice: round(acquirerPriceCny, 4),
-    targetPrice: round(targetPriceCny, 4),
-    cashDistributionCny: round(cashDistributionCny, 4),
-    cashPayout: hasCashLeg ? round(cashOptionPriceCny, 4) : null,
-    stockPayout: round(stockPayout, 4),
-    stockSpread: round(stockSpread, 4),
-    safetyFactor: round(safetyFactor, 4),
-    stockYieldRate: round(stockYieldRate, 4),
-    cashSpread: round(cashSpread, 4),
-    cashYieldRate: round(cashYieldRate, 4),
+    acquirerPrice: round(acquirerPriceCny),
+    targetPrice: round(targetPriceCny),
+    cashDistributionCny: round(cashDistributionCny),
+    cashPayout: hasCashLeg ? round(cashOptionPriceCny) : null,
+    stockPayout: round(stockPayout),
+    stockSpread: round(stockSpread),
+    safetyFactor: round(safetyFactor),
+    stockYieldRate: round(stockYieldRate),
+    cashSpread: round(cashSpread),
+    cashYieldRate: round(cashYieldRate),
     updateTime: nowIso(),
   };
 }
@@ -118,5 +120,6 @@ module.exports = {
   toCny,
   recalculateMonitor,
   summarizeMonitor,
+  MONITOR_DECIMALS,
 };
 

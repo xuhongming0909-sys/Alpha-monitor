@@ -48,6 +48,7 @@ storage:
     merger_company_reports: "merger_company_reports.json"
     push_config: "push_config.json"
     push_runtime_state: "push_runtime_state.json"
+    cb_arb_aux_cache: "cb_arb_aux_cache.json"
     event_arbitrage_cache: "event_arbitrage_cache.json"
     cb_rights_issue_state: "cb_rights_issue_state.json"
     cb_rights_issue_push_config: "cb_rights_issue_push_config.json"
@@ -220,20 +221,19 @@ data_fetch:
     convertible_bond:
       intraday: true
       refresh_interval_ms: 300000
+      force_request_soft_timeout_ms: 55000
       daily_incremental_sync: true
       sync_stock_history_before_strategy: true
       trading_days_per_year: 252
       volatility_windows:
-        - 20
-        - 60
-        - 120
+        - 250
       atr_window: 20
       turnover_avg_windows:
         - 5
         - 20
-      primary_vol_window: 60
-      history_lookback_days: 420
-      stock_history_retention_rows: 160
+      primary_vol_window: 250
+      history_lookback_days: 540
+      stock_history_retention_rows: 320
       max_vol_sync_workers: 8
       max_financial_workers: 10
       inline_history_hydrate_limit: 24
@@ -248,8 +248,8 @@ data_fetch:
       daily_incremental_sync: true
       sync_stock_history_before_strategy: true
       request_timeout_ms: 20000
-      history_lookback_days: 420
-      stock_history_retention_rows: 90
+      history_lookback_days: 540
+      stock_history_retention_rows: 320
       max_history_sync_workers: 8
       inline_history_hydrate_limit: 12
       source_page_url: "https://www.jisilu.cn/web/data/cb/pre"
@@ -260,16 +260,12 @@ data_fetch:
       intraday: true
       refresh_interval_ms: 300000
       daily_incremental_sync: false
-      default_group: "europe_us"
+      default_group: "index"
       source_page_urls:
         index: "https://www.jisilu.cn/data/lof/#index"
-        europe_us: "https://www.jisilu.cn/data/qdii/#qdiie"
-        commodity: "https://www.jisilu.cn/data/qdii/#qdiic"
         asia: "https://www.jisilu.cn/data/qdii/#qdiia"
       source_api_urls:
         index: "https://www.jisilu.cn/data/lof/index_lof_list/"
-        europe_us: "https://www.jisilu.cn/data/qdii/qdii_list/E"
-        commodity: "https://www.jisilu.cn/data/qdii/qdii_list/C"
         asia: "https://www.jisilu.cn/data/qdii/qdii_list/A"
       source_referer: "https://www.jisilu.cn/"
       request_timeout_ms: 20000
@@ -278,30 +274,6 @@ data_fetch:
       firecrawl_api_url: "${FIRECRAWL_API_URL}"
       firecrawl_api_key: "${FIRECRAWL_API_KEY}"
       firecrawl_timeout_ms: 20000
-      external_market_api:
-        enabled: true
-        provider: "stooq"
-        request_timeout_ms: 12000
-        current_quote_url: "https://stooq.com/q/l/"
-        history_quote_url: "https://stooq.com/q/d/l/"
-        index_symbol_map:
-          cal_index_id:
-            "SPX.GI": "^SPX"
-            "NDX.GI": "^NDQ"
-            "DJI.GI": "^DJI"
-            "AGG": "AGG.US"
-            "HSI.GI": "^HSI"
-            "HSI": "^HSI"
-          index_name:
-            "恒生指数": "^HSI"
-        fx_symbol_map:
-          "USD": "usdcny"
-          "HKD": "hkdcny"
-          "EUR": "eurcny"
-          "GBP": "gbpcny"
-          "AUD": "audcny"
-          "SGD": "sgdcny"
-          "CAD": "cadcny"
       limited_apply_cap_amount: 100000
       limited_premium_rate_threshold: 1
       unlimited_abs_premium_rate_threshold: 5
@@ -324,8 +296,12 @@ strategy:
       - "conversion_arbitrage"
       - "delisting_game"
     discount_strategy:
-      buy_threshold: 2
-      sell_threshold: 0.5
+      trading_days_only: true
+      session_windows:
+        - "09:30-11:30"
+        - "13:00-15:00"
+      buy_threshold: -2
+      sell_threshold: -0.5
       monitor_interval_minutes: 10
       monitor_session_times:
         - "09:30"
@@ -398,18 +374,25 @@ strategy:
   cb_rights_issue:
     min_expected_return_rate: 6
     target_bond_lots: 10
-    lot_size_shares: 100
-    shanghai_ratio_factor: 0.6
+    margin_share_ratio: 0.6
+    expected_round_lot_shares: 100
+    margin_round_lot_shares: 50
     moving_average_window: 20
-    volatility_window: 60
+    volatility_window: 250
     option_term_years: 6
     option_model: "black_scholes"
+    annualization_trading_days_per_year: 252
+    apply_stage_keywords:
+      - "申购"
+      - "待发"
+      - "发行公告"
+      - "网上发行"
     eligible_progress_keywords:
       - "上市委通过"
       - "同意注册"
       - "注册生效"
   lof_arbitrage:
-    default_group: "europe_us"
+    default_group: "index"
     ranking_metric: "premium_rate"
     limited_apply_cap_amount: 100000
     limited_premium_rate_threshold: 1
@@ -436,28 +419,18 @@ presentation:
     desktop_cell_padding_x: 8
     tablet_font_px: 15
     min_width_by_kind:
-      subscription: 1180
-      convertible: 2360
-      premium: 1440
-      monitor: 1320
-      dividend: 1100
-      merger: 1280
-      lof: 1680
+      subscription: 1080
+      convertible: 2080
+      premium: 1260
+      monitor: 1200
+      dividend: 980
+      merger: 1160
+      lof: 1520
   dashboard_module_notes:
-    subscription:
-      data_sources:
-        - "新股与可转债打新日历来自 AkShare 打新接口，抓取结果会同步到本地 sqlite 历史库。"
-      formulas:
-        - "今日申购 = subscribeDate 等于今天。"
-        - "今日中签缴款 = paymentDate 等于今天。"
-        - "今日上市 = listingDate 等于今天。"
-      strategy_notes:
-        - "页面只展示今天发生的打新事件，并按申购 → 缴款 → 上市顺序汇总。"
-        - "摇号/中签公告日不再单独展示，也不再冒充缴款日。"
     cbArb:
       data_sources:
         - "转债实时行情来自新浪转债行情与东方财富转债资料；正股历史与部分财务字段来自 AkShare / 东方财富。"
-        - "60日波动率依赖本地历史 K 线库与正股历史同步链路。"
+        - "250日波动率依赖本地历史 K 线库与正股历史同步链路，并使用后复权收盘价年化计算。"
       formulas:
         - "转股价值 = 100 ÷ 转股价 × 正股现价。"
         - "转股溢价率 = (转债现价 ÷ 转股价值 - 1) × 100%。"
@@ -521,7 +494,7 @@ presentation:
       strategy_notes:
         - "只有处于上市委通过、同意注册(注册生效)或已明确申购日，且预计收益率大于 6% 的项目才进入当天监控列表。"
         - "URL 页面给出的转股价按 20 日均值代理处理，行权价取转股价与当前价的较大值。"
-        - "60日波动率严格来自本功能独立历史库，若历史不足则不入池。"
+        - "250日波动率严格来自本功能独立历史库（后复权），若历史不足则不入池。"
         - "页面展示的是配售期权价值估算口径，不代表实际收益保证。"
     lofArb:
       data_sources:
@@ -530,7 +503,7 @@ presentation:
       formulas:
         - "溢价率 = (现价 / IOPV - 1) × 100%。"
         - "指数LOF / QDII亚洲：净值日期为 T-1 时，IOPV = T-1 日净值 × (1 + 指数涨幅) × (今日汇率 / 基准汇率)；净值日期为当日时，IOPV = 当日净值。"
-        - "QDII欧美：按最新已发布净值日期对齐锚点；净值为 T-2 时按 T-2 锚点估算，净值为 T-1 时按 T-1 锚点估算，今日指数与今日汇率优先走外部实时 API。"
+        - "LOF 当前只保留 指数LOF 与 QDII亚洲；净值为当日时直接使用当日净值，净值为 T-1 时按源侧指数涨幅与汇率修正。"
       strategy_notes:
         - "页面顶部只显示限购监控池和非限购监控池，不再堆放额外状态卡。"
         - "限购池要求存在限购、限额低于 10 万、溢价率大于 1%、成交额大于 100 万，且暂停申购样本不得入池；非限池要求不限购、未暂停申购且溢价率绝对值大于 5%、成交额大于 100 万。"
@@ -584,9 +557,7 @@ notification:
     enabled: true
     trading_days_only: true
     default_times:
-      - "13:30"
       - "14:00"
-      - "14:30"
   wecom:
     webhook_url: "${WECOM_WEBHOOK_URL}"
     push_html_url: "${PUSH_HTML_URL}"

@@ -3,8 +3,6 @@
 function createLofArbitragePushService(options = {}) {
   const getConfig = typeof options.getConfig === "function" ? options.getConfig : () => ({ enabled: false, times: [] });
   const runtimeStore = options.runtimeStore;
-  const stateStore = options.stateStore || {};
-  const saveStateStore = typeof options.saveStateStore === "function" ? options.saveStateStore : () => {};
   const getDataset = options.getDataset;
   const sendMarkdown = options.sendMarkdown;
   const buildMarkdown = options.buildMarkdown;
@@ -15,23 +13,6 @@ function createLofArbitragePushService(options = {}) {
   const nowIso = typeof options.nowIso === "function" ? options.nowIso : () => new Date().toISOString();
   const logInfo = options.logInfo || ((message) => console.info(message));
   const logError = options.logError || ((scope, error) => console.error(scope, error));
-
-  function ensureStateShape() {
-    if (!stateStore.seenEntryMap || typeof stateStore.seenEntryMap !== "object") stateStore.seenEntryMap = {};
-    if (!Object.prototype.hasOwnProperty.call(stateStore, "lastInstantAttemptAt")) stateStore.lastInstantAttemptAt = null;
-    if (!Object.prototype.hasOwnProperty.call(stateStore, "lastInstantSuccessAt")) stateStore.lastInstantSuccessAt = null;
-    if (!Object.prototype.hasOwnProperty.call(stateStore, "lastInstantError")) stateStore.lastInstantError = null;
-  }
-
-  function setSeenEntryMap(nextMap) {
-    ensureStateShape();
-    stateStore.seenEntryMap = nextMap;
-    saveStateStore();
-  }
-
-  function buildEntryKey(poolType, row) {
-    return `${poolType}:${row?.code || ""}`;
-  }
 
   async function readPayload() {
     const result = await getDataset("lofArb");
@@ -47,71 +28,6 @@ function createLofArbitragePushService(options = {}) {
       rebuildStatus: payload.rebuildStatus && typeof payload.rebuildStatus === "object" ? payload.rebuildStatus : {},
       updateTime: result?.updateTime || payload?.updateTime || null,
     };
-  }
-
-  function collectNewEntries(payload) {
-    ensureStateShape();
-    const nextMap = {};
-    const newLimitedRows = [];
-    const newUnlimitedRows = [];
-    const seenEntryMap = stateStore.seenEntryMap || {};
-
-    for (const row of payload.limitedMonitorRows) {
-      const key = buildEntryKey("limited", row);
-      nextMap[key] = payload.updateTime || nowIso();
-      if (!seenEntryMap[key]) newLimitedRows.push(row);
-    }
-    for (const row of payload.unlimitedMonitorRows) {
-      const key = buildEntryKey("unlimited", row);
-      nextMap[key] = payload.updateTime || nowIso();
-      if (!seenEntryMap[key]) newUnlimitedRows.push(row);
-    }
-
-    return {
-      nextMap,
-      newLimitedRows,
-      newUnlimitedRows,
-    };
-  }
-
-  async function pushInstantIfNeeded() {
-    const payload = await readPayload();
-    const config = getConfig();
-    const { nextMap, newLimitedRows, newUnlimitedRows } = collectNewEntries(payload);
-    const newCount = newLimitedRows.length + newUnlimitedRows.length;
-
-    if (!newCount || !config.enabled) {
-      setSeenEntryMap(nextMap);
-      return { success: true, skipped: true, reason: newCount ? "module_disabled" : "no_new_entries", total: newCount };
-    }
-    if (!isDeliveryAvailable()) {
-      return { success: true, skipped: true, reason: "delivery_not_configured", total: newCount };
-    }
-
-    const attemptAt = nowIso();
-    ensureStateShape();
-    stateStore.lastInstantAttemptAt = attemptAt;
-    stateStore.lastInstantError = null;
-    saveStateStore();
-
-    try {
-      const markdown = buildMarkdown(payload, {
-        mode: "instant",
-        limitedRows: newLimitedRows,
-        unlimitedRows: newUnlimitedRows,
-        maxItems: 20,
-      });
-      await sendMarkdown(markdown);
-      stateStore.lastInstantSuccessAt = attemptAt;
-      stateStore.lastInstantError = null;
-      stateStore.seenEntryMap = nextMap;
-      saveStateStore();
-      return { success: true, skipped: false, total: newCount, attemptAt };
-    } catch (error) {
-      stateStore.lastInstantError = String(error?.message || error || "unknown_error");
-      saveStateStore();
-      throw error;
-    }
   }
 
   async function pushNow() {
@@ -188,9 +104,7 @@ function createLofArbitragePushService(options = {}) {
   }
 
   return {
-    ensureStateShape,
     readPayload,
-    pushInstantIfNeeded,
     pushNow,
     runIfNeeded,
   };

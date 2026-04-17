@@ -17,15 +17,26 @@ function Get-DefaultHealthUrl {
 const { getConfig } = require('./shared/config/node_config');
 const config = getConfig();
 const port = Number(config?.app?.port || 5000);
+const normalizeBaseUrl = (value) => {
+  const text = String(value || '').trim();
+  if (/^\$\{.+\}$/.test(text)) return '';
+  return text ? text.replace(/\/+$/, '') : '';
+};
 const healthPath = String(
   config?.deployment?.healthcheck?.public_path ||
   config?.app?.healthcheck_path ||
   '/api/health'
 ).trim();
 const normalizedHealthPath = healthPath.startsWith('/') ? healthPath : `/${healthPath}`;
+const publicBaseUrl = normalizeBaseUrl(
+  process.env.PUBLIC_BASE_URL ||
+  config?.deployment?.public_base_url
+);
+const serverBaseUrl = normalizeBaseUrl(config?.app?.server_base_url);
+const baseUrl = publicBaseUrl || serverBaseUrl || `http://127.0.0.1:${port}`;
 
 process.stdout.write(JSON.stringify({
-  url: `http://127.0.0.1:${port}${normalizedHealthPath}`
+  url: `${baseUrl}${normalizedHealthPath}`
 }));
 '@ | node -
 

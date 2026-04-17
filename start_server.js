@@ -38,6 +38,8 @@ const {
 } = require('./strategy/subscription/service');
 const {
   sanitizeCbArbRows: strategySanitizeCbArbRows,
+  isCbArbRowActiveForceRedeem: strategyIsCbArbRowActiveForceRedeem,
+  selectCbArbSummaryRows: strategySelectCbArbSummaryRows,
   buildConvertibleBondDiscountSnapshot: strategyBuildConvertibleBondDiscountSnapshot,
 } = require('./strategy/convertible_bond/service');
 const { createConvertibleBondDiscountRuntimeStore } = require('./strategy/convertible_bond/discount_runtime_store');
@@ -93,7 +95,10 @@ const CB_RIGHTS_ISSUE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.cb_rights_issu
 const LOF_ARBITRAGE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.lof_arbitrage && typeof NOTIFICATION_CONFIG.lof_arbitrage === 'object')
   ? NOTIFICATION_CONFIG.lof_arbitrage
   : {};
-const INDEX_FILE = path.resolve(ROOT, PRESENTATION_CONFIG.dashboard_entry || './index.html');
+const INDEX_FILE = path.resolve(
+  ROOT,
+  PRESENTATION_CONFIG.dashboard_entry || './presentation/templates/dashboard_template.html'
+);
 const STATIC_DATA_DIR = PATH_POLICY.dataRootDir;
 const SHARED_DATA_DIR = PATH_POLICY.sharedDataDir;
 const DATA_PROFILE = PATH_POLICY.dbProfile;
@@ -151,6 +156,26 @@ function normalizeTimeListConfig(values, fallback) {
       .filter(Boolean)
   )).sort();
   return items.length ? items : [fallback];
+}
+
+function normalizeSessionWindowText(value) {
+  const text = String(value || '').trim();
+  const hit = text.match(/^(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})$/);
+  if (!hit) return '';
+  const start = normalizeTimeConfig(hit[1], '');
+  const end = normalizeTimeConfig(hit[2], '');
+  if (!start || !end || start >= end) return '';
+  return `${start}-${end}`;
+}
+
+function normalizeSessionWindowListConfig(values, fallback = []) {
+  const source = Array.isArray(values) ? values : [];
+  const items = Array.from(new Set(
+    source
+      .map((item) => normalizeSessionWindowText(item))
+      .filter(Boolean)
+  ));
+  return items.length ? items : [...fallback];
 }
 
 function normalizeAnchorConfig(values, fallback) {
@@ -248,6 +273,10 @@ const PYTHON_CANDIDATES = Array.from(new Set(
     .filter(Boolean)
 ));
 const DAILY_SYNC_CUTOFF_TIME = normalizeTimeConfig(APP_CONFIG?.data_fetch?.daily_sync?.cutoff_time, '16:10');
+const CB_ARB_FORCE_REQUEST_SOFT_TIMEOUT_MS = toIntConfig(
+  pluginFetchConfig('convertible_bond').force_request_soft_timeout_ms,
+  55 * 1000
+);
 const DEFAULT_MAIN_PUSH_TIME = normalizeTimeConfig(NOTIFICATION_CONFIG?.default_full_push_time, '08:00');
 const DEFAULT_MAIN_PUSH_TIMES = normalizeTimeListConfig(
   NOTIFICATION_CONFIG?.scheduler?.default_times,
@@ -269,8 +298,10 @@ const DEFAULT_DISCOUNT_STRATEGY_MONITOR_TIMES = [
   '13:00', '13:10', '13:20', '13:30', '13:40', '13:50', '14:00', '14:10', '14:20', '14:30', '14:40', '14:50',
 ];
 const DEFAULT_DISCOUNT_STRATEGY_CONFIG = {
-  buyThreshold: 2,
-  sellThreshold: 0.5,
+  tradingDaysOnly: true,
+  sessionWindows: ['09:30-11:30', '13:00-15:00'],
+  buyThreshold: -2,
+  sellThreshold: -0.5,
   monitorIntervalMinutes: 10,
   monitorSessionTimes: DEFAULT_DISCOUNT_STRATEGY_MONITOR_TIMES,
   atrAnchors: [
@@ -292,7 +323,15 @@ const DEFAULT_DISCOUNT_STRATEGY_CONFIG = {
   },
 };
 const DISCOUNT_STRATEGY_CONFIG = {
-  buyThreshold: toPositiveNumberConfig(CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.buy_threshold, DEFAULT_DISCOUNT_STRATEGY_CONFIG.buyThreshold),
+  tradingDaysOnly: toBooleanConfig(
+    CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.trading_days_only,
+    DEFAULT_DISCOUNT_STRATEGY_CONFIG.tradingDaysOnly
+  ),
+  sessionWindows: normalizeSessionWindowListConfig(
+    CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.session_windows,
+    DEFAULT_DISCOUNT_STRATEGY_CONFIG.sessionWindows
+  ),
+  buyThreshold: toNumConfigOrFallback(CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.buy_threshold, DEFAULT_DISCOUNT_STRATEGY_CONFIG.buyThreshold),
   sellThreshold: toNumConfigOrFallback(CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.sell_threshold, DEFAULT_DISCOUNT_STRATEGY_CONFIG.sellThreshold),
   monitorIntervalMinutes: toIntConfig(CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.monitor_interval_minutes, DEFAULT_DISCOUNT_STRATEGY_CONFIG.monitorIntervalMinutes),
   monitorSessionTimes: Array.isArray(CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.monitor_session_times)
@@ -329,8 +368,8 @@ const DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG = {
   enabled: Boolean(LOF_ARBITRAGE_NOTIFICATION_CONFIG?.enabled),
   times: normalizeTimeListConfig(
     LOF_ARBITRAGE_NOTIFICATION_CONFIG?.default_times,
-    '13:30'
-  ).slice(0, 3),
+    '14:00'
+  ).slice(0, 1),
   tradingDaysOnly: LOF_ARBITRAGE_NOTIFICATION_CONFIG?.trading_days_only !== false,
 };
 
@@ -365,6 +404,11 @@ function buildDashboardAutoRefreshConfig(config = {}) {
   };
 }
 
+function normalizeDashboardThemeConfig(value) {
+  const normalized = String(value || 'classic').trim().toLowerCase();
+  return ['classic', 'clean_data'].includes(normalized) ? normalized : 'classic';
+}
+
 function normalizeStringListConfig(values) {
   return (Array.isArray(values) ? values : [])
     .map((item) => String(item || '').trim())
@@ -382,22 +426,20 @@ function buildDashboardModuleNotesConfig(config = {}) {
     };
   };
 
-  return {
-    subscription: buildModuleNote('subscription'),
-    cbArb: buildModuleNote('cbArb'),
-    ah: buildModuleNote('ah'),
-    ab: buildModuleNote('ab'),
-    lofArb: buildModuleNote('lofArb'),
-    monitor: buildModuleNote('monitor'),
-    dividend: buildModuleNote('dividend'),
-    merger: buildModuleNote('merger'),
-    cbRightsIssue: buildModuleNote('cbRightsIssue'),
-  };
+  const result = {};
+  for (const moduleKey of ['subscription', 'cbArb', 'ah', 'ab', 'lofArb', 'monitor', 'dividend', 'merger', 'cbRightsIssue']) {
+    const note = buildModuleNote(moduleKey);
+    if (note.dataSources.length || note.formulas.length || note.strategyNotes.length) {
+      result[moduleKey] = note;
+    }
+  }
+  return result;
 }
 
 const DASHBOARD_TABLE_UI = buildDashboardTableUiConfig(PRESENTATION_DASHBOARD_TABLE_UI_CONFIG);
 const DASHBOARD_MODULE_NOTES = buildDashboardModuleNotesConfig(PRESENTATION_DASHBOARD_MODULE_NOTES_CONFIG);
 const DASHBOARD_AUTO_REFRESH = buildDashboardAutoRefreshConfig(PRESENTATION_DASHBOARD_AUTO_REFRESH_CONFIG);
+const DASHBOARD_THEME = normalizeDashboardThemeConfig(PRESENTATION_CONFIG?.dashboard_theme);
 const PROCESS_STARTED_AT = sharedNowIso();
 const APP_PACKAGE_VERSION = (() => {
   try {
@@ -781,6 +823,7 @@ const mergerReportStore = STATE_REGISTRY.read('merger_company_reports', 'merger_
 const refreshLocks = new Map();
 const intradayLastRun = new Map();
 const datasetCache = new Map();
+const datasetRefreshMeta = new Map();
 let schedulerStarted = false;
 let refreshTimer = null;
 let schedulerTickRunning = false;
@@ -821,6 +864,27 @@ function saveLofArbStateStore() {
 
 function saveLofArbPushConfigStore() {
   STATE_REGISTRY.write('lof_arbitrage_push_config', 'lof_arbitrage_push_config.json', lofArbPushConfigStore);
+}
+
+// LOF 推送本轮固定为交易日 14:00 一次全量推送，启动时主动把旧三时点运行态收敛到单时点。
+function migrateLofArbPushConfigStore() {
+  const nextEnabled = typeof lofArbPushConfigStore.enabled === 'boolean'
+    ? lofArbPushConfigStore.enabled
+    : DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG.enabled;
+  const nextTradingDaysOnly = typeof lofArbPushConfigStore.tradingDaysOnly === 'boolean'
+    ? lofArbPushConfigStore.tradingDaysOnly
+    : DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG.tradingDaysOnly;
+  const changed = (
+    lofArbPushConfigStore.enabled !== nextEnabled ||
+    lofArbPushConfigStore.tradingDaysOnly !== nextTradingDaysOnly ||
+    !Array.isArray(lofArbPushConfigStore.times) ||
+    lofArbPushConfigStore.times.length !== 1 ||
+    lofArbPushConfigStore.times[0] !== '14:00'
+  );
+  lofArbPushConfigStore.enabled = nextEnabled;
+  lofArbPushConfigStore.tradingDaysOnly = nextTradingDaysOnly;
+  lofArbPushConfigStore.times = ['14:00'];
+  if (changed) saveLofArbPushConfigStore();
 }
 
 function saveLofArbPushRuntimeState() {
@@ -1026,6 +1090,31 @@ function withCachedDatasetMeta(cached, extra = {}) {
   };
 }
 
+function markDatasetRefreshSuccess(key, result) {
+  datasetRefreshMeta.set(key, {
+    servedFromCache: false,
+    refreshError: null,
+    updateTime: String(result?.updateTime || result?.data?.updateTime || '').trim() || null,
+    cacheTime: null,
+    lastAttemptAt: nowIso(),
+    lastSuccessAt: nowIso(),
+    lastFailureAt: null,
+  });
+}
+
+function markDatasetRefreshFallback(key, error, cached = null) {
+  const previous = datasetRefreshMeta.get(key);
+  datasetRefreshMeta.set(key, {
+    servedFromCache: Boolean(cached),
+    refreshError: normalizeError(error || 'refresh_failed'),
+    updateTime: String(cached?.updateTime || cached?.data?.updateTime || previous?.updateTime || '').trim() || null,
+    cacheTime: String(cached?.cacheTime || previous?.cacheTime || '').trim() || null,
+    lastAttemptAt: nowIso(),
+    lastSuccessAt: previous?.lastSuccessAt || null,
+    lastFailureAt: nowIso(),
+  });
+}
+
 const DASHBOARD_RESOURCE_STATUS_DATASET_KEYS = Object.freeze({
   exchangeRate: 'exchangeRate',
   ipo: 'ipo',
@@ -1043,14 +1132,18 @@ function readCachedDatasetStatus(resourceKey) {
   const datasetKey = DASHBOARD_RESOURCE_STATUS_DATASET_KEYS[resourceKey];
   if (!datasetKey || !DATASETS[datasetKey]) return null;
   const cached = readDatasetCache(datasetKey);
+  const runtimeMeta = datasetRefreshMeta.get(datasetKey);
   const updateTime = String(cached?.updateTime || cached?.data?.updateTime || '').trim() || null;
   const cacheTime = String(cached?.cacheTime || '').trim() || null;
   return {
     resourceKey,
     datasetKey,
-    updateTime,
-    cacheTime,
-    servedFromCache: Boolean(cached),
+    updateTime: runtimeMeta?.updateTime || updateTime,
+    cacheTime: runtimeMeta?.cacheTime || cacheTime,
+    servedFromCache: typeof runtimeMeta?.servedFromCache === 'boolean'
+      ? runtimeMeta.servedFromCache
+      : Boolean(cached),
+    refreshError: runtimeMeta?.refreshError || null,
     refreshing: refreshLocks.has(`${datasetKey}:normal`) || refreshLocks.has(`${datasetKey}:daily`),
     intraday: Boolean(DATASETS[datasetKey]?.intraday),
     refreshIntervalMs: Number(DATASETS[datasetKey]?.refreshIntervalMs) || null,
@@ -1098,11 +1191,12 @@ const cbRightsIssuePushRuntimeDomain = createModulePushRuntimeStore({
   save: saveCbRightsIssuePushRuntimeState,
   parsePushMinutes: (value) => cbRightsIssuePushConfigDomain.parsePushMinutes(value),
 });
+migrateLofArbPushConfigStore();
 const lofArbPushConfigDomain = createModulePushConfigStore({
   state: lofArbPushConfigStore,
   defaultConfig: DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG,
   save: saveLofArbPushConfigStore,
-  maxTimes: 3,
+  maxTimes: 1,
 });
 const lofArbPushRuntimeDomain = createModulePushRuntimeStore({
   state: lofArbPushRuntimeState,
@@ -1236,15 +1330,13 @@ function getLofArbPushDeliveryStatus() {
     lastAttemptAt: lofArbPushRuntimeState.lastAttemptAt || null,
     lastSuccessAt: lofArbPushRuntimeState.lastSuccessAt || null,
     lastError: lofArbPushRuntimeState.lastError || null,
-    lastInstantAttemptAt: lofArbStateStore.lastInstantAttemptAt || null,
-    lastInstantSuccessAt: lofArbStateStore.lastInstantSuccessAt || null,
-    lastInstantError: lofArbStateStore.lastInstantError || null,
   };
 }
 
 function getDiscountStrategyConfig() {
   return {
     ...DISCOUNT_STRATEGY_CONFIG,
+    sessionWindows: [...DISCOUNT_STRATEGY_CONFIG.sessionWindows],
     monitorSessionTimes: [...DISCOUNT_STRATEGY_CONFIG.monitorSessionTimes],
     atrAnchors: DISCOUNT_STRATEGY_CONFIG.atrAnchors.map((item) => ({ ...item })),
     sellPressureAnchors: DISCOUNT_STRATEGY_CONFIG.sellPressureAnchors.map((item) => ({ ...item })),
@@ -1255,6 +1347,9 @@ function getDiscountStrategyConfig() {
 function buildDiscountStrategyStatus() {
   return {
     enabled: true,
+    tradingDaysOnly: DISCOUNT_STRATEGY_CONFIG.tradingDaysOnly !== false,
+    sessionWindows: [...DISCOUNT_STRATEGY_CONFIG.sessionWindows],
+    monitorSessionTimes: [...DISCOUNT_STRATEGY_CONFIG.monitorSessionTimes],
     buyThreshold: DISCOUNT_STRATEGY_CONFIG.buyThreshold,
     sellThreshold: DISCOUNT_STRATEGY_CONFIG.sellThreshold,
     monitorIntervalMinutes: DISCOUNT_STRATEGY_CONFIG.monitorIntervalMinutes,
@@ -1411,6 +1506,10 @@ function sanitizeCbArbRows(rows) {
   return strategySanitizeCbArbRows(rows);
 }
 
+function isCbArbRowActiveForceRedeem(row) {
+  return strategyIsCbArbRowActiveForceRedeem(row);
+}
+
 const CB_ARB_PUBLIC_ROW_KEYS = [
   'code',
   'bondName',
@@ -1428,7 +1527,7 @@ const CB_ARB_PUBLIC_ROW_KEYS = [
   'convertPrice',
   'convertValue',
   'premiumRate',
-  'discountRate',
+  'weightedDiscountRate',
   'bondValue',
   'doubleLow',
   'stockAtr20Pct',
@@ -1438,20 +1537,31 @@ const CB_ARB_PUBLIC_ROW_KEYS = [
   'sellPressureCoefficient',
   'boardType',
   'boardCoefficient',
-  'weightedDiscountRate',
   'isDiscountMonitorActive',
   'redeemTriggerPrice',
   'putbackPrice',
+  'volatility250',
   'volatility60',
   'annualizedVolatility',
   'pureBondValue',
+  'pricingFormula',
+  'callStrike',
+  'redeemCallStrike',
+  'longCallOptionValue',
+  'shortCallOptionValue',
+  'callSpreadOptionValue',
   'callOptionValue',
   'putOptionValue',
   'theoreticalPrice',
   'theoreticalPremiumRate',
   'yieldToMaturityPretax',
   'rating',
+  'forceRedeemStatus',
+  'forceRedeemNoticeDate',
+  'delistDate',
+  'ceaseDate',
   'maturityDate',
+  'maturityRedeemPrice',
   'remainingYears',
   'remainingSizeYi',
   'turnoverAmountYi',
@@ -1484,17 +1594,20 @@ function normalizeDatasetPayload(key, result) {
       todayDate: getShanghaiParts().date,
     });
     const rows = shapeCbArbPublicRows(snapshot.rows);
-    const sortedByDoubleLow = [...rows].sort(
-      (a, b) => (Number(a?.doubleLow) || Number.POSITIVE_INFINITY) - (Number(b?.doubleLow) || Number.POSITIVE_INFINITY)
+    const summaryRows = strategySelectCbArbSummaryRows(rows);
+    const sortedByDoubleLow = [...summaryRows].sort(
+      (a, b) => (Number.isFinite(Number(a?.doubleLow)) ? Number(a.doubleLow) : Number.POSITIVE_INFINITY)
+        - (Number.isFinite(Number(b?.doubleLow)) ? Number(b.doubleLow) : Number.POSITIVE_INFINITY)
     );
-    const sortedByTheory = [...rows].sort(
-      (a, b) => (Number(b?.theoreticalPremiumRate) || Number.NEGATIVE_INFINITY) - (Number(a?.theoreticalPremiumRate) || Number.NEGATIVE_INFINITY)
+    const sortedByTheory = [...summaryRows].sort(
+      (a, b) => (Number.isFinite(Number(b?.theoreticalPremiumRate)) ? Number(b.theoreticalPremiumRate) : Number.NEGATIVE_INFINITY)
+        - (Number.isFinite(Number(a?.theoreticalPremiumRate)) ? Number(a.theoreticalPremiumRate) : Number.NEGATIVE_INFINITY)
     );
     const { data: _rawData, list: _legacyList, rows: _legacyRows, ...rest } = result;
     return {
       ...rest,
       data: rows,
-      discountMonitorSummary: snapshot.discountMonitorSummary,
+      premiumMonitorSummary: snapshot.premiumMonitorSummary,
       summary: {
         topDoubleLow: sortedByDoubleLow.slice(0, 3),
         topTheoreticalPremiumRate: sortedByTheory.slice(0, 3),
@@ -1607,20 +1720,15 @@ async function refreshDataset(key, options = {}) {
     }
     if (key === 'lofArb') {
       persistLofArbStateFromResult(finalResult);
-      if (finalResult && finalResult.success !== false) {
-        try {
-          await lofArbPushService.pushInstantIfNeeded();
-        } catch (error) {
-          console.error('[push][lof_arbitrage] instant failed:', error?.message || error);
-        }
-      }
     }
     if (finalResult && typeof finalResult === 'object' && finalResult.success !== false) {
       writeDatasetCache(key, finalResult);
+      markDatasetRefreshSuccess(key, finalResult);
       return finalResult;
     }
 
     const cached = readDatasetCachePayload(key);
+    markDatasetRefreshFallback(key, finalResult?.error || 'refresh_failed', cached);
     if (!options.force && !options.dailySync && cached) {
       return withCachedDatasetMeta(cached, {
         refreshError: normalizeError(finalResult?.error || 'refresh_failed'),
@@ -1661,7 +1769,7 @@ function isCbArbSchemaReady(result) {
   const hasStockChange = rows.some((item) => Number.isFinite(Number(item?.stockChangePercent)));
   if (!hasStockChange) return false;
 
-  const volatilityCount = rows.filter((item) => Number.isFinite(Number(item?.volatility60))).length;
+  const volatilityCount = rows.filter((item) => Number.isFinite(Number(item?.volatility250 ?? item?.volatility60))).length;
   const volatilityCoverage = volatilityCount / rows.length;
   if (volatilityCoverage < 0.55) return false;
 
@@ -1711,6 +1819,27 @@ function isAhSchemaReady(result) {
 async function getDataset(key, options = {}) {
   if (!DATASETS[key]) throw new Error(`Unknown dataset: ${key}`);
   if (options.force || options.dailySync) {
+    if (
+      key === 'cbArb'
+      && options.force
+      && !options.dailySync
+      && CB_ARB_FORCE_REQUEST_SOFT_TIMEOUT_MS > 0
+    ) {
+      const cached = readDatasetCachePayload(key);
+      if (cached) {
+        const task = refreshDataset(key, options);
+        const fallback = new Promise((resolve) => {
+          setTimeout(() => {
+            resolve(withCachedDatasetMeta(cached, {
+              refreshing: true,
+              forceAccepted: true,
+              forceRefreshDeferred: true,
+            }));
+          }, CB_ARB_FORCE_REQUEST_SOFT_TIMEOUT_MS);
+        });
+        return Promise.race([task, fallback]);
+      }
+    }
     return refreshDataset(key, options);
   }
 
@@ -1754,11 +1883,33 @@ async function runDailySync() {
   if (!isAfterDailySyncCutoff(new Date(), cutoffHour, cutoffMinute)) return;
 
   if (getStateDate('lastDailySyncDate') !== shanghai.date) {
-    const tasks = Object.entries(DATASETS)
+    const datasetEntries = Object.entries(DATASETS)
       .filter(([, dataset]) => dataset.dbDailySync)
-      .map(([key]) => refreshDataset(key, { dailySync: true, force: true }));
-    await Promise.allSettled(tasks);
-    setStateDate('lastDailySyncDate', shanghai.date);
+      .map(([key]) => key);
+    const settled = await Promise.allSettled(
+      datasetEntries.map((key) => refreshDataset(key, { dailySync: true, force: true }))
+    );
+    const failures = settled
+      .map((item, index) => ({ key: datasetEntries[index], item }))
+      .filter(({ item }) => (
+        item.status === 'rejected'
+        || (item.status === 'fulfilled' && item.value && typeof item.value === 'object' && item.value.success === false)
+      ))
+      .map(({ key, item }) => ({
+        key,
+        error: item.status === 'rejected'
+          ? normalizeError(item.reason || 'daily_sync_failed')
+          : normalizeError(item.value?.error || 'daily_sync_failed'),
+      }));
+
+    if (!failures.length) {
+      setStateDate('lastDailySyncDate', shanghai.date);
+    } else {
+      console.error('[daily_sync_failed]', JSON.stringify({
+        date: shanghai.date,
+        failures,
+      }, null, 2));
+    }
   }
 
   if (getStateDate('lastPremiumHistorySyncDate') !== shanghai.date) {
@@ -2765,7 +2916,10 @@ registerPushRoutes({
   updateCbRightsIssuePushConfig: (payload) => cbRightsIssuePushConfigDomain.updateConfig(payload),
   buildCbRightsIssuePushConfigResponse: buildCbRightsIssuePushConfigViewModel,
   getLofArbPushConfig: () => lofArbPushConfigDomain.getConfig(),
-  updateLofArbPushConfig: (payload) => lofArbPushConfigDomain.updateConfig(payload),
+  updateLofArbPushConfig: (payload) => lofArbPushConfigDomain.updateConfig({
+    ...(payload && typeof payload === 'object' ? payload : {}),
+    times: ['14:00'],
+  }),
   buildLofArbPushConfigResponse: buildLofArbPushConfigViewModel,
 });
 
@@ -2774,6 +2928,7 @@ registerDashboardRoutes({
   nowIso,
   getHealthSnapshot: buildHealthSnapshot,
   getDashboardUiConfig: () => ({
+    dashboardTheme: DASHBOARD_THEME,
     tableUi: {
       desktopFontPx: DASHBOARD_TABLE_UI.desktopFontPx,
       desktopHeaderFontPx: DASHBOARD_TABLE_UI.desktopHeaderFontPx,

@@ -33,8 +33,8 @@ _CB_FETCH_CONFIG = (((_CONFIG.get("data_fetch") or {}).get("plugins") or {}).get
 MAX_WORKERS = max(1, int(_CB_FETCH_CONFIG.get("max_vol_sync_workers") or 8))
 LOOKBACK_DAYS = max(120, int(_CB_FETCH_CONFIG.get("history_lookback_days") or 420))
 VOL_WINDOWS = tuple(
-    sorted({max(1, int(item)) for item in (_CB_FETCH_CONFIG.get("volatility_windows") or [20, 60, 120])})
-) or (20, 60, 120)
+    sorted({max(1, int(item)) for item in (_CB_FETCH_CONFIG.get("volatility_windows") or [250])})
+) or (250,)
 ATR_WINDOW = max(1, int(_CB_FETCH_CONFIG.get("atr_window") or 20))
 TURNOVER_AVG_WINDOWS = tuple(
     sorted({max(1, int(item)) for item in (_CB_FETCH_CONFIG.get("turnover_avg_windows") or [5, 20])})
@@ -43,7 +43,7 @@ REQUIRED_CLOSE_ROWS = max(VOL_WINDOWS) + 1
 REQUIRED_RICH_BAR_ROWS = max(ATR_WINDOW + 1, max(TURNOVER_AVG_WINDOWS))
 STOCK_HISTORY_RETENTION_ROWS = max(
     max(REQUIRED_CLOSE_ROWS, REQUIRED_RICH_BAR_ROWS) + 30,
-    int(_CB_FETCH_CONFIG.get("stock_history_retention_rows") or 160),
+    int(_CB_FETCH_CONFIG.get("stock_history_retention_rows") or 320),
 )
 
 

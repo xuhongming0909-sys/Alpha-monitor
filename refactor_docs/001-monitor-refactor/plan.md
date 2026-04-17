@@ -2967,4 +2967,44 @@ Plan:
 Acceptance:
 - The public cb-rights-issue page shows only the three phase groups and their tables.
 - The page no longer renders `推送候选` or `独立推送`.
+
+## 100. Phase CN: CB-rights-issue Expected-Return Share Adjustment (2026-04-17)
+
+Goal: adjust the expected return rate calculation so that `配售股数` uses the same 60%
+ratio as margin shares but rounds up to 100-share lots instead of 50-share lots.
+
+Scope of change:
+- Calculation formula (计算口径)
+- Configuration items (配置项)
+
+Plan:
+1. Update `plan.md` first (this entry).
+2. Update `REQUIREMENTS.md` contract #96 to reflect the new share-adjustment rules.
+3. Update `SPEC.md` section 96.3 (main derived-field rule) and 96.4 (peel-yield rule).
+4. Implement in `strategy/cb_rights_issue/service.py`:
+   - Add `EXPECTED_ROUND_LOT_SHARES = 100` config constant
+   - Add `_resolve_expected_required_shares()` function: `ceil(raw × 0.6 / 100) × 100`
+   - Change `placement_shares` from raw to adjusted value
+   - Decouple `original_funds_baseline` to always use `rawRequiredShares × stockPrice`
+5. Add `expected_round_lot_shares: 100` to `config.yaml > strategy.cb_rights_issue`.
+6. Run minimal checks, push to `main`, deploy to cloud, and verify the public page/API.
+
+Key formula changes:
+- `配售股数 = ceil(原始所需股数 × 0.6 / 100) × 100` (was: `原始所需股数`)
+- `两融所需股数 = ceil(原始所需股数 × 0.6 / 50) × 50` (unchanged)
+- `所需资金 = 配售股数 × 当前股价` (denominator changes)
+- `原始资金基线 = 原始所需股数 × 当前股价` (decoupled from 所需资金)
+- `预期收益率 = 期权价值 / 所需资金` (now based on adjusted shares)
+- `预期收益率去皮 = 预期收益率 × (原始资金基线 - 所需资金) / 所需资金` (now non-zero)
+- `去皮预期收益率` follows the same pattern as `去皮两融收益率`
+
+Regression boundary:
+- 两融收益率 / 两融收益率去皮 / 年化收益率 unchanged
+- Other modules (AH / AB / LOF / 转债套利 / 分红 / 事件套利) unchanged
+
+Acceptance:
+- `配售股数` uses 60% ratio with 100-share rounding
+- `预期收益率` denominator changes accordingly
+- `预期收益率去皮` produces meaningful non-zero values
+- Cloud page and API reflect the updated calculations
 - `GET /api/market/cb-rights-issue` still returns `monitorList`, but it is empty.
