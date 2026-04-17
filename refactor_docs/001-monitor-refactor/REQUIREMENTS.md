@@ -1,2377 +1,653 @@
-﻿# Alpha Monitor 闇€姹傛墜鍐?
-## 1. 浠〃鐩橀椤?- 鍔熻兘娓呭崟锛?  - 鎵撳紑棣栭〉鍚庯紝鐩存帴鐪嬪埌鐪熷疄甯傚満鏁版嵁銆佽偂鍊烘墦鏂般€佹帹閫佽缃拰 7 涓姛鑳介〉銆?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - 椤甸潰鍙鍙栫幇鏈?`/api/*` 鎺ュ彛锛屼笉鏂板涓撶敤椤甸潰鎺ュ彛銆?- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - 椤甸潰涓嶈兘鍐嶆槸绌哄３銆?  - 鏍囬涓嬫柟涓嶅啀鏀鹃暱璇存槑銆?  - 椤堕儴鏀规垚涓€琛岀姸鎬佹枃瀛楋紝鍐呰仈鏄剧ず `HKD/CNY`銆乣USD/CNY`銆佸崄骞存湡鍥藉€烘敹鐩婄巼銆佹洿鏂版椂闂淬€?  - `鎺ㄩ€佽缃甡 涓嶅啀鍗犵敤棣栭〉椤堕儴鍙充晶鍖哄煙锛岀粺涓€涓嬫矇鍒版暣椤垫湯灏俱€?  - 椤甸潰鏁翠綋缁х画浣跨敤榛戠孩绉戞妧椋庯紝浣嗗竷灞€蹇呴』鏇磋鏁淬€佹洿閫傚悎闀胯〃闃呰銆?- UI鐣岄潰锛?  - 鏈€涓婃柟鏄爣棰樺拰鐘舵€佹枃瀛椼€?  - 涓笂閮ㄦ槸鈥滆偂鍊烘墦鏂扳€濋暱琛ㄣ€?  - 涓儴鏄?7 涓姛鑳介〉绛惧拰瀵瑰簲鏁版嵁闈㈡澘銆?  - 椤甸潰鏈€鏈熬鏄畝娲佺増鈥滄帹閫佽缃€濄€?- 閰嶇疆椤硅鏄庯細
-  - 棣栭〉鍏ュ彛锛歚config.yaml > presentation.dashboard_entry`
-
-## 2. 鍔熻兘椤靛悕绉?- 鍔熻兘娓呭崟锛?  - 棣栭〉涓诲鑸浐瀹氫负 7 涓姛鑳介〉銆?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - 缁х画浣跨敤鍘熸湁妯″潡瀵瑰簲 API銆?- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - 鍚嶇О鍥哄畾涓猴細
-    - `杞€哄鍒ー
-    - `AH婧环`
-    - `AB婧环`
-    - `LOF濂楀埄`
-    - `鐩戞帶濂楀埄`
-    - `鍒嗙孩鎻愰啋`
-    - `浜嬩欢濂楀埄`
-- UI鐣岄潰锛?  - 7 涓悕绉颁綔涓洪椤典富 tab銆?- 閰嶇疆椤硅鏄庯細
-  - 鏈疆鍚嶇О鏄浐瀹氶〉闈㈡枃妗堬紝涓嶅崟鐙斁閰嶇疆椤广€?
-## 3. 鍏变韩琛ㄦ牸鍙鎬?- 鍔熻兘娓呭崟锛?  - 缁熶竴鎻愬崌棣栭〉鍚勫姛鑳介〉闀胯〃鐨勫彲璇绘€с€?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - 缁х画浣跨敤鐜版湁涓氬姟鎺ュ彛銆?  - 鏂板鍙灞曠ず閰嶇疆鎺ュ彛锛歚GET /api/dashboard/ui-config`
-- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - 鏈疆鍙敼灞曠ず灞傦紝涓嶆敼涓氬姟瀛楁鍚箟銆佹帓搴忓彛寰勩€佸垎椤佃鍒欏拰鏁版嵁鎶撳彇閾捐矾銆?  - 鍏变韩涓昏〃缁х画閫氳繃鐜版湁鍏变韩娓叉煋鍣ㄨ緭鍑猴紝涓嶄负鍚勬ā鍧楁媶鍑虹嫭绔嬭〃鏍兼鏋躲€?  - 妗岄潰绔富琛?`th / td` 瀛楀彿蹇呴』鏄庢樉楂樹簬褰撳墠 `12px` 鍩虹嚎銆?  - 妗岄潰绔厑璁糕€滃彈鎺х殑杞诲害妯悜婊氬姩鈥濓紝涓嶅啀瑕佹眰鎵€鏈夐暱琛ㄥ湪澶у瓧鍙蜂笅缁х画闆舵粴鍔ㄧ‖鍘嬨€?  - 琛ㄦ牸瀵嗗害浼樺寲浼樺厛閫氳繃鍏变韩鏍峰紡鎻愬崌鍜屽崟鍏冩牸鍐呬俊鎭垎灞傚畬鎴愶紝涓嶉潬澶ц妯″垹鍒楄В鍐抽棶棰樸€?  - 50 鏉″垎椤佃鍒欎繚鎸佷笉鍙樸€?  - 鎺掑簭銆佸睍寮€璇︽儏銆佸瓧娈佃В閲娿€侀鑹茶涔変繚鎸佷笉鍙樸€?- UI鐣岄潰锛?  - 妗岄潰绔〃鏍煎瓧浣撱€佽楂樸€佸崟鍏冩牸鍐呰竟璺濄€佽鎯呮枃瀛椼€佸垎椤电姸鎬佹枃瀛楀悓姝ヤ笂璋冦€?  - 鏁板瓧鍒楅渶瑕佷娇鐢ㄦ洿绋冲畾鐨勭瓑瀹芥暟瀛楀榻愯〃鐜帮紝鎻愬崌浠锋牸/鐧惧垎姣旀壂璇绘晥鐜囥€?  - 琛ㄦ牸琛屼箣闂撮渶瑕佹湁鏇存竻鏅扮殑鍒嗛殧鎴栧急鏂戦┈绾癸紝浣嗕笉瑕嗙洊浠婃棩楂樹寒鍜岄樁娈甸珮浜€?  - 绉诲姩绔户缁娇鐢ㄧ幇鏈夋í鍚戝鍣ㄥ拰鑷劧鎹㈣锛屼笉鍋氱浜屽涓撶敤甯冨眬銆?- 閰嶇疆椤硅鏄庯細
-  - `config.yaml > presentation.dashboard_table_ui.desktop_font_px`
-  - `config.yaml > presentation.dashboard_table_ui.desktop_header_font_px`
-  - `config.yaml > presentation.dashboard_table_ui.desktop_line_height`
-  - `config.yaml > presentation.dashboard_table_ui.desktop_cell_padding_y`
-  - `config.yaml > presentation.dashboard_table_ui.desktop_cell_padding_x`
-  - `config.yaml > presentation.dashboard_table_ui.tablet_font_px`
-  - `config.yaml > presentation.dashboard_table_ui.min_width_by_kind`
-
-## 3. 椤堕儴鐘舵€佽
-- 鍔熻兘娓呭崟锛?  - 鐢ㄤ竴琛屾枃瀛楁樉绀烘眹鐜囧拰鍗佸勾鏈熷浗鍊烘敹鐩婄巼銆?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - 姹囩巼锛歚/api/market/exchange-rate`
-  - 鍗佸勾鏈熷浗鍊烘敹鐩婄巼锛歚/api/market/convertible-bond-arbitrage`
-- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - 蹇呴』鏄剧ず `HKD/CNY`銆乣USD/CNY`銆佸崄骞存湡鍥藉€烘敹鐩婄巼銆佹洿鏂版椂闂淬€?  - 涓嶆樉绀哄崄骞存湡鍥藉€烘棩鏈熴€?  - 鎺ュ彛娌℃湁杩斿洖鍥藉€烘敹鐩婄巼鏃讹紝瑕佹槑纭啓鈥滄殏鏈繑鍥炩€濄€?- UI鐣岄潰锛?  - 鐘舵€佷俊鎭槸涓€鏁磋鏂囧瓧锛屼笉鍐嶄娇鐢ㄥぇ鐘舵€佸崱銆?- 閰嶇疆椤硅鏄庯細
-  - 姹囩巼鍒锋柊棰戠巼锛歚config.yaml > data_fetch.plugins.exchange_rate.refresh_interval_ms`
-
-## 4. 鑲″€烘墦鏂?- 鍔熻兘娓呭崟锛?  - 灞曠ず浠婂ぉ闇€瑕佸叧娉ㄧ殑鎵撴柊浜嬮」銆?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - 鏂拌偂锛歚/api/market/ipo`
-  - 鍙浆鍊猴細`/api/market/convertible-bonds`
-- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - 鍙樉绀衡€滀粖澶╃浉鍏斥€濈殑浜嬮」銆?  - 鏀规垚妯悜闀胯〃锛屼笉鍐嶆媶鎴愪笁寮犲ぇ鍗＄墖銆?  - 琛ㄩ噷鑷冲皯鏄剧ず锛氬綋鍓嶉樁娈点€佺被鍨嬨€佸悕绉?浠ｇ爜銆佺敵璐棩銆佷腑绛剧即娆炬棩銆佷笂甯傛棩銆佺敵璐笂闄愩€佸彂琛屼环鎴栬浆鑲′环銆?  - 椤甸潰涓嶅啀鍗曠嫭鏄剧ず `鎶界鏃 鏍囩銆?  - 椤甸潰灞曠ず鐨?`涓缂存鏃 鍒楁湰杞浐瀹氫娇鐢?`lotteryDate` 鐨勬棩鏈熷€笺€?  - `浠婃棩涓缂存` 闃舵鍒ゆ柇涔熷繀椤讳笌椤甸潰鏄剧ず鍙ｅ緞涓€鑷达紝鎸?`lotteryDate = 浠婂ぉ` 褰掔被锛屼笉鑳藉啀鎸?`paymentDate` 鍗曠嫭鍒ゅ畾銆?  - 琛岃鎸?`浠婃棩鐢宠喘`銆乣浠婃棩涓缂存`銆乣浠婃棩涓婂競` 鏍囧嚭褰撳墠闃舵銆?  - 涓嶅悓闃舵浣跨敤涓嶅悓搴曡壊銆?- UI鐣岄潰锛?  - 涓€涓í鍚戦暱琛紝琛屽唴娣锋帓鏂拌偂鍜岃浆鍊恒€?  - 姣忚閮戒繚鐣?`鏂拌偂` 鎴?`杞€篳 鏍囩銆?- 閰嶇疆椤硅鏄庯細
-  - 鍒锋柊棰戠巼锛歚config.yaml > data_fetch.plugins.subscription.refresh_interval_ms`
-
-## 5. 鎺ㄩ€佽缃?- 鍔熻兘娓呭崟锛?  - 鍦ㄩ〉闈笂鏌ョ湅鍜屼慨鏀规帹閫佹椂闂淬€?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - 璇诲彇鍜屼繚瀛橈細
-    - `GET /api/push/config`
-    - `POST /api/push/config`
-- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - 鍚嶇О鍥哄畾涓?`鎺ㄩ€佽缃甡銆?  - 鍙繚鐣?3 涓椂闂存銆?  - 鍓?2 涓椂闂存缁欏父瑙勬ā鍧椾富鎺ㄩ€併€?  - 绗?3 涓椂闂存缁?`鏀惰喘绉佹湁` 涓撴姤鎺ㄩ€併€?  - 椤甸潰瑕佹樉绀哄綋鍓嶆帹閫佺姸鎬侊紝浣嗕笉鍐嶅啓闀胯В閲娿€?  - 淇濆瓨鍚庡繀椤绘寜鎺ュ彛杩斿洖缁撴灉绔嬪嵆鍥炲啓鍒伴〉闈紝涓嶈兘鍙彁绀烘垚鍔熷嵈涓嶅埛鏂版樉绀哄€笺€?  - 椤甸潰閲嶈浇鍚庡繀椤荤户缁鍙栬繍琛屾椂閰嶇疆锛屼笉鑳介€€鍥炴棫榛樿鍊笺€?- UI鐣岄潰锛?  - 椤甸潰鏈熬鐨勪竴琛屽紡缂栬緫鍖猴紝鏃犻渶鐙珛澶ц竟妗嗐€?  - 鍙繚鐣欐爣棰樸€佺姸鎬併€? 涓椂闂存銆佷繚瀛樻寜閽拰鍒锋柊鎸夐挳銆?  - 鏁翠綋瑙嗚姣斿綋鍓嶇増鏈洿鏀舵暃锛岄伩鍏嶅ぇ鍗＄墖鍗犵敤椤甸潰楂樺害銆?- 閰嶇疆椤硅鏄庯細
-  - 榛樿鎺ㄩ€佹椂闂达細`config.yaml > notification.default_full_push_time`
-  - 榛樿妯″潡寮€鍏筹細`config.yaml > notification.enabled_modules`
-
-## 6. 杞€哄鍒?- 鍔熻兘娓呭崟锛?  - 鐪嬪彲杞€哄鍒╂満浼氬拰鍏抽敭鎸囨爣銆?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - `/api/market/convertible-bond-arbitrage`
-- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - 涓昏〃蹇呴』鏂板搴忓彿鍒椼€?  - 涓昏〃蹇呴』鏀寔鐐瑰嚮琛ㄥご鎺掑簭銆?  - 涓昏〃蹇呴』鏀寔鍒嗛〉锛屾瘡椤靛浐瀹?50 鏉°€?  - 琛ㄩ噷鍥哄畾鏄剧ず锛?    - `搴忓彿`
-    - `杞€轰唬鐮乣
-    - `杞€哄悕绉癭
-    - `姝ｈ偂浠ｇ爜`
-    - `姝ｈ偂鍚嶇О`
-    - `杞€虹幇浠穈
-    - `杞€烘定璺屽箙`
-    - `姝ｈ偂鐜颁环`
-    - `姝ｈ偂娑ㄨ穼骞卄
-    - `杞偂浠穈
-    - `杞偂浠峰€糮
-    - `杞偂婧环鐜嘸
-    - `鍙屼綆`
-    - `鐞嗚婧环鐜嘸
-    - `璇勭骇`
-    - `鍓╀綑骞撮檺`
-    - `鍓╀綑瑙勬ā(浜?`
-    - `鎴愪氦棰?浜?`
-    - `鍒版湡绋庡墠鏀剁泭鐜嘸
-    - `涓婂競鏃
-    - `杞偂璧峰鏃
-  - 杞偂浠峰€?= 姝ｈ偂浠锋牸 * 100 / 杞偂浠?  - 杞€烘孩浠风巼 = (杞€虹幇浠?/ 杞偂浠峰€?- 1) * 100
-  - 鍙屼綆鍊?= 杞€虹幇浠?+ 杞€烘孩浠风巼
-  - 杞偂濂楀埄绌洪棿 > 2% 鎵嶇畻鍊欓€夋満浼?- UI鐣岄潰锛?  - 鐢佃剳绔紭鍏堝睍绀虹揣鍑戞憳瑕佸拰闀胯〃銆?  - 椤堕儴鎽樿鍖哄弬鑰?`AH` 鐨勫垎鏍忕З搴忥紝浣嗘暣浣撳瘑搴︽洿楂樸€佹洿鑺傜渷绌洪棿銆?  - 椤堕儴鎽樿鍖轰笉鑳藉啀鐢ㄥぇ鍧楀崱鐗囧爢婊￠灞忥紝涓昏〃瑕佸敖鏃╄繘鍏ヨ閲庛€?  - 鎵嬫満绔繚鐣欏悓涓€濂楄〃鏍肩粨鏋勶紝閫氳繃妯悜婊氬姩鏌ョ湅銆?- 閰嶇疆椤硅鏄庯細
-  - 鍒锋柊棰戠巼锛歚config.yaml > data_fetch.plugins.convertible_bond.refresh_interval_ms`
-  - 鎺ㄩ€佸垎绫伙細`config.yaml > strategy.convertible_bond.push_categories`
-
-## 7. AH婧环
-- 鍔熻兘娓呭崟锛?  - 鐪?A 鑲″拰 H 鑲′箣闂寸殑婧环鎺掕銆?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - `/api/market/ah`
-  - 鍘嗗彶鏍锋湰鏉ヨ嚜 `runtime_data/shared/premium_history.db`
-- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - AH 婧环 = (H 鑲′汉姘戝竵浠?/ A 鑲′环 - 1) * 100
-  - H 鑲′汉姘戝竵浠?= H 鑲′环鏍?* 娓竵鍏戜汉姘戝竵姹囩巼
-  - 椤甸潰椤堕儴鍥哄畾鏄剧ず鍓嶄笁鍜屽€掓暟鍓嶄笁銆?  - 涓昏〃淇濈暀瀹屾暣鍒楄〃銆?  - 涓昏〃蹇呴』鏂板搴忓彿鍒椼€?  - 涓昏〃蹇呴』鏀寔鐐瑰嚮琛ㄥご鎺掑簭銆?  - 涓昏〃蹇呴』鏀寔鍒嗛〉锛屾瘡椤靛浐瀹?50 鏉°€?  - 涓昏〃鍥哄畾鏄剧ず锛?    - `搴忓彿`
-    - `A鑲′唬鐮乣
-    - `A鑲″悕绉癭
-    - `H鑲′唬鐮乣
-    - `H鑲″悕绉癭
-    - `A鑲′环`
-    - `H鑲′环`
-    - `瀵规墜浜烘皯甯佷环`
-    - `浠峰樊`
-    - `婧环鐜嘸
-    - `杩戜笁骞寸櫨鍒嗕綅`
-    - `鏍锋湰鍖洪棿`
-  - 鏍锋湰鍖洪棿鐢ㄥ帇缂╂牸寮忔樉绀猴紝渚嬪 `250520-260321`銆?  - `historyCount` 浠嶇劧琛ㄧず鈥滆繎涓夊勾鍙敤鏍锋湰鏁扳€濓紝浣嗕富琛ㄤ笉鍗曠嫭鏄剧ず杩欎竴鍒椼€?- UI鐣岄潰锛?  - 鍜?AB 椤甸潰浣跨敤瀹屽叏鐩稿悓鐨勬牱寮忓拰浜や簰銆?  - 椤堕儴鏄弻鎽樿锛屼笅鏂规槸涓昏〃鍜屾牱鏈鏄庛€?- 閰嶇疆椤硅鏄庯細
-  - 鍒锋柊棰戠巼锛歚config.yaml > data_fetch.plugins.ah_premium.refresh_interval_ms`
-  - 鎺ㄩ€佸悕棰濓細`config.yaml > strategy.ah_premium.push_top_n`
-
-## 8. AB婧环
-- 鍔熻兘娓呭崟锛?  - 鐪?A 鑲″拰 B 鑲′箣闂寸殑婧环鎺掕銆?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - `/api/market/ab`
-  - 鍘嗗彶鏍锋湰鏉ヨ嚜 `runtime_data/shared/premium_history.db`
-- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - AB 婧环 = (B 鑲′汉姘戝竵浠?/ A 鑲′环 - 1) * 100
-  - B 鑲′汉姘戝竵浠?= B 鑲′环鏍?* 瀵瑰簲姹囩巼
-  - 椤甸潰椤堕儴鍥哄畾鏄剧ず鍓嶄笁鍜屽€掓暟鍓嶄笁銆?  - 涓昏〃淇濈暀瀹屾暣鍒楄〃銆?  - 涓昏〃蹇呴』鏂板搴忓彿鍒椼€?  - 涓昏〃蹇呴』鏀寔鐐瑰嚮琛ㄥご鎺掑簭銆?  - 涓昏〃蹇呴』鏀寔鍒嗛〉锛屾瘡椤靛浐瀹?50 鏉°€?  - 涓昏〃鍥哄畾鏄剧ず锛?    - `搴忓彿`
-    - `A鑲′唬鐮乣
-    - `A鑲″悕绉癭
-    - `B鑲′唬鐮乣
-    - `B鑲″悕绉癭
-    - `A鑲′环`
-    - `B鑲′环`
-    - `瀵规墜浜烘皯甯佷环`
-    - `浠峰樊`
-    - `婧环鐜嘸
-    - `杩戜笁骞寸櫨鍒嗕綅`
-    - `鏍锋湰鍖洪棿`
-  - 鏍锋湰鍖洪棿鐢ㄥ帇缂╂牸寮忔樉绀猴紝渚嬪 `250520-260321`銆?  - `historyCount` 浠嶇劧琛ㄧず鈥滆繎涓夊勾鍙敤鏍锋湰鏁扳€濓紝浣嗕富琛ㄤ笉鍗曠嫭鏄剧ず杩欎竴鍒椼€?- UI鐣岄潰锛?  - 鍜?AH 椤甸潰浣跨敤瀹屽叏鐩稿悓鐨勬牱寮忓拰浜や簰銆?- 閰嶇疆椤硅鏄庯細
-  - 鍒锋柊棰戠巼锛歚config.yaml > data_fetch.plugins.ab_premium.refresh_interval_ms`
-  - 鎺ㄩ€佸悕棰濓細`config.yaml > strategy.ab_premium.push_top_n`
-
-## 9. 鐩戞帶濂楀埄
-- 鍔熻兘娓呭崟锛?  - 鐪嬭嚜瀹氫箟褰曞叆鐨勫鍒╃洃鎺ч」鐩€?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - `/api/monitors`
-- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - 椤甸潰蹇呴』鏄剧ず鍏紡銆佹敹璐柟鑲′环銆佽鏀惰喘鏂硅偂浠枫€?  - 鑲＄エ鑵跨悊璁哄浠?= 鏀惰喘鏂硅偂浠?* 鎹㈣偂姣斾緥 * 瀹夊叏绯绘暟 + 鐜伴噾鍒嗘淳
-  - 鑲＄エ鑵挎敹鐩婄巼 = (鑲＄エ鑵跨悊璁哄浠?- 鐩爣鐜颁环) / 鐩爣鐜颁环 * 100
-  - 鐜伴噾鑵挎敹鐩婄巼 = (鐜伴噾瀵逛环 - 鐩爣鐜颁环) / 鐩爣鐜颁环 * 100
-  - 绾幇閲戞ā寮忕户缁繚鐣欍€?  - 榛樿杩斿洖缁撴灉瑕佷娇鐢ㄦ渶鏂拌偂浠凤紝涓嶅厑璁搁暱鏈熸部鐢ㄦ棫浠锋牸銆?  - 椤甸潰蹇呴』鑳界ǔ瀹氭樉绀烘帴鍙ｅ凡杩斿洖鐨勭洃鎺у垪琛紝涓嶈兘鍥犱负鍗曠嫭娓叉煋璺緞澶辨晥鑰屾暣鍧楃┖鐧芥垨鎶ラ敊銆?  - 涓昏〃蹇呴』鏀寔鍒嗛〉锛屾瘡椤靛浐瀹?50 鏉°€?  - 椤甸潰蹇呴』鏀寔鏂板鐩戞帶椤圭洰銆?  - 椤甸潰蹇呴』鏀寔淇敼宸叉湁鐩戞帶鐨勫弬鏁板苟鍘熷湴淇濆瓨銆?  - 琛ュ厖鍙傛暟鍖虹洿鎺ユ樉绀哄湪姣忎釜鐩戞帶椤圭洰涓嬫柟锛屼笉鍐嶄繚鐣欏崟鐙殑 `璇︽儏` 鏍囩鎴栧睍寮€鎸夐挳銆?  - 琛ュ厖鍙傛暟鍖烘枃妗堝繀椤讳娇鐢ㄧ湡瀹炰笟鍔″彛寰勶紝涓嶈兘鍑虹幇鐢ㄦ埛涓嶈鍙殑铏氭瀯鏍囩銆?- UI鐣岄潰锛?  - 灞曠ず鐩戞帶鍚嶇О銆佹敹璐柟/鐩爣鏂广€佷袱杈硅偂浠枫€佸叕寮忚鏄庛€佽偂绁ㄨ吙瀵逛环銆佺幇閲戣吙瀵逛环銆佷袱绉嶆敹鐩婄巼銆?  - 闈㈡澘椤堕儴鎻愪緵鏂板 / 缂栬緫琛ㄥ崟锛屽垪琛ㄥ尯灞曠ず宸蹭繚瀛橀」鐩€?- 閰嶇疆椤硅鏄庯細
-  - 鍒锋柊棰戠巼锛歚config.yaml > data_fetch.plugins.custom_monitor.refresh_interval_ms`
-
-## 10. 鍒嗙孩鎻愰啋
-- 鍔熻兘娓呭崟锛?  - 鎻愰啋浠婂ぉ鐧昏鏃ョ殑鑲＄エ銆?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - `/api/dividend?action=refresh`
-- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - 鑲℃伅鐜?= 姣忚偂鍒嗙孩 / 褰撳墠鑲′环 * 100
-  - 鍙己璋冧粖澶╃櫥璁版棩鐨勬潯鐩€?  - 瀹屾暣瑙傚療琛ㄥ繀椤绘敮鎸佸垎椤碉紝姣忛〉鍥哄畾 50 鏉°€?- UI鐣岄潰锛?  - 鎶娾€滀粖鏃ョ櫥璁版棩鎻愰啋鈥濈洿鎺ユ斁鍦ㄩ〉闈㈤《閮ㄤ富浣嶇疆銆?  - 涓嬫柟淇濈暀瀹屾暣瑙傚療琛ㄣ€?- 閰嶇疆椤硅鏄庯細
-  - 鍒锋柊棰戠巼锛歚config.yaml > data_fetch.plugins.dividend.refresh_interval_ms`
-
-## 11. 鏀惰喘绉佹湁
-- 鍔熻兘娓呭崟锛?  - 鐪嬫敹璐€佸苟璐€佺鏈夊寲鐩稿叧鍏憡銆?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - `/api/market/merger`
-  - 骞惰喘鎶ュ憡缁х画娌跨敤鐜版湁鍚庣鑳藉姏
-- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - 椤甸潰蹇呴』鍒楀嚭鍏ㄩ噺鍏憡锛屼笉鍐嶅彧鐪嬪綋澶┿€?  - 榛樿鎸夊叕鍛婃椂闂村€掑簭銆?  - 褰?`announcementDate` 鎴?`announcementTime` 灞炰簬褰撳ぉ鏃讹紝璇ヨ楂樹寒鏄剧ず銆?  - 涓昏〃瑕佸敖閲忓睍绀虹幇鏈夊彲鐢ㄥ瓧娈碉紝渚嬪浠ｇ爜銆佸叕鍙搞€佺被鍨嬨€佸叧閿瘝銆佸叕鍛婃爣棰樸€佸叕鍛婃椂闂淬€佺幇浠枫€佹姤浠枫€佹姤浠锋孩浠枫€侀摼鎺ャ€?  - 涓昏〃蹇呴』鏀寔鍒嗛〉锛屾瘡椤靛浐瀹?50 鏉°€?- UI鐣岄潰锛?  - 浠ヤ富琛ㄤ负涓伙紝涓嶅啀淇濈暀閲嶅鎽樿鍗°€?  - 浠婃棩鍏憡瑕佹湁鏄庢樉楂樹寒鍜岃鏍囥€?- 閰嶇疆椤硅鏄庯細
-  - 鍒锋柊鏃堕棿锛歚config.yaml > data_fetch.plugins.merger.refresh_time`
-  - 鍥炵湅澶╂暟锛歚config.yaml > data_fetch.plugins.merger.announcement_lookback_days`
-
-## 12. 鐢佃剳绔笌鎵嬫満绔€傞厤
-- 鍔熻兘娓呭崟锛?  - 椤甸潰鍚屾椂閫傞厤鐢佃剳绔拰鎵嬫満绔€?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - 缁х画璇诲彇鐜版湁浠〃鐩樻帴鍙ｃ€?- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - 鐢佃剳绔〉闈富浣撲笉鑳藉啀琚繃绐勫搴﹀崱姝伙紝瑕佸敖閲忔弧灞忔樉绀恒€?  - 闀胯〃鍖哄煙鍏佽鑷敱妯悜鍜岀旱鍚戞粴鍔ㄣ€?  - 鎵嬫満绔繚鐣欏悓涓€濂?tab 鍜岃〃鏍艰涔夛紝涓嶅崟鐙媶绗簩濂楅〉闈€?  - 鎵嬫満涓婇€氳繃鍗曞垪甯冨眬鍜屾í鍚戞粴鍔ㄤ繚璇佸彲鐢ㄣ€?  - 鍏ㄥ眬鍩虹瀛楀彿銆乼ab 鏂囧瓧銆佽〃澶淬€佽〃鏍兼鏂囥€佹寜閽笌杈撳叆妗嗘枃瀛楅兘瑕佹槑鏄鹃珮浜庡綋鍓嶇増鏈紝涓嶈兘缁х画鍑虹幇鈥滄暣浣撳お灏忋€侀毦鐪嬫竻鈥濈殑浣撻獙銆?- UI鐣岄潰锛?  - 鐢佃剳绔己璋冨眰娆°€佸瓧鍙峰彲璇绘€у拰琛ㄦ牸鍒╃敤鐜囥€?  - 鎵嬫満绔《閮ㄥ尯鍧楃旱鍚戝爢鍙狅紝琛ㄦ牸淇濇寔鍙粦鍔ㄣ€?- 閰嶇疆椤硅鏄庯細
-  - 鏈疆涓洪〉闈㈠竷灞€鏀归€狅紝涓嶆柊澧為厤缃」銆?
-## 13. 楠屾敹鏍囧噯
-- 棣栭〉鎵撳紑鍚庡繀椤昏兘鐪嬪埌鐪熷疄鏁版嵁銆?- 鍏釜鍔熻兘椤靛繀椤昏兘鍒囨崲銆?- 椤堕儴鐘舵€佷俊鎭槸涓€琛屾枃瀛楋紝涓嶅啀鏄ぇ鐘舵€佸崱銆?- `鑲″€烘墦鏂癭 鏄粖鏃ヤ簨椤归暱琛紝骞舵樉绀哄叧閿棩鏈熷拰鐢宠喘涓婇檺绛夊瓧娈点€?- `鑲″€烘墦鏂癭 涓嶅啀鏄剧ず `鎶界鏃 鍒楋紝椤甸潰涓婄殑 `涓缂存鏃 浣跨敤 `lotteryDate` 鐨勬棩鏈熷€笺€?- `鑲″€烘墦鏂癭 鐨?`浠婃棩涓缂存` 闃舵涓庨〉闈㈡樉绀轰繚鎸佸悓鍙ｅ緞锛屼篃鎸?`lotteryDate` 鍒ゅ畾銆?- `鎺ㄩ€佽缃甡 浣嶄簬椤甸潰鏈熬锛屽彧淇濈暀 3 涓椂闂存锛屼笖鑳戒繚瀛樺苟绔嬪嵆鍥炴樉銆?- `杞€哄鍒?/ AH / AB` 涓昏〃閮芥柊澧炲簭鍙峰垪銆?- `杞€哄鍒?/ AH / AB` 涓昏〃閮芥敮鎸佺偣鍑昏〃澶存帓搴忋€?- `杞€哄鍒?/ AH / AB / 鐩戞帶濂楀埄 / 鍒嗙孩鎻愰啋 / 鏀惰喘绉佹湁` 涓昏〃閮芥敮鎸佸垎椤碉紝姣忛〉 50 鏉°€?- `鐩戞帶濂楀埄` 鏀寔鏂板涓庣紪杈戝凡鏈夌洃鎺э紝涓旇ˉ鍏呭弬鏁扮洿鎺ユ樉绀哄湪椤圭洰涓嬫柟锛屼笉鍐嶄緷璧栧崟鐙鎯呮寜閽€?- AH/AB 鍚屾椂鏄剧ず鍓嶄笁鍜屽€掓暟鍓嶄笁銆?- AH/AB 涓昏〃鏄剧ず浠峰樊銆佽繎涓夊勾鐧惧垎浣嶅拰鍘嬬缉鏍锋湰鍖洪棿銆?- `鏀惰喘绉佹湁` 鏄剧ず鍏ㄩ噺鍏憡锛屼粖鏃ュ叕鍛婅楂樹寒鏄庢樉銆?- `杞€哄鍒ー 椤堕儴鎽樿鍖烘槑鏄炬敹绱э紝涓昏〃鍦ㄩ灞忔洿鏃╁彲瑙併€?- 鐢佃剳绔〉闈㈡帴杩戞弧灞忔樉绀猴紝鏁翠綋瀛楀彿鏄庢樉鎻愬崌锛屾墜鏈虹椤甸潰涓嶅帇鍧忋€?## 14. 浜戞湇鍔″櫒鍏綉璁块棶
-- 鍔熻兘娓呭崟锛?  - 椤圭洰蹇呴』閮ㄧ讲鍦ㄤ簯鏈嶅姟鍣ㄤ笂锛屽苟淇濇寔闀挎湡鍦ㄧ嚎锛屼换浣曚汉鎷垮埌缃戝潃鍚庨兘鑳界洿鎺ユ墦寮€棣栭〉銆?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - 椤甸潰涓庢帴鍙ｇ户缁鍙栧綋鍓嶉」鐩凡鏈夋暟鎹簱銆佽繍琛屾椂鐘舵€佹枃浠跺拰 `/api/*` 鏁版嵁婧愶紝涓嶅洜涓洪儴缃插埌浜戞湇鍔″櫒鑰屾敼鍙樹笟鍔℃暟鎹潵婧愩€?- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - 瀵瑰璁块棶鐩爣鏄€滃浐瀹氱綉鍧€闀挎湡鍙敤鈥濓紝涓嶆帴鍙椻€滃彧鍦ㄦ湰鏈鸿兘鎵撳紑鈥濇垨鈥滈噸鍚悗瑕佹墜鍔ㄩ噸鏂拌窇鍛戒护鈥濄€?  - 鏈€缁堝澶栧叆鍙ｄ紭鍏堜娇鐢?`80/443`锛屽苟浼樺厛鎻愪緵 HTTPS銆?  - 瑁?`5000` 绔彛鍙厑璁镐綔涓鸿皟璇曟垨杩囨浮璁块棶鏂瑰紡锛屼笉鑳戒綔涓烘渶缁堟寮忓澶栨柟妗堛€?  - 鏈嶅姟杩涚▼蹇呴』鐢辨寮忓畧鎶ゆ柟寮忔墭绠★紝渚嬪 `systemd`銆佺瓑浠锋湇鍔＄鐞嗗櫒鎴栧鍣ㄩ噸鍚瓥鐣ャ€?  - 鏈嶅姟鍣ㄩ噸鍚悗锛岀綉椤垫湇鍔″繀椤昏嚜鍔ㄦ仮澶嶃€?  - 浜戦槻鐏銆佸畨鍏ㄧ粍銆佺郴缁熼槻鐏鍜屽弽鍚戜唬鐞嗛厤缃繀椤讳簰鐩镐竴鑷达紝涓嶈兘鍙斁琛屽叾涓竴灞傘€?  - 瀵瑰鍋ュ悍妫€鏌ュ繀椤昏兘璁块棶锛屽苟鑳藉尯鍒?`web`銆乣data_jobs`銆乣push_scheduler` 鐨勭姸鎬併€?- UI鐣岄潰锛?  - 鍏綉璁块棶鏃堕椤靛湴鍧€淇濇寔鍚屼竴濂楅〉闈紝涓嶆柊澧炵浜屽鈥滃缃戠増椤甸潰鈥濄€?  - 鑻ュ惎鐢ㄥ煙鍚嶏紝娴忚鍣ㄦ墦寮€鍩熷悕鍚庣洿鎺ヨ繘鍏ョ幇鏈変华琛ㄧ洏棣栭〉銆?- 閰嶇疆椤硅鏄庯細
-  - 鏈嶅姟鐩戝惉鍦板潃锛歚config.yaml > app.host`
-  - 鏈嶅姟绔彛锛歚config.yaml > app.port`
-  - 瀵瑰鍩虹鍦板潃锛歚config.yaml > app.server_base_url`
-
-## 15. 鍏綉閮ㄧ讲楠屾敹
-- 澶栫綉璁惧鍦ㄤ笉杩炴帴鏈嶅姟鍣ㄦ湰鏈烘闈㈢殑鎯呭喌涓嬶紝鐩存帴璁块棶姝ｅ紡缃戝潃鍙互鎵撳紑棣栭〉銆?- 浜戞湇鍔″櫒閲嶅惎鍚庯紝涓嶉渶瑕佷汉宸ョ櫥褰曟墽琛屽懡浠わ紝缃戦〉浠嶈兘鎭㈠璁块棶銆?- 鎵嬪姩鏉€鎺夌綉椤典富杩涚▼鍚庯紝瀹堟姢鏈哄埗鑳借嚜鍔ㄦ媺璧锋湇鍔°€?- 姝ｅ紡缃戝潃璁块棶浼樺厛涓?HTTPS锛涘鏋滄殏鏈厤缃煙鍚嶏紝鍒欒嚦灏戣璇佹槑鍏綉 IP 鍙闂紝骞舵槑纭繖鍙槸杩囨浮鐘舵€併€?- `/api/health` 閫氳繃姝ｅ紡缃戝潃鍙闂紝涓?`web` 鐘舵€佷负 `ok`銆?
-## 16. GitHub 鑷姩鏇存柊閮ㄧ讲
-- 鍔熻兘娓呭崟锛?  - 浠撳簱鎺ㄩ€佸埌 `main` 鍚庯紝浜戞湇鍔″櫒鑷姩鎷夊彇鏈€鏂颁唬鐮佸苟瀹屾垚閮ㄧ讲銆?- 鏁版嵁搴撳拰鏁版嵁鏉ユ簮锛?  - 鑷姩閮ㄧ讲鍙洿鏂颁唬鐮佸拰渚濊禆锛屼笉鏀瑰彉褰撳墠涓氬姟鏁版嵁搴撱€佽繍琛屾暟鎹洰褰曞拰 `/api/*` 鏁版嵁鏉ユ簮銆?- 涓氬姟瑙勫垯锛堟牳蹇冿級锛?  - 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細`GitHub Actions -> SSH -> 鏈嶅姟鍣ㄦ洿鏂拌剼鏈?-> 鏈嶅姟閲嶅惎 -> 鍋ュ悍妫€鏌
-  - GitHub Actions 宸ヤ綔娴佷笉寰楀湪 YAML 鍐呯洿鎺ユ墽琛?`git fetch/reset`銆乣npm ci/install`銆乣systemctl restart` 绛夋湇鍔″櫒涓氬姟姝ラ
-  - 浠ｇ爜鍚屾銆佷緷璧栧悓姝ャ€佹湇鍔￠噸鍚€佸仴搴锋鏌ョ粺涓€鐢?`tools/deploy/update_from_github.sh` 鎵挎媴
-  - 宸ヤ綔娴佹棩蹇楀繀椤绘槑纭爣璁拌嚦灏?4 涓樁娈碉細`Validate secrets`銆乣Prepare SSH`銆乣Trigger remote script`銆乣Deployment done`
-  - 姝ｅ紡鑷姩閮ㄧ讲鐩爣鍒嗘敮鍥哄畾涓?`main`
-  - 鏈嶅姟鍣ㄩ」鐩洰褰曢粯璁ゆ槸 `/home/ubuntu/Alpha monitor`
-  - 鑷姩閮ㄧ讲瀹屾垚鍚庯紝鑻?`alpha-monitor` 鏈嶅姟瀛樺湪锛屽繀椤昏嚜鍔ㄩ噸鍚鏈嶅姟
-  - 鑻?`alpha-monitor` 鏈嶅姟灏氭湭瀹夎锛岃嚜鍔ㄩ儴缃插簲鏄庣‘鎶ュ嚭鈥滀唬鐮佸凡鏇存柊浣嗘湇鍔℃湭鎵樼鈥濓紝鑰屼笉鏄潤榛樻垚鍔?  - 鑷姩閮ㄧ讲澶辫触鏃讹紝鏃ュ織蹇呴』鑳藉尯鍒?SSH 澶辫触銆佹媺鍙栧け璐ャ€佷緷璧栧畨瑁呭け璐ャ€佹湇鍔￠噸鍚け璐ャ€佸仴搴锋鏌ュけ璐?  - 鑷姩閮ㄧ讲涓嶅厑璁哥洿鎺ヤ慨鏀逛笟鍔″叕寮忋€侀〉闈㈠悎鍚屾垨鎺ュ彛鍙ｅ緞
-- UI鐣岄潰锛?  - 鏈潯涓洪儴缃茶姹傦紝涓嶆柊澧炲墠绔〉闈?- 閰嶇疆椤硅鏄庯細
-  - GitHub 浠撳簱渚ц嚦灏戦渶瑕?4 涓?Secrets锛?    - `SERVER_HOST`
-    - `SERVER_USER`
-    - `SERVER_PORT`
-    - `SERVER_SSH_KEY`
-  - 鍙€?Secrets锛?    - `SERVER_APP_DIR`
-    - `SERVER_SERVICE_NAME`
-
-## 17. 鑷姩閮ㄧ讲楠屾敹
-- 鍚?`main` 鎺ㄩ€佷竴娆℃彁浜ゅ悗锛孏itHub Actions 鑷姩寮€濮嬮儴缃层€?- GitHub Actions 鑳介€氳繃 SSH 鐧诲綍鏈嶅姟鍣ㄥ苟杩涘叆姝ｇ‘椤圭洰鐩綍銆?- 鏈嶅姟鍣ㄧ缁熶竴鏇存柊鑴氭湰鑳藉畬鎴?`git fetch --all`銆乣git reset --hard origin/main`銆佷緷璧栧悓姝ュ拰鍋ュ悍妫€鏌ャ€?- 鑻ユ湇鍔″櫒宸插畨瑁?`alpha-monitor` 鏈嶅姟锛岃嚜鍔ㄩ儴缃插悗鏈嶅姟浼氳嚜鍔ㄩ噸鍚苟鎭㈠鎻愪緵缃戦〉璁块棶銆?- GitHub Actions 鏃ュ織涓兘鐪嬪嚭澶辫触鍙戠敓鍦?SSH銆佷唬鐮佸悓姝ャ€佷緷璧栧畨瑁呫€佹湇鍔￠噸鍚繕鏄仴搴锋鏌ラ樁娈点€?- 閮ㄧ讲浠诲姟涓殑鏈嶅姟鍣ㄤ笟鍔℃墽琛屾棩蹇楁潵鑷?`tools/deploy/update_from_github.sh`锛岃€屼笉鏄暎钀藉湪 workflow YAML 鍐呫€?- 鑷姩閮ㄧ讲瀹屾垚鍚庯紝姝ｅ紡缃戝潃涓?`/api/health` 浠嶅彲璁块棶锛屼笖 `web` 鐘舵€佷负 `ok`銆?
-
-## 18. Deploy Drift Guardrails (2026-03-22)
-
-- The server deploy script must validate `config.yaml` syntax before service restart.
-- The server deploy script must force-release stale listeners on `app.port` before restarting managed service.
-- Deployment success must include homepage marker verification:
-  - expected marker present: `dashboard_page.js`
-  - forbidden legacy markers absent: `app.js` and `message-form`
-- If marker validation fails, deployment must exit non-zero and report explicit reason in logs.
-- Health check after restart must use a retry window (instead of single-shot probe) to avoid startup race false failures.
-
-## 19. Compact List Contract (2026-03-22)
-- Desktop hard constraint (1920x1080): key list information must be readable without module-internal horizontal/vertical scrolling.
-- List strategy is fixed to:
-  - key columns by default
-  - strong pagination
-  - inline row detail expansion for secondary fields
-- Global page scroll remains allowed; nested table container scroll must be avoided as the primary reading path.
-- Strong pagination default page size is `50`.
-
-## 20. Push Config and Scheduling Contract (2026-03-22)
-- `GET /api/push/config` and `POST /api/push/config` must always return parseable JSON.
-- Unknown `/api/*` paths must return JSON 404 payload, not HTML fallback.
-- After push config save:
-  - UI must apply POST response immediately
-  - UI must perform one follow-up GET sync
-  - page refresh must show the same persisted runtime values
-- Scheduler calendar mode for this round is fixed to daily execution (Mon-Sun).
-
-## 21. Monitor Arbitrage Runtime Contract (2026-03-22)
-- Monitor arbitrage must not depend on a single hardcoded Python binary.
-- Production deploy must install Python dependencies from `requirements.txt`.
-- Deploy must verify Python import readiness for at least:
-  - `akshare`
-  - `pandas`
-  - `requests`
-- If dependency verification fails, deployment must fail fast and block release.
-
-## 22. Fresh Market Data Contract (2026-03-23)
-- Dashboard market modules may keep the cache layer for fast first paint, but the user-facing interaction contract changes to:
-  - clicking `鍒锋柊` must request fresh backend data, not only replay the current cache snapshot
-  - if the first dashboard load receives cached payload for `exchangeRate / cbArb / ah / ab`, the page must trigger one same-session force revalidation and replace stale values after the fresh response returns
-- UI must expose whether the currently shown value is still from cache or has completed the real-time revalidation path.
-- Manual verification target for this round is the previously inconsistent `娴蜂紭杞€?118008` premium display: refreshed page value must follow the latest backend snapshot instead of staying on the old `+3.61%` cache view.
-
-## 23. Dense Core Table Contract For CB / AH / AB (2026-03-23)
-- `杞€哄鍒?/ AH婧环 / AB婧环` main tables must stop relying on a visible `璇︽儏` column as the primary reading mode.
-- `杞€哄鍒ー default-row main table must directly show the following key information:
-  - `杞€篳
-  - `姝ｈ偂`
-  - `杞€虹幇浠穈
-  - `杞€烘定璺屽箙`
-  - `姝ｈ偂鐜颁环`
-  - `姝ｈ偂娑ㄨ穼骞卄
-  - `杞偂浠穈
-  - `杞偂浠峰€糮
-  - `杞偂婧环鐜嘸
-  - `鍙屼綆`
-  - `60鏃ユ尝鍔ㄧ巼`
-  - `绾€轰环鍊糮
-  - `鐞嗚浠锋牸`
-  - `鐞嗚婧环鐜嘸
-  - `鍒版湡绋庡墠鏀剁泭鐜嘸
-- `AH / AB` must follow the same dense-table principle:
-  - keep `A鑲?/ 瀵规墜鑲?/ A鑲′环 / 瀵规墜甯傚満浠?/ 瀵规墜浜烘皯甯佷环 / 浠峰樊 / 婧环鐜?/ 杩戜笁骞村垎浣峘
-  - move sample metadata into the visible default row, including `historyCount` and compressed sample range
-  - do not keep the old detail-label path as the normal reading path
-
-## 24. Push Delivery Reliability And Observability Contract (2026-03-23)
-- Push scheduler success semantics change for this round:
-  - failed downstream WeCom sends must not be recorded as completed schedule slots
-  - only successful sends may write the sent-time record that suppresses retries
-- Push runtime state must retain at least:
-  - last attempt time
-  - last success time
-  - latest failure reason
-  - separated status for main push and merger report push
-- `GET /api/push/config` must surface enough runtime context for the UI to explain why push is or is not working, including:
-  - selected modules
-  - scheduler enabled state
-  - scheduler calendar mode
-  - webhook configured or missing
-  - last main push success/failure
-  - last merger push success/failure
-- Dashboard push strip must clearly warn when push is blocked by missing webhook configuration or by the latest runtime failure.
-- Current main-push content contract remains the enabled summary modules:
-  - `AH/AB`
-
-## 25. Premium History Incremental Sync Resilience (2026-03-23)
-- AH / AB premium-history incremental sync must not degrade the whole dashboard health status just because a small number of symbols hit transient upstream historical-price provider errors during update mode.
-- Update mode may keep serving existing local premium-history cache for those symbols when:
-  - the failure is limited to per-symbol upstream fetch anomalies
-  - the batch still completes for the remaining symbols
-- These tolerated failures must still be visible in script output as warnings with symbol code and short reason.
-- Full rebuild mode remains strict:
-  - provider failures in rebuild mode are still fatal
-
-## 26. Cloud Runtime Preservation And First-Install Closure (2026-03-23)
-- Auto deploy must preserve server-local runtime JSON state under `runtime_data/shared/*.json`.
-- These runtime JSON files are environment-local state, not release-source artifacts.
-- A deploy triggered from GitHub must not overwrite existing server monitor lists, push config, push runtime state, merger reports, or cached market snapshots with repository copies.
-- The managed Linux service template must load from the project root and support `.env` overrides consistently after reboot.
-- First public rollout must support both:
-  - `tools/deploy/install_nginx_site.sh`
-  - `tools/deploy/install_caddy_site.sh`
-- Public homepage and public `/api/health` must still resolve to the same dashboard service after either proxy installer is used.
-
-## 27. Convertible Bond Daily Delist Filtering (2026-03-23)
-- `杞€哄鍒ー 椤甸潰涓?`/api/market/convertible-bond-arbitrage` 杩斿洖鍒楄〃蹇呴』鎸夆€滃綋澶┾€濆姩鎬佸墧闄ゅ凡缁忛€€甯傘€佺粓姝笂甯傛垨宸插埌鏈熺殑鍙浆鍊恒€?- 杩欎釜鍒ゅ畾蹇呴』姣忓ぉ閲嶆柊鎵ц锛屼笉鑳藉彧渚濊禆缂撳瓨鐢熸垚褰撴椂鍐欏叆鐨?`isDelistedOrExpired` 缁撴灉銆?- 褰撴弧瓒充互涓嬩换涓€鏉′欢鏃讹紝鏉＄洰涓嶈兘缁х画鍑虹幇鍦ㄩ〉闈㈠彲瑙佸垪琛ㄤ腑锛?  - `delistDate <= 浠婂ぉ`
-  - `ceaseDate <= 浠婂ぉ`
-  - `maturityDate < 浠婂ぉ`
-- 鈥滀粖澶┾€濈殑鍙ｅ緞鍥哄畾涓轰笂娴锋棩鏈熴€?- 鏈疆涓嶆柊澧為〉闈㈠叆鍙ｃ€佷笉鏂板涓撶敤鎺ュ彛锛屽彧淇鐜版湁杞€哄鍒╂暟鎹嚭鍙ｇ殑鍙鎬ц鍒欍€?
-## 28. Minimal Monitor Editor Contract (2026-03-23)
-- `鐩戞帶濂楀埄` 椤甸潰涓殑鏂板/缂栬緫琛ㄥ崟蹇呴』榛樿鏀惰捣锛屼笉鑳藉啀闀挎湡鍗犳嵁鍒楄〃椤堕儴銆?- 鐢ㄦ埛鐐瑰嚮 `鏂板鐩戞帶` 鎴栨煇涓€琛岀殑 `缂栬緫` 鍚庯紝鎵嶆樉绀虹洃鎺х紪杈戝尯銆?- 鐢ㄦ埛鍙杈撳叆椤瑰彧淇濈暀锛?  - `鏀惰喘鏂筦
-  - `鐩爣鏂筦
-  - `鎹㈣偂姣斾緥`
-  - `瀹夊叏绯绘暟`
-  - `鐜伴噾瀵逛环`
-  - `鐜伴噾瀵逛环甯佺`
-  - `鐜伴噾閫夋嫨鏉僠
-  - `鐜伴噾閫夋嫨鏉冨竵绉峘
-- 缂栬緫鍖哄繀椤诲湪褰撳墠椤甸潰涓悜涓嬪睍寮€锛屼笉鍐嶄娇鐢ㄩ伄缃╁脊绐楁垨鏂版爣绛鹃〉銆?- 淇濆瓨鎴愬姛鍚庯紝缂栬緫鍖哄繀椤昏嚜鍔ㄦ敹璧枫€?- `鏀惰喘鏂筦 涓?`鐩爣鏂筦 杈撳叆蹇呴』鏀寔鑷姩妫€绱紝骞舵槑纭睍绀哄綋鍓嶈瘑鍒埌鐨勮偂绁ㄥ悕绉?浠ｇ爜/甯傚満/甯佺锛岃鐢ㄦ埛纭绯荤粺鐞嗚В姝ｇ‘銆?- 鐢ㄦ埛鍙琛ㄥ崟涓嶅啀鐩存帴鏆撮湶浠ヤ笅瀹炵幇缁嗚妭瀛楁锛?  - 鏀惰喘鏂逛唬鐮?  - 鐩爣鏂逛唬鐮?  - 鏀惰喘鏂瑰競鍦?  - 鐩爣鏂瑰競鍦?  - 鏀惰喘鏂瑰竵绉?  - 鐩爣鏂瑰竵绉?  - 鐩戞帶鍚嶇О
-  - 澶囨敞
-- 瀵逛簬闅愯棌瀛楁锛岀郴缁熷簲浼樺厛鑷姩鍒ゆ柇锛涚紪杈戝凡鏈夐」鐩椂锛屽鐢ㄦ埛鏈敼鍔ㄤ富浣撳璞★紝蹇呴』淇濈暀鍘熸湁闅愯棌瀛楁锛屼笉鑳藉洜琛ㄥ崟绠€鍖栨妸鑰佹暟鎹竻绌恒€?## 28. Event Arbitrage Unified Module Contract (2026-03-23)
-- Dashboard top-level module `閺€鎯板枠缁変焦婀乣 is upgraded to `娴滃娆㈡總妤€鍩刞.
-- The event-arbitrage rename rule remains valid, but the dashboard now has 7 top-level tabs after the new `LOF濂楀埄` module is added.
-- `娴滃娆㈡總妤€鍩刞 must become a unified entry for:
-  - `濞擃垵鍋傜粔浣规箒閸?`
-  - `娑擃厽顩ч懖锛勵潌閺堝瀵瞏
-  - `A閼测€愁殰閸?`
-  - `濞擃垵鍋傛笟娑滃亗閺?`
-  - `閸忣剙鎲″Ч?`
-- Phase-1 formal online scope is fixed to:
-  - `濞擃垵鍋傜粔浣规箒閸?`
-  - `娑擃厽顩ч懖锛勵潌閺堝瀵瞏
-  - `A閼测€愁殰閸?`
-  - `閸忣剙鎲″Ч?鏉堝懎濮猔
-- `濞擃垵鍋傛笟娑滃亗閺?` must be represented in the information architecture, but phase 1 must show it as `瀵板懏甯撮崗?` because the current source is not allowed under the zero-login constraint.
-- Phase 1 must stay webpage-only:
-  - no new push integration
-  - no new Jisilu-row AI summaries
-  - existing merger push/report chain remains unchanged
-- External event data becomes the primary reading path; the existing merger announcement list becomes auxiliary evidence and deep-dive support.
-- Existing routes remain backward-compatible:
-  - `/api/market/merger`
-  - `/api/merger/report`
-  - `/api/merger/reports/today`
-- New unified data contract is provided by `GET /api/market/event-arbitrage`.
-- `GET /api/market/event-arbitrage` must return:
-  - `overview`
-  - `categories`
-  - `sourceStatus`
-  - `updateTime`
-  - `cacheTime`
-  - `servedFromCache`
-- `categories` must contain:
-  - `hk_private`
-  - `cn_private`
-  - `a_event`
-  - `rights_issue`
-  - `announcement_pool`
-- In phase 1:
-  - `rights_issue` must return an empty list
-  - `sourceStatus.rights_issue` must explicitly indicate `disabled_no_public_source`
-- Each standardized event row must expose at least:
-  - `id`
-  - `source`
-  - `category`
-  - `market`
-  - `symbol`
-  - `name`
-  - `currentPrice`
-  - `changeRate`
-  - `marketValue`
-  - `offerPrice`
-  - `spreadRate`
-  - `eventType`
-  - `eventStage`
-  - `offeror`
-  - `offerorHolding`
-  - `registryPlace`
-  - `dealMethod`
-  - `canShort`
-  - `canCounter`
-  - `summary`
-  - `detailUrl`
-  - `officialMatch`
-  - `raw`
-- `officialMatch` must be object-or-null. When present, it must at least include:
-  - `matched`
-  - `announcementId`
-  - `title`
-  - `announcementDate`
-  - `pdfUrl`
-  - `reportAvailable`
-- Phase-1 matching rule is fixed to exact security-code matching only; fuzzy matching is forbidden in this round.
-- A single-source failure must only degrade the corresponding category, and must not blank the whole `娴滃娆㈡總妤€鍩刞 page or the rest of the dashboard.
-## 29. Startup Responsiveness And Premium History Recovery (2026-03-23)
-- Cached dashboard first-load quote endpoints remain the primary fast path; this round does not replace them with synchronous full real-time refresh.
-- The product must distinguish between:
-  - fast cached first paint
-  - slow force-refresh paths used for manual refresh or background revalidation
-- AH / AB premium history must self-heal when the local SQLite cache is obviously degraded, including:
-  - `sampleCount3Y <= 1`
-  - missing `startDate3Y` or `endDate3Y` while summary samples exist
-  - collapsed same-day or near-same-day ranges that indicate only a recent snapshot survived
-- When the local premium-history summary is degraded, incremental update mode must not skip that symbol as "already synced"; it must trigger a full historical backfill for the affected symbol.
-- This self-healing rule applies to both:
-  - scheduled premium-history maintenance
-  - on-demand history ensure/load flows that rely on the same summary decision
-- `/api/market/ipo` must degrade gracefully when no IPO history exists yet:
-  - response stays parseable JSON
-  - `success = true`
-  - `data = []`
-  - `upcoming = []`
-  - optional warning text is allowed
-- The homepage must not appear broken or permanently loading just because IPO history is currently empty on the server.
-## 30. Public Convertible Bond Payload Slimming (2026-03-23)
-- Public dashboard opening speed must not be dominated by downloading an oversized `convertible-bond-arbitrage` JSON payload.
-- The outward-facing `杞€哄鍒ー API may return fewer fields than the internal calculation result, as long as the dashboard keeps the same visible values and sorting behavior.
-- Payload slimming for this round is limited to response shaping:
-  - no formula changes
-  - no route-path changes
-  - no fake aggregation or sample truncation
-- The outward-facing row payload must preserve at least the fields needed by:
-  - `杞€哄鍒ー summary cards
-  - the dense main table columns
-  - existing daily delist filtering and row sanitization logic before shaping
-
-- The public HTTP contract for this round keeps only one primary row array:
-  - `data`
-- The same outward row collection must not be duplicated again in top-level `list` or `rows`.
-
-## 30. Event Arbitrage UI Simplification Contract (2026-03-23)
-- The phase-1 `浜嬩欢濂楀埄` page must no longer render a visible `鎬昏` sub-tab.
-- The backend `overview` payload may remain in `/api/market/event-arbitrage`, but it is no longer part of the required first-screen navigation contract.
-- `浜嬩欢濂楀埄` default visible sub-tab must be `A鑲″鍒ー.
-- Visible sub-tabs are fixed to:
-  - `A鑲″鍒ー
-  - `娓偂濂楀埄`
-  - `涓绉佹湁`
-  - `娓緵濂楀埄`
-  - `鏈€鏂板叕鍛奰
-- `A鑲″鍒ー page must not render a `璁哄潧閾炬帴` entry in the table or detail area.
-- A-share official announcement entry must be labeled `瀹樻柟鍏憡`.
-- `浜嬩欢濂楀埄` tables in this round must not expose `灞曞紑 / 鏀惰捣` controls.
-- `娓偂濂楀埄` page main table must keep only the fetched core fields plus鍘熷鏍稿績鍏憡閾炬帴锛屼笉鍐嶅彔鍔犲叕鍛婃睜琛ュ厖瀛楁銆?- `娓偂濂楀埄` / `涓绉佹湁` remarks must render as always-visible secondary rows below the main row, using the same non-expand style as the A-share summary row.
-- `A鑲″鍒ー main-row fields stay aligned with the scraped payload fields, and `鎽樿` must render as an always-visible secondary block under the row instead of:
-  - a dedicated summary column
-  - an expandable detail area
-  - an additional nested tab
-
-## 31. Same-day Subscription Truthfulness And Dense CB Core Fields (2026-03-23)
-- `鑲″€烘墦鏂癭 must show today's subscribe / lottery / listing items from the latest available server-side fetch result, instead of staying blank because a same-day empty cache snapshot was treated as healthy.
-- Beijing exchange IPO rows must be recognized correctly in the subscription source path, including `92*` code segments.
-- When IPO runtime history is still empty, the server must not keep serving an apparently fresh empty cache forever; it must retry the live fetch path on later requests until real rows are available or the source explicitly returns none again.
-- `杞€哄鍒ー visible rows must exclude clearly invalid end-state bonds, including at least:
-  - `price <= 0`
-  - zero-turnover rows that have already entered the terminal `cease / delist / maturity` chain
-- This round keeps the existing CB theoretical-pricing formula, but refines the visible field contract and the truth-source contract for outward display fields.
-- `杞€哄鍒ー main table must directly show the following core fields:
-  - `搴忓彿`
-  - `杞€哄悕绉?浠ｇ爜`
-  - `杞€虹幇浠?娑ㄨ穼`
-  - `姝ｈ偂鍚嶇О/浠ｇ爜`
-  - `姝ｈ偂鐜颁环/娑ㄨ穼`
-  - `姝ｈ偂杩戜笁骞村钩鍧嘡OE`
-  - `璧勪骇璐熷€虹巼`
-  - `杞偂浠?杞偂浠峰€糮
-  - `杞偂婧环鐜嘸
-  - `绾€轰环鍊糮
-  - `绾€烘孩浠风巼`
-  - `鍙屼綆`
-  - `寮鸿祹浠穈
-  - `鍥炲敭浠穈
-  - `60鏃ユ尝鍔ㄧ巼`
-  - `鏈熸潈鐞嗚浠峰€糮
-  - `鐞嗚浠峰€糮
-  - `鐞嗚婧环鐜嘸
-  - `涓婂競鏃
-  - `杞偂璧峰鏃
-  - `鍒版湡鏃
-  - `璇勭骇`
-- The page must visibly鎻愮ず褰撳墠鐞嗚浠峰€煎叕寮忥紝鑷冲皯鍖呭惈锛?  - `鐞嗚浠峰€?= 绾€轰环鍊?+ 鏈熸潈鐞嗚浠峰€糮
-  - `鏈熸潈鐞嗚浠峰€?= 鐪嬫定鏈熸潈浠峰€?- 鐪嬭穼鏈熸潈浠峰€糮
-- `鍒版湡绋庡墠鏀剁泭鐜嘸 must come from a real upstream source field and must not continue using a locally computed approximation as the outward displayed value.
-- `姝ｈ偂杩戜笁骞村钩鍧嘡OE` and `璧勪骇璐熷€虹巼` must come from real upstream financial statement interfaces rather than local heuristic calculations.
-- `250日波动率` for the current round is only a historical-estimate display field, not an execution-grade truth field.
-- `鏈熸潈鐞嗚浠峰€?/ 鐞嗚浠峰€?/ 鐞嗚婧环鐜嘸 must be displayed as reference values because they are driven by the current historical-volatility estimate.
-- The outward-facing CB payload may continue slimming unused fields, but it must preserve every field needed by the table above.
-
-## 33. Convertible-bond Truth-source Yield And Formula Hint Contract (2026-03-23)
-- `yieldToMaturityPretax` outward value is fixed to a real source field for this round:
-  - prefer Jisilu `bond_cb_jsl()` `鍒版湡绋庡墠鏀剁泭`
-  - if the upstream row has no real value, keep the field empty rather than fabricating a local approximation
-- `鐞嗚浠峰€糮 visible explanation belongs on the page itself and may not be discoverable only by reading source code.
-- `stockAvgRoe3Y` and `stockDebtRatio` remain real-source fields:
-  - the server may use Eastmoney report-summary / balance-sheet tables as the stable bulk source
-  - if bulk source misses a code, it may fallback to `ak.stock_financial_abstract_ths` and `ak.stock_financial_abstract`
-- The page-visible `杞€哄鍒ー contract no longer requires rendering `yieldToMaturityPretax`.
-- Current volatility truth boundary is fixed for this round:
-  - `volatility250` is the annualized standard deviation of the latest `250` stock close-to-close log returns from real `后复权` history
-  - the page must not present volatility-driven theoretical metrics as certainty-level values
-
-## 31A. Constitution Governance Alignment Contract (2026-03-23)
-- `CONSTITUTION.md` and `.specify/memory/constitution.md` must remain logically涓€鑷达紝涓嶈兘鍑虹幇涓€澶勪慨鏀广€佸彟涓€澶勬粸鍚庣殑鐘舵€併€?- 褰撳娉曟枃鏈彂鐢熶慨璁㈡椂锛屼袱浠芥枃浠堕兘蹇呴』鍚屾鏇存柊浠ヤ笅鍏冩暟鎹細
-  - `Version`
-  - `Last Amended`
-  - `Amendment Summary`
-- 浠撳簱蹇呴』鎻愪緵涓€涓槑纭殑鑷姩鏍￠獙鍏ュ彛锛岀敤浜庢鏌ュ娉曚富鏂囦欢鍜岄暅鍍忔枃浠舵槸鍚﹀悓姝ャ€?- 璇ユ牎楠屽湪鍙戠幇浠ヤ笅浠讳竴闂鏃跺繀椤诲け璐ュ苟杩斿洖闈為浂閫€鍑虹爜锛?  - 浠讳竴鏂囦欢缂哄け
-  - 涓や唤鏂囦欢姝ｆ枃涓嶄竴鑷?  - 涓や唤鏂囦欢浠呭洜杩戞湡淇鑰屽彂鐢熸紓绉讳絾灏氭湭鍚屾
-- 鏈疆瀹硶瀵归綈瀹炴柦閬靛畧鈥滄渶鐭摼鏉♀€濆拰鈥滃ゥ鍗″鍓冨垁鈥濆師鍒欙細
-  - 鍙慨娌荤悊閾捐矾鍜岄槻鍥炲綊鎶ゆ爮
-  - 涓嶅€熸満鎶婃棤鍏充笟鍔℃ā鍧楁媺鍏ュぇ閲嶆瀯
-  - 濡傚彂鐜版洿澶х殑缁撴瀯鎬ч棶棰橈紝搴斿彟璧疯鍒掞紝涓嶅湪鏈疆娣锋敼
-- 鏈疆鍙栨秷鏂板鐨?`PROJECT_PLAN.md / PROJECT_REQUIREMENTS.md / PROJECT_TECH_STACK.md` 鏍圭洰褰曡姹傦細
-  - 椤圭洰姝ｅ紡宸ヤ綔娴佷粛浠?`refactor_docs/001-monitor-refactor/plan.md / REQUIREMENTS.md / SPEC.md` 涓哄噯
-  - 涓嶅啀棰濆缁存姢绗簩濂楁牴鐩綍鏂囨。鍏ュ彛
-
-## 31B. Access Entry Truthfulness Contract (2026-03-24)
-- 鏍瑰叆鍙ｉ〉 `index.html` 涓嶅緱缁х画鍐欐 `http://127.0.0.1:5000` 浣滀负鍞竴鏈嶅姟鍦板潃銆?- 鍏ュ彛椤靛睍绀哄拰璺宠浆鐨勬湇鍔″湴鍧€蹇呴』鏉ヨ嚜杩愯鏃剁湡瀹為厤缃紝鑰屼笉鏄暎钀界‖缂栫爜銆?- 浠撳簱搴旀彁渚涗竴涓交閲忓彧璇绘帴鍙ｏ紝渚涘叆鍙ｉ〉鑾峰彇褰撳墠璁块棶淇℃伅锛岃嚦灏戝寘鎷細
-  - `serverBaseUrl`
-  - `publicBaseUrl`
-  - `publicHealthUrl`
-  - `environment`
-- 褰撳叆鍙ｉ〉閫氳繃姝ｅ湪杩愯鐨?Node 鏈嶅姟璁块棶鏃讹細
-  - 椤甸潰蹇呴』灞曠ず鐪熷疄鍙闂殑鏈嶅姟鍦板潃
-  - 鈥滄墦寮€鏈嶅姟鐗堥〉闈⑩€濇寜閽繀椤绘寚鍚戠湡瀹炶繍琛屽湴鍧€
-- 褰?`index.html` 琚洿鎺ュ綋浣滄湰鍦版枃浠舵墦寮€鏃讹細
-  - 椤甸潰涓嶅緱缁х画鎻愪緵鏈湴棰勮
-  - 椤甸潰涓嶅緱缁х画澹扮О鍥哄畾鏈嶅姟鍦板潃涓€瀹氭槸 `127.0.0.1:5000`
-  - 椤甸潰搴旀槑纭彁绀烘寮忚闂彧璁や簯绔?`deployment.public_base_url`
-
-## 36. Event-arbitrage Detail Text Responsive Contract (2026-03-24)
-- `浜嬩欢濂楀埄` A-share `鎽樿` must render as an always-visible full-width secondary detail block below the row.
-- `娓偂濂楀埄` and `涓绉佹湁` `澶囨敞` must use the same full-width secondary detail style.
-- These detail-text blocks must adapt to available screen width:
-  - desktop must not constrain them to the left quarter of a shared multi-column detail grid
-  - mobile must continue wrapping naturally
-- This round changes presentation only and does not alter the event-arbitrage data schema.
-## 37. Shared Dashboard Table Readability Contract (2026-03-24)
-- This round upgrades dashboard table readability through the shared presentation layer only.
-- A new read-only presentation contract is exposed by:
-  - `GET /api/dashboard/ui-config`
-- `GET /api/dashboard/ui-config` must return at least:
-  - `tableUi.desktopFontPx`
-  - `tableUi.desktopHeaderFontPx`
-  - `tableUi.desktopLineHeight`
-  - `tableUi.desktopCellPaddingY`
-  - `tableUi.desktopCellPaddingX`
-  - `tableUi.tabletFontPx`
-  - `tableUi.minWidthByKind`
-- Active `tableUi.minWidthByKind` keys must cover at least:
-  - `subscription`
-  - `convertible`
-  - `premium`
-  - `monitor`
-  - `dividend`
-  - `merger`
-  - `lof`
-- Shared table rendering must continue using the existing common renderer path for:
-  - `杞€哄鍒ー
-  - `AH婧环`
-  - `AB婧环`
-  - `鐩戞帶濂楀埄`
-  - `鍒嗙孩鎻愰啋`
-  - `浜嬩欢濂楀埄`
-  - `LOF濂楀埄` if the page is re-enabled later
-  - 椤堕儴鑲″€烘墦鏂伴暱琛?- Desktop readability contract for this round:
-  - visible table text is larger than the current `12px` baseline
-  - row height and cell padding are visibly relaxed
-  - table numbers use stable tabular alignment
-  - long tables may use light controlled horizontal scrolling instead of hard compression
-- Mobile contract for this round:
-  - page must remain loadable at narrow widths
-  - existing horizontal container behavior remains valid
-  - no second mobile-only card-table layout is introduced
-
-## 38. Repository-local mini-SWE-agent Integration Contract (2026-03-24)
-- This round adds only a repository-local agent-assist workflow for development and does not change product runtime behavior.
-- The repository must provide a stable local helper entry for generating `mini-SWE-agent` task text from project rules.
-- The generated task text must explicitly include the current workflow gate:
-  - read `CONSTITUTION.md` first
-  - update `refactor_docs/001-monitor-refactor/plan.md` before implementation when scope changes
-  - update `refactor_docs/001-monitor-refactor/REQUIREMENTS.md` and `refactor_docs/001-monitor-refactor/SPEC.md` before coding when contracts change
-- The generated task text must remind the agent to respect repository layering:
-  - `data_fetch/` fetch + normalize only
-  - `strategy/` business calculation and rule judgment only
-  - `presentation/` page, API shaping, and display logic only
-  - `notification/` push configuration and delivery only
-  - `shared/` reusable cross-domain support only
-- The helper must support narrowing the requested implementation scope by module or area so the caller can keep changes minimal.
-- The helper must include default validation guidance for this repository, at least:
-  - `npm run check`
-  - `npm run check:boundaries`
-- The repository must include a local usage guide covering at least:
-  - `mini-SWE-agent` installation
-  - recommended `confirm` mode before any `yolo`-style execution
-  - how to invoke the repository helper
-  - how Codex and `mini-SWE-agent` should divide responsibilities in this project
-- This integration is human-in-the-loop only in this round:
-  - it may generate prompt/task text
-  - it may document command examples
-  - it must not auto-launch or auto-approve `mini-SWE-agent` actions from project code
-- The live dashboard, API routes, scheduler, deploy scripts, and production runtime state must remain unchanged by this round.
-
-## 39. Push Summary + Event-alert Refactor Contract (2026-03-24)
-- Active push entrances are reduced to two:
-  - fixed-time summary push
-  - event-driven alert push
-- `鏀惰喘绉佹湁涓撴姤` is removed from the active push product contract in this round.
-- Dashboard push settings must render:
-  - summary time 1
-  - summary time 2
-  - event-alert cooldown minutes
-- Dashboard push settings must not render a third merger-report push time input.
-- `GET /api/push/config` must return parseable JSON including at least:
-  - `times`
-  - `eventAlert.enabled`
-  - `eventAlert.cooldownMinutes`
-  - `eventAlert.convertibleBond.convertPremiumLt`
-  - `deliveryStatus.webhookConfigured`
-  - `deliveryStatus.pushHtmlUrlConfigured`
-  - `deliveryStatus.schedulerEnabled`
-  - `deliveryStatus.lastMainPushSuccessAt`
-  - `deliveryStatus.lastMainPushError`
-  - `deliveryStatus.lastEventAlertSuccessAt`
-  - `deliveryStatus.lastEventAlertError`
-- `GET /api/push/config` must not expose merger-report push schedule or merger-report push delivery state.
-- `POST /api/push/config` must save only:
-  - the two summary times
-  - the event-alert cooldown minutes
-- Summary push content contract for this round:
-  - keep `鍙浆鍊?/ AH / AB / 鎵撴柊 / 鍒嗙孩 / 鑷畾涔夌洃鎺?/ 浜嬩欢濂楀埄鏂板娆℃棩姹囨€籤
-  - `鑷畾涔夌洃鎺 remains full-volume
-  - each summary item must be compressed into a scanable concise line or short block
-  - summary push must avoid large dense paragraphs
-- Event-arbitrage push contract for this round:
-  - only rows newly discovered on day `D` may appear in the next day's summary
-  - this round does not add same-day event-arbitrage alert pushes
-- First-phase event-alert contract:
-  - source is convertible-bond arbitrage rows only
-  - trigger rule is `杞偂婧环鐜?< -3%`
-  - same bond same rule must respect a per-item cooldown
-  - default cooldown is `30` minutes
-  - alert message must include only triggered rows and must not append the full summary
-- Active notification config must include formal event-alert settings in `config.yaml`, at least:
-  - `notification.event_alert.enabled`
-  - `notification.event_alert.cooldown_minutes`
-  - `notification.event_alert.convertible_bond.convert_premium_lt`
-  - concise summary row-count settings under `notification.summary`
-- Active push contract must include a real public HTML URL so enterprise-wecom messages can link back to the live webpage.
-
-## 39. Dashboard UI Coordination Contract (2026-03-24)
-- This round is presentation-only and focuses on coordinated improvement of:
-  - aesthetics
-  - readability
-  - information density
-- The round must follow the least-change rule:
-  - keep existing functions
-  - keep existing business meaning
-  - keep existing route and data contracts
-  - avoid unrelated refactors
-- Dashboard optimization priority is fixed to:
-  - surface more effective information per screen
-  - reduce wasted blank space
-  - strengthen visual hierarchy
-  - preserve stable interaction semantics
-- The homepage must keep the same module order and functional meaning:
-  - hero
-  - top subscription table
-  - root tabs
-  - active module panel
-  - bottom push strip
-- The page may tighten layout through shared presentation adjustments only, including:
-  - container padding
-  - vertical gaps
-  - card density
-  - toolbar composition
-  - summary layout
-  - button/input sizing
-  - empty/loading/pagination footprint
-- The page must not fake or invent new summary content for visual effect.
-- `杞€哄鍒?/ AH婧环 / AB婧环 / 鐩戞帶濂楀埄 / 鍒嗙孩鎻愰啋 / 浜嬩欢濂楀埄` must keep their current interaction logic and data semantics.
-- Desktop and mobile must remain usable under the same responsive structure; this round may compress spacing but must not introduce a new page model.
-- Core layout and key style adjustments in the implementation must retain concise Chinese comments.
-
-## 40. Release-path Visibility + Fast Deploy Contract (2026-03-24)
-- `/api/health` must expose deployment/version metadata from the currently running checkout, not only generic liveness status.
-- The health payload must include at least:
-  - `version.appVersion`
-  - `version.gitSha`
-  - `version.gitShortSha`
-  - `version.gitBranch`
-  - `version.gitCommitTime`
-  - `version.startedAt`
-  - `version.source`
-- If git metadata cannot be resolved at runtime, the service must still return `/api/health` successfully and clearly mark the missing fields instead of failing the health endpoint.
-- Homepage must visibly display the currently deployed version metadata sourced from the live server, so the user can directly confirm whether the page is old or new.
-- The homepage version area must not invent build numbers; it may only display real values returned by `/api/health`.
-- The repository must include a dedicated fast deploy entry script:
-  - `tools/deploy/update_fast.sh`
-- `tools/deploy/update_fast.sh` is only for dependency-unchanged releases and must keep the same safety rails as the full deploy path:
-  - git sync
-  - service restart
-  - health check
-  - homepage marker verification
-- `tools/deploy/update_fast.sh` must skip heavy dependency refresh by default:
-  - skip Node dependency install
-  - skip Python dependency install
-  - skip Python import verification
-- The default automatic `push main` deploy path must remain the safe full deploy path and must not silently switch to fast mode.
-- GitHub Actions manual deploy must support selecting `full` or `fast` mode.
-- If fast deploy is used when dependencies have actually changed, the failure must remain visible through service restart failure, health failure, or homepage marker failure; the script must not fake success.
-
-## 41. Cloud-only Runtime Contract (2026-03-24)
-- The official Alpha Monitor runtime target is cloud-only.
-- Official user/operator access must use the configured cloud public URL, not a Windows-local helper entry, local preview page, or local scheduled task.
-- The repository may keep developer-only local execution for coding and verification, but that path must be clearly labeled as development-only and must not be presented as the product's formal access method.
-- Package-level official scripts must not expose Windows-local stable-runtime management commands such as:
-  - local watcher bootstrap
-  - local watcher stop
-  - local scheduled-task install/uninstall
-  - local access-info display
-- The root repository access page must stop offering:
-  - local preview
-  - local service start instructions
-  - local-service-first wording
-- The root access page must instead guide the user to:
-  - configured public homepage URL
-  - configured public `/api/health`
-  - deployment/runbook instructions when public URL is not yet available
-- Dashboard user-facing failure copy must not tell the user to "confirm local service is started"; the wording must stay environment-neutral or cloud-oriented.
-- `RUNBOOK.md` and `quickstart.md` must explicitly state:
-  - cloud runtime is the only official long-term operating mode
-  - local `npm run dev` exists only for development validation
-
-## 42. Local Push-scheduler Suppression Contract (2026-03-24)
-- Loopback-only runtime must not execute scheduled push attempts.
-- The suppression trigger for this round is:
-  - effective public base URL host is `127.0.0.1`, `localhost`, or `0.0.0.0`
-- Under this local-runtime condition:
-  - timed push scheduler must be skipped
-  - local startup must not repeatedly fail because `WECOM_WEBHOOK_URL` is absent
-  - health/push status must expose that the scheduler is intentionally disabled
-- Cloud runtime with a non-loopback public URL must keep the existing timed push behavior unchanged.
-
-## 42. Core Cloud-env Sync Contract (2026-03-24)
-- Cloud runtime core parameters backed by environment variables must be syncable to the server without a full GitHub deploy.
-- The authoritative connection/runtime source for this sync path is `ops/server_profile.local.yaml`.
-- Later Codex sessions must be able to read that file and reuse:
-  - server host / port / user / auth
-  - remote app directory
-  - remote `.env` file path
-  - managed service name
-  - stored webhook / public URL values
-- The repository must provide a stable local command entry for this sync path.
-- The sync path must at least cover the following remote env keys when authoritative values exist:
-  - `WECOM_WEBHOOK_URL`
-  - `PUBLIC_BASE_URL`
-  - `PUSH_HTML_URL`
-  - `ALPHA_MONITOR_HTML_URL`
-- Public-URL class values must prefer the server profile public URL as the source of truth instead of stale local `.env` leftovers.
-- Webhook values must prefer the server profile stored webhook when present.
-- Other env-backed secrets that already exist in effective local config may also be synced, but this round must not require inventing new secret storage.
-- After remote `.env` values change, the sync path must restart the managed service and verify the configured health endpoint.
-- If no effective value changed, the sync path may skip restart but must still report that the server is already aligned.
-
-## 43. Core-table Concentration + Dividend Watchlist Merge Contract (2026-03-24)
-- This round keeps existing route paths, pagination size, and business formulas unchanged unless explicitly stated below.
-- `杞€哄鍒ー page must treat `250日波动率` as an existing core field rather than a hidden trailing field.
-- The visible wording for `250日波动率` must state that it is calculated from the historical K-line store using real `后复权` price data.
-- Wide-table presentation must prioritize 鈥渃ore fields on the first screen鈥?
-  - keep one field per column
-  - keep single-line cells by default
-  - reduce unnecessary horizontal whitespace
-  - allow light horizontal scrolling for the remaining non-core fields
-- When a table has fewer columns, it must still expand naturally to use available width instead of staying artificially narrow.
-- `AB婧环` top summary cards are fixed to:
-  - `婧环鐜囧墠涓塦
-  - `婧环鐜囧€掓暟鍓嶄笁`
-- `AB婧环` top summary cards must not switch to `杩戜笁骞村垎浣峘 because of temporary table sorting changes.
-- Historical percentile calculation is a data-side contract and should move toward adjusted-price history; this round must not fake percentile values in the UI.
-- Dividend page watchlist contract for this round:
-  - visible rows come from the union of the saved dividend portfolio and the user鈥檚 existing custom-monitor stock selections
-  - rows are de-duplicated by stock code
-  - auto-merged rows must not break existing manual dividend add/remove behavior
-
-## 43. Subscription Payment-day Truth Contract (2026-03-24)
-- This contract supersedes older subscription wording that treated `lotteryDate` as the payment-day display source.
-- In the top `鑲″€烘墦鏂癭 table:
-  - the visible `涓缂存鏃 column must display the real `paymentDate`
-  - the `浠婃棩涓缂存` stage must be triggered by `paymentDate = 浠婂ぉ`
-  - `lotteryDate` must not masquerade as `涓缂存鏃
-- The page may still keep `鎽囧彿鏃?/ 涓鍏憡鏃 hidden as a standalone column, but hiding that column must not change the meaning of the visible payment-day field.
-- On 2026-03-24, the page must show the real payment-day rows from live source data, including the currently due IPO rows, instead of only a single `lotteryDate = 浠婂ぉ` false hit.
-
-## 44. Dashboard Module Footnote Contract (2026-03-24)
-- `股债打新` 与各主功能页末尾都要增加统一的说明尾注。
-- 本轮覆盖范围固定为：
-  - `股债打新`
-  - `转债套利`
-  - `AH溢价`
-  - `AB溢价`
-  - `监控套利`
-  - `分红提醒`
-  - `事件套利`
-- 尾注标准结构固定为三类信息：
-  - `数据来源`
-  - `计算公式`
-  - `策略说明`
-- 尾注内容必须来自统一展示配置，不得继续散落在多个前端函数里硬编码。
-- `config.yaml` 新增展示配置入口：
-  - `presentation.dashboard_module_notes`
-- `presentation.dashboard_module_notes` 下每个模块至少支持：
-  - `data_sources`
-  - `formulas`
-  - `strategy_notes`
-- `GET /api/dashboard/ui-config` 需要扩展返回模块尾注配置，供 dashboard 页面统一消费。
-- 尾注是解释性展示，不改变：
-  - 业务字段含义
-  - 排序逻辑
-  - 分页行为
-  - 实际抓取源和计算结果
-- 如果某个模块某一类说明为空：
-  - 该小节自动隐藏
-  - 不影响其他小节显示
-
-## 41. DB-authoritative Convertible Volatility Contract (2026-03-24)
-- `250日波动率` must be computed from the local `stock_price_history.db` using the most recent `250` close-to-close log-return observations from real `后复权` history.
-- The calculation must require at least `window + 1` closes from the local history database.
-- The current off-by-one sample bug (`window - 1` returns) is not allowed.
-- Inline missing-data hydration may backfill the local history database only when the local database does not yet contain enough closes for volatility calculation.
-- Once enough closes already exist locally, volatility calculation must read from the database result directly.
-- The convertible-bond stock-history sync path must not prune each symbol back down to a short rolling slice that destroys the established historical K-line library.
-
-## 42. Full CB History Sync + Real Example Note Contract (2026-03-24)
-- When the underlying-stock HFQ history library is fully synced, convertible-bond theoretical metrics must be recalculated from the refreshed volatility inputs in the same release cycle.
-- The convertible-bond page note must include one real current example drawn from the live dataset.
-- The example must show the actual bond code/name and the actual numeric formula branch used for the displayed theoretical-price reference field.
-- The example must not use fabricated placeholder values.
-
-## 45. Convertible Volatility Percent Display Contract (2026-03-24)
-- The convertible-bond API uses `volatility250` as the active truth field, and may keep `volatility60` only as a temporary compatibility alias to the same value during migration.
-- The dashboard display layer must convert those ratio values into human-readable percentages such as `34.91%`.
-- The same display rule must be used consistently in:
-  - the main `250日波动率` column
-  - the bottom real-example explanatory note
-- This round does not change:
-  - volatility sorting basis
-  - volatility calculation logic
-  - theoretical-price formulas
-
-## 46. Scheduled Push Truth Recovery Contract (2026-03-24)
-- Cloud scheduled push must not treat persisted slot text alone as authoritative proof of delivery.
-- For the current Shanghai date, a scheduled slot may suppress re-send only when both conditions are true:
-  - the slot exists in the active configured schedule
-  - the latest same-day scheduled-push success time proves that this slot is not later than the latest successful delivery point
-- Dirty persisted records that point to:
-  - future slots
-  - removed schedule slots
-  - same-day slots later than the latest successful delivery time
-  must be pruned before scheduled due-slot judgment.
-- Scheduled push success semantics remain strict:
-  - downstream WeCom success is still required before a slot is recorded as sent
-  - failed slots must remain retryable on later scheduler ticks
-- The scheduler must emit live server logs that make scheduled-push diagnosis possible, including:
-  - schedule date
-  - evaluated slot
-  - attempt start
-  - success
-  - failure reason
-- Manual push and scheduled push remain separate:
-  - manual push may update the latest push success metadata
-  - manual push must not automatically mark configured scheduled slots as delivered
-- This round does not change:
-  - webhook contract
-  - summary content selection
-  - dashboard push settings fields
-
-## 47. Convertible Underlying ATR + Liquidity Contract (2026-03-25)
-- `杞€哄鍒ー 涓昏〃蹇呴』鏂板浠ヤ笅鍙瀛楁锛?  - `姝ｈ偂ATR(杩?0鏃?`
-  - `鍓╀綑瑙勬ā(浜?`
-  - `姝ｈ偂杩?0鏃ュ钩鍧囨垚浜ら(浜?`
-  - `姝ｈ偂杩?鏃ュ钩鍧囨垚浜ら(浜?`
-- 浠ヤ笂瀛楁蹇呴』浣跨敤鐪熷疄鏁版嵁锛屼笉鍏佽闈欐€佸崰浣嶅€笺€?- `remainingSizeYi` 寤剁画鐜版湁鐪熷疄瀛楁璇箟锛屼絾鏈疆瑕佹眰杩涘叆涓昏〃鍙鍖恒€?- `stockAtr20` 蹇呴』鍩轰簬姝ｈ偂鍘嗗彶琛屾儏鐪熷疄璁＄畻锛屽彛寰勫浐瀹氫负杩?`20` 涓氦鏄撴棩鐨?ATR銆?- `stockAvgTurnoverAmount20Yi` 涓?`stockAvgTurnoverAmount5Yi` 蹇呴』鍩轰簬姝ｈ偂鍘嗗彶鏃ユ垚浜ら鐪熷疄鍧囧€艰绠楋紝骞朵互 `浜縛 涓哄睍绀哄彛寰勩€?- 鏂板瓧娈典粎褰卞搷 `cbArb` 鏁版嵁閾捐矾涓庨〉闈㈠睍绀猴紝涓嶅緱鐗靛姩 AH / AB / 鎵撴柊 / 鎺ㄩ€佸姛鑳姐€?
-
-## 48. Convertible Discount Strategy Replacement Contract (2026-03-25)
-- The production convertible-bond event-alert rule is no longer premiumRate < convertPremiumLt.
-- The new production rule chain is fixed to:
-  - buy alert when discountRate > 2% and the bond newly enters the buy zone
-  - sell alert when a monitored bond discountRate < 0.5% and newly enters the sell zone
-  - monitored-list timed push during trading sessions
-- discountRate is fixed to -premiumRate for this strategy round.
-- stockAtr20 keeps the real-data meaning vg(TR[-20:]) over the latest 20 trading days.
-- ATR百分比 = stockAtr20 / stockPrice * 100.
-- The strategy must calculate and expose at least:
-  - discountRate
-  - weightedDiscountRate
-  - stockAtr20Pct
-  - trCoefficient
-  - sellPressureRatio
-  - sellPressureCoefficient
-  - oardType
-  - oardCoefficient
-- The strategy must persist an independent runtime state file 
-untime_data/shared/cb_discount_strategy_state.json and must not reuse the old event-alert cooldown records as the source of truth.
-- First bootstrap rule:
-  - if the strategy state is empty or missing, currently eligible bonds enter the monitored list silently
-  - bootstrap must not backfill historical buy alerts
-- Timed monitored-list push schedule is fixed to:
-  - morning 9:30, 09:40, ... , 11:30
-  - afternoon 13:00, 13:10, ... , 14:50
-  - 14:50 must push once when the monitored list is non-empty
-- 转债套利 top summary area must replace the old 转股套利候选 card with 折价监控.
-- The 折价监控 card must show the full current monitored list rather than truncating to top 3.
-- Each monitored-card item must show at least:
-  - 转债名称/代码
-  - 折价率
-  - 加权折价率
-- Push settings UI must remove the obsolete 异动冷却(分钟) field and must no longer expose the old -3% negative-premium rule wording.
-- GET /api/push/config must stop returning the old cooldown-based cb event-alert contract and instead expose discount-strategy runtime status.
-
-## 49. Convertible Rights-Issue Monitoring Contract (2026-03-25)
-- Dashboard must add a 7th root tab `可转债抢权配售`.
-- This feature is a new independent module and must not be folded into:
-  - `转债套利`
-  - `股债打新`
-  - `事件套利 > rights_issue`
-- Phase-1 source scope is fixed to one real source only:
-  - `https://www.jisilu.cn/web/data/cb/pre`
-  - implementation fetch path may use the corresponding real JSON endpoint `https://www.jisilu.cn/webapi/cb/pre/?history=0`
-- The page must not expose a user-side URL input / URL parsing area in this round.
-- The page structure is fixed to:
-  - same-day monitor list
-  - fixed-source structured information area
-
-## 65. Convertible Discount Push Session Contract (2026-03-27)
-- `可转债折价推送` is an A-share-session-bound module and must not follow the broader
-  main-summary daily scheduler semantics.
-- The module must only emit discount-related push messages when both conditions hold:
-  - trading weekday
-  - current Shanghai time is inside `09:30-11:30` or `13:00-15:00`
-- After `15:00` Shanghai time:
-  - no timed monitor-list push may be emitted
-  - no buy signal may be emitted
-  - no sell signal may be emitted
-- Non-trading days must not emit any convertible discount push, even if the general
-  summary scheduler remains enabled for other modules.
-- The discount-push runtime must keep two explicit lanes:
-  - timed monitor-list push
-  - buy/sell instant push triggered by zone crossing
-- Shared scheduler tick execution is allowed, but the runtime contract must not collapse
-  the two lanes into one periodic business meaning.
-- `config.yaml` must hold the discount-push session constraints in the convertible-bond
-  strategy section, including at least:
-  - `trading_days_only`
-  - `session_windows`
-  - existing `monitor_session_times`
-- Dashboard push status must expose the separation truthfully:
-  - monitor schedule slots
-  - instant-signal trading window
-  - latest buy success/error
-  - latest sell success/error
-  - latest monitor-list success/error
-  - module-local push settings
-  - page footnote
-- The monitor list only includes rows that satisfy both:
-  - stage is one of `上市委通过` / `同意注册(注册生效)` / `已明确申购日`
-  - `预计收益率 > 6%`
-- `已明确申购日` means the row has a real `apply_date`; this round does not add an extra “提前3天/5天窗口” rule.
-- The same-day monitor list is rebuilt daily:
-  - clear previous day state at `00:00`
-  - rebuild from the latest fixed-source rows
-  - keep only rows that still satisfy the current rule
-- Core calculation contract for this page:
-  - `配售所需资金 = 配售10张实际所需股数 × 当前股价`
-  - `配售预期收益 = 单位期权价值 × 期权数量`
-  - `预计收益率 = 配售预期收益 ÷ 配售所需资金`
-- `配售10张实际所需股数` contract:
-  - 深市: raw required shares for 10 bonds, then round up to `100股`
-  - 沪市: raw required shares for 10 bonds, then apply `× 0.6`, then round up to `100股`
-  - 沪市 `0.6` 修正规则 is enabled in phase 1 as a direct multiplier
-- `单位期权价值` contract:
-  - strike input uses `max(源页面 convertPrice, 当前价)` as the exercised reference
-  - source `convertPrice` is treated as the source-provided `20日均值` proxy
-  - risk-free rate uses real 10Y treasury yield
-  - volatility uses real underlying-stock `60日历史波动率`
-  - term is fixed to `6年`
-- `期权数量 = 1000 ÷ 行权价`.
-- The page must clearly state that this is an estimated rights-issue option-value model rather than guaranteed realized profit.
-- This feature must maintain its own independent underlying-stock history database:
-  - it is separate from the existing convertible-bond underlying history DB
-  - it stores real `后复权` daily closes for this feature only
-  - `250日波动率` must be calculated from this DB rather than static page fields
-  - the DB is used for volatility only and must not be used to override the strike reference
-- New public API contract:
-  - `GET /api/market/cb-rights-issue`
-    - returns `monitorList`
-    - returns `sourceRows`
-    - returns `sourceSummary`
-    - returns `rebuildStatus`
-    - returns `updateTime`
-  - `GET /api/push/cb-rights-issue-config`
-  - `POST /api/push/cb-rights-issue-config`
-- The feature must keep an independent runtime state for:
-  - latest same-day monitor list
-  - latest fixed-source structured snapshot
-  - latest rebuild time / error
-  - module-local push runtime
-- This feature must keep an independent push schedule:
-  - default trading-day times `08:00` and `14:30`
-  - push content is generated only from the current same-day monitor list
-  - it must not be merged into the existing summary push
-- The page’s fixed-source structured information area must at least expose:
-  - source link
-  - source title / source stats
-  - bond / stock identifiers
-  - progress / apply date / record date / listing date
-  - raw source fields that directly affect rights-issue calculation
-- The page footnote must explain:
-  - data source
-  - calculation formula
-  - strategy boundary / risk note
-- Failure rule:
-  - if source fetch fails, key fields are missing, or volatility cannot be computed from the dedicated DB, the row must not enter the monitor list
-  - the system must surface the real failure reason instead of filling placeholders
-- Regression boundary:
-  - `打新 / 转债套利 / AH / AB / 监控套利 / 分红提醒 / 事件套利` existing behavior remains unchanged in this round
-
-## 50. 转债套利 / AH / AB 主表搜索合同 (2026-03-25)
-- 本轮只增加展示层搜索，不新增后端搜索接口。
-- 以下三个页面必须在主表上方提供搜索框：
-  - `转债套利`
-  - `AH溢价`
-  - `AB溢价`
-- 搜索必须基于页面已经加载的真实数据即时筛选，不允许假数据补齐或额外拼装静态结果。
-- 搜索命中范围固定为：
-  - `转债套利`：转债代码、转债名称、正股代码、正股名称
-  - `AH溢价`：A股代码、A股名称、H股代码、H股名称
-  - `AB溢价`：A股代码、A股名称、B股代码、B股名称
-- 搜索属于前端筛选：
-  - 先筛选
-  - 再排序
-  - 最后分页
-- 搜索输入过程不得因为前端重渲染而丢失焦点。
-- 搜索框必须支持中文输入法组合输入，不得出现“输入一个字符后必须重新点击”或“无法输入中文”的情况。
-- 清空搜索词后必须恢复完整主表。
-- 现有 50 条分页规则、排序语义、接口返回字段和业务公式都不得改变。
-
-## 51. 转债纯债价值真实性与搜索输入稳定性合同 (2026-03-25)
-- `转债套利` 页面中的 `纯债价值 / 纯债溢价率 / 期权理论价值 / 理论价格 / 理论溢价率` 不得再把本地债底折现值伪装成真实纯债价值。
-- `pureBondValue` 的正式来源改为东方财富可转债价值分析真实数据：
-  - 优先读取对应转债代码最新可用的 `纯债价值`
-  - 当真实源可用时，理论定价必须以该真实 `pureBondValue` 为基础
-- 只有在真实纯债价值源暂时不可用时，才允许继续使用现有 `bondValue` 折现兜底参与理论定价。
-- 即使进入兜底，也不得伪装成“已经拿到了真实纯债价值”：
-  - `pureBondValue` 保持缺失
-  - 仅 `bondValue` 允许保留兜底结果
-- 本轮不新增前端独立解释页，也不改 `转债套利 / AH / AB` 搜索范围和搜索方式。
-- 搜索交互稳定性补充要求：
-  - 输入一个字符后，搜索框不得因重渲染丢失焦点
-  - 光标位置应尽量保持在用户继续输入的位置
-  - 中文输入法组合输入期间不得打断输入过程
-  - 点击 `清空` 后应自动回到对应搜索框继续输入
-
-## 52. 转债理论定价行权价简化合同 (2026-03-25)
-- `转债套利` 页面中的理论定价模型，`看涨期权行权价` 固定使用 `转股价`。
-- 该口径已被 2026-03-30 第 95 条新合同正式废止，不再是当前生效规则。
-- 本轮取消任何额外行权价判定或派生逻辑：
-  - 不再使用 `bondValue / optionQty` 与 `convertPrice` 比较
-  - 不再使用 `max(...)` 形成更高执行价
-- 只要 `convertPrice` 有效：
-  - `callStrike = convertPrice`
-  - `optionQty = 100 / convertPrice`
-- 本轮不改变以下内容：
-  - `pureBondValue` 的真实来源优先级
-  - `bond+call` 与 `bond+call-put` 的分支判断
-  - 波动率、剩余年限、无风险利率的输入来源
-
-## 53. 转债名称固定左列合同 (2026-03-25)
-- 本轮只调整 `转债套利` 主表的展示层可读性，不改接口和业务计算。
-- 由于转债主表列很多，横向滚动时必须始终能知道当前是哪只转债。
-- `转债名称` 不应生硬地跳到最前面破坏阅读顺序。
-- `转债套利` 主表左侧固定识别区应保持自然顺序：
-  - `序号`
-  - `转债代码`
-  - `转债名称`
-- 以上三列在横向滚动时固定显示。
-- 固定规则只要求覆盖 `转债套利` 主表，不扩展到 AH / AB / 监控 / 分红 / 事件套利。
-- 本轮允许为实现该目标而恢复 `转债套利` 主表前几列顺序，但不得删除已有核心字段。
-- 固定左列后仍必须保持：
-  - 现有排序逻辑可用
-  - 50 条分页不变
-  - 横向滚动可继续查看后续列
-  - 移动端页面不压坏
-
-## 52. 共享数据库自动更新与滚动保留合同 (2026-03-25)
-- 本轮只修数据库自动维护链路，不改页面结构、推送内容和业务公式。
-- 当前共享数据库按职责分为三类：
-  - `premium_history.db`：已具备日常增量与历史裁剪，继续沿用现状。
-  - `market_pairs.db`：属于配对主数据，不是持续膨胀的时序库，继续沿用现状。
-  - 以下数据库必须补齐“自动更新后立即裁剪”的正式链路：
-    - `subscription_history.db`
-    - `stock_price_history.db`
-    - `cb_rights_issue_stock_history.db`
-- `subscription_history.db` 合同：
-  - 继续按 IPO / 可转债打新每日抓取结果做 upsert。
-  - 每次同步完成后，必须自动删除超过保留窗口的旧记录。
-  - 保留窗口必须进入 `config.yaml`，不得硬编码散落。
-- `stock_price_history.db` 合同：
-  - 继续以“仅补新增/缺失交易日”为主，不重建整库。
-  - 每次可转债正股历史同步完成后，必须按“每个股票保留最近 N 条”自动裁剪。
-  - N 必须覆盖当前最大真实需求，并留有安全余量，至少不能破坏：
-    - `250日波动率`
-    - `ATR20`
-    - `正股近20日平均成交额`
-    - `正股近5日平均成交额`
-- `cb_rights_issue_stock_history.db` 合同：
-  - 继续以“仅补新增/缺失交易日”为主，不重建整库。
-  - 每次抢权配售正股历史同步完成后，必须按“每个股票保留最近 N 条”自动裁剪。
-  - N 必须覆盖当前 `250日波动率` 的真实需求并留有安全余量。
-- 新增的数据库保留参数必须集中进入 `config.yaml`，并由同步链路直接读取。
-
-## 54. 服务器主刷新与网页状态级自动刷新合同 (2026-03-25)
-- 本轮的刷新职责固定为：
-  - 服务器负责自动抓取、自动缓存、自动调度、自动推送
-  - 网页只负责读取当前状态与展示结果
-- 网页必须保留自动刷新，但其正式语义固定为：
-  - 刷新频率：`60s`
-  - 默认范围：当前可见 tab 的状态层
-  - 主表完整数据只有在服务端缓存时间变化后才允许重拉
-- 网页普通访问、普通切换标签页、普通自动刷新不得触发重型维护任务，至少包括：
-  - `sync-cb-stock-history`
-- 服务器端现有刷新频率在本轮保持不变：
-  - `AH / AB / 汇率 / 转债套利 / 事件套利` 继续按 `5 分钟`
-  - `IPO / 转债申购 / 可转债抢权配售` 继续按 `15 分钟`
-  - 日更链路继续按 `16:10` 后 daily sync
-- Dashboard 允许新增轻量状态接口用于缓存变更检测；正式允许依赖的最小元信息至少包括：
-  - `updateTime`
-  - `cacheTime`
-  - `servedFromCache`
-  - `refreshing`
-- `转债套利` 普通读取链路必须与正股历史同步解耦：
-  - 页面读取默认直接返回 last-good 展示缓存
-  - 正股历史同步只允许留在后台维护或显式维护任务中
-- 首页启动不得继续为隐藏 tab 全量并发加载所有模块；必须优先保证：
-  - 头部状态
-  - 当前激活 tab
-- 本轮新增的前端自动刷新配置必须进入 `config.yaml > presentation.dashboard_auto_refresh`，不得散落硬编码。
-- 同步结果必须真实返回裁剪数量，不能再固定写死 `prunedRows = 0`。
-- 这轮不要求把所有数据库都改成按年归档；只要求用最短链路完成“每日增量 + 超量即删”。
-
-## 62. 推送调度午夜时间归一合同 (2026-03-26)
-- 项目内所有“上海时间”调度判断必须使用一致的小时语义。
-- 若运行环境的本地化时间格式在午夜返回 `24:xx`：
-  - 系统必须将其归一为 `00:xx`
-  - 不得把 `00:xx` 误判为当天所有定时槽位都已到点
-- `主摘要定时推送`、`可转债抢权配售独立推送`、`LOF独立定时推送` 都必须遵守该规则。
-- 定时推送的真实触发条件保持不变：
-  - `enabled = true`
-  - 当前上海日期允许执行
-  - 当前上海时间大于等于配置时间
-  - 且该日期该槽位尚未成功发送
-- 本轮明确禁止以下错误行为：
-  - 上海 `00:00-00:59` 被当成 `24:00-24:59`
-  - 因午夜解析不一致导致运行态去重记录在下一分钟被清空
-  - 同一日期同一槽位在午夜一小时内反复重发
-- 本轮不改变任何推送内容、模块选择、默认时间、Webhook 配置，只修复午夜时间判断与去重一致性。
-
-## 63. 数据刷新可靠性与状态真实性合同 (2026-03-26)
-- 作为金融网站，主行情页面的正式要求是“读到最近一次成功构建的真实快照”，而不是长期停留在跨日旧缓存。
-- 本轮只修以下四类问题：
-  - `可转债套利 cbArb` 的超时与跨日陈旧缓存
-  - Dashboard `缓存/实时` 状态误报
-  - `runDailySync()` 成功标记过度乐观
-  - 午夜时间解析导致的定时推送提前触发
-- `可转债套利` 的普通读取链路必须与重型正股历史维护解耦：
-  - 页面读取与普通 API 读取优先返回最新一次成功的 `cbArb` 数据集
-  - 正股历史同步不得继续挂在每次普通实时读取的关键路径上
-  - 重型同步仅允许留在显式维护任务或 daily-sync 路径
-- `GET /api/market/convertible-bond-arbitrage?force=1` 必须能在云端代理超时窗口内完成，不得继续稳定返回 `504 Gateway Time-out`。
-- `cbArb` 数据一旦刷新失败：
-  - 页面可以继续显示 last-good 数据
-  - 但必须能明确知道“这是失败回退结果”，不能与“今天刚成功更新的数据”混为一谈
-- `GET /api/dashboard/resource-status` 的 `servedFromCache` 语义必须收敛为真实回退状态：
-  - 不能因为“数据最终落盘到了缓存文件”就一律标记为缓存态
-  - 新鲜数据和失败回退数据必须可区分
-- Dashboard 顶部与模块状态文案必须与上述真实语义一致：
-  - 不能把当天刚构建成功的数据写成“当前显示缓存快照”
-  - 不能把跨日旧数据伪装成“实时数据已连接”
-- `runDailySync()` 只有在本轮要求的 daily-sync 数据集全部成功时，才允许把 `lastDailySyncDate` 记为当天。
-- 若 daily-sync 中有失败：
-  - 必须保留失败事实
-  - 不得把该日状态写成“已完成”
-  - 失败模块必须可通过运行态或日志定位
-- 午夜时间合同继续强制适用于：
-  - 主摘要定时推送
-  - 可转债抢权配售独立推送
-  - LOF 独立定时推送
-- 本轮不修改：
-  - `AH / AB / LOF / 抢权配售 / 事件套利` 的业务公式
-  - 表格字段与视觉布局
-  - 推送内容与默认时间配置
-
-## 64. Dashboard 双主题低风险改版合同 (2026-03-27)
-- 本轮目标是把 Dashboard 视觉风格升级为更简洁、突出数据的样式，但必须保持功能完全等效。
-- 本轮正式边界固定为“只改展示层，不改业务层”：
-  - 不改数据抓取链路
-  - 不改策略计算口径
-  - 不改推送与调度逻辑
-  - 不改公开 API 路径
-  - 不改页面字段集合、列顺序、分页规则、搜索规则、排序规则
-- Dashboard 必须新增一个正式主题配置入口：
-  - `config.yaml > presentation.dashboard_theme`
-- `dashboard_theme` 本轮只允许两个值：
-  - `classic`
-  - `clean_data`
-- `classic` 代表当前旧主题语义，是正式回退主题。
-- `clean_data` 代表新的“数据优先、简洁大气”主题，视觉目标固定为：
-  - 更轻的背景
-  - 更弱的装饰发光
-  - 更清晰的表格边界
-  - 更平静的蓝灰色强调色
-  - 保持金融数据页面的高密度可读性
-- 新主题不得通过重写页面结构实现：
-  - 不新增第二套 Dashboard DOM
-  - 不为各模块复制第二份渲染函数
-  - 不改变现有 tab / 子 tab / 表格 / 表单结构
-- 主题切换必须走现有 Dashboard UI 配置通道：
-  - `GET /api/dashboard/ui-config`
-  - 前端只根据配置切换主题，不在多个文件散落硬编码
-- `GET /api/dashboard/ui-config` 在保留现有字段的前提下，允许新增：
-  - `dashboardTheme`
-- 回退合同固定为：
-  - 把 `config.yaml > presentation.dashboard_theme` 改回 `classic`
-  - 页面即恢复旧视觉
-  - 不需要回滚业务代码
-- 本轮验收标准：
-  - 页面仍能正常打开
-  - 所有现有模块功能可用
-  - 新旧主题可切换
-  - 切换主题不会影响抓取、推送、调度、接口返回和页面交互语义
-
-## 65. Dashboard 页面末尾注释与紧凑命名合同 (2026-03-28)
-- 本轮继续只改 Dashboard 展示层，不改业务逻辑、接口、推送和调度。
-- 所有模块原先内嵌在各自面板里的 `页面注释` 必须迁移到整页末尾统一展示。
-- 页面末尾注释区的正式合同为：
-  - 只展示当前激活主 Tab 对应模块的注释
-  - 注释内容仍沿用现有 `数据来源 / 计算公式 / 策略说明`
-  - 模块面板内部不再重复渲染注释卡
-- 主功能标签必须继续保持 8 个根 Tab，但在桌面端要更紧凑：
-  - 标签更短
-  - 高度更低
-  - 优先保持一行阅读
-  - 移动端仍允许按现有响应式规则换行
-- 标签文案与模块显性标题允许按“短名称”收敛，但不得改变业务语义：
-  - `转债套利` 可收敛为 `转债`
-  - `AH溢价` 可收敛为 `AH`
-  - `AB溢价` 可收敛为 `AB`
-  - `LOF套利` 可收敛为 `LOF`
-  - `监控套利` 可收敛为 `监控`
-  - `分红提醒` 可收敛为 `分红`
-  - `事件套利` 可收敛为 `事件`
-  - `可转债抢权配售` 可收敛为 `抢权`
-- 各模块置顶信息区必须更紧凑，正式方向为：
-  - 能同栏分栏展示的摘要信息，优先并排而不是继续纵向堆叠
-  - 顶部说明文案更短
-  - 保持数据先于说明进入视野
-- 列表区名称也应统一短化，接近集思录的数据页风格：
-  - `主表` 优先改为 `列表`
-  - `今日登记日提醒` 可改为 `今日登记`
-  - `分红观察名单` 可改为 `观察列表`
-  - `监控列表` 可改为 `入池列表`
-  - `固定来源结构化信息` 可改为 `来源列表`
-  - `前三 / 倒数前三` 可改为 `前3 / 后3`
-- 上述短化只允许改显示文案，不得改：
-  - 字段含义
-  - 表格列
-  - 搜索/排序/分页行为
-  - 子标签顺序
-  - 推送表单语义
-- 本轮验收标准：
-  - 页面注释全部移到整页末尾
-  - 模块内部不再重复显示页面注释卡
-  - 桌面端主 Tab 更小、更紧凑，并保持单行
-  - 各模块置顶摘要区明显更省空间
-  - 列表和模块名称更短、更集中，但业务含义保持不变
-
-## 66. Dashboard 表头短化优先合同 (2026-03-28)
-- 本轮纠正上一轮的文案收敛方向：
-  - 主功能名不再继续缩写
-  - 模块标题不再继续缩写
-  - 优先压缩的是模块内部的列表名、表头名和列宽
-- 根 Tab 与模块显性标题继续保持原始业务名称，例如：
-  - `转债套利`
-  - `AH溢价`
-  - `AB溢价`
-  - `LOF套利`
-  - `监控套利`
-  - `分红提醒`
-  - `事件套利`
-  - `可转债抢权配售`
-- 表头短化是本轮正式优化重点，允许收敛为更高密度、接近集思录的短表头，但不得改变字段含义。
-- 允许的正式方向包括：
-  - `转债代码 -> 代码`
-  - `转债名称 -> 转债`
-  - `正股代码 -> 正股码`
-  - `正股名称 -> 正股`
-  - `转股价值 -> 转股值`
-  - `转股溢价率 -> 转股溢`
-  - `近三年分位 -> 分位`
-  - `样本区间 -> 区间`
-  - `预计收益率 -> 收益率`
-  - `官方公告 -> 公告`
-- 列宽压缩也以表格为中心：
-  - 代码列更窄
-  - 日期列更窄
-  - 数值列更窄
-  - sticky 列宽也要同步收敛
-- 本轮明确不通过以下方式做“伪密度提升”：
-  - 删除真实字段
-  - 把字段藏到展开区
-  - 改变排序、搜索、分页或接口语义
-- 本轮验收标准：
-  - 主功能名称保持原始业务名称
-  - 各大列表表头明显更短
-  - 表格横向宽度明显收敛
-  - 数据密度提升来自表头和列宽优化，而不是丢字段
-
-## 63. Module-local Timed Push Runtime Self-healing Contract (2026-03-26)
-- `cb_rights_issue` and `lof_arbitrage` scheduled pushes must follow the same
-  same-day slot-validation rule as the main summary scheduler.
-- Module-local runtime JSON must not treat persisted slot text alone as proof that
-  the scheduled delivery really happened at or after that slot.
-- For the current Shanghai day, a recorded module-local scheduled slot may remain
-  valid only when the latest same-day module success time proves that the slot is
-  not later than the latest successful delivery point.
-- If the latest same-day module success time is earlier than a recorded future slot,
-  that future slot record must be auto-cleared before the next scheduler decision.
-- If there is no same-day success record, current-day persisted scheduled-slot text
-  must be treated as dirty and cleared before the next scheduler decision.
-- This self-healing rule applies to both module-local timed push chains:
-  - `cb_rights_issue`
-  - `lof_arbitrage`
-- `lof_arbitrage` timed-push logs must expose enough context for live diagnosis,
-  including at least:
-  - sanitized same-day record result
-  - `not_due_yet`
-  - `already_sent`
-  - success / failure
-- Existing module push content, module push times, and push-config API routes remain
-  unchanged in this round.
-
-## 67. 可转债转股溢价率真值修复合同 (2026-03-28)
-- 本轮继续只修 `可转债套利` 这一条链路，不改 AH / AB / LOF / 抢权 / 事件套利。
-- `可转债套利` 对外正式口径统一收敛为 `转股溢价率`，本轮起页面、摘要、推送和状态文案不得再把
-  `折价率 / 加权折价率` 作为正式用户侧字段继续暴露。
-- `转股价值` 必须固定按真实实时字段重算：
-  - `转股价值 = 正股现价 × 100 ÷ 转股价`
-- `转股溢价率` 必须固定按重算后的 `转股价值` 计算：
-  - `转股溢价率 = (转债现价 ÷ 转股价值 - 1) × 100`
-- 上述两项属于实时价衍生字段，必须优先读取最新实时 API 输入，不得继续信任上游错误透传值，也不得继续从前一版缓存行回填：
-  - `stockPrice`
-  - `convertPrice`
-  - `convertValue`
-  - `premiumRate`
-- 慢字段缓存仍允许保留，但范围只限：
-  - 正股历史 K 线衍生的波动率
-  - ATR
-  - 历史成交额均值
-  - 纯债价值日缓存
-  - 静态元数据补充
-- `转债套利` 顶部监控摘要和相关推送改为 `低溢价监控` 语义：
-  - 买入区：`premiumRate < -2%`
-  - 卖出区：`premiumRate > -0.5%`
-- 用户侧无需再看到为了旧折价策略而额外派生的：
-  - `discountRate`
-  - `weightedDiscountRate`
-- 转债主表固定列调整为：
-  - 固定第 1 列 `序号`
-  - 固定第 2 列 `转债名称`
-  - `转债代码` 保留展示，但不再作为固定列，也不再排在固定名称列之前
-- 本轮验收必须包含一个明确坏样本校验：
-  - `118025 奕瑞转债`
-  - 当 `stockPrice = 106.02`、`convertPrice = 114.97` 时，`convertValue` 必须约等于 `92.215`
-- 云端验收要求：
-  - 云端 API 强制刷新后返回的是当日修正后的真实值
-  - 云端网页展示和推送状态文案与新口径一致
-  - 若 `cbArb force` 实时重算超过公网代理窗口，接口必须返回最近一次成功快照并继续后台刷新，不得直接 `504`
-
-## 69. 可转债固定列修正与加权折价率恢复合同 (2026-03-28)
-- 本轮继续只修 `可转债套利` 这一条链路，不改 AH / AB / LOF / 抢权 / 事件套利。
-- `转股溢价率` 仍是 `可转债套利` 的主口径，实时计算口径继续保持：
-  - `转股价值 = 正股现价 × 100 ÷ 转股价`
-  - `转股溢价率 = (转债现价 ÷ 转股价值 - 1) × 100`
-- 本轮恢复 `加权折价率`，但其折价基础必须切换为：
-  - `discountRate = -premiumRate`
-- `加权折价率` 的正式计算口径恢复为：
-  - `weightedDiscountRate = discountRate × atrCoefficient × sellPressureCoefficient × boardCoefficient`
-- 本轮用户侧展示合同：
-  - 主口径字段仍为 `转股溢价率`
-  - 不恢复单独的主表 `折价率` 列
-  - 允许恢复 `加权折价率` 作为辅助策略字段
-- `转债套利` 主表固定列合同修正为：
-  - 固定第 1 列 `序号`
-  - 固定第 2 列 `转债名称`
-  - `转债代码` 不再固定
-  - `转债代码` 也不再紧跟在固定名称列之后
-- 本轮验收标准：
-  - 页面横向滚动时，固定列只剩 `序号 + 转债名称`
-  - `转债代码` 仍可查看，但不会冻结在左侧
-  - `加权折价率` 已恢复返回并与 `-转股溢价率` 口径一致
-  - 云端页面与 API 同步到该口径
-
-## 70. 可转债主表收敛合同 (2026-03-28)
-- 本轮继续只改 `可转债套利` 的前端主表展示，不改抓取链、计算链和后端真实字段保留规则。
-- 可转债主表的目标是“桌面端能读下关键指标”，因此本轮允许减少前端默认可见列，但不得删除后端真实字段。
-- 主表列名应尽量缩短，正式方向包括但不限于：
-  - `转债现价 -> 转债价`
-  - `转债涨跌幅 -> 转债涨`
-  - `转债代码 -> 代码`
-  - `正股代码 -> 正股码`
-  - `正股名称 -> 正股`
-  - `正股现价 -> 正股价`
-  - `正股20日均额(亿) / 正股5日均额(亿) -> 正股成交`
-  - `转股溢价率 -> 转股溢`
-  - `加权折价率 -> 加权折`
-  - `理论溢价率(参考) -> 理论溢`
-  - `剩余年限 -> 剩余期`
-- 本轮主表允许把天然成对的信息合并进同一单元格展示，只要不改变含义，例如：
-  - `转债价 = 现价 + 涨幅`
-  - `正股 = 名称 + 代码`
-  - `正股价 = 现价 + 涨幅`
-  - `正股成交 = 20日均额 + 5日均额`
-- 以下字段继续保留在后端，但不再进入主表默认可见列：
-  - `listingDate`
-  - `convertStartDate`
-  - `maturityDate`
-  - `optionTheoreticalValue`
-  - `theoreticalPrice`
-- 期限类展示口径收敛为单一字段：
-  - 前端主表只显示 `remainingYears`
-  - 显示名为 `剩余期`
-- 理论定价展示口径收敛为单一字段：
-  - 前端主表只显示 `theoreticalPremiumRate`
-  - 显示名为 `理论溢`
-- 搜索能力保留，但可转债主表的搜索区不再保留独立的清空按钮和额外提示行，避免继续占据纵向空间。
-- 分页状态中的筛选提示也应收敛，不再突出单独的“筛选后”提示文案。
-- 本轮验收标准：
-  - 可转债主表明显比当前更窄
-  - `正股成交` 等短标签生效
-  - `上市日 / 转股起始日 / 到期日 / 期权理论价值 / 理论价值` 不再出现在主表
-  - `剩余期` 与 `理论溢` 成为保留的期限/理论代表字段
-
-## Effective Rollback Note (2026-03-28)
-
-- `Dashboard Low-risk Dual-theme Restyle / Footer-note + Compact Naming / Table-header Compaction`
-  no longer define the live effective UI contract after rollback.
-- The effective dashboard requirement is restored to:
-  - classic presentation baseline
-  - inline module notes inside each module instead of shared page-bottom notes
-  - original list titles and original visible table-header wording
-  - original density guidance rather than the experimental compact-width preset
-
-## 72. 可转债主表固定列与双值标签跟进合同 (2026-03-30)
-- 本轮继续只改 `可转债套利` 的前端主表展示，不改抓取、计算、推送与公开 API 字段口径。
-- `转债套利` 主表新的固定列合同为：
-  - 取消可见 `序号` 列
-  - `转债名称` 与 `转债代码` 合并为同一列
-  - 合并后的 `转债名称` 列采用和当前 `正股` 列一致的双层展示方式：
-    - 第一行显示名称
-    - 第二行显示代码
-  - 横向滚动时，左侧只固定这一列，不再保留单独的固定序号列
-- 本轮继续只做展示合并，不改变真实字段含义：
-  - 后端仍保留 `bondName`、`code`
-  - 前端只是把两者收敛进同一个单元格
-- `转股溢价` 列的用户侧展示合同改为：
-  - 列名固定为 `转股溢价`
-  - 同一单元格同时显示：
-    - 溢价金额
-    - 转股溢价率
-  - 展示密度参考当前 `正股价` 列，而不是拆成两列
-- `加权折价` 列的用户侧展示合同改为：
-  - 列名固定为 `加权折价`
-  - 同一单元格同时显示：
-    - 折价金额
-    - 加权折价率
-- `理论溢价` 列的用户侧展示合同改为：
-  - 列名固定为 `理论溢价`
-  - 同一单元格同时显示：
-    - 理论溢价金额
-    - 理论溢价率
-- 本轮可转债主表文案同步收口为：
-  - `纯债价 -> 纯债价值`
-  - `规模 -> 剩余规模`
-  - `250波动 -> 波动率`
-  - `剩余期 -> 剩余期限`
-- 本轮验收标准：
-  - 页面上不再看到 `序号` 列
-  - 页面上不再看到单独的 `代码` 列
-  - `转债名称` 列左侧冻结且同时展示名称与代码
-  - `转股溢价 / 加权折价 / 理论溢价` 为双值单元格，不再只显示百分比
-  - `纯债价值 / 剩余规模 / 波动率 / 剩余期限` 文案与页面展示一致
-
-## 73. 可转债加权折价率口径清理合同 (2026-03-30)
-- 本轮继续只修 `可转债套利` 这一条链路，不改 AH / AB / LOF / 抢权 / 事件套利。
-- 本轮起不再新增或继续强调单独的 `折价率` 概念：
-  - 正式基底直接使用 `-转股溢价率`
-  - 文档与代码不再把 `discountRate` 作为本轮用户侧正式字段继续扩散
-- `加权折价率` 的正式口径改为直接基于 `-premiumRate`：
-  - `weightedDiscountRate = (-premiumRate) × atrCoefficient × sellPressureCoefficient × boardCoefficient`
-- 由于 ATR 系数锚点只接受非负比值，本轮 ATR 系数输入口径固定为：
-  - `ATR百分比 = stockAtr20 / stockPrice × 100`
-  - `ATR比值 = abs(-premiumRate) / ATR百分比`
-- 抛压系数继续固定为：
-  - `抛压比值 = 剩余规模 / 正股20日平均成交额`
-- 本轮正式要求可转债主表“全量显示加权折价率”：
-  - 不再只给旧低溢价监控池行返回 `weightedDiscountRate`
-  - 只要 `premiumRate`、ATR、20日成交额、板块因子存在，就必须计算并展示
-- 可转债主表列顺序补充要求：
-  - `ATR系数/ATR%`
-  - `抛压系数`
-  - `市场`
-  必须出现在 `加权折价` 之前
-- `转股溢价 / 理论溢价 / 加权折价` 的单元格主显示必须统一收敛为百分比：
-  - 第一行显示对应百分比
-  - 第二行显示对应金额
-- 本轮可转债主表排序合同收窄为仅保留：
-  - `加权折价`
-  - `理论溢价`
-  - `双低`
-- 其他可转债主表列不再显示可点击排序入口。
-- 本轮验收标准：
-  - 绝大多数正常转债行都能看到 `加权折价` 百分比
-  - `转股溢价 / 理论溢价 / 加权折价` 主显示都是百分比而不是金额
-  - `ATR系数/ATR% / 抛压系数 / 市场` 列位于 `加权折价` 之前
-  - 主表排序入口只剩 `加权折价 / 理论溢价 / 双低`
-
-## 74. 可转债转股溢价排序恢复合同 (2026-03-30)
-- 本轮继续只改 `可转债套利` 主表的前端排序入口，不改抓取、计算、推送、数据库和 API 字段。
-- 用户当前生效需求为：`转股溢价` 重新支持排序。
-- 因此本轮可转债主表可见排序入口正式调整为 4 项：
-  - `转股溢价`
-  - `加权折价`
-  - `理论溢价`
-  - `双低`
-- `转股溢价` 的排序口径固定为：
-  - 使用真实数值字段 `premiumRate`
-  - 按数值排序，不按双值展示文本排序
-  - 默认方向保持与当前百分比风险字段一致，采用降序
-- 本轮不改变 `转股溢价` 的显示形式：
-  - 第一行仍显示转股溢价率
-  - 第二行仍显示溢价金额
-- 本轮不恢复其他列的排序能力，除上述 4 列外，其余可转债主表列继续不显示排序入口。
-- 本轮验收标准：
-  - 页面上 `转股溢价` 表头重新出现排序按钮
-  - 点击后按 `premiumRate` 数值正确升降序
-  - `加权折价 / 理论溢价 / 双低` 的排序行为不回退
-
-## 75. 可转债剩余期限与强赎高亮合同 (2026-03-30)
-- 本轮继续只改 `可转债套利` 主表展示，不改抓取公式、推送链路和非可转债模块。
-- `剩余期限` 的用户侧展示口径统一收口为：
-  - 继续使用真实字段 `remainingYears`
-  - 不再对小于 1 年的值切换成“月”
-  - 页面一律按“年”显示
-  - 示例：`0.42年`、`1.75年`
-- 本轮新增 `强赎高亮` 的页面合同：
-  - 对“已经公布强赎”的可转债行做高亮显示
-  - 高亮颜色固定为黄色系
-  - 高亮范围为整行及左侧固定的 `转债名称` 单元格
-- 强赎高亮的判定边界固定为：
-  - 使用现有真实字段 `forceRedeemStatus`
-  - 仅当状态文本明确属于已公告/已实施中的强赎语义时高亮
-  - `不强赎 / 暂不强赎 / 不提前赎回` 一类否定语义不得高亮
-  - `完成 / 摘牌 / 终止 / 退市` 等终态不得因本轮高亮规则重新出现误标
-- 本轮不新增新的强赎数据源，也不改现有字段命名；只是把已有真实字段在页面上表达得更清楚。
-- 本轮验收标准：
-  - 可转债主表中的 `剩余期限` 全部以“年”为单位显示
-  - 已公告强赎的可转债行显示黄色高亮
-  - 否定强赎或已完成终态不会被错误高亮
-
-## 77. 可转债强赎字段透传修复合同 (2026-03-30)
-- 本轮继续只修 `可转债套利` 的页面读数链路，不改转债公式、LOF、AH/AB、推送和非转债模块。
-- 本轮正式明确强赎页面行为边界：
-  - `已公告强赎、但尚未终止上市` 的可转债，应在主表中黄色高亮
-  - `已完成强赎 / 已终止上市 / 已摘牌` 的可转债，不应高亮，而应直接从主表中剔除
-- 本轮正式要求 `/api/market/convertible-bond-arbitrage` 的公开行补齐下列真实字段，供页面高亮与诊断使用：
-  - `forceRedeemStatus`
-  - `delistDate`
-  - `ceaseDate`
-- 上述字段口径保持真实源透传：
-  - 不允许页面自行编造强赎状态
-  - 不允许用假标签替代真实状态文本
-- 海优转债这一类“已完成强赎”的案例，本轮的正确结果不是高亮，而是主表中不再出现。
-- 本轮验收标准：
-  - 可转债公开行包含 `forceRedeemStatus / delistDate / ceaseDate`
-  - 有真实强赎状态的未终态样本可被页面高亮
-  - 已完成强赎的样本不会继续留在主表中
-
-## 55. 250D HFQ Volatility Active Standard (2026-03-30)
-- This round replaces the previously effective `60日波动率` live standard for the following two chains:
-  - convertible-bond theoretical pricing
-  - cb-rights-issue option-value / expected-return pricing
-- The single active rule is:
-  - use real underlying-stock `后复权` daily closes
-  - use the latest `250` close-to-close log returns
-  - annualize by trading-day convention
-  - require at least `251` closes before the row is treated as volatility-ready
-- Convertible-bond public rows may still carry `volatility60` temporarily for compatibility, but if present during this round it must equal the active `250日年化后复权波动率`, not the old 60-day metric.
-- User-facing wording for the affected modules must explicitly say `250日波动率`, not `60日波动率`.
-
-## 56. Cloud-only Web Entry Contract (2026-03-30)
-- The project no longer treats any local webpage path on this machine as an official delivery target.
-- The only official operator-facing web entry is the cloud deployment exposed by:
-  - `deployment.public_base_url`
-  - the live server runtime
-  - the live dashboard template and page bundle actually served by `start_server.js`
-- The effective live web chain is fixed to:
-  - `start_server.js`
-  - `presentation/templates/dashboard_template.html`
-  - `presentation/dashboard/dashboard_page.js`
-- Root-level local web entry residues that are not part of the live chain should be removed instead of kept as parallel access paths, including duplicate mirror files or local-only access pages.
-- Windows local firewall helper scripts for exposing the local web port are no longer part of the maintained operator workflow.
-- Default repository verification semantics must prefer the configured cloud/public URL:
-  - `npm run check`
-  - `npm run check:health`
-  should target the public deployment by default when it is configured, while still allowing explicit override through env vars / parameters.
-- Local loopback addresses such as `127.0.0.1`, `localhost`, or `0.0.0.0` may still exist for internal server bind/reverse-proxy use, but they must not be documented or maintained as a second formal user access path.
-- `RUNBOOK.md` and `quickstart.md` must state consistently that:
-  - official updates target the cloud server
-  - official viewing/verification uses the cloud homepage and public `/api/health`
-  - local `npm run dev` is at most a temporary developer debug action, not a delivery checkpoint
-- This round must not delete or weaken the actual cloud dashboard assets or cloud deployment scripts.
-- Acceptance:
-  - the repository no longer presents a root local webpage as an official entry
-  - duplicate local dashboard mirror files are removed
-  - default smoke/health checks are cloud-first
-  - cloud homepage behavior remains unchanged and available
-
-## 75. 转债纯债价值真值 + 排序稳定 + 250日波动率就绪合同 (2026-03-30)
-- 本轮继续只修 `转债套利` 与 `可转债抢权配售` 的相关链路，不改 AH / AB / LOF / 分红 / 事件套利业务口径。
-- `转债套利` 理论定价中的 `纯债价值 / bondValue` 正式口径收敛为：
-  - 只允许直接使用上游纯债价值接口返回的 `pureBondValue`
-  - 不再允许用本地折现公式自行兜底生成 `bondValue`
-- 因此当 `pureBondValue` 缺失时，系统必须 truthfully 降级：
-  - `bondValue = null`
-  - `theoreticalPrice = null`
-  - `theoreticalPremiumRate = null`
-  - 页面显示 `--`，不得伪装成已经拿到真实纯债价值
-- 前端 `纯债价值` 的读取口径也必须与此一致：
-  - 优先且正式读取 `pureBondValue`
-  - 不得再把旧 `bondValue` 当成可替代的本地折现兜底值
-- Dashboard 表格排序交互必须保持视图稳定：
-  - 点击可排序表头后，当前表格横向滚动位置应尽量保持
-  - 不得再出现一排序就跳回首列、页面明显抖动的行为
-- `250日后复权年化波动率` 继续是唯一有效口径，且本轮要补齐“默认值”和“历史库保留”层面的真值一致性：
-  - 可转债主链默认波动率窗口必须是 `250`
-  - 抢权链默认波动率窗口必须是 `250`
-  - 相关历史同步默认保留行数必须满足至少 `251` 个收盘价的最低要求，并保留运维安全边际
-- 本轮必须核实现有历史数据库是否真的满足 `250` 日口径，不得只改字段名：
-  - `stock_price_history.db`
-  - `cb_rights_issue_stock_history.db`
-- 若数据库当前不满足 `251` 个收盘价最小要求，必须明确说明并执行相应补数/同步，不得继续把旧 60 日状态伪装成已完成 250 日切换。
-- 本轮验收标准：
-  - 理论价不再使用本地折现纯债兜底
-  - 排序时宽表不再跳回左侧首列
-  - 代码默认口径与页面文案都只认 `250日后复权年化波动率`
-  - 已核实数据库是否满足 250 日口径，并将云端运行态修到真实可用状态
-
-## 76. 转债纯债价值缓存接线修复合同 (2026-03-30)
-- 本轮继续只修 `转债套利` 的纯债价值读链路，不改转债公式、AH/AB、LOF、事件套利、推送与非转债模块。
-- `纯债价值 / pureBondValue` 的正式来源仍然固定为真实上游接口：
-  - 使用东方财富纯债价值接口返回的 `PUREBONDVALUE`
-  - 不允许恢复本地折现兜底
-- 本轮修复的目标不是新增来源，而是把现有真实来源重新接回普通读取链路：
-  - 普通 `GET /api/market/convertible-bond-arbitrage` 读取时，必须尝试按日加载 `pureBondMap`
-  - 同日抓取成功时，需写入运行态辅助缓存并供当次结果直接使用
-  - 若同日抓取失败，只允许回退到历史缓存中的真实上游值
-  - 若历史缓存也没有，则页面继续显示 `--`
-- 运行态与用户侧语义必须保持一致：
-  - `pureBondValue` 有值时，页面 `纯债价值` 显示真实值
-  - `pureBondValue` 无值时，不得把 `bondValue` 或其他本地估算值伪装成纯债价值
-- 本轮需要同步清理说明文本：
-  - 不再保留“上游纯债价值或本地折现兜底”之类旧口径描述
-- 本轮验收标准：
-  - 公网 `/api/market/convertible-bond-arbitrage` 能重新返回大量真实 `pureBondValue`
-  - 页面 `纯债价值` 列对有上游值的转债恢复显示
-  - 缺失值样本继续诚实显示空，不引入新的本地兜底
-
-## 82. 可转债强赎页面真值与理论溢价率修复合同 (2026-03-30)
-- 本轮继续只修 `可转债套利` 的真实读数链路与页面显示，不改 AH / AB / LOF / 打新 / 分红 / 推送业务口径。
-- 强赎页面行为正式再次收口为：
-  - `已公告强赎、但尚未停牌/摘牌/终止上市` 的转债，在主表中黄色高亮；
-  - `已停牌 / 已摘牌 / 已终止上市 / 已完成强赎` 的终态转债，不应高亮，而应继续从主表中剔除。
-- 因此像 `海优转债` 这类若真实源已经给出停牌/摘牌/终态日期或终态语义，本轮正确结果仍然是“不再出现在主表中”，不是重新高亮。
-- `理论溢价率` 的正式显示口径继续固定为：
-  - 依赖真实 `pureBondValue`
-  - 依赖真实 `250日后复权年化波动率`
-  - 依赖现有理论价公式产出的 `theoreticalPrice / theoreticalPremiumRate`
-- 当真实输入齐备时：
-  - 页面 `理论溢价` 必须恢复显示真实 `theoreticalPremiumRate`
-  - 排序与摘要读取也必须基于该真实字段
-- 当 `pureBondValue` 缺失时：
-  - `theoreticalPrice = null`
-  - `theoreticalPremiumRate = null`
-  - 页面继续显示 `--`
-  - 不允许恢复本地纯债折现兜底
-- 页面与说明文案必须与当前有效口径一致：
-  - 本链路波动率仍显示并解释为 `250日后复权年化波动率`
-  - 不得重新写回 `60日波动率` 旧口径
-- 本轮验收标准：
-  - 终态强赎样本不会继续留在主表误高亮
-  - 未终态强赎样本仍可黄色高亮
-  - 有真实纯债价值与 250D 波动率输入的样本恢复 `理论溢价率`
-  - 缺失真实输入的样本继续诚实显示 `--`
-
-## 83. 可转债主表全列排序与紧凑列宽合同 (2026-03-30)
-- 本轮继续只改 `可转债套利` 主表前端展示，不改抓取、计算、数据库、推送与其他模块。
-- 可转债主表的当前可见列，全部恢复排序能力：
-  - `转债名称`
-  - `转债价`
-  - `正股`
-  - `正股价`
-  - `正股成交`
-  - `转股价`
-  - `转股价值`
-  - `转股溢价`
-  - `ATR系数/ATR%`
-  - `抛压系数`
-  - `市场`
-  - `加权折价`
-  - `双低`
-  - `纯债价值`
-  - `理论溢价`
-  - `剩余规模`
-  - `250日波动率`
-  - `剩余期限`
-- 排序口径固定为“按该列主显示值排序”：
-  - 名称/市场类按文本排序
-  - 价格、价值、规模、期限、波动率类按数值排序
-  - 复合单元格按第一行主值排序，而不是按拼接后的展示文本排序
-- 排序表头的可视形式改为更紧凑的提示：
-  - 使用小箭头
-  - 箭头置于标签上方
-  - 不再使用占宽过大的横向图标布局
-- 本轮同时收紧可转债主表列宽合同：
-  - 列宽优先按内容适配
-  - 不再让可转债表继续沿用偏宽的通用列宽
-  - 可转债应使用更细的专用列宽分类，减少无意义留白
-  - 横向滚动仍然允许存在，但应在“真实字段多”时承担滚动，而不是因为列宽配置过松
-- 本轮验收标准：
-  - 可转债主表所有当前可见列都能点击排序
-  - 排序箭头位于列标题上方，视觉更接近你给出的紧凑表头风格
-  - 主表列宽明显收紧，首屏信息密度提升
-  - 不改变任何可转债后端字段与公式口径
-
-## 84. 抢权配售 250 日波动率强制化与历史库修复合同 (2026-03-30)
-- 本轮继续只修 `可转债抢权配售` 链路，不改 AH / AB / LOF / 转债套利 / 分红 / 推送业务口径。
-- 抢权配售定价使用的波动率正式收口为：
-  - 只允许使用 `250日后复权年化波动率`
-  - 不再允许真实使用旧 `60日波动率` 参与 Black-Scholes 定价
-- 若为了兼容旧前端/字段保留 `volatility60`：
-  - 也只能作为 `volatility250` 的别名镜像
-  - 不得再表示真实旧 60 日口径
-- 抢权配售源数据与策略输出必须一致：
-  - 源侧优先输出 `volatility250`
-  - 当历史库不足 `251` 个收盘价时，`volatility250 = null`
-  - 此时收益率也必须 truthfully 为空，不得回退到旧口径
-- 本轮必须修复专用历史数据库真值，而不只是改字段名：
-  - 核查 `runtime_data/shared/cb_rights_issue_stock_history.db`
-  - 需要让有足够上市历史的标的补齐到 `>=251` 条后复权收盘价
-  - 若个别标的上市历史确实不足，则保留真实空值
-- 本轮验收标准：
-  - 抢权配售代码链不再真实使用旧 `volatility60`
-  - `cb_rights_issue_stock_history.db` 对可满足条件的标的补齐到 `>=251` 条
-  - 云端接口对可满足条件的标的返回真实 `volatility250`
-  - 收益率与监控入池结果和 `volatility250` 口径一致
-
-## 86. 抢权配售网页可见层 250 日同步与缓存强刷合同 (2026-03-30)
-- 本轮继续只修 `可转债抢权配售` 的网页可见层，不改 AH / AB / LOF / 转债套利 / 分红 / 推送业务口径。
-- 本轮正式目标是补齐“后端已切到 250 日，但页面仍可能让用户误以为没变化”的最后一层问题。
-- 页面正式合同收口为：
-  - 抢权配售模块任何当前仍对外展示的波动率说明文案，都必须与活跃口径一致写为 `250日波动率`
-  - 不得继续保留 `60 日波动率` 或 `60日波动率` 旧文案
-- 页面说明文案必须与当前真实约束一致：
-  - 波动率来自本功能独立后复权历史库
-  - 使用最近 `250` 个对数收益率样本年化
-  - 少于 `251` 个收盘价时不得伪装为已具备波动率
-- 本轮允许做一个前端缓存强制更新动作：
-  - 模板中的 dashboard 脚本版本参数必须提升
-  - 目的是强制浏览器重新拉取新的前端 bundle
-  - 该动作不得改变 API 路径、字段、公式和推送逻辑
-- 本轮验收标准：
-  - 公网抢权配售页面不再出现 `60 日波动率` 旧文案
-  - 刷新页面后浏览器能拉到新版 dashboard 资源
-  - 公网接口继续返回修复后的 `volatility250`
-
-## 87. 可转债理论期权相关列扩展合同 (2026-03-30)
-- 本轮继续只改 `可转债套利` 主表前端展示，不改抓取、计算、数据库、推送与其他模块。
-- 用户侧新增 3 个可见列，位置固定在 `理论溢价` 之后：
-  - `理论期权价值`
-  - `隐含期权价值`
-  - `期权折价率`
-- 本轮不新增新的后端字段，3 个新列必须直接复用现有真实字段计算：
-  - `理论期权价值`：
-    - 优先读取当前理论定价链已经产出的真实期权价值
-    - 对当前 `bond+callspread` 口径，直接读取现有 `callOptionValue`
-    - 若遇到兼容旧行，则按现有兼容逻辑读取 `callOptionValue - putOptionValue` 或 `theoreticalPrice - pureBondValue`
-  - `隐含期权价值`：
-    - 固定按 `转债价格 - 纯债价值`
-    - 即 `price - pureBondValue`
-  - `期权折价率`：
-    - 固定按 `隐含期权价值 / 理论期权价值 - 1`
-- 若任一所需真实输入缺失：
-  - 对应列必须诚实显示空值
-  - 不得新增猜测性回填
-- 这 3 个新增列继续纳入当前可转债主表排序合同：
-  - `理论期权价值` 按数值排序
-  - `隐含期权价值` 按数值排序
-  - `期权折价率` 按数值排序
-- 本轮允许同步提升前端 bundle 版本参数，避免浏览器缓存让新增列看起来“没上线”。
-- 本轮验收标准：
-  - `理论溢价` 后面能看到 3 个新列
-  - 新列数值与当前理论价/纯债价值口径一致
-  - 不改任何转债后端公式与 API 路径
-
-## 88. 可转债期权折价率口径修正合同 (2026-03-30)
-- 本轮继续只改 `可转债套利` 主表前端展示，不改抓取、计算、数据库、推送与其他模块。
-- `理论期权价值` 与 `隐含期权价值` 的定义保持不变：
-  - `理论期权价值` 继续读取现有理论定价链的真实期权价值
-  - `隐含期权价值 = 转债价格 - 纯债价值`
-- 原列名 `期权比例` 本轮正式改为：
-  - `期权折价率`
-- `期权折价率` 的正式口径为：
-  - `隐含期权价值 / 理论期权价值 - 1`
-- 若 `理论期权价值` 缺失或等于 `0`：
-  - `期权折价率` 必须诚实显示空值
-  - 不得伪造 `0`、`∞` 或其他占位结果
-- `期权折价率` 继续按数值排序，但排序读取值改为上述真实折价率口径。
-- 本轮允许同步提升前端 bundle 版本参数，避免浏览器缓存继续显示旧的减法口径。
-- 本轮验收标准：
-  - 公网可转债主表中的该列名称变为 `期权折价率`
-  - 公网可转债主表中的该列采用 `隐含期权价值 / 理论期权价值 - 1`
-  - 不改任何转债后端公式与 API 路径
-
-## 89. 可转债期权折价率列显示期权价差合同 (2026-03-30)
-- 本轮继续只改 `可转债套利` 主表前端展示，不改抓取、计算、数据库、推送与其他模块。
-- `期权折价率` 这一列的显示方式补充为双行：
-  - 第一行显示 `期权折价率`
-  - 第二行显示 `期权价差`
-- `期权价差` 的正式口径固定为：
-  - `理论期权价值 - 隐含期权价值`
-- 该值属于展示层派生值：
-  - 不新增后端字段
-  - 直接复用当前前端已经读取的 `理论期权价值` 与 `隐含期权价值`
-- 若任一所需真实输入缺失：
-  - `期权价差` 必须诚实显示空值
-  - 不得补猜测值
-- `期权折价率` 这一列继续按折价率数值排序，不改排序语义。
-- 本轮验收标准：
-  - 公网可转债主表中的 `期权折价率` 列同时显示折价率和期权价差
-  - `期权价差` 采用 `理论期权价值 - 隐含期权价值`
-  - 不改任何转债后端公式与 API 路径
-
-## 89. 可转债摘要与推送强赎排除合同 (2026-03-30)
-- 本轮继续只修 `可转债套利` 的摘要与推送入选逻辑，不改抓取、定价、主表字段与其他模块。
-- 当前用户生效要求是：
-  - 转债套利页面顶部“前三”摘要卡中，只要是强赎标的就要排除
-  - 相关推送也要按同样规则排除
-- 本轮正式边界收口为：
-  - 主表中的强赎标的不要求删除
-  - 只是不再进入“摘要/推送候选集”
-- 本轮需要统一一条共享规则：
-  - 对“已公告强赎 / 强赎进行中 / 实施赎回 / 公告赎回”语义的活跃强赎标的，摘要与推送必须排除
-  - `不强赎 / 暂不强赎 / 不提前赎回` 不属于排除对象
-  - `已完成强赎 / 已摘牌 / 已终止上市 / 已停止交易` 继续由既有终态过滤规则处理
-- 必须排除的范围包括：
-  - 页面 `双低前3`
-  - 页面 `理论溢价前3`
-  - 主摘要推送中的转债重点项
-  - 转债独立折价推送中的监控列表与买卖信号候选
-- 页面顶部 `低溢价监控` 摘要卡若来源于独立推送监控池，也必须同步排除活跃强赎标的，避免页面与推送不一致。
-- 本轮验收标准：
-  - 活跃强赎标的不再出现在转债前三摘要卡
-  - 活跃强赎标的不再进入转债相关推送
-  - 主表仍保留这些活跃强赎标的
-
-## 84. 监控套利三位小数精度合同 (2026-03-30)
-- 本轮继续只改 `监控套利 / 自定义监控` 链路，不改 AH / AB / 转债 / LOF / 分红 / 事件套利模块。
-- `监控套利` 的各项计算结果正式统一收口为：
-  - 计算完成后的对外数值保留 `小数点后三位`
-  - 包括价格、理论对价、价差、收益率等派生字段
-- 本轮不改变监控套利公式本身：
-  - 股票腿理论对价
-  - 现金腿价差
-  - 收益率公式
-  - 仅改变输出精度，不改变公式与输入项
-- 页面显示合同同步收口为三位小数：
-  - 监控套利主表中的 `目标现价 / 股票腿收益率 / 现金腿收益率 / 最优收益率`
-  - 展开详情中的价格、对价、价差、公式说明
-  - 都应统一显示为 `3` 位小数
-- 推送与摘要中的 `自定义监控（全量）` 也必须一致：
-  - 股票腿收益率
-  - 现金腿收益率
-  - 最优收益率
-  - 同样使用 `3` 位小数
-- 本轮验收标准：
-  - 监控套利表格、详情和摘要中的相关数值位数一致
-  - 监控套利所有派生结果统一为 `3` 位小数
-  - 其他模块的显示精度不被意外改动
-
-## 85. 可转债强赎状态列与高亮纠偏合同 (2026-03-30)
-- 本轮继续只修 `可转债套利` 的读数与展示链路，不改 AH / AB / LOF / 打新 / 分红 / 推送与监控套利模块。
-- 本轮正式废止把上游原始 `IS_REDEEM / isRedeem` 直接当作“强赎状态”来高亮页面的旧做法：
-  - 该字段不得再被视为“已公告强赎”的直接真值
-  - 不得再因为这个字段几乎全为 `是` 而把全表染黄
-- `forceRedeemStatus` 的用户侧语义正式收口为：
-  - 由真实公告日期、终态日期等更强证据推导出的展示状态文本
-  - 用于页面状态展示与高亮判定
-- 页面新增 `强赎状态` 列，位置固定为可转债主表最后一列：
-  - 第一行显示状态文本
-  - 若有真实公告日期，可在第二行补充日期
-- 高亮规则正式收口为：
-  - 仅当 `强赎状态` 明确属于“已公告强赎/强赎进行中”语义时高亮
-  - 终态如 `已摘牌 / 已完成强赎 / 已终止上市` 不高亮
-  - 无明确强赎状态的普通转债不高亮
-- 高亮颜色合同同步调整为：
-  - 使用更亮的黄色系
-  - 不再使用偏暗、偏棕的黄色效果
-- 本轮验收标准：
-  - 可转债主表不再出现“几乎所有转债都高亮”
-  - 主表最后一列新增 `强赎状态`
-  - 强赎样本使用亮黄色高亮
-  - 普通样本恢复正常底色
-
-## 86. 可转债双看涨价差理论定价合同 (2026-03-30)
-- 本轮继续只修 `可转债套利` 理论定价链路，不改 AH / AB / LOF / 打新 / 分红 / 推送与其他模块。
-- 本节正式废止上一轮“`bond+call` / `bond+call-put`”与“按强赎价扣减看跌期权”的口径。
-- 期权价值正式改为双看涨价差：
-  - `期权价值 = 看涨期权价值(行权价 = 转股价) - 看涨期权价值(行权价 = 强赎价)`
-- 上面“行权价 = 转股价”的旧写法已被同日第 95 条覆盖；当前生效口径为
-  `max(转股价, 纯债价值 / 对应股数)`。
-- 因此理论价值口径正式收口为：
-  - `theoreticalPrice = bondValue + max(americanCall(convertPrice) - americanCall(redeemTriggerPrice), 0)`
-- 输入真值边界固定为：
-  - 只有 `pureBondValue / stockPrice / convertPrice / redeemTriggerPrice / remainingYears / volatility / riskFreeRate` 同时有效时，才允许输出理论价值
-  - 若缺少真实 `redeemTriggerPrice`，则 `theoreticalPrice / theoreticalPremiumRate` 必须为空
-- `redeemTriggerPrice` 的正式来源不变：
-  - 优先读取上游真实字段
-  - 缺失时再按 `convertPrice * redeemTriggerRatio` 推导
-- 对外字段语义同步更新：
-  - `callOptionValue` 改为“净看涨价差价值”
-  - `putOptionValue` 退役为兼容字段，继续保留但固定为空
-- 页面说明文案必须同步：
-  - 不得继续描述为“债底 + 看涨期权”或“债底 + 看涨期权 - 看跌期权”
-  - 必须明确为“债底 + 净看涨价差价值”
-- 本轮验收标准：
-  - 存在真实 `redeemTriggerPrice` 的转债，`callOptionValue = max(longCall - shortCall, 0)`
-  - 缺少真实 `redeemTriggerPrice` 的转债，`theoreticalPrice / theoreticalPremiumRate` 为空
-  - 页面公式说明与真实实现一致
-
-## 91. 可转债纯债溢价双值列合同 (2026-03-30)
-- 本轮继续只改 `可转债套利` 主表前端展示，不改抓取、数据库、API、推送与其他模块。
-- 原 `纯债价值` 列正式改为 `纯债溢价` 列。
-- `纯债溢价` 的主显示值正式定义为：
-  - `纯债溢价率 = 转债价格 / 纯债价值 - 1`
-  - 本轮按用户最新指定口径执行，不再使用旧的 `转债价格 / 纯债价值` 口径
-- 同一单元格需要展示两个数据：
-  - 第一行：`纯债溢价率`
-  - 第二行：`纯债价值`
-- 排序口径正式收口为：
-  - 按 `纯债溢价率 = 转债价格 / 纯债价值 - 1` 排序
-  - 不再按 `纯债价值` 本身排序
-- 本轮验收标准：
-  - 主表列名显示为 `纯债溢价`
-  - 单元格同时显示 `纯债溢价率` 与 `纯债价值`
-  - 点击表头后按 `转债价格 / 纯债价值 - 1` 正确排序
-
-## 92. 可转债强赎提示简化合同 (2026-03-30)
-- 本轮正式废止转债主表中的整行黄色 `强赎高亮` 表达。
-- 本轮同时废止主表最后一列 `强赎状态` 的单独展示，改为把风险提示集中到 `转债名称` 单元格内部。
-- 新的页面表达固定为：
-  - 仅对“活跃强赎语义”的转债，在 `转债名称` 后面追加红色感叹号 `!`
-  - 不再使用整行黄底、黄字或整列高亮
-- `活跃强赎语义` 的判定口径不变，继续只认现有真实字段：
-  - `forceRedeemStatus`
-  - `forceRedeemNoticeDate`
-  - 否定语义如 `不强赎 / 暂不强赎 / 不提前赎回` 不得加红色感叹号
-  - 终态语义如 `已完成强赎 / 已摘牌 / 已终止上市 / 退市` 不得加红色感叹号
-- `转债名称` 下方需要展示真实原因说明，字段来源固定为：
-  - 强赎说明：`forceRedeemStatus + forceRedeemNoticeDate`
-  - 到期说明：`maturityDate + maturityRedeemPrice`
-  - 若 `maturityRedeemPrice` 缺失，则只显示到期日期，不得编造到期价格
-- 为支持真实说明，`可转债套利` 对外公开行必须补充透传：
-  - `maturityRedeemPrice`
-- 本轮不改强赎筛选边界：
-  - 主表仍可保留活跃强赎标的
-  - 顶部摘要和推送对活跃强赎的排除逻辑继续保留
-- 本轮验收标准：
-  - 页面不再出现整行黄色强赎高亮
-  - `转债名称` 后可见红色感叹号
-  - 名称下方能看到真实的强赎/到期原因说明
-  - 主表不再单列显示 `强赎状态`
-
-## 92. 股债打新注释移除合同 (2026-03-30)
-- 本轮只改 `股债打新` 顶部区域的解释性尾注显示，不改打新数据源、表格字段、阶段判断、分页与其他模块。
-- `股债打新` 当前不再展示 `页面注释` 卡片。
-- 正式实现路径固定为：
-  - 撤销 `config.yaml > presentation.dashboard_module_notes.subscription` 的生效内容
-  - 继续复用共享 footnote renderer 的“空配置自动隐藏整卡”行为
-- 本轮不改：
-  - `GET /api/dashboard/ui-config` 路由
-  - `presentation/dashboard/dashboard_page.js` 的通用尾注渲染逻辑
-  - 其他模块的 `dashboard_module_notes`
-- 本轮验收标准：
-  - 首页顶部 `股债打新` 区域不再出现 `页面注释`
-  - 其他主模块尾注仍按当前配置正常显示
-  - 打新表格内容和刷新行为不受影响
-
-## 93. 可转债加权折价系数简化合同 (2026-03-30)
-- 本轮继续只修 `可转债套利` 的折价策略计算与对应展示文案，不改 AH / AB / LOF / 打新 / 分红 / 事件套利 / 推送框架。
-- 本轮正式废止 `ATR系数` 与 `抛压系数` 的锚点插值口径：
-  - 不再使用 ATR 锚点插值
-  - 不再使用抛压锚点插值
-- `ATR系数` 的正式新口径固定为：
-  - `ATR百分比 = stockAtr20 / stockPrice × 100`
-  - `atrCoefficient = ATR百分比`
-  - 该定义已被同日第 94 条新合同覆盖，不再是当前生效口径
-- `抛压系数` 的正式新口径固定为：
-  - `sellPressureCoefficient = stockAvgTurnoverAmount20Yi / remainingSizeYi`
-  - 当 `剩余规模 <= 0` 或输入缺失时，`sellPressureCoefficient` 为空，不得伪造
-- `市场系数` 保留原方案：
-  - 继续按正股代码映射 `科创板 / 创业板 / 主板`
-  - 继续沿用当前板块系数配置
-- `加权折价率` 的正式口径固定为：
-  - `weightedDiscountRate = (-premiumRate) × atrCoefficient × sellPressureCoefficient × boardCoefficient`
-- 兼容字段要求：
-  - `stockAtr20Pct` 继续返回
-  - `sellPressureRatio` 与当前正式抛压口径保持一致，即 `20日均成交额 / 剩余规模`
-  - `atrRatio` 退化为兼容调试字段，不再参与 `加权折价率` 计算
-- 页面展示要求：
-  - `ATR系数/ATR%` 列继续保留
-  - `抛压系数` 列继续保留
-  - `抛压系数` 的辅助说明必须反映 `成交额 / 剩余规模` 的新方向，不能继续暗示旧的 `剩余规模 / 成交额`
-- 本轮验收标准：
-  - 本条关于 `atrCoefficient = stockAtr20Pct` 的旧验收口径已被第 94 条覆盖
-  - 页面与 API 返回的 `sellPressureCoefficient` 直接等于 `20日均成交额 / 剩余规模`
-  - `boardCoefficient` 不变
-  - `weightedDiscountRate` 按新系数重新计算
-  - 部署后 `可转债套利` 页面、接口与自动推送链路继续可用
-
-## 94. 可转债 ATR 系数定义回切合同 (2026-03-30)
-- 本轮继续只修 `可转债套利` 的加权折价因子口径，不改其他模块。
-- 用户最新生效要求为：
-  - `ATR系数 = 转股溢价率绝对值 / ((20日ATR / 正股现价) × 100)`
-- 因此本轮 `ATR系数` 的正式口径固定为：
-  - `ATR百分比 = stockAtr20 / stockPrice × 100`
-  - `premiumMagnitude = abs(-premiumRate)`
-  - `atrCoefficient = premiumMagnitude / ATR百分比`
-- 当 `ATR百分比 <= 0`、`premiumRate` 缺失、`stockPrice <= 0` 或 `stockAtr20` 缺失时：
-  - `atrCoefficient` 必须返回空值
-  - 不得伪造为 0 或其他兜底值
-- `抛压系数` 保持上一轮新口径不变：
-  - `sellPressureCoefficient = stockAvgTurnoverAmount20Yi / remainingSizeYi`
-- `市场系数` 保持原方案不变。
-- `加权折价率` 继续固定为：
-  - `weightedDiscountRate = (-premiumRate) × atrCoefficient × sellPressureCoefficient × boardCoefficient`
-- 兼容字段要求：
-  - `stockAtr20Pct` 继续返回
-  - `atrRatio` 允许继续保留，并与当前正式 `atrCoefficient` 一致
-- 页面展示要求：
-  - `ATR系数/ATR%` 列可继续保留
-  - 但其主值必须是新 `atrCoefficient`
-  - 其辅助值可继续显示 `ATR%`
-- 本轮验收标准：
-  - 页面与 API 返回的 `atrCoefficient` 等于 `abs(-premiumRate) / stockAtr20Pct`
-  - 页面与 API 返回的 `sellPressureCoefficient` 继续等于 `20日均成交额 / 剩余规模`
-  - `weightedDiscountRate` 按新 `atrCoefficient` 重新计算
-
-## 95. 可转债多头看涨行权价 max 口径合同 (2026-03-30)
-- 本轮继续只修 `可转债套利` 理论定价链路，不改 AH / AB / LOF / 打新 / 分红 / 推送与其他模块。
-- 用户最新生效要求为：
-  - `longCall` 的行权价应为 `max(转股价, 纯债价值 / 对应股数)`
-- 因此本轮多头看涨行权价正式收口为：
-  - `optionQty = 100 / convertPrice`
-  - `bondFloorStrike = pureBondValue / optionQty`
-  - `longCallStrike = max(convertPrice, bondFloorStrike)`
-- 空头看涨行权价保持不变：
-  - `shortCallStrike = redeemTriggerPrice`
-- 理论期权价值正式口径改为：
-  - `期权价值 = 看涨期权价值(行权价 = max(转股价, 纯债价值 / 对应股数)) - 看涨期权价值(行权价 = 强赎价)`
-- 理论总价值继续为：
-  - `theoreticalPrice = pureBondValue + max(longCallValue - shortCallValue, 0)`
-- 输入真值边界：
-  - 只有 `pureBondValue / stockPrice / convertPrice / redeemTriggerPrice / remainingYears / volatility / riskFreeRate` 同时有效时，才允许输出理论价值
-  - 若 `optionQty <= 0` 或 `bondFloorStrike` 无法计算，则应按真实缺失口径返回空值，不得伪造
-- 对外字段语义调整：
-  - `callStrike*` 与主字段 `callStrike` 改为返回当前真实多头看涨行权价
-  - 不再承诺等于 `convertPrice`
-- 页面说明要求：
-  - 理论定价说明不得继续把第一腿写死成 `call(转股价)`
-  - 必须改为 `call(max(转股价, 债底折算行权价))` 或与之等价的真实描述
-- 旧合同覆盖说明：
-  - 第 52 条“看涨期权行权价固定使用转股价”正式废止
-  - 第 86 条中“行权价 = 转股价”的说法由本条覆盖
-- 本轮验收标准：
-  - `callStrike` 在需要时可以高于 `convertPrice`
-  - 页面与 API 返回的理论期权价值按新多头行权价重算
-  - 页面说明与真实实现一致
-
-## 94. 可转债表头换行压缩合同 (2026-03-30)
-- 本轮只改 `可转债套利` 主表表头与列宽展示，不改数据抓取、排序口径、API、推送与其他模块。
-- 可转债主表需要支持“表头标签分行”，目标是避免长标签把整列撑宽。
-- 分行行为只作用于 `可转债套利` 主表表头，不作用于表格正文数据。
-- 典型长标签允许按人工指定方式换行，例如：
-  - `隐含期 / 权价值`
-  - `期权 / 折价率`
-  - `理论期 / 权价值`
-  - 其他长标签也可按同样思路压缩
-- 本轮允许同步收紧可转债主表的：
-  - 表头左右 padding
-  - 数值列、百分比列、因子列、市场列的最小宽度
-- 但展示边界不变：
-  - 排序功能必须继续可点
-  - 排序语义必须保持原口径
-  - 正文数值与双值单元格不得因为表头换行被截断成不可读
-- 本轮验收标准：
-  - 长表头会自动按指定换行显示
-  - 列宽较当前进一步收窄
-  - 可转债主表排序与正文展示不回退
-
-## 95. 可转债定期摘要与顶部前三筛选收紧合同 (2026-03-30)
-- 本轮继续只修 `可转债套利` 的顶部摘要卡与主摘要定时推送，不改转债主表、理论定价、低溢价监控阈值与其他模块。
-- 顶部 `双低前3 / 理论溢价前3` 和主摘要定时推送中的转债候选，必须统一使用同一套真实筛选口径：
-  - 排除活跃强赎样本
-  - 排除已退市、已终止上市、已停止交易、到期失效等非 live 样本
-- 本轮明确保留低溢价监控原方案不变：
-  - `低溢价监控` 卡片继续来自独立折价监控池
-  - 独立低溢价监控的买卖信号与推送链路不因本轮调整而改阈值或改频率
-- 主摘要定时推送中的转债内容本轮收口为仅保留两组：
-  - `双低前三名`
-  - `理论溢价率前三名`
-- `理论溢价率前三名` 的每条推送内容必须额外包含：
-  - `期权折价率`
-- 本轮验收标准：
-  - 顶部 `双低前3 / 理论溢价前3` 不再出现活跃强赎或已终态样本
-  - 主摘要定时推送中的转债部分只剩 `双低前三名` 与 `理论溢价率前三名`
-  - `理论溢价率前三名` 推送中能看到 `期权折价率`
-  - `低溢价监控` 卡片与独立低溢价推送维持原行为
-## 96. 抢权配售单表改版与列表置顶合同 (2026-04-16)
-- 本轮继续只修 `可转债抢权配售` 链路，不改 AH / AB / LOF / 转债套利 / 分红 / 事件套利业务口径。
-- 抢权配售页面正式废止当前“顶部置顶摘要区 + 监控表 + 来源表 + 详情区”的多块结构，改为：
-  - 仅保留一张主表
-  - 主表风格对齐 `可转债套利`
-  - 不再保留详情界面
-- 主表固定展示以下列：
-  - `正股代码`
-  - `正股名称`
-  - `方案进展`
-  - `进展公告日`
-  - `发行规模`
-  - `总市值`
-  - `发行比例`
-  - `原始所需股数`
-  - `配售股数`
-  - `两融所需股数`
-  - `转股价`
-  - `波动率`
-  - `单位期权价值`
-  - `期权价值`
-  - `所需资金`
-  - `股权登记日`
-  - `预期收益率`
-  - `两融收益率`
-  - `预期收益率去皮`
-  - `两融收益率去皮`
-  - `年化收益率`
-- 本轮移除可见列：
-  - `转债代码`
-  - `转债名称`
-- `发行比例` 的正式口径改为：
-  - `发行比例 = 发行规模 / 正股总市值`
-  - `总市值` 必须直接来自真实股票实时接口
-  - 不得继续用所需股数或配售比例反推后冒充真实总市值
-- `发行规模` 继续使用当前真实源字段 `cb_amount / cbAmountYi`。
-- 股数与资金口径正式收口为：
-  - `原始所需股数 = rawRequiredShares`
-  - `配售股数 = ceil((原始所需股数 × 0.6) / 100) × 100`
-  - `两融所需股数 = ceil((原始所需股数 × 0.6) / 50) × 50`
-  - `所需资金 = 配售股数 × 当前股价`
-  - `两融所需资金 = 两融所需股数 × 当前股价`
-- 收益口径正式收口为：
-  - `期权价值 = 单位期权价值 × 期权数量`
-  - `预期收益率 = 期权价值 / 所需资金`
-  - `两融收益率 = 期权价值 / 两融所需资金`
-- 去皮收益率正式固定为“额外释放资金的价值”：
-  - `原始资金基线 = 原始所需股数 × 当前股价`
-  - `预期收益率去皮 = 预期收益率 × (原始资金基线 - 所需资金) / 所需资金`
-  - `两融收益率去皮 = 两融收益率 × (原始资金基线 - 两融所需资金) / 两融所需资金`
-- `年化收益率` 正式固定为：
-  - 基数只取 `两融收益率去皮`
-  - 公式为 `(1 + 两融收益率去皮)^(252 / 预计交易日数) - 1`
-- `预计交易日数` 口径继续保持：
-  - `上市委通过 -> 申购日` 使用真实历史样本交易日差中位数
-  - `同意注册 / 注册生效 -> 申购日` 使用真实历史样本交易日差中位数
-  - 当前行若已有未来 `applyDate`，优先使用 `今天 -> applyDate` 的真实交易日数
-  - 无真实样本或结果非正时，`年化收益率` 必须为空
-- 抢权配售页面不再通过顶部卡片表达“重点项目”，而改为列表内部置顶规则：
-  - 第一优先级：`进入申购阶段`
-  - 第二优先级：`预期收益率 > 6%`
-  - 第三优先级：其他项目
-- “进入申购阶段”正式认定为：
-  - `applyDate` 有真实值
-  - 或阶段语义已明确处于申购阶段，且必须与 `applyDate` 对外显示保持一致
-- 主表默认排序合同固定为：
-  - 先按置顶优先级
-  - 同优先级内按 `年化收益率` 降序
-  - `年化收益率` 为空时回落到 `两融收益率` 降序
-- 推送范围正式收口为仅两组：
-  - `申购阶段项目`
-  - `预期收益率 > 6% 项目`
-  - 第二组必须排除已在第一组出现的重复样本
-- 推送正文必须新增：
-  - `两融收益率`
-  - `两融收益率去皮`
-  - 以及 `方案进展 / 进展公告日 / 发行规模 / 总市值 / 发行比例 / 两融所需股数 / 年化收益率`
-- 本轮验收标准：
-  - 抢权配售页面已无顶部摘要卡、来源状态卡、口径提醒卡
-  - 页面只保留一张主表，且无详情面板
-  - `发行比例 = 发行规模 / 总市值`
-  - `两融所需股数 = ceil((原始所需股数 × 0.6) / 50) × 50`
-  - 列表顺序为“申购阶段优先，其次收益率大于 6%”
-  - 独立推送只推这两组，并展示两融收益率与两融去皮收益率
-
-## 97. 抢权配售三子标签页合同 (2026-04-17)
-- 本轮继续只改 `可转债抢权配售` 的页面表达，不改抓取口径、收益率公式、接口路径和独立推送分组。
-- 抢权配售页面必须拆为三个子标签页：
-  - `申购阶段`
-  - `埋伏阶段`
-  - `等待阶段`
-- 三个子标签页的入组规则固定为：
-  - `申购阶段`：`inApplyStage = true`
-  - `埋伏阶段`：不在申购阶段，且 `方案进展` 属于 `上市委通过 / 同意注册 / 注册生效`，同时 `预期收益率 > 6%`
-  - `等待阶段`：除上述两组之外的全部项目
-- 页面必须取消原来的置顶表达：
-  - 不再在 `正股名称` 下方显示阶段/收益率徽标
-  - 不再通过行高亮表达“置顶”
-  - 不再对抢权配售列表额外应用前端 `pinPriority` 排序
-- `正股名称` 单元格必须只显示正股名称文本，不再附带第二行信息。
-- 三个子标签页可以按阶段差异展示字段；本轮至少要求：
-  - `股权登记日` 只在 `申购阶段` 显示
-  - `埋伏阶段` 与 `等待阶段` 不显示 `股权登记日`
-- 本轮不新增任何 `年化收益率` 页面标签：
-  - 不在名称列下方显示
-  - 不在子标签页头部作为额外功能标签显示
-  - 若页面继续显示 `年化收益率` 数据列，其字段语义保持不变，但不得再包装成额外标签
-- 本轮验收标准：
-  - 页面可切换 `申购阶段 / 埋伏阶段 / 等待阶段`
-  - 名称列只剩正股名称
-  - 原置顶徽标与行高亮消失
-  - `申购阶段` 保留 `股权登记日`，其余两个子页不显示该列
-
-## 98. 抢权配售发行规模修正与年化列下线合同 (2026-04-17)
-- 本轮修正 `可转债抢权配售` 的两个合同点：
-  - `发行规模` 字段口径纠偏
-  - 页面三子标签页不再显示 `年化收益率`
-- `发行规模` 的真实口径改为当前固定来源中的 `amount / amountYi`：
-  - `issueScaleYi = amountYi`
-  - `cb_amount / cbAmountYi` 保留为源侧辅助字段，但不得继续冒充 `发行规模`
-  - 若 `issueScaleYi` 缺失，策略层回退顺序固定为 `issueScaleYi -> amountYi -> cbAmountYi`
-- 因此：
-  - `发行比例 = issueScaleYi / 总市值`
-  - 推送中展示的 `发行规模` 也必须随之修正
-- 抢权配售页面的三个子标签页全部取消 `年化收益率` 可见列：
-  - `申购阶段`
-  - `埋伏阶段`
-  - `等待阶段`
-- 本轮只下线页面列，不要求删除 API 字段：
-  - `annualizedReturnRate` 可继续保留在接口中
-  - 但页面不得再把它显示为表格列
-- 埋伏阶段默认排序不得继续依赖已下线列，必须改用仍然可见的收益字段。
-- 本轮验收标准：
-  - `金杨精密` 等样本的 `发行规模` 回到真实 `9.8` 亿级别
-  - 页面三个子标签页都看不到 `年化收益率`
-  - 接口路径和推送链路继续可用
-
-## 99. 抢权配售监控语义下线合同 (2026-04-17)
-- 本轮正式取消 `可转债抢权配售` 原有的各项监控表达，只保留当前按阶段划分的三个分组：
-  - `申购阶段`
-  - `埋伏阶段`
-  - `等待阶段`
-- 页面不得再出现以下监控表达：
-  - `推送候选`
-  - `独立推送`
-  - 任何“监控池/监控候选”措辞
-- 抢权配售模块的可见主表达固定为三阶段子标签页及其列表，不再附带独立监控面板。
-- 对外接口为兼容可以继续保留 `monitorList` 字段，但其语义改为：
-  - 保留字段名
-  - 固定返回空数组
-  - 不再代表当前功能中的有效监控池
-- 同步要求：
-  - `pushEligibleCount = 0`
-  - 原有依赖 `monitorList` 的独立推送链路应自然停用，不再发出旧监控内容
-- 本轮验收标准：
-  - 页面只剩 `申购阶段 / 埋伏阶段 / 等待阶段`
-  - 页面看不到 `推送候选` 与 `独立推送`
-  - `GET /api/market/cb-rights-issue` 的 `monitorList` 为空
-
-## 102. 抢权配售沪深双页签与深市列收口合同 (2026-04-17)
-- 本轮继续只改 `可转债抢权配售` 页面表达，不改抓取口径、收益率公式、接口路径和独立推送分组。
-- 抢权配售页面不再直接把 `申购阶段 / 埋伏阶段 / 等待阶段` 做成唯一子标签页；
-  页面必须先拆成两个市场标签页：
-  - `沪市`
-  - `深市`
-- 每个市场标签页下面都必须纵向连续渲染 3 张独立表格：
-  - `申购阶段`
-  - `埋伏阶段`
-  - `等待阶段`
-- 分组规则保持不变，但要先按市场拆分，再按阶段入组：
-  - `沪市`：`market = sh`
-  - `深市`：`market = sz`
-  - `申购阶段`：`inApplyStage = true`
-  - `埋伏阶段`：不在申购阶段，且 `方案进展` 属于 `上市委通过 / 同意注册 / 注册生效`，同时 `预期收益率 > 6%`
-  - `等待阶段`：除上述两组之外的全部项目
-- `沪市` 页面继续保留当前完整收益字段表达：
-  - `两融所需股数`
-  - `两融收益率`
-  - `预期收益率去皮`
-  - `两融收益率去皮`
-- `深市` 页面必须收口为常规配售口径，不再显示以下列：
-  - `两融所需股数`
-  - `两融收益率`
-  - `预期收益率去皮`
-  - `两融收益率去皮`
-- 三阶段里的 `股权登记日` 规则继续成立：
-  - `申购阶段` 显示
-  - `埋伏阶段 / 等待阶段` 不显示
-- 页面交互要求：
-  - 用户切换的是 `沪市 / 深市`
-  - 进入某个市场标签页后，应同时看到该市场下的 3 张阶段表，而不是再点一次阶段页签
-  - 每张表继续保留独立搜索、排序和分页
-- 本轮验收标准：
-  - 页面先显示 `沪市 / 深市` 两个标签页
-  - `沪市` 标签页下同时出现 `申购阶段 / 埋伏阶段 / 等待阶段` 3 张竖排表
-  - `深市` 标签页下也同时出现 `申购阶段 / 埋伏阶段 / 等待阶段` 3 张竖排表
-  - `深市` 任一阶段表中都看不到 `两融收益率 / 预期收益率去皮 / 两融收益率去皮`
-
-## 103. 抢权配售沪市资金列与独立推送改版合同 (2026-04-17)
-- 本轮继续只改 `可转债抢权配售` 的页面显示与独立推送内容，不改收益率公式、接口路径、推送时刻和深市页面分组。
-- 沪市页面列补充要求：
-  - `沪市` 三个阶段表在保留 `两融所需股数` 的同时，必须新增 `两融所需资金`
-  - `两融所需资金 = 两融所需股数 × 最新股价`
-  - 对外字段直接复用现有 `marginRequiredFunds`
-- 深市页面保持当前收口：
-  - 不新增 `两融所需资金`
-  - 也不恢复任何两融/去皮相关列
-- 抢权配售独立推送正式改为只推沪市数据：
-  - `深市` 不参与独立推送
-  - 推送时间保持当前配置不变
-- 沪市 `申购阶段` 推送规则：
-  - 只推 `股权登记日 = 今天` 或 `股权登记日 = 明天` 的股票
-  - 推送字段顺序固定为：
-    - `名称`
-    - `股权登记日`
-    - `两融所需股数`
-    - `两融所需资金`
-    - `发行比例`
-    - `两融收益率去皮`
-  - 示例格式：
-    - `斯达半导 2026-4-15 100股 ￥9950 6.3% +2.21%`
-- 沪市 `埋伏阶段` 推送规则：
-  - 全量推送所有满足埋伏条件的沪市项目
-  - 推送字段顺序固定为：
-    - `名称`
-    - `方案进展`
-    - `进展公告日`
-    - `两融所需股数`
-    - `两融所需资金`
-    - `发行比例`
-    - `两融收益率去皮`
-- 文案要求：
-  - 不再使用原来的总标题、摘要卡式说明或来源说明
-  - 直接输出数据行即可
-  - 如同时存在 `申购阶段` 与 `埋伏阶段` 数据，可用最小分组标签区分两组
-- 本轮验收标准：
-  - `沪市` 表格可见 `两融所需资金`
-  - 独立推送只包含沪市
-  - `申购阶段` 只推今天/明天股权登记日
-  - `埋伏阶段` 按新字段格式全量推送
-  - 推送时间配置保持不变
-
-## 101. 可转债顶部摘要指标语义收口合同 (2026-04-17)
-- 本轮继续只改 `可转债套利` 的顶部摘要卡展示，不改抓取、缓存、公式、主表字段、推送与其他模块。
-- 当前 `双低前3 / 理论溢价前3` 卡片不得再以“无字段名的大数字”方式展示主指标，
-  因为这会把 `双低值 / 理论溢价率` 误读成 `转债现价`，造成“价格长期不更新”的假象。
-- `双低前3` 卡片的正式展示合同改为：
-  - 主值必须显式标注为 `双低值`
-  - 同一卡片中必须同步展示 `现价`
-  - 排名口径仍然固定按 `doubleLow`
-- `理论溢价前3` 卡片的正式展示合同改为：
-  - 主值必须显式标注为 `理论溢价率`
-  - 同一卡片中必须同步展示 `现价`
-  - 同一卡片中必须同步展示 `理论价`
-  - 排名口径仍然固定按 `theoreticalPremiumRate`
-- 本轮不改：
-  - `双低前3` / `理论溢价前3` 的入选集合
-  - 顶部卡片与主表的数据来源
-  - `闻泰转债 110081` 等真实行的 `price / doubleLow / theoreticalPrice` 计算口径
-- 本轮验收标准：
-  - `双低前3` 不再把 `104.80` 这类数字裸露显示成像“现价”的主值
-  - `闻泰转债 110081` 在顶部摘要中能同时看见 `现价` 约 `99.79` 与单独标注的 `双低值`
-  - `理论溢价前3` 主值明确写成 `理论溢价率`
+# Alpha Monitor 需求手册
+
+## 1. 文档定位
+
+本文件是当前生效的产品需求合同，面向两类读者：
+
+- 你自己阅读时，应该能直接看懂“现在这个产品到底要表现成什么样”。
+- 后续 AI 改代码时，应该能用它判断哪些行为是必须保留的，哪些地方不能擅自改口径。
+
+本文件只保留“当前仍然生效”的需求，不再把历史 phase 变更逐条堆在正文里。
+
+文档分工固定如下：
+
+- `CONSTITUTION.md`：项目最高原则。
+- `plan.md`：每一轮为什么改、改哪些文件、验收什么。
+- `REQUIREMENTS.md`：产品和业务层面的当前生效要求。
+- `SPEC.md`：接口、字段、前端状态、技术实现和更细的计算/实现合同。
+
+如果旧需求被新需求覆盖，以本文件中更靠后的当前口径为准；如果本文件没有展开到字段级技术细节，再看 `SPEC.md`。
+
+---
+
+## 2. 产品目标
+
+Alpha Monitor 的目标固定为：
+
+- 用真实市场数据生成套利监控网页。
+- 提供定时推送与独立模块推送。
+- 最终交付形态是云端可访问服务，而不是只在本机临时可跑。
+
+本项目默认遵守以下产品原则：
+
+- 只使用真实数据、真实接口、真实文件结果。
+- 页面优先服务“看盘”和“决策”，而不是做演示页。
+- 改动应尊重现有链路，优先做最小、最短、最可验证的修改。
+
+---
+
+## 3. 当前产品总结构
+
+首页当前固定结构如下：
+
+1. 页面标题：`Alpha Monitor`
+2. 顶部状态行
+3. 顶部 `股债打新` 今日事项区
+4. 主标签页区域
+5. 页面底部 `推送设置`
+
+当前主标签页固定为 8 个，顺序固定：
+
+1. `转债套利`
+2. `AH溢价`
+3. `AB溢价`
+4. `LOF套利`
+5. `监控套利`
+6. `分红提醒`
+7. `事件套利`
+8. `可转债抢权配售`
+
+页面不得再退回到以下旧表达：
+
+- 标题下方的大段说明文字
+- 首页顶部多个大卡片式“市场概况”
+- 用演示数据填满页面
+- 为展示层单独增加一条重型 dashboard 专用后端链路
+
+页面默认应复用现有接口和缓存元信息，而不是新造平行接口。
+
+---
+
+## 4. 通用页面与交互规则
+
+### 4.1 数据与刷新
+
+- 页面必须优先展示最近一次成功的真实数据。
+- 关键行情模块允许先读缓存再后台刷新，但不能长期停留在跨日旧快照。
+- `exchangeRate / cbArb / ah / ab` 属于关键行情模块。
+- 如果首次加载返回的是缓存结果，前端应在同一会话内触发一次后台重校验。
+- 页面分钟级轮询优先读取轻量级状态接口，而不是每次整表重拉。
+
+### 4.2 表格
+
+除明确例外外，主表统一遵守：
+
+- 支持排序
+- 支持搜索
+- 支持分页
+- 每页固定 `50` 条
+- 桌面端允许受控横向滚动
+
+以下模块必须使用分页主表：
+
+- `转债套利`
+- `AH溢价`
+- `AB溢价`
+- `LOF套利`
+- `监控套利`
+- `分红提醒`
+- `事件套利`
+- `可转债抢权配售`
+
+### 4.3 桌面端与移动端
+
+- 桌面端以高密度、长表阅读为优先。
+- 移动端不单独再做一套业务语义，只通过堆叠和横向滚动保证可用。
+- 全局字体、表头、按钮、输入框和表格正文不能小到难以阅读。
+
+### 4.4 展示配置
+
+页面应继续通过统一配置读取展示参数，例如：
+
+- `config.yaml > presentation.dashboard_entry`
+- `config.yaml > presentation.dashboard_table_ui.*`
+- `config.yaml > presentation.dashboard_auto_refresh.*`
+- `config.yaml > presentation.dashboard_module_notes.*`
+
+---
+
+## 5. 顶部固定区域
+
+### 5.1 顶部状态行
+
+用途：
+
+- 一行展示全局关键行情状态。
+
+数据来源：
+
+- `/api/market/exchange-rate`
+- `/api/market/convertible-bond-arbitrage`
+
+必须显示：
+
+- `HKD/CNY`
+- `USD/CNY`
+- `十年期国债收益率`
+- 最近更新时间
+
+规则：
+
+- 状态行是一整行文字，不再使用大状态卡。
+- 若 `treasuryYield10y` 缺失，必须明确显示“暂未返回”。
+
+### 5.2 顶部股债打新
+
+用途：
+
+- 展示今天需要关注的 IPO / 可转债打新事项。
+
+数据来源：
+
+- `/api/market/ipo`
+- `/api/market/convertible-bonds`
+
+规则：
+
+- 只显示“今天相关”的事项。
+- 表格内混排新股和转债。
+- 至少显示：
+  - 当前阶段
+  - 类型
+  - 名称/代码
+  - 申购日
+  - 中签缴款日
+  - 上市日
+  - 申购上限
+  - 发行价或转股价
+- 不再单独显示 `抽签日` 列。
+- 页面显示的 `中签缴款日` 一律使用 `lotteryDate`。
+- `今日中签缴款` 的阶段判断也一律使用 `lotteryDate`，不得再单独按 `paymentDate` 判断。
+- 阶段标签固定为：
+  - `今日申购`
+  - `今日中签缴款`
+  - `今日上市`
+
+### 5.3 页面底部推送设置
+
+用途：
+
+- 让用户直接查看并修改主推送时间。
+
+数据来源：
+
+- `GET /api/push/config`
+- `POST /api/push/config`
+
+规则：
+
+- 固定放在页面底部。
+- 固定只保留 3 个时间槽。
+- 前 2 个时间槽用于常规模块主推送。
+- 第 3 个时间槽用于独立推送模块。
+- 保存成功后，页面必须直接回写接口返回结果。
+- 页面重载后必须继续读取运行时真实配置，不能退回到旧默认值。
+
+---
+
+## 6. 主标签页需求
+
+### 6.1 转债套利
+
+用途：
+
+- 展示可转债与正股的套利相关核心指标。
+
+数据来源：
+
+- `/api/market/convertible-bond-arbitrage`
+
+页面结构固定为：
+
+1. 标题与更新时间
+2. 顶部摘要卡
+3. 主表
+4. 说明文字
+
+顶部摘要卡固定保留 3 组：
+
+- `双低前3`
+- `理论溢价前3`
+- `低溢价监控`
+
+摘要卡规则：
+
+- `双低前3` 按 `doubleLow` 排名。
+- `理论溢价前3` 按 `theoreticalPremiumRate` 排名。
+- `低溢价监控` 来自独立折价监控池，不与前两组混用。
+- `双低前3` 主值必须明确标注为 `双低值`，同时显示 `现价`。
+- `理论溢价前3` 主值必须明确标注为 `理论溢价率`，同时显示 `现价` 和 `理论价`。
+- 不允许再把 `双低值 / 理论溢价率` 用裸数字展示成像“现价”的样子。
+
+主表必须支持排序、搜索、分页，并保留当前主要字段族：
+
+- 转债身份：代码、名称
+- 正股身份：代码、名称
+- 行情：转债价、正股价、涨跌幅
+- 转股相关：转股价、转股价值、转股溢价率、双低
+- 折价策略：ATR 系数、抛压系数、市场系数、加权折价率
+- 债底与期权：纯债价值、纯债溢价、理论价格、理论溢价率、理论期权价值、隐含期权价值、期权折价率
+- 其他：剩余规模、波动率、剩余期限、评级、上市日、转股起始日
+
+当前生效计算口径：
+
+- `转股价值 = stockPrice * 100 / convertPrice`
+- `转股溢价率 = (price / convertValue - 1) * 100`
+- `双低 = price + premiumRate`
+- `纯债溢价率 = (price / pureBondValue - 1) * 100`
+- `ATR百分比 = stockAtr20 / stockPrice * 100`
+- `ATR系数 = abs(-premiumRate) / ATR百分比`
+- `抛压系数 = stockAvgTurnoverAmount20Yi / remainingSizeYi`
+- `加权折价率 = (-premiumRate) * atrCoefficient * sellPressureCoefficient * boardCoefficient`
+
+理论定价口径固定为“债底 + 净看涨价差价值”：
+
+- `optionQty = 100 / convertPrice`
+- `bondFloorStrike = pureBondValue / optionQty`
+- `longCallStrike = max(convertPrice, bondFloorStrike)`
+- `shortCallStrike = redeemTriggerPrice`
+- `theoreticalPrice = pureBondValue + max(longCallValue - shortCallValue, 0)`
+
+期权相关展示口径：
+
+- `理论期权价值 = theoreticalPrice - pureBondValue`
+- `隐含期权价值 = price - pureBondValue`
+- `期权折价率 = implicitOptionValue / theoreticalOptionValue - 1`
+
+活跃强赎与终态规则：
+
+- 主表可以显示活跃强赎样本，但必须用名称内风险提示表达，不再做整行高亮。
+- 终态、退市、停牌到期失效等非 live 样本不得继续出现在页面可见主表中。
+- 顶部 `双低前3 / 理论溢价前3` 必须排除：
+  - 活跃强赎样本
+  - 终态 / 非 live 样本
+
+独立低溢价监控规则：
+
+- `低溢价监控` 卡片与独立推送沿用独立监控池。
+- 本模块顶部摘要卡收口不改变该独立推送的阈值与节奏。
+
+### 6.2 AH溢价
+
+用途：
+
+- 展示 A/H 溢价排行与分位情况。
+
+数据来源：
+
+- `/api/market/ah`
+- 历史样本来自 `runtime_data/shared/premium_history.db`
+
+公式：
+
+- `AH溢价 = (H股人民币价 / A股价 - 1) * 100`
+- `H股人民币价 = H股价 * HKD/CNY`
+- `价差 = H股人民币价 - A股价`
+
+页面规则：
+
+- 顶部固定显示当前排序口径下的前 3 和后 3。
+- 主表固定支持排序、搜索、分页。
+- 主表当前核心字段：
+  - A股代码
+  - A股名称
+  - H股代码
+  - H股名称
+  - A股价
+  - H股价
+  - H股人民币价
+  - 价差
+  - 溢价率
+  - 近三年分位
+  - 样本区间
+
+### 6.3 AB溢价
+
+用途：
+
+- 展示 A/B 溢价排行与分位情况。
+
+数据来源：
+
+- `/api/market/ab`
+- 历史样本来自 `runtime_data/shared/premium_history.db`
+
+公式：
+
+- `AB溢价 = (B股人民币价 / A股价 - 1) * 100`
+- `B股人民币价 = B股价 * 对应汇率`
+- `价差 = B股人民币价 - A股价`
+
+页面规则：
+
+- 布局、排序、分页和 AH 页面保持一致。
+- 主表字段与 AH 页面对应，只把 H 股字段替换成 B 股字段。
+
+### 6.4 LOF套利
+
+用途：
+
+- 展示 LOF / QDII 套利数据与监控池。
+
+数据来源：
+
+- `/api/market/lof-arbitrage`
+- `GET /api/push/lof-arbitrage-config`
+- `POST /api/push/lof-arbitrage-config`
+
+当前页面结构：
+
+1. 标题与说明
+2. 顶部两个监控池卡片
+3. 分组列表
+4. LOF 独立推送卡
+
+当前生效分组合同：
+
+- 可见分组只保留：
+  - `指数LOF`
+  - `QDII亚洲`
+- 默认分组固定为 `index`
+
+规则：
+
+- 顶部卡片只保留 `限购池` 和 `非限池`。
+- 列表按当前分组显示 IOPV、溢价率、成交额等字段。
+- 独立推送配置固定为单时间槽。
+- 当前 LOF 独立推送时间固定收口为 `14:00`。
+
+### 6.5 监控套利
+
+用途：
+
+- 管理用户自定义的并购/换股/现金对价监控项目。
+
+数据来源：
+
+- `GET /api/monitors`
+- `POST /api/monitors`
+- `DELETE /api/monitors/:id`
+
+页面结构：
+
+1. 顶部新增/编辑表单
+2. 实时监控主表
+
+规则：
+
+- 页面必须支持新增监控。
+- 页面必须支持编辑已有监控并原地保存。
+- 页面必须支持删除监控。
+- 补充参数必须直接显示在每个项目下方，不再保留单独的 `详情` 按钮或控制列。
+- 文案必须使用真实业务术语，不得使用自造字段名。
+- 返回结果应尽量使用最新股价，不能长期沿用旧价格。
+
+当前核心公式：
+
+- `股票腿理论对价 = 收购方股价 * 换股比例 * 安全系数 + 现金对价`
+- `股票腿收益率 = (股票腿理论对价 - 目标方现价) / 目标方现价 * 100`
+- `现金腿收益率 = (现金对价 - 目标方现价) / 目标方现价 * 100`
+
+### 6.6 分红提醒
+
+用途：
+
+- 展示今日登记日提醒和完整观察列表。
+
+数据来源：
+
+- `/api/dividend?action=refresh`
+- `/api/dividend?action=portfolio`
+
+页面结构：
+
+1. 今日登记日提醒
+2. 完整观察表
+
+公式：
+
+- `股息率 = 每股分红 / 当前股价 * 100`
+
+规则：
+
+- 顶部优先强调今天登记日的股票。
+- 完整观察表继续支持排序、分页。
+
+### 6.7 事件套利
+
+用途：
+
+- 聚合 A 股事件套利、港股私有化、中概私有化和最新公告池。
+
+数据来源：
+
+- `/api/market/event-arbitrage`
+- `/api/merger/reports/today`
+- `/api/merger/report`
+- `/api/merger/report/generate`
+
+当前页面结构：
+
+1. 标题与状态
+2. 概览卡片与来源状态
+3. 子标签页内容
+
+当前子标签页固定为：
+
+- `A股套利`
+- `港股套利`
+- `中概私有`
+- `港供套利`
+- `最新公告`
+
+当前状态要求：
+
+- `港供套利` 可保留入口，但当前可以是待接入/禁用态。
+- `最新公告` 必须能展示公告池与匹配状态。
+- 有官方公告匹配的行，应继续支持 AI 报告链路。
+
+### 6.8 可转债抢权配售
+
+用途：
+
+- 展示可转债抢权配售机会，并支持独立推送。
+
+数据来源：
+
+- `/api/market/cb-rights-issue`
+- `GET /api/push/cb-rights-issue-config`
+- `POST /api/push/cb-rights-issue-config`
+
+当前页面结构已经不再使用旧的“摘要卡 + 来源表 + 详情区”模式，而是固定为：
+
+1. 顶部总览条
+2. `沪市 / 深市` 两个市场页签
+3. 每个市场页签内纵向连续展示三张阶段表：
+   - `申购阶段`
+   - `埋伏阶段`
+   - `等待阶段`
+
+当前阶段划分规则：
+
+- `申购阶段`：`inApplyStage = true`
+- `埋伏阶段`：不在申购阶段，且 `progressName` 属于 `上市委通过 / 同意注册 / 注册生效`，同时 `expectedReturnRate > 6%`
+- `等待阶段`：其余项目
+
+当前市场划分规则：
+
+- `沪市`：`market = sh`
+- `深市`：`market = sz`
+- 若市场字段缺失，可按代码前缀补推断：
+  - `6* -> sh`
+  - `0* / 3* -> sz`
+
+当前生效计算口径：
+
+- `issueScaleYi` 的真实语义来自 `amountYi`
+- `issueRatio = issueScaleYi / stockMarketValueYi`
+- `placementShares = ceil(rawRequiredShares * 0.6 / 100) * 100`
+- `marginRequiredShares = ceil(rawRequiredShares * 0.6 / 50) * 50`
+- `requiredFunds = placementShares * stockPrice`
+- `marginRequiredFunds = marginRequiredShares * stockPrice`
+- `expectedReturnRate = optionValue / requiredFunds * 100`
+- `marginReturnRate = optionValue / marginRequiredFunds * 100`
+- `expectedPeelReturnRate = expectedReturnRate * (originalFundsBaseline - requiredFunds) / requiredFunds`
+- `marginPeelReturnRate = marginReturnRate * (originalFundsBaseline - marginRequiredFunds) / marginRequiredFunds`
+- `annualizedReturnRate = (1 + marginPeelReturnRate / 100)^(252 / estimatedApplyTradingDays) - 1`
+
+当前页面列规则：
+
+- 共享核心列保留：
+  - 正股代码
+  - 正股名称
+  - 方案进展
+  - 进展公告日
+  - 发行规模
+  - 总市值
+  - 发行比例
+  - 原始所需股数
+  - 配售股数
+  - 转股价
+  - 波动率
+  - 单位期权价值
+  - 期权价值
+  - 所需资金
+  - 预期收益率
+- `股权登记日` 只在 `申购阶段` 显示。
+- `沪市` 额外保留：
+  - 两融所需股数
+  - 两融所需资金
+  - 两融收益率
+  - 预期收益率去皮
+  - 两融收益率去皮
+- `深市` 不再显示：
+  - 两融所需股数
+  - 两融所需资金
+  - 两融收益率
+  - 预期收益率去皮
+  - 两融收益率去皮
+
+当前独立推送规则：
+
+- 只推 `沪市` 项目。
+- `深市` 不参与独立推送。
+- `申购阶段` 拆为两段推送：
+  - `买入提醒`：`recordDate = 今天` 或 `明天` 的沪市项目，分别覆盖股权登记日当天与前一交易日提醒。
+  - `卖出提醒`：`applyDate = 今天` 的沪市项目，用于申购日当天提醒卖出。
+- `埋伏阶段` 推送所有满足埋伏条件的沪市项目。
+- 推送文本使用数据行表达，不再使用旧的摘要卡式标题。
+- 推送字段顺序固定把 `发行规模` 放在 `发行比例` 之前：
+  - `买入提醒`：`名称 股权登记日 两融所需股数 两融所需资金 发行规模 发行比例 两融收益率去皮`
+  - `卖出提醒`：`名称 申购日 两融所需股数 两融所需资金 发行规模 发行比例 两融收益率去皮`
+  - `埋伏阶段`：`名称 方案进展 进展公告日 两融所需股数 两融所需资金 发行规模 发行比例 两融收益率去皮`
+
+---
+
+## 7. 接口复用边界
+
+当前 dashboard 应优先复用以下接口，不新增平行重型接口：
+
+- `GET /api/health`
+- `GET /api/dashboard/ui-config`
+- `GET /api/dashboard/resource-status`
+- `GET /api/market/exchange-rate`
+- `GET /api/market/ipo`
+- `GET /api/market/convertible-bonds`
+- `GET /api/market/convertible-bond-arbitrage`
+- `GET /api/market/ah`
+- `GET /api/market/ab`
+- `GET /api/market/lof-arbitrage`
+- `GET /api/market/event-arbitrage`
+- `GET /api/market/cb-rights-issue`
+- `GET /api/monitors`
+- `GET /api/dividend`
+- `GET /api/push/config`
+- `POST /api/push/config`
+- `GET /api/push/lof-arbitrage-config`
+- `POST /api/push/lof-arbitrage-config`
+- `GET /api/push/cb-rights-issue-config`
+- `POST /api/push/cb-rights-issue-config`
+
+接口变更边界固定为：
+
+- `strategy / data_fetch` 定义业务含义与计算结果。
+- `presentation` 只负责整形、状态管理和展示。
+- 若字段含义变化，必须先更新 `REQUIREMENTS.md` 和 `SPEC.md`，再改代码。
+
+---
+
+## 8. 配置边界
+
+所有可变参数仍应集中在 `config.yaml` 或项目统一配置入口中。
+
+后续改动时优先关注以下配置族：
+
+- `presentation.dashboard_entry`
+- `presentation.dashboard_table_ui.*`
+- `presentation.dashboard_auto_refresh.*`
+- `presentation.dashboard_module_notes.*`
+- `data_fetch.plugins.*.refresh_interval_ms`
+- `strategy.convertible_bond.*`
+- `strategy.cb_rights_issue.*`
+- `notification.default_full_push_time`
+- `notification.enabled_modules`
+- `notification.scheduler.*`
+
+不得把新的阈值、分组规则、URL、服务名、端口、推送时间散落硬编码在多个文件中。
+
+---
+
+## 9. 验收要求
+
+### 9.1 页面验收
+
+至少应满足：
+
+- 首页能直接打开并看到真实数据。
+- 顶部状态行是一行文字，不再退回旧卡片式结构。
+- 顶部 `股债打新` 使用今天事项长表。
+- 底部 `推送设置` 可以读取、保存、回显。
+- 8 个主标签页都能切换。
+- `转债套利 / AH / AB / LOF / 监控 / 分红 / 事件套利 / 可转债抢权配售` 都能正确渲染。
+- 分页表统一保持 `50` 条每页。
+- `闻泰转债 110081` 这类样本在 `转债套利` 顶部摘要中不会再把 `双低值` 误看成现价。
+
+### 9.2 最小校验命令
+
+实施后至少优先尝试：
+
+- `npm run check`
+- `npm run check:boundaries`
+- `python data_dispatch.py exchange-rate`
+- `python data_dispatch.py ah`
+- `python data_dispatch.py ab`
+
+如果本轮改了计算口径，还必须检查是否与 `SPEC.md` 保持一致。
+
+---
+
+## 10. 后续 AI 改代码时必须遵守的要求
+
+- 不要把本文件重新写回“历史 phase 堆叠日志”。
+- 本文件应始终保持“当前生效需求手册”的形态。
+- 新增需求时：
+  1. 先改 `plan.md`
+  2. 再改本文件
+  3. 再改 `SPEC.md`
+  4. 最后改代码
+- 如果只是历史追踪、排障过程、阶段背景，写到 `plan.md`，不要继续塞回本文件正文。
+
+本文件的长期目标只有两个：
+
+- 让你自己能读懂
+- 让后续 AI 不敢乱改

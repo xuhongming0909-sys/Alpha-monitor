@@ -21,7 +21,7 @@ function compactDateText(value) {
 
 function formatMoney(value) {
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return "￥--";
+  if (!Number.isFinite(parsed)) return "--";
   const fixed = parsed.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
   return `￥${fixed}`;
 }
@@ -38,6 +38,12 @@ function formatInt(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return "--";
   return String(Math.round(parsed));
+}
+
+function formatIssueScale(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return "--";
+  return `${parsed.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1")}亿`;
 }
 
 function normalizeProgressText(value) {
@@ -63,16 +69,29 @@ function resolveCbRightsIssuePushGroups(payload = {}, options = {}) {
   const tomorrow = normalizeDateText(options.tomorrow || shiftDate(today, 1));
   const shRows = rows.filter((row) => String(row?.market || "").trim().toLowerCase() === "sh");
 
-  const applyRows = shRows.filter((row) => {
+  const buyRows = shRows.filter((row) => {
     const recordDate = normalizeDateText(row?.recordDate);
     return Boolean(row?.inApplyStage) && Boolean(recordDate) && (recordDate === today || recordDate === tomorrow);
   });
 
+  const sellRows = shRows.filter((row) => {
+    const applyDate = normalizeDateText(row?.applyDate);
+    return Boolean(row?.inApplyStage) && Boolean(applyDate) && applyDate === today;
+  });
+
   const ambushRows = shRows.filter((row) => isAmbushRow(row));
 
-  applyRows.sort((left, right) => {
+  buyRows.sort((left, right) => {
     const dateCompare = normalizeDateText(left?.recordDate).localeCompare(normalizeDateText(right?.recordDate));
     if (dateCompare !== 0) return dateCompare;
+    return String(left?.stockCode || "").localeCompare(String(right?.stockCode || ""));
+  });
+
+  sellRows.sort((left, right) => {
+    const applyDateCompare = normalizeDateText(left?.applyDate).localeCompare(normalizeDateText(right?.applyDate));
+    if (applyDateCompare !== 0) return applyDateCompare;
+    const recordDateCompare = normalizeDateText(left?.recordDate).localeCompare(normalizeDateText(right?.recordDate));
+    if (recordDateCompare !== 0) return recordDateCompare;
     return String(left?.stockCode || "").localeCompare(String(right?.stockCode || ""));
   });
 
@@ -85,18 +104,32 @@ function resolveCbRightsIssuePushGroups(payload = {}, options = {}) {
   });
 
   return {
-    applyRows,
+    buyRows,
+    sellRows,
     ambushRows,
-    total: applyRows.length + ambushRows.length,
+    total: buyRows.length + sellRows.length + ambushRows.length,
   };
 }
 
-function buildApplyLine(row) {
+function buildBuyLine(row) {
   return [
     row.stockName || "--",
     compactDateText(row.recordDate),
     `${formatInt(row.marginRequiredShares)}股`,
     formatMoney(row.marginRequiredFunds),
+    formatIssueScale(row.issueScaleYi),
+    formatPercent(Number(row.issueRatio) * 100, 1, false),
+    formatPercent(row.marginPeelReturnRate, 2, true),
+  ].join(" ");
+}
+
+function buildSellLine(row) {
+  return [
+    row.stockName || "--",
+    compactDateText(row.applyDate),
+    `${formatInt(row.marginRequiredShares)}股`,
+    formatMoney(row.marginRequiredFunds),
+    formatIssueScale(row.issueScaleYi),
     formatPercent(Number(row.issueRatio) * 100, 1, false),
     formatPercent(row.marginPeelReturnRate, 2, true),
   ].join(" ");
@@ -109,6 +142,7 @@ function buildAmbushLine(row) {
     compactDateText(row.progressDate),
     `${formatInt(row.marginRequiredShares)}股`,
     formatMoney(row.marginRequiredFunds),
+    formatIssueScale(row.issueScaleYi),
     formatPercent(Number(row.issueRatio) * 100, 1, false),
     formatPercent(row.marginPeelReturnRate, 2, true),
   ].join(" ");
@@ -118,9 +152,15 @@ function buildCbRightsIssueMarkdown(payload = {}, options = {}) {
   const groups = resolveCbRightsIssuePushGroups(payload, options);
   const lines = [];
 
-  if (groups.applyRows.length) {
-    lines.push("申购阶段");
-    groups.applyRows.forEach((row) => lines.push(buildApplyLine(row)));
+  if (groups.buyRows.length) {
+    lines.push("买入提醒");
+    groups.buyRows.forEach((row) => lines.push(buildBuyLine(row)));
+  }
+
+  if (groups.sellRows.length) {
+    if (lines.length) lines.push("");
+    lines.push("卖出提醒");
+    groups.sellRows.forEach((row) => lines.push(buildSellLine(row)));
   }
 
   if (groups.ambushRows.length) {
@@ -132,7 +172,8 @@ function buildCbRightsIssueMarkdown(payload = {}, options = {}) {
   return {
     markdown: lines.join("\n"),
     total: groups.total,
-    applyCount: groups.applyRows.length,
+    buyCount: groups.buyRows.length,
+    sellCount: groups.sellRows.length,
     ambushCount: groups.ambushRows.length,
   };
 }

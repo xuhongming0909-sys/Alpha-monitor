@@ -4791,6 +4791,65 @@ untime_data/shared/cb_discount_strategy_state.json
 - Apply-stage push includes only Shanghai rows whose `recordDate` is today or tomorrow.
 - Ambush-stage push includes all Shanghai ambush rows with the new compact line format.
 
+## 104. Phase CQ: CB-rights-issue Push Buy/Sell Reminder Split + Issue-scale in Push (2026-04-17)
+
+- This round changes:
+  - `notification/styles/cb_rights_issue_markdown.js`
+  - related live docs only
+- This round does not change:
+  - `GET /api/market/cb-rights-issue` response envelope
+  - cb-rights-issue pricing formulas
+  - push schedule times
+  - Shenzhen exclusion from push
+
+### 104.1 Apply-stage split rule
+- Shanghai apply-stage push must no longer be expressed as one single group.
+- The live push grouping is fixed to:
+  - `买入提醒`
+  - `卖出提醒`
+  - `埋伏阶段`
+
+### 104.2 Buy-reminder membership rule
+- `买入提醒` membership is fixed to:
+  - `market = sh`
+  - `inApplyStage = true`
+  - `recordDate = today` or `recordDate = tomorrow` in Shanghai calendar
+- This group covers both:
+  - the day before record date
+  - the record-date day itself
+
+### 104.3 Sell-reminder membership rule
+- `卖出提醒` membership is fixed to:
+  - `market = sh`
+  - `inApplyStage = true`
+  - `applyDate = today` in Shanghai calendar
+- The practical semantic is:
+  - remind exit on subscription day
+  - in common cases this is `recordDate + 1 trading day`
+
+### 104.4 Push row-field order rule
+- All cb-rights-issue push rows must insert `发行规模` before `发行比例`.
+- Field order is fixed to:
+  - `买入提醒`: `名称 股权登记日 两融所需股数 两融所需资金 发行规模 发行比例 两融收益率去皮`
+  - `卖出提醒`: `名称 申购日 两融所需股数 两融所需资金 发行规模 发行比例 两融收益率去皮`
+  - `埋伏阶段`: `名称 方案进展 进展公告日 两融所需股数 两融所需资金 发行规模 发行比例 两融收益率去皮`
+- `发行规模` outward field source remains the truthful `issueScaleYi`.
+
+### 104.5 Formatting rule
+- The push stays data-first and title-free:
+  - no overall title
+  - no summary line
+  - no source footer
+- Minimal plain section labels are allowed only for:
+  - `买入提醒`
+  - `卖出提醒`
+  - `埋伏阶段`
+
+### 104.6 Acceptance
+- A live push can independently contain `买入提醒` and `卖出提醒`.
+- `卖出提醒` rows are selected by `applyDate = today`, not by `recordDate`.
+- Every pushed line shows `发行规模` before `发行比例`.
+
 ## 101. Convertible Summary Card Metric Truthfulness Spec (2026-04-17)
 
 - This round changes only:
