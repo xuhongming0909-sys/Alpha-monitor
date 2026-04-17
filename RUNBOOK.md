@@ -282,6 +282,22 @@ Official repo-side auto deploy chain:
 4. Runner triggers `tools/deploy/update_from_github.sh` inside `SERVER_APP_DIR`
 5. The server-side script performs code sync, dependency install, service refresh/restart, and health checks
 
+Deploy-mode rule:
+
+- Push-triggered deploy now defaults to `auto`
+- Manual dispatch supports:
+  - `auto`
+  - `fast`
+  - `full`
+- `auto` decides whether to install dependencies / refresh systemd / restart the service from the changed-file set
+- `fast` skips dependency installation and Python import verification
+- `full` forces the full install path
+
+Queue rule:
+
+- Deploy workflow enables branch-level concurrency cancellation
+- If multiple pushes land on the same branch in a short time, GitHub Actions cancels older in-flight deploy jobs and keeps only the newest one running
+
 Required GitHub Secrets:
 
 - `SERVER_HOST`
@@ -304,6 +320,7 @@ Important notes:
 - GitHub Actions only validates secrets, prepares SSH, and triggers the remote script.
 - All server-side business steps stay inside `tools/deploy/update_from_github.sh`.
 - The remote directory must already contain the repository and the deploy script.
+- The server script now avoids unconditional `npm ci`, `pip install`, whole-project `chown -R`, and forced restart on doc-only changes.
 
 ## 11. Server-side manual dry run
 
@@ -314,12 +331,22 @@ cd "/home/ubuntu/Alpha monitor"
 bash tools/deploy/update_from_github.sh
 ```
 
+Preferred manual modes:
+
+```bash
+cd "/home/ubuntu/Alpha monitor"
+bash tools/deploy/update_fast.sh
+DEPLOY_MODE=auto bash tools/deploy/update_from_github.sh
+bash tools/deploy/update_from_github.sh
+```
+
 Expected behavior:
 
 1. Fetch and reset to the configured target branch
-2. Install Node and Python dependencies
-3. Refresh and restart `alpha-monitor` if it exists
-4. Print health-check and homepage marker verification results
+2. Derive the changed-file set and choose the effective deploy steps
+3. Install dependencies only when their manifests changed or full mode was requested
+4. Refresh and restart `alpha-monitor` only when runtime-affecting files changed
+5. Print health-check and homepage marker verification results
 
 ## 12. If auto deploy fails
 

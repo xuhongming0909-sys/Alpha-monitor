@@ -1444,34 +1444,48 @@ GitHub 鑷姩閮ㄧ讲姝ｅ紡閾捐矾鍥哄畾涓猴細
 - New server-side wrapper script:
   - `tools/deploy/update_fast.sh`
 - `update_fast.sh` must delegate to `tools/deploy/update_from_github.sh` instead of duplicating deploy logic.
-- `update_fast.sh` must set the existing deploy script into a dependency-skip mode by default:
-  - `INSTALL_NODE_MODULES=0`
-  - `INSTALL_PYTHON_REQUIREMENTS=0`
-  - `VERIFY_PYTHON_IMPORTS=0`
+- `update_fast.sh` must set the existing deploy script into `DEPLOY_MODE=fast` by default.
 - `update_fast.sh` must preserve the following checks from the full deploy path:
   - config syntax validation
   - git sync
-  - service stop/restart
+  - service restart
   - `/api/health` readiness check
   - homepage marker verification
 
 ### 29.4 Full deploy script extension
 - `tools/deploy/update_from_github.sh` must support a new env flag:
+  - `DEPLOY_MODE`
+- Allowed `DEPLOY_MODE` values are:
+  - `auto`
+  - `fast`
+  - `full`
+- `DEPLOY_MODE=full` keeps the current full-deploy behavior.
+- `DEPLOY_MODE=fast` skips dependency install and Python import verification, while preserving git sync, restart, health, and marker checks.
+- `DEPLOY_MODE=auto` must derive the effective steps from the changed-file set between the currently deployed revision and the target revision.
+- `tools/deploy/update_from_github.sh` must still accept explicit step overrides:
   - `INSTALL_NODE_MODULES`
-- `INSTALL_NODE_MODULES=1` keeps the current Node dependency install behavior.
-- `INSTALL_NODE_MODULES=0` skips `npm ci` / `npm install` and logs that the step was intentionally skipped.
-- Existing full deploy defaults remain unchanged.
+  - `INSTALL_PYTHON_REQUIREMENTS`
+  - `VERIFY_PYTHON_IMPORTS`
+  - `REFRESH_SYSTEMD_UNIT`
+  - `RESTART_SERVICE`
+- In `auto` mode the script must at least follow these rules:
+  - dependency install is required only when the corresponding dependency manifest changed
+  - `systemd` unit refresh is required only when the service template or Linux startup entry changed
+  - service restart is required only when runtime-affecting files changed
+  - doc-only or deploy-script-only updates must not force an app restart
 
 ### 29.5 GitHub Actions dispatch rule
 - `.github/workflows/deploy.yml` keeps:
   - `push main` automatic deploy
   - `workflow_dispatch` manual deploy
 - Manual dispatch adds `deploy_mode` with allowed values:
+  - `auto`
   - `full`
   - `fast`
-- `push main` must continue using `full`.
+- `push main` must default to `auto`.
 - Manual `fast` deploy must execute `tools/deploy/update_fast.sh`.
-- Manual `full` deploy and push-triggered deploy must execute `tools/deploy/update_from_github.sh`.
+- Manual `auto` / `full` deploy and push-triggered deploy must execute `tools/deploy/update_from_github.sh`.
+- The workflow must enable branch-level deploy concurrency cancellation so only the newest in-flight deploy for the same ref continues.
 
 ## 30. Cloud-only Runtime Surface Spec (2026-03-24)
 
@@ -4882,3 +4896,70 @@ untime_data/shared/cb_discount_strategy_state.json
   - `现价` is about `99.79`
   - `双低值` is a separate metric around `104.80`
 - `理论溢价前3` must visually read as a metric card for `理论溢价率`, not for price.
+
+## 105. Phase CR: Deploy Chain Auto-mode Rewrite + Queue Cancellation (2026-04-17)
+
+- This round changes:
+  - `.github/workflows/deploy.yml`
+  - `tools/deploy/update_from_github.sh`
+  - `tools/deploy/update_fast.sh`
+  - `package.json`
+  - related live docs only
+- This round does not change:
+  - public site route contract
+  - service name contract
+  - health endpoint contract
+  - server env-sync contract
+
+### 105.1 Workflow dispatch rule
+- `.github/workflows/deploy.yml` must keep:
+  - `push main` automatic deploy
+  - `workflow_dispatch` manual deploy
+- Effective deploy modes are fixed to:
+  - `auto`
+  - `fast`
+  - `full`
+- `push main` must default to `auto`.
+- Manual dispatch default must also be `auto`.
+- `fast` may continue using `tools/deploy/update_fast.sh`.
+- `auto` / `full` must execute `tools/deploy/update_from_github.sh`.
+
+### 105.2 Concurrency rule
+- The GitHub Actions deploy workflow must enable ref-level concurrency cancellation.
+- When multiple pushes arrive on the same branch:
+  - older in-flight deploy jobs must be canceled
+  - only the newest deploy continues
+
+### 105.3 Server-side changed-file rule
+- `tools/deploy/update_from_github.sh` must compute the changed-file set between:
+  - current deployed revision
+  - target fetched revision
+- The changed-file set must drive the effective deploy steps in `DEPLOY_MODE=auto`.
+
+### 105.4 Auto deploy-step rule
+- In `DEPLOY_MODE=auto`:
+  - Node dependency install runs only when `package.json` or `package-lock.json` changed
+  - Python dependency install and import verification run only when `requirements.txt` changed
+  - `systemd` unit refresh runs only when `tools/deploy/alpha-monitor.service` or `tools/deploy/start_linux.sh` changed
+  - service restart runs only when runtime-affecting files changed
+- Pure docs or deploy-script-only changes must not force an app restart.
+
+### 105.5 Heavy-step retirement rule
+- The deploy script must no longer unconditionally perform:
+  - whole-project `chown -R`
+  - whole-project dependency reinstall
+  - stop-then-kill-port before every restart
+- Port-owner release may remain only as a fallback after a restart failure.
+
+### 105.6 Local script contract
+- `package.json` must expose a server-side auto deploy entry:
+  - `npm run deploy:server:auto`
+- Existing entries may remain:
+  - `npm run deploy:server:fast`
+  - `npm run deploy:server:full`
+
+### 105.7 Acceptance
+- A normal code push to `main` uses `auto` deploy mode.
+- Consecutive pushes do not queue stale deploy jobs indefinitely.
+- Front-end / strategy / notification changes no longer trigger unconditional Node/Python reinstall.
+- Dependency manifest changes still trigger the required full install path.

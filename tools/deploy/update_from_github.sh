@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 服务器统一部署入口（GitHub Actions 与人工排障共用）：
-# 1) 预检查 2) 代码同步 3) 依赖安装 4) service 更新与重启 5) 健康检查
+# 统一服务器部署入口：
+# 1. 预检查
+# 2. Git 同步
+# 3. 按改动自动决定是否安装依赖 / 刷新 systemd / 重启服务
+# 4. 健康检查与首页标记校验
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 TARGET_BRANCH="${TARGET_BRANCH:-main}"
@@ -12,6 +15,7 @@ APP_PORT="${APP_PORT:-}"
 HEALTH_PATH="${HEALTH_PATH:-/api/health}"
 SKIP_GIT_SYNC="${SKIP_GIT_SYNC:-0}"
 DEPLOY_REEXEC="${DEPLOY_REEXEC:-0}"
+DEPLOY_MODE="${DEPLOY_MODE:-auto}"
 GIT_RETRY_COUNT="${GIT_RETRY_COUNT:-8}"
 GIT_RETRY_DELAY_SECONDS="${GIT_RETRY_DELAY_SECONDS:-8}"
 SERVICE_RETRY_COUNT="${SERVICE_RETRY_COUNT:-8}"
@@ -23,11 +27,14 @@ FORCE_RELEASE_APP_PORT="${FORCE_RELEASE_APP_PORT:-1}"
 VERIFY_HOMEPAGE_MARKER="${VERIFY_HOMEPAGE_MARKER:-1}"
 EXPECTED_HOME_MARKER="${EXPECTED_HOME_MARKER:-dashboard_page.js}"
 FORBIDDEN_HOME_MARKERS="${FORBIDDEN_HOME_MARKERS:-app.js|message-form}"
-INSTALL_NODE_MODULES="${INSTALL_NODE_MODULES:-1}"
-INSTALL_PYTHON_REQUIREMENTS="${INSTALL_PYTHON_REQUIREMENTS:-1}"
-VERIFY_PYTHON_IMPORTS="${VERIFY_PYTHON_IMPORTS:-1}"
+INSTALL_NODE_MODULES="${INSTALL_NODE_MODULES:-}"
+INSTALL_PYTHON_REQUIREMENTS="${INSTALL_PYTHON_REQUIREMENTS:-}"
+VERIFY_PYTHON_IMPORTS="${VERIFY_PYTHON_IMPORTS:-}"
+REFRESH_SYSTEMD_UNIT="${REFRESH_SYSTEMD_UNIT:-}"
+RESTART_SERVICE="${RESTART_SERVICE:-}"
 PYTHON_BIN_CANDIDATES="${PYTHON_BIN_CANDIDATES:-python3 python}"
 RUNTIME_PRESERVE_DIR="${RUNTIME_PRESERVE_DIR:-}"
+CHANGED_FILES_FILE="${CHANGED_FILES_FILE:-}"
 
 log() {
   printf '[deploy] %s\n' "$1"
@@ -68,6 +75,22 @@ require_command() {
   command -v "$cmd" >/dev/null 2>&1 || die "required command not found: ${cmd}"
 }
 
+normalize_toggle() {
+  local name="$1"
+  local value="$2"
+  case "$value" in
+    ""|0|1) ;;
+    *) die "invalid ${name}: ${value} (expected 0 or 1)" ;;
+  esac
+}
+
+normalize_deploy_mode() {
+  case "$DEPLOY_MODE" in
+    auto|fast|full) ;;
+    *) die "invalid DEPLOY_MODE: ${DEPLOY_MODE} (expected auto|fast|full)" ;;
+  esac
+}
+
 preflight_checks() {
   [[ -d "$PROJECT_ROOT" ]] || die "project root not found: $PROJECT_ROOT"
   if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
@@ -96,6 +119,66 @@ detect_python_bin() {
   return 1
 }
 
+ensure_changed_files_file() {
+  if [[ -n "$CHANGED_FILES_FILE" ]]; then
+    return 0
+  fi
+  CHANGED_FILES_FILE="$(mktemp)"
+}
+
+cleanup_changed_files_file() {
+  [[ -n "$CHANGED_FILES_FILE" ]] || return 0
+  [[ -f "$CHANGED_FILES_FILE" ]] || return 0
+  rm -f "$CHANGED_FILES_FILE"
+}
+
+changed_files_count() {
+  [[ -n "$CHANGED_FILES_FILE" && -s "$CHANGED_FILES_FILE" ]] || {
+    printf '0'
+    return 0
+  }
+  grep -c . "$CHANGED_FILES_FILE" || true
+}
+
+changed_files_match() {
+  local pattern="$1"
+  [[ -n "$CHANGED_FILES_FILE" && -s "$CHANGED_FILES_FILE" ]] || return 1
+  grep -Eq "$pattern" "$CHANGED_FILES_FILE"
+}
+
+log_changed_files_summary() {
+  local count
+  count="$(changed_files_count)"
+  log "detected changed files between deployed revision and target revision: ${count}"
+  if (( count > 0 )); then
+    sed -n '1,40p' "$CHANGED_FILES_FILE" | sed 's/^/[deploy][changed] /'
+    if (( count > 40 )); then
+      log "changed file list truncated at 40 lines"
+    fi
+  fi
+}
+
+write_changed_files_between_revisions() {
+  local current_rev="${1:-}"
+  local target_rev="${2:-}"
+
+  ensure_changed_files_file
+  : > "$CHANGED_FILES_FILE"
+
+  if [[ -z "$target_rev" ]]; then
+    return 0
+  fi
+
+  if [[ -n "$current_rev" && "$current_rev" != "$target_rev" ]] && git cat-file -e "${current_rev}^{commit}" >/dev/null 2>&1; then
+    git diff --name-only --no-renames "$current_rev" "$target_rev" | sed '/^$/d' > "$CHANGED_FILES_FILE"
+    return 0
+  fi
+
+  if [[ -z "$current_rev" ]]; then
+    git diff-tree --no-commit-id --name-only -r "$target_rev" | sed '/^$/d' > "$CHANGED_FILES_FILE"
+  fi
+}
+
 install_python_requirements() {
   local python_bin="${1:-}"
   local pip_log
@@ -113,7 +196,7 @@ install_python_requirements() {
   [[ -n "$python_bin" ]] || die "python runtime not found; cannot install requirements"
   log "installing Python dependencies with ${python_bin} -m pip install -r requirements.txt"
   pip_log="$(mktemp)"
-  if "$python_bin" -m pip install -r "$PROJECT_ROOT/requirements.txt" > >(tee "$pip_log") 2> >(tee -a "$pip_log" >&2); then
+  if "$python_bin" -m pip install --disable-pip-version-check -r "$PROJECT_ROOT/requirements.txt" > >(tee "$pip_log") 2> >(tee -a "$pip_log" >&2); then
     rm -f "$pip_log"
     return 0
   fi
@@ -121,7 +204,7 @@ install_python_requirements() {
   pip_rc=$?
   if grep -qi "externally-managed-environment" "$pip_log"; then
     warn "system Python is externally managed; retrying pip install with --break-system-packages"
-    "$python_bin" -m pip install --break-system-packages -r "$PROJECT_ROOT/requirements.txt"
+    "$python_bin" -m pip install --disable-pip-version-check --break-system-packages -r "$PROJECT_ROOT/requirements.txt"
     rm -f "$pip_log"
     return 0
   fi
@@ -156,7 +239,6 @@ if missing:
 EOF
 }
 
-# 尝试 sudo systemctl；若 sudo 不可用则回退普通 systemctl。
 run_systemctl() {
   local err_file
   local rc
@@ -193,16 +275,52 @@ service_exists() {
   printf '%s\n' "$list_output" | grep -q "${SERVICE_NAME}\.service"
 }
 
-repair_project_permissions() {
-  log "repairing file ownership for deploy user: ${PROJECT_OWNER}"
+repair_path_ownership() {
+  local recursive="$1"
+  local path="$2"
+  [[ -e "$path" ]] || return 0
 
-  if sudo -n chown -R "${PROJECT_OWNER}:${PROJECT_OWNER}" "$PROJECT_ROOT" >/dev/null 2>&1; then
+  if [[ "$recursive" == "1" ]]; then
+    sudo -n chown -R "${PROJECT_OWNER}:${PROJECT_OWNER}" "$path" >/dev/null 2>&1 \
+      || chown -R "${PROJECT_OWNER}:${PROJECT_OWNER}" "$path" >/dev/null 2>&1 \
+      || warn "unable to change ownership recursively for ${path}"
+  else
+    sudo -n chown "${PROJECT_OWNER}:${PROJECT_OWNER}" "$path" >/dev/null 2>&1 \
+      || chown "${PROJECT_OWNER}:${PROJECT_OWNER}" "$path" >/dev/null 2>&1 \
+      || warn "unable to change ownership for ${path}"
+  fi
+}
+
+repair_project_permissions_if_needed() {
+  local needs_repair=0
+  local check_path
+  local direct_targets=("$PROJECT_ROOT" "$PROJECT_ROOT/package.json" "$PROJECT_ROOT/package-lock.json" "$PROJECT_ROOT/requirements.txt")
+  local recursive_targets=("$PROJECT_ROOT/.git" "$PROJECT_ROOT/runtime_data" "$PROJECT_ROOT/runtime_logs" "$PROJECT_ROOT/tools/deploy")
+
+  if [[ "$INSTALL_NODE_MODULES" == "1" ]]; then
+    recursive_targets+=("$PROJECT_ROOT/node_modules")
+  fi
+
+  for check_path in "${direct_targets[@]}" "${recursive_targets[@]}"; do
+    [[ -e "$check_path" ]] || continue
+    if [[ ! -w "$check_path" ]]; then
+      needs_repair=1
+      break
+    fi
+  done
+
+  if (( needs_repair == 0 )); then
+    log "skip ownership repair because deployment-critical paths are already writable"
     return 0
   fi
 
-  if ! chown -R "${PROJECT_OWNER}:${PROJECT_OWNER}" "$PROJECT_ROOT" >/dev/null 2>&1; then
-    warn "unable to change ownership for ${PROJECT_ROOT}; continuing with existing permissions"
-  fi
+  log "repairing file ownership for deploy user on deployment-critical paths"
+  for check_path in "${direct_targets[@]}"; do
+    repair_path_ownership 0 "$check_path"
+  done
+  for check_path in "${recursive_targets[@]}"; do
+    repair_path_ownership 1 "$check_path"
+  done
 }
 
 preserve_tracked_runtime_files() {
@@ -253,24 +371,92 @@ cleanup_preserved_runtime_files() {
 }
 
 git_sync() {
+  local current_rev
+  local target_rev
+
   export GIT_TERMINAL_PROMPT=0
+  ensure_changed_files_file
+  current_rev="$(git rev-parse HEAD 2>/dev/null || true)"
 
   retry_hard \
-    "fetching latest code from origin with resilient HTTP settings" \
-    git -c http.version=HTTP/1.1 -c http.maxRequests=2 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
-    fetch --all --prune
-
-  if git show-ref --quiet "refs/remotes/origin/${TARGET_BRANCH}"; then
-    retry_hard "resetting worktree to origin/${TARGET_BRANCH}" git reset --hard "origin/${TARGET_BRANCH}"
-    return 0
-  fi
-
-  warn "origin/${TARGET_BRANCH} not found after --all fetch, trying direct branch fetch"
-  retry_hard \
-    "fetching target branch explicitly" \
+    "fetching latest code from origin/${TARGET_BRANCH} with resilient HTTP settings" \
     git -c http.version=HTTP/1.1 -c http.maxRequests=2 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
     fetch --prune origin "$TARGET_BRANCH"
-  retry_hard "resetting worktree to fetched HEAD" git reset --hard FETCH_HEAD
+
+  if git show-ref --quiet "refs/remotes/origin/${TARGET_BRANCH}"; then
+    target_rev="$(git rev-parse "refs/remotes/origin/${TARGET_BRANCH}")"
+  else
+    target_rev="$(git rev-parse FETCH_HEAD)"
+  fi
+
+  write_changed_files_between_revisions "$current_rev" "$target_rev"
+  log_changed_files_summary
+
+  if [[ -n "$current_rev" && "$current_rev" == "$target_rev" ]]; then
+    log "worktree revision already matches target revision ${target_rev}; resetting anyway to clean local drift"
+  fi
+  retry_hard "resetting worktree to ${target_rev}" git reset --hard "$target_rev"
+}
+
+apply_deploy_mode() {
+  local auto_install_node=""
+  local auto_install_python=""
+  local auto_verify_python=""
+  local auto_refresh_systemd=""
+  local auto_restart_service=""
+
+  normalize_deploy_mode
+  normalize_toggle "INSTALL_NODE_MODULES" "$INSTALL_NODE_MODULES"
+  normalize_toggle "INSTALL_PYTHON_REQUIREMENTS" "$INSTALL_PYTHON_REQUIREMENTS"
+  normalize_toggle "VERIFY_PYTHON_IMPORTS" "$VERIFY_PYTHON_IMPORTS"
+  normalize_toggle "REFRESH_SYSTEMD_UNIT" "$REFRESH_SYSTEMD_UNIT"
+  normalize_toggle "RESTART_SERVICE" "$RESTART_SERVICE"
+
+  case "$DEPLOY_MODE" in
+    full)
+      auto_install_node="1"
+      auto_install_python="1"
+      auto_verify_python="1"
+      auto_refresh_systemd="1"
+      auto_restart_service="1"
+      ;;
+    fast)
+      auto_install_node="0"
+      auto_install_python="0"
+      auto_verify_python="0"
+      auto_refresh_systemd="0"
+      auto_restart_service="1"
+      ;;
+    auto)
+      if [[ -z "$CHANGED_FILES_FILE" || ! -f "$CHANGED_FILES_FILE" ]]; then
+        warn "changed file list is unavailable in auto mode; falling back to full deploy decisions"
+        auto_install_node="1"
+        auto_install_python="1"
+        auto_verify_python="1"
+        auto_refresh_systemd="1"
+        auto_restart_service="1"
+      else
+        changed_files_match '^(package\.json|package-lock\.json)$' && auto_install_node="1" || auto_install_node="0"
+        changed_files_match '^requirements\.txt$' && auto_install_python="1" || auto_install_python="0"
+        auto_verify_python="$auto_install_python"
+        changed_files_match '^tools/deploy/(alpha-monitor\.service|start_linux\.sh)$' && auto_refresh_systemd="1" || auto_refresh_systemd="0"
+        if changed_files_match '^(data_fetch/|strategy/|presentation/|notification/|shared/|start_server\.js$|config\.yaml$|package\.json$|package-lock\.json$|requirements\.txt$|data_dispatch\.py$|db_paths\.py$|tools/deploy/(start_linux\.sh|alpha-monitor\.service)$)'; then
+          auto_restart_service="1"
+        else
+          auto_restart_service="0"
+        fi
+      fi
+      ;;
+  esac
+
+  [[ -n "$INSTALL_NODE_MODULES" ]] || INSTALL_NODE_MODULES="$auto_install_node"
+  [[ -n "$INSTALL_PYTHON_REQUIREMENTS" ]] || INSTALL_PYTHON_REQUIREMENTS="$auto_install_python"
+  [[ -n "$VERIFY_PYTHON_IMPORTS" ]] || VERIFY_PYTHON_IMPORTS="$auto_verify_python"
+  [[ -n "$REFRESH_SYSTEMD_UNIT" ]] || REFRESH_SYSTEMD_UNIT="$auto_refresh_systemd"
+  [[ -n "$RESTART_SERVICE" ]] || RESTART_SERVICE="$auto_restart_service"
+
+  log "deploy mode: ${DEPLOY_MODE}"
+  log "effective steps: install_node=${INSTALL_NODE_MODULES} install_python=${INSTALL_PYTHON_REQUIREMENTS} verify_python=${VERIFY_PYTHON_IMPORTS} refresh_systemd=${REFRESH_SYSTEMD_UNIT} restart_service=${RESTART_SERVICE}"
 }
 
 refresh_systemd_unit() {
@@ -278,6 +464,11 @@ refresh_systemd_unit() {
   local target_path="/etc/systemd/system/${SERVICE_NAME}.service"
   local rendered_unit
   local unit_written=0
+
+  [[ "$REFRESH_SYSTEMD_UNIT" == "1" ]] || {
+    log "skip systemd unit refresh because REFRESH_SYSTEMD_UNIT=${REFRESH_SYSTEMD_UNIT}"
+    return 0
+  }
 
   if [[ ! -f "$template_path" ]]; then
     warn "systemd template not found: $template_path"
@@ -390,7 +581,7 @@ release_stale_port_owner() {
   [[ "$FORCE_RELEASE_APP_PORT" == "1" ]] || return 0
   [[ -n "$port" ]] || return 0
 
-  log "releasing stale owner on port ${port} before restart"
+  warn "releasing stale owner on port ${port} after restart failure"
 
   if command -v fuser >/dev/null 2>&1; then
     if sudo -n fuser -k "${port}/tcp" >/dev/null 2>&1; then
@@ -434,6 +625,32 @@ stop_conflicting_pm2_process() {
   warn "detected legacy PM2 process '${SERVICE_NAME}', removing it to avoid port conflicts"
   pm2 delete "$SERVICE_NAME" >/dev/null 2>&1 || pm2 stop "$SERVICE_NAME" >/dev/null 2>&1 || true
   pm2 save >/dev/null 2>&1 || true
+}
+
+restart_service_if_needed() {
+  local resolved_port="$1"
+
+  if ! service_exists; then
+    warn "system service ${SERVICE_NAME}.service not found; code was updated but service is not managed yet"
+    return 0
+  fi
+
+  refresh_systemd_unit
+
+  [[ "$RESTART_SERVICE" == "1" ]] || {
+    log "skip service restart because RESTART_SERVICE=${RESTART_SERVICE}"
+    return 0
+  }
+
+  stop_conflicting_pm2_process
+  log "restarting system service: ${SERVICE_NAME}"
+  if ! run_systemctl restart "$SERVICE_NAME"; then
+    warn "first restart attempt failed; trying stale-port cleanup before retry"
+    release_stale_port_owner "$resolved_port"
+    run_systemctl restart "$SERVICE_NAME"
+  fi
+  wait_service_active
+  run_systemctl --no-pager --full status "$SERVICE_NAME" | sed -n '1,12p'
 }
 
 run_health_check() {
@@ -498,7 +715,6 @@ log "target branch: $TARGET_BRANCH"
 log "project owner: $PROJECT_OWNER"
 
 preflight_checks
-repair_project_permissions
 
 if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
   if [[ -z "$RUNTIME_PRESERVE_DIR" ]]; then
@@ -506,7 +722,6 @@ if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
   fi
   git_sync
 
-  # 代码同步后重新执行新版本脚本，避免“旧脚本跑后半程”。
   if [[ "$DEPLOY_REEXEC" != "1" ]]; then
     log "reloading deployment script from latest synced revision"
     exec env \
@@ -518,20 +733,32 @@ if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
       HEALTH_PATH="$HEALTH_PATH" \
       SKIP_GIT_SYNC=1 \
       DEPLOY_REEXEC=1 \
+      DEPLOY_MODE="$DEPLOY_MODE" \
       GIT_RETRY_COUNT="$GIT_RETRY_COUNT" \
       GIT_RETRY_DELAY_SECONDS="$GIT_RETRY_DELAY_SECONDS" \
       SERVICE_RETRY_COUNT="$SERVICE_RETRY_COUNT" \
       SERVICE_RETRY_DELAY_SECONDS="$SERVICE_RETRY_DELAY_SECONDS" \
+      VERIFY_CONFIG_YAML="$VERIFY_CONFIG_YAML" \
+      FORCE_RELEASE_APP_PORT="$FORCE_RELEASE_APP_PORT" \
+      VERIFY_HOMEPAGE_MARKER="$VERIFY_HOMEPAGE_MARKER" \
+      EXPECTED_HOME_MARKER="$EXPECTED_HOME_MARKER" \
+      FORBIDDEN_HOME_MARKERS="$FORBIDDEN_HOME_MARKERS" \
       INSTALL_NODE_MODULES="$INSTALL_NODE_MODULES" \
       INSTALL_PYTHON_REQUIREMENTS="$INSTALL_PYTHON_REQUIREMENTS" \
       VERIFY_PYTHON_IMPORTS="$VERIFY_PYTHON_IMPORTS" \
+      REFRESH_SYSTEMD_UNIT="$REFRESH_SYSTEMD_UNIT" \
+      RESTART_SERVICE="$RESTART_SERVICE" \
       PYTHON_BIN_CANDIDATES="$PYTHON_BIN_CANDIDATES" \
       RUNTIME_PRESERVE_DIR="$RUNTIME_PRESERVE_DIR" \
+      CHANGED_FILES_FILE="$CHANGED_FILES_FILE" \
       bash "$PROJECT_ROOT/tools/deploy/update_from_github.sh"
   fi
 else
   log "skipping git sync because SKIP_GIT_SYNC=1"
 fi
+
+apply_deploy_mode
+repair_project_permissions_if_needed
 
 restore_preserved_runtime_files "$RUNTIME_PRESERVE_DIR"
 cleanup_preserved_runtime_files "$RUNTIME_PRESERVE_DIR"
@@ -540,10 +767,10 @@ RUNTIME_PRESERVE_DIR=""
 if [[ "$INSTALL_NODE_MODULES" == "1" ]]; then
   if [[ -f package-lock.json ]]; then
     log "installing Node dependencies with npm ci"
-    npm ci
+    npm ci --no-audit --fund=false
   else
     log "package-lock.json not found, using npm install"
-    npm install
+    npm install --no-audit --fund=false
   fi
 else
   log "skip Node dependency install because INSTALL_NODE_MODULES=${INSTALL_NODE_MODULES}"
@@ -564,20 +791,8 @@ verify_python_imports "$PYTHON_BIN"
 log "ensuring Linux entrypoint is executable"
 chmod +x "$PROJECT_ROOT/tools/deploy/start_linux.sh"
 
-if service_exists; then
-  refresh_systemd_unit
-  log "stopping system service before restart: ${SERVICE_NAME}"
-  run_systemctl stop "$SERVICE_NAME" || true
-  stop_conflicting_pm2_process
-  release_stale_port_owner "$RESOLVED_APP_PORT"
-  log "restarting system service: ${SERVICE_NAME}"
-  run_systemctl restart "$SERVICE_NAME"
-  wait_service_active
-  run_systemctl --no-pager --full status "$SERVICE_NAME" | sed -n '1,12p'
-else
-  warn "system service ${SERVICE_NAME}.service not found; code was updated but service is not managed yet"
-fi
-
+restart_service_if_needed "$RESOLVED_APP_PORT"
 run_health_check "$RESOLVED_APP_PORT"
 run_homepage_marker_check "$RESOLVED_APP_PORT"
+cleanup_changed_files_file
 log "deployment finished successfully"

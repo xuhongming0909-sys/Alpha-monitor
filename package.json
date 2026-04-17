@@ -7,6 +7,7 @@
     "dev": "node start_server.js",
     "start": "node start_server.js",
     "check:health": "powershell -ExecutionPolicy Bypass -File ./tools/check_health.ps1",
+    "deploy:server:auto": "DEPLOY_MODE=auto bash ./tools/deploy/update_from_github.sh",
     "deploy:server:full": "bash ./tools/deploy/update_from_github.sh",
     "deploy:server:fast": "bash ./tools/deploy/update_fast.sh",
     "check": "node smoke_check.js",
