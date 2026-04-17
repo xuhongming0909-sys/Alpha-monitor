@@ -4632,3 +4632,115 @@ untime_data/shared/cb_discount_strategy_state.json
 - The public cb-rights-issue page shows only the three phase groups and their tables.
 - The public page contains no `推送候选` or `独立推送`.
 - `GET /api/market/cb-rights-issue` returns an empty `monitorList`.
+
+## 102. Phase CN: CB-rights-issue SH/SZ Split + Shenzhen Column Retirement (2026-04-17)
+
+- This round changes only the cb-rights-issue presentation contract:
+  - `presentation/dashboard/dashboard_page.js`
+  - related live docs only
+- This round does not change:
+  - `GET /api/market/cb-rights-issue` response envelope
+  - cb-rights-issue pricing formulas
+  - cb-rights-issue push grouping
+  - non-cb-rights-issue modules
+
+### 102.1 Market-tab split rule
+- The live cb-rights-issue page must render two market subtabs first:
+  - `沪市`
+  - `深市`
+- Market grouping is fixed to truthful row market semantics:
+  - `沪市`: `market = sh`
+  - `深市`: `market = sz`
+- If the outward row market field is blank, the page may infer only by A-share code prefix:
+  - `6* -> sh`
+  - `0* / 3* -> sz`
+
+### 102.2 Stacked three-table rule
+- Inside each market tab, the page must vertically render three independent tables together:
+  - `申购阶段`
+  - `埋伏阶段`
+  - `等待阶段`
+- The phase grouping rule itself remains unchanged:
+  - `申购阶段`: `inApplyStage = true`
+  - `埋伏阶段`: `inApplyStage = false`, stage semantic is one of `上市委通过 / 同意注册 / 注册生效`, and `expectedReturnRate > 6`
+  - `等待阶段`: all remaining rows
+- The page must no longer require a second phase-tab click after market selection.
+
+### 102.3 Table-state isolation rule
+- The six rendered tables must keep independent front-end table state:
+  - search query
+  - sort key / direction
+  - pagination
+- Suggested table-key family:
+  - `cbRightsIssueShApply`
+  - `cbRightsIssueShAmbush`
+  - `cbRightsIssueShWait`
+  - `cbRightsIssueSzApply`
+  - `cbRightsIssueSzAmbush`
+  - `cbRightsIssueSzWait`
+
+### 102.4 Shanghai visible-column rule
+- `沪市` keeps the current page-visible yield expression:
+  - `两融所需股数`
+  - `两融收益率`
+  - `预期收益率去皮`
+  - `两融收益率去皮`
+- Existing phase-specific rule still applies:
+  - `股权登记日` appears only in `申购阶段`
+
+### 102.5 Shenzhen visible-column rule
+- `深市` must retire the one-lot / margin-style visible columns from all three phase tables:
+  - `两融所需股数`
+  - `两融收益率`
+  - `预期收益率去皮`
+  - `两融收益率去皮`
+- `预期收益率` remains visible.
+- This round is presentation-only:
+  - the API may continue exposing the retired fields for compatibility
+  - no backend formula deletion is required in this round
+- `股权登记日` rule remains phase-specific in `深市` as well:
+  - visible only in `申购阶段`
+
+### 102.6 Default-sort rule
+- `沪市埋伏阶段` may keep sorting by `marginReturnRate desc`.
+- Any `深市` table must not default-sort by a retired column.
+- `深市埋伏阶段` should default to a still-visible yield column:
+  - `expectedReturnRate desc`
+
+### 102.7 Acceptance
+- The public cb-rights-issue page first switches between `沪市 / 深市`.
+- After entering either market tab, the user can see three vertically stacked phase tables without another phase-tab switch.
+- `深市` tables do not visibly render `两融收益率 / 预期收益率去皮 / 两融收益率去皮`.
+
+## 101. Convertible Summary Card Metric Truthfulness Spec (2026-04-17)
+
+- This round changes only:
+  - `presentation/dashboard/dashboard_page.js`
+- This round does not change:
+  - `GET /api/market/convertible-bond-arbitrage` response shape
+  - convertible ranking formulas
+  - convertible main-table columns
+  - push markdown content
+
+### 101.1 Summary-card wording rule
+- In `presentation/dashboard/dashboard_page.js > renderConvertibleBondPanel()`:
+  - `双低前3` items must no longer render a bare numeric `value`
+  - the main metric text must explicitly include the `双低值` label
+  - the same item text must also include `现价`
+- `理论溢价前3` items must:
+  - explicitly include the `理论溢价率` label in the main metric text
+  - include `现价`
+  - include `理论价`
+
+### 101.2 Ranking boundary
+- Keep unchanged:
+  - `双低前3` still reads `cbPayload.summary.topDoubleLow`
+  - `理论溢价前3` still reads `cbPayload.summary.topTheoreticalPremiumRate`
+- This round changes only presentation wording, not candidate selection or ordering.
+
+### 101.3 Misread-prevention acceptance
+- A row such as `闻泰转债 110081` must no longer appear as if its live price were `104.80`.
+- The same card should make it visually obvious that:
+  - `现价` is about `99.79`
+  - `双低值` is a separate metric around `104.80`
+- `理论溢价前3` must visually read as a metric card for `理论溢价率`, not for price.

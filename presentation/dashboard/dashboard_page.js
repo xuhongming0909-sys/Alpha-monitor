@@ -63,6 +63,15 @@ const ENDPOINTS = {
 
 const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'lof-arb', 'monitor', 'dividend', 'merger', 'cb-rights-issue'];
 const CB_RIGHTS_ISSUE_SUBTAB_SEQUENCE = ['apply', 'ambush', 'wait'];
+const CB_RIGHTS_ISSUE_MARKET_SUBTAB_SEQUENCE = ['sh', 'sz'];
+const CB_RIGHTS_ISSUE_TABLE_KEYS = [
+  'cbRightsIssueShApply',
+  'cbRightsIssueShAmbush',
+  'cbRightsIssueShWait',
+  'cbRightsIssueSzApply',
+  'cbRightsIssueSzAmbush',
+  'cbRightsIssueSzWait',
+];
 const EVENT_ARB_SUBTAB_SEQUENCE = ['a_event', 'hk_private', 'cn_private', 'rights_issue', 'announcement_pool'];
 const TAB_PRIMARY_RESOURCE_KEYS = Object.freeze({
   'cb-arb': ['cbArb'],
@@ -116,9 +125,12 @@ const TABLE_DEFAULTS = {
   dividend: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   merger: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   lofArb: { sortKey: 'premiumRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
-  cbRightsIssueApply: { sortKey: 'recordDate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
-  cbRightsIssueAmbush: { sortKey: 'marginReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
-  cbRightsIssueWait: { sortKey: 'progressDate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  cbRightsIssueShApply: { sortKey: 'recordDate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  cbRightsIssueShAmbush: { sortKey: 'marginReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  cbRightsIssueShWait: { sortKey: 'progressDate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  cbRightsIssueSzApply: { sortKey: 'recordDate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  cbRightsIssueSzAmbush: { sortKey: 'expectedReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  cbRightsIssueSzWait: { sortKey: 'progressDate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   eventArbHk: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   eventArbCn: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   eventArbA: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
@@ -146,17 +158,32 @@ const TABLE_SEARCH_CONFIG = Object.freeze({
     hint: '可按LOF代码、LOF名称、相关指数搜索',
     fields: ['code', 'name', 'indexName'],
   },
-  cbRightsIssueApply: {
+  cbRightsIssueShApply: {
     placeholder: '搜索正股代码、名称或方案进展',
     hint: '可按正股代码、正股名称、方案进展搜索',
     fields: ['stockCode', 'stockName', 'progressName'],
   },
-  cbRightsIssueAmbush: {
+  cbRightsIssueShAmbush: {
     placeholder: '搜索正股代码、名称或方案进展',
     hint: '可按正股代码、正股名称、方案进展搜索',
     fields: ['stockCode', 'stockName', 'progressName'],
   },
-  cbRightsIssueWait: {
+  cbRightsIssueShWait: {
+    placeholder: '搜索正股代码、名称或方案进展',
+    hint: '可按正股代码、正股名称、方案进展搜索',
+    fields: ['stockCode', 'stockName', 'progressName'],
+  },
+  cbRightsIssueSzApply: {
+    placeholder: '搜索正股代码、名称或方案进展',
+    hint: '可按正股代码、正股名称、方案进展搜索',
+    fields: ['stockCode', 'stockName', 'progressName'],
+  },
+  cbRightsIssueSzAmbush: {
+    placeholder: '搜索正股代码、名称或方案进展',
+    hint: '可按正股代码、正股名称、方案进展搜索',
+    fields: ['stockCode', 'stockName', 'progressName'],
+  },
+  cbRightsIssueSzWait: {
     placeholder: '搜索正股代码、名称或方案进展',
     hint: '可按正股代码、正股名称、方案进展搜索',
     fields: ['stockCode', 'stockName', 'progressName'],
@@ -166,7 +193,7 @@ const TABLE_SEARCH_CONFIG = Object.freeze({
 const state = {
   activeTab: 'cb-arb',
   lofSubview: 'index',
-  cbRightsIssueSubview: 'apply',
+  cbRightsIssueMarketSubview: 'sh',
   mergerSubview: 'a_event',
   eventsBound: false,
   savingPush: false,
@@ -183,9 +210,12 @@ const state = {
     ah: false,
     ab: false,
     lofArb: false,
-    cbRightsIssueApply: false,
-    cbRightsIssueAmbush: false,
-    cbRightsIssueWait: false,
+    cbRightsIssueShApply: false,
+    cbRightsIssueShAmbush: false,
+    cbRightsIssueShWait: false,
+    cbRightsIssueSzApply: false,
+    cbRightsIssueSzAmbush: false,
+    cbRightsIssueSzWait: false,
   },
   monitorEditor: createMonitorEditorState(),
   expandedRows: {
@@ -207,9 +237,12 @@ const state = {
     dividend: createTableState('dividend'),
     merger: createTableState('merger'),
     lofArb: createTableState('lofArb'),
-    cbRightsIssueApply: createTableState('cbRightsIssueApply'),
-    cbRightsIssueAmbush: createTableState('cbRightsIssueAmbush'),
-    cbRightsIssueWait: createTableState('cbRightsIssueWait'),
+    cbRightsIssueShApply: createTableState('cbRightsIssueShApply'),
+    cbRightsIssueShAmbush: createTableState('cbRightsIssueShAmbush'),
+    cbRightsIssueShWait: createTableState('cbRightsIssueShWait'),
+    cbRightsIssueSzApply: createTableState('cbRightsIssueSzApply'),
+    cbRightsIssueSzAmbush: createTableState('cbRightsIssueSzAmbush'),
+    cbRightsIssueSzWait: createTableState('cbRightsIssueSzWait'),
     eventArbHk: createTableState('eventArbHk'),
     eventArbCn: createTableState('eventArbCn'),
     eventArbA: createTableState('eventArbA'),
@@ -794,7 +827,7 @@ function renderSearchableTablePanel(tableKey) {
     renderLofArbPanel();
     return;
   }
-  if (tableKey === 'cbRightsIssueApply' || tableKey === 'cbRightsIssueAmbush' || tableKey === 'cbRightsIssueWait') {
+  if (isCbRightsIssueTableKey(tableKey)) {
     renderCbRightsIssuePanel();
   }
 }
@@ -827,12 +860,17 @@ function renderSearchableTableHostContent(tableKey) {
       emptyMessage: '当前分组没有符合条件的 LOF 套利数据',
     });
   }
-  if (tableKey === 'cbRightsIssueApply' || tableKey === 'cbRightsIssueAmbush' || tableKey === 'cbRightsIssueWait') {
-    const meta = readCbRightsIssueSubviewMeta(tableKey === 'cbRightsIssueApply' ? 'apply' : (tableKey === 'cbRightsIssueAmbush' ? 'ambush' : 'wait'));
+  if (isCbRightsIssueTableKey(tableKey)) {
+    const parsed = parseCbRightsIssueTableKey(tableKey);
+    const meta = readCbRightsIssueSubviewMeta(parsed.marketKey, parsed.subview);
     return renderPaginatedTable({
       tableKey: meta.tableKey,
       tableKind: 'convertible',
-      columns: buildCbRightsIssueColumns({ includeRecordDate: meta.includeRecordDate }),
+      columns: buildCbRightsIssueColumns({
+        includeRecordDate: meta.includeRecordDate,
+        includeMarginColumns: meta.includeMarginColumns,
+        includePeelColumns: meta.includePeelColumns,
+      }),
       rows: meta.rows,
       emptyMessage: meta.emptyMessage,
     });
@@ -933,11 +971,40 @@ function normalizeCbRightsIssueProgressText(value) {
     .trim();
 }
 
-function ensureCbRightsIssueSubview() {
-  if (!CB_RIGHTS_ISSUE_SUBTAB_SEQUENCE.includes(state.cbRightsIssueSubview)) {
-    state.cbRightsIssueSubview = 'apply';
+function normalizeCbRightsIssueMarketKey(row) {
+  const market = String(row?.market || '').trim().toLowerCase();
+  if (market === 'sh' || market === 'sz') return market;
+  const stockCode = String(row?.stockCode || '').trim();
+  if (stockCode.startsWith('6')) return 'sh';
+  if (stockCode.startsWith('0') || stockCode.startsWith('3')) return 'sz';
+  return '';
+}
+
+function buildCbRightsIssueTableKey(marketKey, subview) {
+  const marketPart = String(marketKey || '').trim().toLowerCase() === 'sz' ? 'Sz' : 'Sh';
+  const subviewPart = subview === 'ambush' ? 'Ambush' : (subview === 'wait' ? 'Wait' : 'Apply');
+  return `cbRightsIssue${marketPart}${subviewPart}`;
+}
+
+function parseCbRightsIssueTableKey(tableKey) {
+  const text = String(tableKey || '').trim();
+  const match = /^cbRightsIssue(Sh|Sz)(Apply|Ambush|Wait)$/.exec(text);
+  if (!match) return null;
+  return {
+    marketKey: match[1] === 'Sz' ? 'sz' : 'sh',
+    subview: match[2] === 'Ambush' ? 'ambush' : (match[2] === 'Wait' ? 'wait' : 'apply'),
+  };
+}
+
+function isCbRightsIssueTableKey(tableKey) {
+  return Boolean(parseCbRightsIssueTableKey(tableKey));
+}
+
+function ensureCbRightsIssueMarketSubview() {
+  if (!CB_RIGHTS_ISSUE_MARKET_SUBTAB_SEQUENCE.includes(state.cbRightsIssueMarketSubview)) {
+    state.cbRightsIssueMarketSubview = 'sh';
   }
-  return state.cbRightsIssueSubview;
+  return state.cbRightsIssueMarketSubview;
 }
 
 function isCbRightsIssueAmbushRow(row) {
@@ -947,8 +1014,8 @@ function isCbRightsIssueAmbushRow(row) {
   return isTargetStage && (toNumber(row?.expectedReturnRate) ?? -Infinity) > 6;
 }
 
-function readCbRightsIssueRowsBySubview(subview) {
-  const rows = readCbRightsIssueSourceRows();
+function readCbRightsIssueRowsByMarketAndSubview(marketKey, subview) {
+  const rows = readCbRightsIssueSourceRows().filter((row) => normalizeCbRightsIssueMarketKey(row) === marketKey);
   if (subview === 'apply') {
     return rows.filter((row) => Boolean(row?.inApplyStage));
   }
@@ -958,16 +1025,36 @@ function readCbRightsIssueRowsBySubview(subview) {
   return rows.filter((row) => !row?.inApplyStage && !isCbRightsIssueAmbushRow(row));
 }
 
-function readActiveCbRightsIssueRows() {
-  return readCbRightsIssueRowsBySubview(ensureCbRightsIssueSubview());
+function readCbRightsIssueRowsByMarket(marketKey) {
+  return readCbRightsIssueSourceRows().filter((row) => normalizeCbRightsIssueMarketKey(row) === marketKey);
 }
 
-function readCbRightsIssueSubviewMeta(subview = ensureCbRightsIssueSubview()) {
-  const active = CB_RIGHTS_ISSUE_SUBTAB_SEQUENCE.includes(subview) ? subview : 'apply';
+function readCbRightsIssueActiveMarketMeta(marketKey = ensureCbRightsIssueMarketSubview()) {
+  const active = CB_RIGHTS_ISSUE_MARKET_SUBTAB_SEQUENCE.includes(marketKey) ? marketKey : 'sh';
+  const metaByMarket = {
+    sh: {
+      key: 'sh',
+      label: '沪市',
+      note: '沪市保留申购阶段、埋伏阶段、等待阶段三张竖排表，并继续展示两融与去皮相关字段。',
+    },
+    sz: {
+      key: 'sz',
+      label: '深市',
+      note: '深市同样按三阶段竖排展示，但不再显示两融收益率、两融所需股数及去皮收益率列。',
+    },
+  };
+  return {
+    ...metaByMarket[active],
+    rows: readCbRightsIssueRowsByMarket(active),
+  };
+}
+
+function readCbRightsIssueSubviewMeta(marketKey, subview) {
+  const activeMarket = CB_RIGHTS_ISSUE_MARKET_SUBTAB_SEQUENCE.includes(marketKey) ? marketKey : ensureCbRightsIssueMarketSubview();
+  const activeSubview = CB_RIGHTS_ISSUE_SUBTAB_SEQUENCE.includes(subview) ? subview : 'apply';
   const metaBySubview = {
     apply: {
       key: 'apply',
-      tableKey: 'cbRightsIssueApply',
       label: '申购阶段',
       note: '展示已进入申购阶段的项目，保留股权登记日字段，便于直接执行申购跟踪。',
       includeRecordDate: true,
@@ -975,7 +1062,6 @@ function readCbRightsIssueSubviewMeta(subview = ensureCbRightsIssueSubview()) {
     },
     ambush: {
       key: 'ambush',
-      tableKey: 'cbRightsIssueAmbush',
       label: '埋伏阶段',
       note: '展示上市委通过、同意注册或注册生效且预期收益率大于 6% 的项目，用于提前埋伏。',
       includeRecordDate: false,
@@ -983,16 +1069,21 @@ function readCbRightsIssueSubviewMeta(subview = ensureCbRightsIssueSubview()) {
     },
     wait: {
       key: 'wait',
-      tableKey: 'cbRightsIssueWait',
       label: '等待阶段',
       note: '展示未进入申购阶段、也未达到埋伏门槛的项目，便于后续继续观察。',
       includeRecordDate: false,
       emptyMessage: '当前没有等待阶段的股票',
     },
   };
+  const isShenzhen = activeMarket === 'sz';
   return {
-    ...metaBySubview[active],
-    rows: readCbRightsIssueRowsBySubview(active),
+    ...metaBySubview[activeSubview],
+    marketKey: activeMarket,
+    marketLabel: activeMarket === 'sz' ? '深市' : '沪市',
+    tableKey: buildCbRightsIssueTableKey(activeMarket, activeSubview),
+    includeMarginColumns: !isShenzhen,
+    includePeelColumns: !isShenzhen,
+    rows: readCbRightsIssueRowsByMarketAndSubview(activeMarket, activeSubview),
   };
 }
 
@@ -1338,11 +1429,11 @@ function bindEvents() {
       return;
     }
 
-    const cbRightsIssueSubtab = event.target.closest('[data-cb-rights-issue-subtab]');
-    if (cbRightsIssueSubtab) {
-      const subtab = String(cbRightsIssueSubtab.dataset.cbRightsIssueSubtab || '').trim();
-      if (!CB_RIGHTS_ISSUE_SUBTAB_SEQUENCE.includes(subtab)) return;
-      state.cbRightsIssueSubview = subtab;
+    const cbRightsIssueMarketSubtab = event.target.closest('[data-cb-rights-issue-market-subtab]');
+    if (cbRightsIssueMarketSubtab) {
+      const subtab = String(cbRightsIssueMarketSubtab.dataset.cbRightsIssueMarketSubtab || '').trim();
+      if (!CB_RIGHTS_ISSUE_MARKET_SUBTAB_SEQUENCE.includes(subtab)) return;
+      state.cbRightsIssueMarketSubview = subtab;
       renderCbRightsIssuePanel();
       return;
     }
@@ -2468,7 +2559,7 @@ function handleSortClick(tableKey, sortKey) {
   if (tableKey === 'ah') renderPremiumPanel('ah');
   if (tableKey === 'ab') renderPremiumPanel('ab');
   if (tableKey === 'lofArb') renderLofArbPanel();
-  if (tableKey === 'cbRightsIssueApply' || tableKey === 'cbRightsIssueAmbush' || tableKey === 'cbRightsIssueWait') renderCbRightsIssuePanel();
+  if (isCbRightsIssueTableKey(tableKey)) renderCbRightsIssuePanel();
   restoreTableScroll(tableKey);
 }
 
@@ -2491,7 +2582,7 @@ function handlePageClick(tableKey, action) {
   if (tableKey === 'lofArb') renderLofArbPanel();
   if (tableKey === 'monitor') renderMonitorPanel();
   if (tableKey === 'dividend') renderDividendPanel();
-  if (tableKey === 'cbRightsIssueApply' || tableKey === 'cbRightsIssueAmbush' || tableKey === 'cbRightsIssueWait') renderCbRightsIssuePanel();
+  if (isCbRightsIssueTableKey(tableKey)) renderCbRightsIssuePanel();
   if (tableKey === 'merger' || tableKey.startsWith('eventArb')) renderMergerPanel();
   restoreTableScroll(tableKey);
 }
@@ -2499,9 +2590,10 @@ function handlePageClick(tableKey, action) {
 function readTableSourceRows(tableKey) {
   if (tableKey === 'cbArb') return readResourceArray('cbArb');
   if (tableKey === 'lofArb') return readLofArbVisibleRows();
-  if (tableKey === 'cbRightsIssueApply') return readCbRightsIssueRowsBySubview('apply');
-  if (tableKey === 'cbRightsIssueAmbush') return readCbRightsIssueRowsBySubview('ambush');
-  if (tableKey === 'cbRightsIssueWait') return readCbRightsIssueRowsBySubview('wait');
+  if (isCbRightsIssueTableKey(tableKey)) {
+    const parsed = parseCbRightsIssueTableKey(tableKey);
+    return readCbRightsIssueRowsByMarketAndSubview(parsed.marketKey, parsed.subview);
+  }
   if (tableKey === 'ah') return readResourceArray('ah');
   if (tableKey === 'ab') return readResourceArray('ab');
   if (tableKey === 'monitor') return readResourceArray('monitor');
@@ -2516,9 +2608,15 @@ function readTableSourceRows(tableKey) {
 function getTableColumns(tableKey) {
   if (tableKey === 'cbArb') return buildConvertibleColumns();
   if (tableKey === 'lofArb') return buildLofArbColumns();
-  if (tableKey === 'cbRightsIssueApply') return buildCbRightsIssueColumns({ includeRecordDate: true });
-  if (tableKey === 'cbRightsIssueAmbush') return buildCbRightsIssueColumns({ includeRecordDate: false });
-  if (tableKey === 'cbRightsIssueWait') return buildCbRightsIssueColumns({ includeRecordDate: false });
+  if (isCbRightsIssueTableKey(tableKey)) {
+    const parsed = parseCbRightsIssueTableKey(tableKey);
+    const meta = readCbRightsIssueSubviewMeta(parsed.marketKey, parsed.subview);
+    return buildCbRightsIssueColumns({
+      includeRecordDate: meta.includeRecordDate,
+      includeMarginColumns: meta.includeMarginColumns,
+      includePeelColumns: meta.includePeelColumns,
+    });
+  }
   if (tableKey === 'ah') return buildPremiumColumns('ah');
   if (tableKey === 'ab') return buildPremiumColumns('ab');
   return [];
@@ -2698,7 +2796,7 @@ function resolveRowId(tableKey, row, fallbackIndex) {
   if (tableKey === 'ab') return `${row.aCode || ''}-${row.bCode || ''}-${fallbackIndex}`;
   if (tableKey === 'lofArb') return String(row.code || row.name || fallbackIndex);
   if (tableKey === 'monitor') return String(row.id || row.name || fallbackIndex);
-  if (tableKey === 'cbRightsIssueApply' || tableKey === 'cbRightsIssueAmbush' || tableKey === 'cbRightsIssueWait') {
+  if (isCbRightsIssueTableKey(tableKey)) {
     return String(row.stockCode || row.stockName || fallbackIndex);
   }
   if (tableKey === 'merger') return String(row.announcementId || `${row.secCode || ''}-${row.announcementTime || ''}-${fallbackIndex}`);
@@ -3252,8 +3350,8 @@ function renderConvertibleBondPanel() {
       "双低前3",
       topDoubleLowItems.map((row) => ({
         title: `${row.bondName || "--"} ${row.code || ""}`.trim(),
-        subtitle: `溢价率 ${formatPercent(row.premiumRate, 2)} / 正股 ${row.stockName || "--"}`,
-        value: formatNumber(row.doubleLow, 2),
+        subtitle: `现价 ${formatNumber(row.price, 2)} / 溢价率 ${formatPercent(row.premiumRate, 2)} / 正股 ${row.stockName || "--"}`,
+        value: `双低值 ${formatNumber(row.doubleLow, 2)}`,
       })),
       "compact-card"
     ),
@@ -3261,8 +3359,8 @@ function renderConvertibleBondPanel() {
       "理论溢价前3",
       topTheoryItems.map((row) => ({
         title: `${row.bondName || "--"} ${row.code || ""}`.trim(),
-        subtitle: `现价 ${formatNumber(row.price, 2)} / 双低 ${formatNumber(row.doubleLow, 2)}`,
-        value: formatPercent(row.theoreticalPremiumRate, 2),
+        subtitle: `现价 ${formatNumber(row.price, 2)} / 理论价 ${formatNumber(row.theoreticalPrice, 2)}`,
+        value: `理论溢价率 ${formatPercent(row.theoreticalPremiumRate, 2)}`,
         valueClass: statusClass(row.theoreticalPremiumRate),
       })),
       "compact-card"
@@ -3647,6 +3745,8 @@ function renderLofArbPanel() {
 
 function buildCbRightsIssueColumns(options = {}) {
   const includeRecordDate = Boolean(options.includeRecordDate);
+  const includeMarginColumns = options.includeMarginColumns !== false;
+  const includePeelColumns = options.includePeelColumns !== false;
   const columns = [
     { key: 'index', label: '序号' },
     { key: 'stockCode', label: '正股代码', columnClassName: 'col-code', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.stockCode || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.stockCode || '--')}</span>` },
@@ -3666,19 +3766,17 @@ function buildCbRightsIssueColumns(options = {}) {
     { key: 'issueRatio', label: '发行比例', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.issueRatio), render: (row) => formatRatioPercent(row.issueRatio, 2) },
     { key: 'rawRequiredShares', label: '原始所需股数', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.rawRequiredShares), render: (row) => formatNumber(row.rawRequiredShares, 2) },
     { key: 'placementShares', label: '配售股数', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.placementShares), render: (row) => formatNumber(row.placementShares, 2) },
-    { key: 'marginRequiredShares', label: '两融所需股数', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.marginRequiredShares), render: (row) => formatInt(row.marginRequiredShares) },
     { key: 'convertPrice', label: '转股价', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.convertPrice), render: (row) => formatNumber(row.convertPrice, 2) },
     { key: 'volatility250', label: '波动率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.volatility250 ?? row.volatility60), render: (row) => formatRatioPercent(row.volatility250 ?? row.volatility60, 2) },
     { key: 'optionUnitValue', label: '单位期权价值', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.optionUnitValue), render: (row) => formatNumber(row.optionUnitValue, 4) },
     { key: 'optionValue', label: '期权价值', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.optionValue), render: (row) => formatNumber(row.optionValue, 2) },
     { key: 'requiredFunds', label: '所需资金', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.requiredFunds), render: (row) => toNumber(row.requiredFunds) === null ? '--' : `¥${formatNumber(row.requiredFunds, 2)}` },
-    { key: 'expectedReturnRate', label: '预期收益率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.expectedReturnRate), className: (row) => statusClass(row.expectedReturnRate), render: (row) => formatPercent(row.expectedReturnRate, 2) },
-    { key: 'marginReturnRate', label: '两融收益率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.marginReturnRate), className: (row) => statusClass(row.marginReturnRate), render: (row) => formatPercent(row.marginReturnRate, 2) },
-    { key: 'expectedPeelReturnRate', label: '预期收益率去皮', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.expectedPeelReturnRate), className: (row) => statusClass(row.expectedPeelReturnRate), render: (row) => formatPercent(row.expectedPeelReturnRate, 2) },
-    { key: 'marginPeelReturnRate', label: '两融收益率去皮', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.marginPeelReturnRate), className: (row) => statusClass(row.marginPeelReturnRate), render: (row) => formatPercent(row.marginPeelReturnRate, 2) },
   ];
+  if (includeMarginColumns) {
+    columns.splice(9, 0, { key: 'marginRequiredShares', label: '两融所需股数', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.marginRequiredShares), render: (row) => formatInt(row.marginRequiredShares) });
+  }
   if (includeRecordDate) {
-    columns.splice(16, 0, {
+    columns.push({
       key: 'recordDate',
       label: '股权登记日',
       columnClassName: 'col-date',
@@ -3689,7 +3787,68 @@ function buildCbRightsIssueColumns(options = {}) {
       render: (row) => escapeHtml(formatDateOnly(row.recordDate)),
     });
   }
+  columns.push({ key: 'expectedReturnRate', label: '预期收益率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.expectedReturnRate), className: (row) => statusClass(row.expectedReturnRate), render: (row) => formatPercent(row.expectedReturnRate, 2) });
+  if (includeMarginColumns) {
+    columns.push({ key: 'marginReturnRate', label: '两融收益率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.marginReturnRate), className: (row) => statusClass(row.marginReturnRate), render: (row) => formatPercent(row.marginReturnRate, 2) });
+  }
+  if (includePeelColumns) {
+    columns.push({ key: 'expectedPeelReturnRate', label: '预期收益率去皮', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.expectedPeelReturnRate), className: (row) => statusClass(row.expectedPeelReturnRate), render: (row) => formatPercent(row.expectedPeelReturnRate, 2) });
+  }
+  if (includeMarginColumns && includePeelColumns) {
+    columns.push({ key: 'marginPeelReturnRate', label: '两融收益率去皮', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.marginPeelReturnRate), className: (row) => statusClass(row.marginPeelReturnRate), render: (row) => formatPercent(row.marginPeelReturnRate, 2) });
+  }
   return columns;
+}
+
+function renderCbRightsIssueMarketTabs() {
+  const active = ensureCbRightsIssueMarketSubview();
+  return `
+    <div class="subtab-nav">
+      ${CB_RIGHTS_ISSUE_MARKET_SUBTAB_SEQUENCE.map((marketKey) => {
+        const meta = readCbRightsIssueActiveMarketMeta(marketKey);
+        return `
+          <button
+            type="button"
+            class="subtab-button ${active === marketKey ? 'active' : ''}"
+            data-cb-rights-issue-market-subtab="${escapeHtml(marketKey)}"
+          >
+            ${escapeHtml(meta.label)}（${escapeHtml(formatInt(meta.rows.length))}）
+          </button>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderCbRightsIssueStageSection(meta) {
+  return `
+    <section class="list-card">
+      <div class="module-toolbar">
+        <div>
+          <h3>${escapeHtml(meta.label)}</h3>
+          <div class="section-note">${escapeHtml(meta.note)}</div>
+        </div>
+        <div class="panel-meta">
+          <span>${escapeHtml(meta.marketLabel)} ${escapeHtml(formatInt(meta.rows.length))} 条</span>
+          <span>来源页 ${buildAnchor(readCbRightsIssueSummary().sourceUrl, '打开') || '--'}</span>
+        </div>
+      </div>
+      ${renderTableSearchBar(meta.tableKey)}
+      <div data-table-host="${escapeHtml(meta.tableKey)}">
+        ${renderPaginatedTable({
+          tableKind: 'convertible',
+          tableKey: meta.tableKey,
+          columns: buildCbRightsIssueColumns({
+            includeRecordDate: meta.includeRecordDate,
+            includeMarginColumns: meta.includeMarginColumns,
+            includePeelColumns: meta.includePeelColumns,
+          }),
+          rows: meta.rows,
+          emptyMessage: meta.emptyMessage,
+        })}
+      </div>
+    </section>
+  `;
 }
 
 function renderCbRightsIssuePanel() {
@@ -3707,11 +3866,16 @@ function renderCbRightsIssuePanel() {
     return;
   }
 
-  const activeMeta = readCbRightsIssueSubviewMeta();
-  const subviewCounts = {
-    apply: readCbRightsIssueRowsBySubview('apply').length,
-    ambush: readCbRightsIssueRowsBySubview('ambush').length,
-    wait: readCbRightsIssueRowsBySubview('wait').length,
+  const activeMarketMeta = readCbRightsIssueActiveMarketMeta();
+  const shCounts = {
+    apply: readCbRightsIssueRowsByMarketAndSubview('sh', 'apply').length,
+    ambush: readCbRightsIssueRowsByMarketAndSubview('sh', 'ambush').length,
+    wait: readCbRightsIssueRowsByMarketAndSubview('sh', 'wait').length,
+  };
+  const szCounts = {
+    apply: readCbRightsIssueRowsByMarketAndSubview('sz', 'apply').length,
+    ambush: readCbRightsIssueRowsByMarketAndSubview('sz', 'ambush').length,
+    wait: readCbRightsIssueRowsByMarketAndSubview('sz', 'wait').length,
   };
   const summary = readCbRightsIssueSummary();
   const rebuildStatus = readCbRightsIssueRebuildStatus();
@@ -3721,13 +3885,13 @@ function renderCbRightsIssuePanel() {
       <div class="module-toolbar">
         <div>
           <div class="tab-title">可转债抢权配售</div>
-          <div class="section-note">页面只保留申购阶段、埋伏阶段、等待阶段三组，按阶段查看即可，不再附带独立监控表达。</div>
+          <div class="section-note">页面拆为沪市与深市两个页签；每个页签内部按申购阶段、埋伏阶段、等待阶段三张独立表格竖向展示。深市不再显示两融与去皮玩法相关列。</div>
         </div>
         <div class="panel-meta">
           <span>固定源总数 ${escapeHtml(formatInt(summary.totalRows))}</span>
           <span>申购阶段 ${escapeHtml(formatInt(summary.applyStageCount))}</span>
-          <span>埋伏阶段 ${escapeHtml(formatInt(subviewCounts.ambush))}</span>
-          <span>等待阶段 ${escapeHtml(formatInt(subviewCounts.wait))}</span>
+          <span>沪市 ${escapeHtml(formatInt(readCbRightsIssueRowsByMarket('sh').length))}</span>
+          <span>深市 ${escapeHtml(formatInt(readCbRightsIssueRowsByMarket('sz').length))}</span>
           <span>最近更新 ${escapeHtml(formatDate(readUpdateTime('cbRightsIssue') || rebuildStatus.lastRebuildAt))}</span>
           <span>${escapeHtml(readFreshnessText('cbRightsIssue'))}</span>
         </div>
@@ -3735,40 +3899,18 @@ function renderCbRightsIssuePanel() {
       <div class="list-card">
         <div class="module-toolbar">
           <div>
-            <h3>${escapeHtml(activeMeta.label)}</h3>
-            <div class="section-note">${escapeHtml(activeMeta.note)}</div>
+            <h3>${escapeHtml(activeMarketMeta.label)}</h3>
+            <div class="section-note">${escapeHtml(activeMarketMeta.note)}</div>
           </div>
           <div class="panel-meta">
-            <span>来源页 ${buildAnchor(summary.sourceUrl, '打开') || '--'}</span>
-            <span>当前页 ${escapeHtml(formatInt(activeMeta.rows.length))} 条</span>
+            <span>${escapeHtml(activeMarketMeta.label)}申购 ${escapeHtml(formatInt(activeMarketMeta.key === 'sh' ? shCounts.apply : szCounts.apply))}</span>
+            <span>${escapeHtml(activeMarketMeta.label)}埋伏 ${escapeHtml(formatInt(activeMarketMeta.key === 'sh' ? shCounts.ambush : szCounts.ambush))}</span>
+            <span>${escapeHtml(activeMarketMeta.label)}等待 ${escapeHtml(formatInt(activeMarketMeta.key === 'sh' ? shCounts.wait : szCounts.wait))}</span>
           </div>
         </div>
-        <div class="subtab-nav">
-          ${CB_RIGHTS_ISSUE_SUBTAB_SEQUENCE.map((key) => {
-            const meta = readCbRightsIssueSubviewMeta(key);
-            const isActive = key === activeMeta.key;
-            return `
-              <button
-                type="button"
-                class="subtab-button ${isActive ? 'active' : ''}"
-                data-cb-rights-issue-subtab="${escapeHtml(key)}"
-              >
-                ${escapeHtml(meta.label)}（${escapeHtml(formatInt(subviewCounts[key]))}）
-              </button>
-            `;
-          }).join('')}
-        </div>
-        ${renderTableSearchBar(activeMeta.tableKey)}
-        <div data-table-host="${escapeHtml(activeMeta.tableKey)}">
-          ${renderPaginatedTable({
-            tableKind: 'convertible',
-            tableKey: activeMeta.tableKey,
-            columns: buildCbRightsIssueColumns({ includeRecordDate: activeMeta.includeRecordDate }),
-            rows: activeMeta.rows,
-            emptyMessage: activeMeta.emptyMessage,
-          })}
-        </div>
+        ${renderCbRightsIssueMarketTabs()}
       </div>
+      ${CB_RIGHTS_ISSUE_SUBTAB_SEQUENCE.map((subview) => renderCbRightsIssueStageSection(readCbRightsIssueSubviewMeta(activeMarketMeta.key, subview))).join('')}
       ${renderModuleFootnote('cbRightsIssue')}
     </div>
   `;
