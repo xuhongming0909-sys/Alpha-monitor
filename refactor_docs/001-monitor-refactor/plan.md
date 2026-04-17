@@ -2866,3 +2866,42 @@ Acceptance:
 - `两融所需股数` follows the new `原始股数 * 0.6 -> 50股向上取整` rule.
 - The visible list is pinned by apply-stage first, then `预期收益率 > 6%`.
 - Independent push only covers those two groups and includes margin yield metrics.
+
+## 97. Phase CK: CB-rights-issue Three-subtab Phase Split (2026-04-17)
+
+Goal: stop expressing抢权配售 priorities through one pinned table, and instead split the
+live page into three operator-facing phase views: `申购阶段` / `埋伏阶段` / `等待阶段`.
+
+Plan:
+1. Update `plan.md`, `REQUIREMENTS.md`, `SPEC.md`, and `可转债抢权配售策略.md` first.
+2. Keep this round isolated to the cb-rights-issue presentation contract:
+   - `presentation/dashboard/dashboard_page.js`
+   - `presentation/templates/dashboard_template.html`
+   - related live docs only
+3. Replace the single visible table view with three subtabs:
+   - `申购阶段`: rows where `inApplyStage = true`
+   - `埋伏阶段`: non-apply rows whose stage is `上市委通过` or `同意注册/注册生效`, and `expectedReturnRate > 6%`
+   - `等待阶段`: all remaining rows
+4. Retire the old in-page pin expression:
+   - no row pin badges under `正股名称`
+   - no row highlight classes used to simulate pinning
+   - no extra front-end pin-priority sort for cb-rights-issue tables
+5. Simplify the `正股名称` cell:
+   - render stock name text only
+   - do not render a second line with phase or yield badges
+   - do not add a standalone `年化收益率` label/tag in the name area or subtab feature tags
+6. Let each subtab expose only the fields useful to that phase:
+   - `股权登记日` remains visible in `申购阶段`
+   - `埋伏阶段` and `等待阶段` do not keep `股权登记日` as a visible column
+7. Keep data path and push path unchanged in this round:
+   - `GET /api/market/cb-rights-issue`
+   - `GET /api/push/cb-rights-issue-config`
+   - `POST /api/push/cb-rights-issue-config`
+8. Run minimal checks, sync to the cloud server, and verify the public page.
+
+Acceptance:
+- The live page shows three subtabs: `申购阶段` / `埋伏阶段` / `等待阶段`.
+- `正股名称` cells contain only the stock name text.
+- The old pin badges/highlight expression disappears from the page.
+- `申购阶段` keeps `股权登记日`, while the other two subtabs do not show it.
+- Public API and independent push remain available after deployment.

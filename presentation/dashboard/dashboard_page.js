@@ -62,6 +62,7 @@ const ENDPOINTS = {
 };
 
 const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'lof-arb', 'monitor', 'dividend', 'merger', 'cb-rights-issue'];
+const CB_RIGHTS_ISSUE_SUBTAB_SEQUENCE = ['apply', 'ambush', 'wait'];
 const EVENT_ARB_SUBTAB_SEQUENCE = ['a_event', 'hk_private', 'cn_private', 'rights_issue', 'announcement_pool'];
 const TAB_PRIMARY_RESOURCE_KEYS = Object.freeze({
   'cb-arb': ['cbArb'],
@@ -115,8 +116,9 @@ const TABLE_DEFAULTS = {
   dividend: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   merger: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   lofArb: { sortKey: 'premiumRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
-  cbRightsIssueMonitor: { sortKey: 'annualizedReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
-  cbRightsIssueSource: { sortKey: 'annualizedReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  cbRightsIssueApply: { sortKey: 'recordDate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  cbRightsIssueAmbush: { sortKey: 'annualizedReturnRate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  cbRightsIssueWait: { sortKey: 'progressDate', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   eventArbHk: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   eventArbCn: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   eventArbA: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
@@ -144,11 +146,27 @@ const TABLE_SEARCH_CONFIG = Object.freeze({
     hint: '可按LOF代码、LOF名称、相关指数搜索',
     fields: ['code', 'name', 'indexName'],
   },
+  cbRightsIssueApply: {
+    placeholder: '搜索正股代码、名称或方案进展',
+    hint: '可按正股代码、正股名称、方案进展搜索',
+    fields: ['stockCode', 'stockName', 'progressName'],
+  },
+  cbRightsIssueAmbush: {
+    placeholder: '搜索正股代码、名称或方案进展',
+    hint: '可按正股代码、正股名称、方案进展搜索',
+    fields: ['stockCode', 'stockName', 'progressName'],
+  },
+  cbRightsIssueWait: {
+    placeholder: '搜索正股代码、名称或方案进展',
+    hint: '可按正股代码、正股名称、方案进展搜索',
+    fields: ['stockCode', 'stockName', 'progressName'],
+  },
 });
 
 const state = {
   activeTab: 'cb-arb',
   lofSubview: 'index',
+  cbRightsIssueSubview: 'apply',
   mergerSubview: 'a_event',
   eventsBound: false,
   savingPush: false,
@@ -165,6 +183,9 @@ const state = {
     ah: false,
     ab: false,
     lofArb: false,
+    cbRightsIssueApply: false,
+    cbRightsIssueAmbush: false,
+    cbRightsIssueWait: false,
   },
   monitorEditor: createMonitorEditorState(),
   expandedRows: {
@@ -186,8 +207,9 @@ const state = {
     dividend: createTableState('dividend'),
     merger: createTableState('merger'),
     lofArb: createTableState('lofArb'),
-    cbRightsIssueMonitor: createTableState('cbRightsIssueMonitor'),
-    cbRightsIssueSource: createTableState('cbRightsIssueSource'),
+    cbRightsIssueApply: createTableState('cbRightsIssueApply'),
+    cbRightsIssueAmbush: createTableState('cbRightsIssueAmbush'),
+    cbRightsIssueWait: createTableState('cbRightsIssueWait'),
     eventArbHk: createTableState('eventArbHk'),
     eventArbCn: createTableState('eventArbCn'),
     eventArbA: createTableState('eventArbA'),
@@ -770,6 +792,10 @@ function renderSearchableTablePanel(tableKey) {
   }
   if (tableKey === 'lofArb') {
     renderLofArbPanel();
+    return;
+  }
+  if (tableKey === 'cbRightsIssueApply' || tableKey === 'cbRightsIssueAmbush' || tableKey === 'cbRightsIssueWait') {
+    renderCbRightsIssuePanel();
   }
 }
 
@@ -799,6 +825,16 @@ function renderSearchableTableHostContent(tableKey) {
       columns: buildLofArbColumns(),
       rows: readLofArbVisibleRows(),
       emptyMessage: '当前分组没有符合条件的 LOF 套利数据',
+    });
+  }
+  if (tableKey === 'cbRightsIssueApply' || tableKey === 'cbRightsIssueAmbush' || tableKey === 'cbRightsIssueWait') {
+    const meta = readCbRightsIssueSubviewMeta(tableKey === 'cbRightsIssueApply' ? 'apply' : (tableKey === 'cbRightsIssueAmbush' ? 'ambush' : 'wait'));
+    return renderPaginatedTable({
+      tableKey: meta.tableKey,
+      tableKind: 'convertible',
+      columns: buildCbRightsIssueColumns({ includeRecordDate: meta.includeRecordDate }),
+      rows: meta.rows,
+      emptyMessage: meta.emptyMessage,
     });
   }
   return '';
@@ -882,14 +918,82 @@ function readCbRightsIssueDataset() {
   return payload?.data && typeof payload.data === 'object' ? payload.data : {};
 }
 
-function readCbRightsIssueMonitorRows() {
-  const dataset = readCbRightsIssueDataset();
-  return Array.isArray(dataset.monitorList) ? dataset.monitorList : [];
-}
-
 function readCbRightsIssueSourceRows() {
   const dataset = readCbRightsIssueDataset();
   return Array.isArray(dataset.sourceRows) ? dataset.sourceRows : [];
+}
+
+function normalizeCbRightsIssueProgressText(value) {
+  return String(value || '')
+    .replaceAll('<br>', ' ')
+    .replaceAll('<br/>', ' ')
+    .replaceAll('<br />', ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function ensureCbRightsIssueSubview() {
+  if (!CB_RIGHTS_ISSUE_SUBTAB_SEQUENCE.includes(state.cbRightsIssueSubview)) {
+    state.cbRightsIssueSubview = 'apply';
+  }
+  return state.cbRightsIssueSubview;
+}
+
+function isCbRightsIssueAmbushRow(row) {
+  if (row?.inApplyStage) return false;
+  const progressText = normalizeCbRightsIssueProgressText(row?.progressName);
+  const isTargetStage = ['上市委通过', '同意注册', '注册生效'].some((keyword) => progressText.includes(keyword));
+  return isTargetStage && (toNumber(row?.expectedReturnRate) ?? -Infinity) > 6;
+}
+
+function readCbRightsIssueRowsBySubview(subview) {
+  const rows = readCbRightsIssueSourceRows();
+  if (subview === 'apply') {
+    return rows.filter((row) => Boolean(row?.inApplyStage));
+  }
+  if (subview === 'ambush') {
+    return rows.filter((row) => isCbRightsIssueAmbushRow(row));
+  }
+  return rows.filter((row) => !row?.inApplyStage && !isCbRightsIssueAmbushRow(row));
+}
+
+function readActiveCbRightsIssueRows() {
+  return readCbRightsIssueRowsBySubview(ensureCbRightsIssueSubview());
+}
+
+function readCbRightsIssueSubviewMeta(subview = ensureCbRightsIssueSubview()) {
+  const active = CB_RIGHTS_ISSUE_SUBTAB_SEQUENCE.includes(subview) ? subview : 'apply';
+  const metaBySubview = {
+    apply: {
+      key: 'apply',
+      tableKey: 'cbRightsIssueApply',
+      label: '申购阶段',
+      note: '展示已进入申购阶段的项目，保留股权登记日字段，便于直接执行申购跟踪。',
+      includeRecordDate: true,
+      emptyMessage: '当前没有进入申购阶段的股票',
+    },
+    ambush: {
+      key: 'ambush',
+      tableKey: 'cbRightsIssueAmbush',
+      label: '埋伏阶段',
+      note: '展示上市委通过、同意注册或注册生效且预期收益率大于 6% 的项目，用于提前埋伏。',
+      includeRecordDate: false,
+      emptyMessage: '当前没有满足埋伏条件的股票',
+    },
+    wait: {
+      key: 'wait',
+      tableKey: 'cbRightsIssueWait',
+      label: '等待阶段',
+      note: '展示未进入申购阶段、也未达到埋伏门槛的项目，便于后续继续观察。',
+      includeRecordDate: false,
+      emptyMessage: '当前没有等待阶段的股票',
+    },
+  };
+  return {
+    ...metaBySubview[active],
+    rows: readCbRightsIssueRowsBySubview(active),
+  };
 }
 
 function readCbRightsIssueSummary() {
@@ -1243,6 +1347,15 @@ function bindEvents() {
       if (!EVENT_ARB_SUBTAB_SEQUENCE.includes(subtab)) return;
       state.mergerSubview = subtab;
       renderMergerPanel();
+      return;
+    }
+
+    const cbRightsIssueSubtab = event.target.closest('[data-cb-rights-issue-subtab]');
+    if (cbRightsIssueSubtab) {
+      const subtab = String(cbRightsIssueSubtab.dataset.cbRightsIssueSubtab || '').trim();
+      if (!CB_RIGHTS_ISSUE_SUBTAB_SEQUENCE.includes(subtab)) return;
+      state.cbRightsIssueSubview = subtab;
+      renderCbRightsIssuePanel();
       return;
     }
 
@@ -2403,7 +2516,7 @@ function handleSortClick(tableKey, sortKey) {
   if (tableKey === 'ah') renderPremiumPanel('ah');
   if (tableKey === 'ab') renderPremiumPanel('ab');
   if (tableKey === 'lofArb') renderLofArbPanel();
-  if (tableKey === 'cbRightsIssueMonitor' || tableKey === 'cbRightsIssueSource') renderCbRightsIssuePanel();
+  if (tableKey === 'cbRightsIssueApply' || tableKey === 'cbRightsIssueAmbush' || tableKey === 'cbRightsIssueWait') renderCbRightsIssuePanel();
   restoreTableScroll(tableKey);
 }
 
@@ -2426,7 +2539,7 @@ function handlePageClick(tableKey, action) {
   if (tableKey === 'lofArb') renderLofArbPanel();
   if (tableKey === 'monitor') renderMonitorPanel();
   if (tableKey === 'dividend') renderDividendPanel();
-  if (tableKey === 'cbRightsIssueMonitor' || tableKey === 'cbRightsIssueSource') renderCbRightsIssuePanel();
+  if (tableKey === 'cbRightsIssueApply' || tableKey === 'cbRightsIssueAmbush' || tableKey === 'cbRightsIssueWait') renderCbRightsIssuePanel();
   if (tableKey === 'merger' || tableKey.startsWith('eventArb')) renderMergerPanel();
   restoreTableScroll(tableKey);
 }
@@ -2434,8 +2547,9 @@ function handlePageClick(tableKey, action) {
 function readTableSourceRows(tableKey) {
   if (tableKey === 'cbArb') return readResourceArray('cbArb');
   if (tableKey === 'lofArb') return readLofArbVisibleRows();
-  if (tableKey === 'cbRightsIssueMonitor') return readCbRightsIssueMonitorRows();
-  if (tableKey === 'cbRightsIssueSource') return readCbRightsIssueSourceRows();
+  if (tableKey === 'cbRightsIssueApply') return readCbRightsIssueRowsBySubview('apply');
+  if (tableKey === 'cbRightsIssueAmbush') return readCbRightsIssueRowsBySubview('ambush');
+  if (tableKey === 'cbRightsIssueWait') return readCbRightsIssueRowsBySubview('wait');
   if (tableKey === 'ah') return readResourceArray('ah');
   if (tableKey === 'ab') return readResourceArray('ab');
   if (tableKey === 'monitor') return readResourceArray('monitor');
@@ -2450,8 +2564,9 @@ function readTableSourceRows(tableKey) {
 function getTableColumns(tableKey) {
   if (tableKey === 'cbArb') return buildConvertibleColumns();
   if (tableKey === 'lofArb') return buildLofArbColumns();
-  if (tableKey === 'cbRightsIssueMonitor') return buildCbRightsIssueMonitorColumns();
-  if (tableKey === 'cbRightsIssueSource') return buildCbRightsIssueSourceColumns();
+  if (tableKey === 'cbRightsIssueApply') return buildCbRightsIssueColumns({ includeRecordDate: true });
+  if (tableKey === 'cbRightsIssueAmbush') return buildCbRightsIssueColumns({ includeRecordDate: false });
+  if (tableKey === 'cbRightsIssueWait') return buildCbRightsIssueColumns({ includeRecordDate: false });
   if (tableKey === 'ah') return buildPremiumColumns('ah');
   if (tableKey === 'ab') return buildPremiumColumns('ab');
   return [];
@@ -2531,20 +2646,9 @@ function compareText(a, b) {
   return String(a).localeCompare(String(b), 'zh-CN');
 }
 
-function compareCbRightsIssuePinPriority(a, b) {
-  const priorityA = toNumber(a?.pinPriority) ?? 99;
-  const priorityB = toNumber(b?.pinPriority) ?? 99;
-  if (priorityA === priorityB) return 0;
-  return priorityA - priorityB;
-}
-
 function sortRowsByColumn(rows, column, direction, options = {}) {
   const dir = direction === 'asc' ? 1 : -1;
   return [...rows].sort((a, b) => {
-    if (options.tableKey === 'cbRightsIssueSource') {
-      const priorityCompare = compareCbRightsIssuePinPriority(a, b);
-      if (priorityCompare !== 0) return priorityCompare;
-    }
     const rawA = typeof column.sortValue === 'function' ? column.sortValue(a) : a[column.key];
     const rawB = typeof column.sortValue === 'function' ? column.sortValue(b) : b[column.key];
     const valueA = normalizeComparableValue(rawA, column.sortType);
@@ -2642,8 +2746,9 @@ function resolveRowId(tableKey, row, fallbackIndex) {
   if (tableKey === 'ab') return `${row.aCode || ''}-${row.bCode || ''}-${fallbackIndex}`;
   if (tableKey === 'lofArb') return String(row.code || row.name || fallbackIndex);
   if (tableKey === 'monitor') return String(row.id || row.name || fallbackIndex);
-  if (tableKey === 'cbRightsIssueMonitor') return String(row.bondCode || row.stockCode || fallbackIndex);
-  if (tableKey === 'cbRightsIssueSource') return String(row.bondCode || row.stockCode || fallbackIndex);
+  if (tableKey === 'cbRightsIssueApply' || tableKey === 'cbRightsIssueAmbush' || tableKey === 'cbRightsIssueWait') {
+    return String(row.stockCode || row.stockName || fallbackIndex);
+  }
   if (tableKey === 'merger') return String(row.announcementId || `${row.secCode || ''}-${row.announcementTime || ''}-${fallbackIndex}`);
   if (tableKey === 'eventArbAnnouncement') return String(row.announcementId || `${row.secCode || ''}-${row.announcementTime || ''}-${fallbackIndex}`);
   if (tableKey === 'eventArbHk' || tableKey === 'eventArbCn' || tableKey === 'eventArbA') {
@@ -3638,24 +3743,9 @@ function renderCbRightsIssuePushCard() {
   `;
 }
 
-function renderCbRightsIssuePriorityBadge(row) {
-  if (row?.inApplyStage) {
-    return '<span class="today-badge">申购阶段</span>';
-  }
-  if ((toNumber(row?.expectedReturnRate) ?? -Infinity) > 6) {
-    return '<span class="core-badge">收益率&gt;6%</span>';
-  }
-  return '';
-}
-
-function readCbRightsIssueRowClassName(row) {
-  if (row?.inApplyStage) return 'cb-rights-issue-row-apply';
-  if ((toNumber(row?.expectedReturnRate) ?? -Infinity) > 6) return 'cb-rights-issue-row-high-return';
-  return '';
-}
-
-function buildCbRightsIssueColumns() {
-  return [
+function buildCbRightsIssueColumns(options = {}) {
+  const includeRecordDate = Boolean(options.includeRecordDate);
+  const columns = [
     { key: 'index', label: '序号' },
     { key: 'stockCode', label: '正股代码', columnClassName: 'col-code', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.stockCode || ''), render: (row) => `<span class="mono-text">${escapeHtml(row.stockCode || '--')}</span>` },
     {
@@ -3665,10 +3755,7 @@ function buildCbRightsIssueColumns() {
       sortType: 'text',
       defaultDir: 'asc',
       sortValue: (row) => String(row.stockName || ''),
-      render: (row) => `
-        <div>${escapeHtml(row.stockName || '--')}</div>
-        <div class="today-badge-row">${renderCbRightsIssuePriorityBadge(row) || '<span class="cell-muted">普通展示</span>'}</div>
-      `,
+      render: (row) => escapeHtml(row.stockName || '--'),
     },
     { key: 'progressName', label: '方案进展', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.progressName || ''), render: (row) => escapeHtml(row.progressName || '--') },
     { key: 'progressDate', label: '进展公告日', columnClassName: 'col-date', sortable: true, sortType: 'date', defaultDir: 'desc', sortValue: (row) => normalizeDateKey(row.progressDate), render: (row) => escapeHtml(formatDateOnly(row.progressDate)) },
@@ -3683,21 +3770,25 @@ function buildCbRightsIssueColumns() {
     { key: 'optionUnitValue', label: '单位期权价值', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.optionUnitValue), render: (row) => formatNumber(row.optionUnitValue, 4) },
     { key: 'optionValue', label: '期权价值', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.optionValue), render: (row) => formatNumber(row.optionValue, 2) },
     { key: 'requiredFunds', label: '所需资金', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.requiredFunds), render: (row) => toNumber(row.requiredFunds) === null ? '--' : `¥${formatNumber(row.requiredFunds, 2)}` },
-    { key: 'recordDate', label: '股权登记日', columnClassName: 'col-date', sortable: true, sortType: 'date', defaultDir: 'desc', sortValue: (row) => normalizeDateKey(row.recordDate), render: (row) => escapeHtml(formatDateOnly(row.recordDate)) },
     { key: 'expectedReturnRate', label: '预期收益率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.expectedReturnRate), className: (row) => statusClass(row.expectedReturnRate), render: (row) => formatPercent(row.expectedReturnRate, 2) },
     { key: 'marginReturnRate', label: '两融收益率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.marginReturnRate), className: (row) => statusClass(row.marginReturnRate), render: (row) => formatPercent(row.marginReturnRate, 2) },
     { key: 'expectedPeelReturnRate', label: '预期收益率去皮', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.expectedPeelReturnRate), className: (row) => statusClass(row.expectedPeelReturnRate), render: (row) => formatPercent(row.expectedPeelReturnRate, 2) },
     { key: 'marginPeelReturnRate', label: '两融收益率去皮', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.marginPeelReturnRate), className: (row) => statusClass(row.marginPeelReturnRate), render: (row) => formatPercent(row.marginPeelReturnRate, 2) },
     { key: 'annualizedReturnRate', label: '年化收益率', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.annualizedReturnRate), className: (row) => statusClass(row.annualizedReturnRate), render: (row) => formatPercent(row.annualizedReturnRate, 2) },
   ];
-}
-
-function buildCbRightsIssueMonitorColumns() {
-  return buildCbRightsIssueColumns();
-}
-
-function buildCbRightsIssueSourceColumns() {
-  return buildCbRightsIssueColumns();
+  if (includeRecordDate) {
+    columns.splice(16, 0, {
+      key: 'recordDate',
+      label: '股权登记日',
+      columnClassName: 'col-date',
+      sortable: true,
+      sortType: 'date',
+      defaultDir: 'desc',
+      sortValue: (row) => normalizeDateKey(row.recordDate),
+      render: (row) => escapeHtml(formatDateOnly(row.recordDate)),
+    });
+  }
+  return columns;
 }
 
 function renderCbRightsIssuePanel() {
@@ -3715,7 +3806,12 @@ function renderCbRightsIssuePanel() {
     return;
   }
 
-  const sourceRows = readCbRightsIssueSourceRows();
+  const activeMeta = readCbRightsIssueSubviewMeta();
+  const subviewCounts = {
+    apply: readCbRightsIssueRowsBySubview('apply').length,
+    ambush: readCbRightsIssueRowsBySubview('ambush').length,
+    wait: readCbRightsIssueRowsBySubview('wait').length,
+  };
   const summary = readCbRightsIssueSummary();
   const rebuildStatus = readCbRightsIssueRebuildStatus();
 
@@ -3724,7 +3820,7 @@ function renderCbRightsIssuePanel() {
       <div class="module-toolbar">
         <div>
           <div class="tab-title">可转债抢权配售</div>
-          <div class="section-note">主表统一展示发行比例、两融收益率、去皮收益率和年化收益率；表内先置顶申购阶段，再置顶预期收益率大于 6% 的项目。</div>
+          <div class="section-note">页面按申购阶段、埋伏阶段、等待阶段拆分展示；正股名称仅展示名称本身，不再用置顶高亮或收益率徽标表达优先级。</div>
         </div>
         <div class="panel-meta">
           <span>固定源总数 ${escapeHtml(formatInt(summary.totalRows))}</span>
@@ -3738,21 +3834,39 @@ function renderCbRightsIssuePanel() {
       <div class="list-card">
         <div class="module-toolbar">
           <div>
-            <h3>主表</h3>
-            <div class="section-note">总市值来自实时股票接口；无真实总市值或无有效交易日样本时，对应发行比例和年化收益率保持空值。</div>
+            <h3>${escapeHtml(activeMeta.label)}</h3>
+            <div class="section-note">${escapeHtml(activeMeta.note)}</div>
           </div>
           <div class="panel-meta">
             <span>来源页 ${buildAnchor(summary.sourceUrl, '打开') || '--'}</span>
+            <span>当前页 ${escapeHtml(formatInt(activeMeta.rows.length))} 条</span>
           </div>
         </div>
-        ${renderPaginatedTable({
-          tableKind: 'convertible',
-          tableKey: 'cbRightsIssueSource',
-          columns: buildCbRightsIssueSourceColumns(),
-          rows: sourceRows,
-          emptyMessage: '固定来源当前没有返回结构化项目',
-          rowClassName: readCbRightsIssueRowClassName,
-        })}
+        <div class="subtab-nav">
+          ${CB_RIGHTS_ISSUE_SUBTAB_SEQUENCE.map((key) => {
+            const meta = readCbRightsIssueSubviewMeta(key);
+            const isActive = key === activeMeta.key;
+            return `
+              <button
+                type="button"
+                class="subtab-button ${isActive ? 'active' : ''}"
+                data-cb-rights-issue-subtab="${escapeHtml(key)}"
+              >
+                ${escapeHtml(meta.label)}（${escapeHtml(formatInt(subviewCounts[key]))}）
+              </button>
+            `;
+          }).join('')}
+        </div>
+        ${renderTableSearchBar(activeMeta.tableKey)}
+        <div data-table-host="${escapeHtml(activeMeta.tableKey)}">
+          ${renderPaginatedTable({
+            tableKind: 'convertible',
+            tableKey: activeMeta.tableKey,
+            columns: buildCbRightsIssueColumns({ includeRecordDate: activeMeta.includeRecordDate }),
+            rows: activeMeta.rows,
+            emptyMessage: activeMeta.emptyMessage,
+          })}
+        </div>
       </div>
       ${renderModuleFootnote('cbRightsIssue')}
     </div>

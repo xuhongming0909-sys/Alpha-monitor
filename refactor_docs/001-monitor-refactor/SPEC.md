@@ -4499,3 +4499,54 @@ untime_data/shared/cb_discount_strategy_state.json
 - `volatility250` remains the only live volatility input.
 - Existing push schedule slots remain unchanged.
 - Rows lacking truthful market value or trading-day samples must remain visible, but the related derived fields must degrade to null rather than guessed values.
+
+## 97. Phase CK: CB-rights-issue Three-subtab Phase Split (2026-04-17)
+
+- This round changes only the cb-rights-issue presentation contract:
+  - `presentation/dashboard/dashboard_page.js`
+  - `presentation/templates/dashboard_template.html`
+  - related live docs only
+- This round does not change:
+  - `GET /api/market/cb-rights-issue` response envelope
+  - cb-rights-issue pricing formulas
+  - cb-rights-issue push grouping
+  - non-cb-rights-issue modules
+
+### 97.1 Subtab split rule
+- The live cb-rights-issue page must render three subtabs:
+  - `申购阶段`
+  - `埋伏阶段`
+  - `等待阶段`
+- Row grouping is fixed to:
+  - `申购阶段`: `inApplyStage = true`
+  - `埋伏阶段`: `inApplyStage = false`, stage semantic is one of `上市委通过 / 同意注册 / 注册生效`, and `expectedReturnRate > 6`
+  - `等待阶段`: all remaining rows
+
+### 97.2 Name-cell simplification rule
+- `正股名称` cells must render stock-name text only.
+- The old second-line badges under the name cell are retired:
+  - no apply-stage badge
+  - no `收益率 > 6%` badge
+  - no standalone `年化收益率` tag
+
+### 97.3 Retired pin-expression rule
+- The page must no longer visually express cb-rights-issue pinning through:
+  - row highlight classes
+  - name-cell badges
+  - extra front-end `pinPriority` pre-sort
+- Existing backend fields such as `pinPriority` may remain in the API for compatibility, but this round's page must not depend on them for visible grouping.
+
+### 97.4 Phase-specific column rule
+- All three subtabs continue using the same truthful source rows.
+- Phase-specific visible columns must differ at least as follows:
+  - `申购阶段` keeps `股权登记日`
+  - `埋伏阶段` does not show `股权登记日`
+  - `等待阶段` does not show `股权登记日`
+- No additional `年化收益率` label/tag may be added in subtab header summaries.
+- If `年化收益率` remains as a data column, its field meaning is unchanged.
+
+### 97.5 Acceptance
+- The public page visibly switches between the three subtabs.
+- `正股名称` cells no longer contain a second line.
+- The previous pinning highlight expression disappears.
+- `股权登记日` appears only in `申购阶段`.
