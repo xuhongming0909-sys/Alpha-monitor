@@ -39,7 +39,9 @@ function cbArbRowScore(row) {
     row.convertValue,
     row.remainingYears,
   ];
-  return metrics.reduce((sum, value) => sum + ((value !== null && value !== undefined && String(value).trim() !== "") ? 1 : 0), 0);
+  return metrics.reduce((sum, value) => (
+    sum + ((value !== null && value !== undefined && String(value).trim() !== "") ? 1 : 0)
+  ), 0);
 }
 
 function isValidCbArbRow(row) {
@@ -69,68 +71,6 @@ function normalizeComparableDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
 }
 
-const DEFAULT_ATR_ANCHORS = [
-  { x: 0, y: 0 },
-  { x: 0.25, y: 0.5 },
-  { x: 0.5, y: 0.8 },
-  { x: 1, y: 1 },
-];
-
-const DEFAULT_SELL_PRESSURE_ANCHORS = [
-  { x: 0.5, y: 1 },
-  { x: 1, y: 0.8 },
-  { x: 5, y: 0.5 },
-  { x: 20, y: 0 },
-];
-
-const DEFAULT_BOARD_COEFFICIENTS = {
-  科创板: 1,
-  创业板: 0.85,
-  主板: 0.8,
-};
-
-/**
- * 低溢价策略的锚点必须来自明确数值，避免页面、推送、调度各自兜底。
- */
-function normalizeAnchorPoints(points, fallback) {
-  const source = Array.isArray(points) && points.length ? points : fallback;
-  const normalized = source
-    .map((item) => ({
-      x: toNum(item?.x),
-      y: toNum(item?.y),
-    }))
-    .filter((item) => item.x !== null && item.y !== null)
-    .sort((a, b) => a.x - b.x);
-  return normalized.length >= 2 ? normalized : fallback;
-}
-
-function interpolateByAnchors(value, points, fallbackPoints) {
-  const num = toNum(value);
-  const anchors = normalizeAnchorPoints(points, fallbackPoints);
-  if (num === null) return null;
-  if (num <= anchors[0].x) return anchors[0].y;
-
-  for (let index = 1; index < anchors.length; index += 1) {
-    const left = anchors[index - 1];
-    const right = anchors[index];
-    if (num <= right.x) {
-      if (right.x === left.x) return right.y;
-      const ratio = (num - left.x) / (right.x - left.x);
-      return left.y + ((right.y - left.y) * ratio);
-    }
-  }
-
-  return anchors[anchors.length - 1].y;
-}
-
-function normalizeBoardCoefficients(input = {}) {
-  return {
-    科创板: toNum(input.科创板) ?? DEFAULT_BOARD_COEFFICIENTS.科创板,
-    创业板: toNum(input.创业板) ?? DEFAULT_BOARD_COEFFICIENTS.创业板,
-    主板: toNum(input.主板) ?? DEFAULT_BOARD_COEFFICIENTS.主板,
-  };
-}
-
 function normalizeBoardType(stockCode) {
   const code = String(stockCode || "").trim();
   if (code.startsWith("688")) return "科创板";
@@ -145,32 +85,28 @@ function hasPassedConvertStart(row) {
   return Number.isFinite(timestamp) ? timestamp <= Date.now() : false;
 }
 
+function compareNumAsc(left, right) {
+  const aValue = toNum(left);
+  const bValue = toNum(right);
+  if (aValue === null && bValue === null) return 0;
+  if (aValue === null) return 1;
+  if (bValue === null) return -1;
+  return aValue - bValue;
+}
+
+function compareNumDesc(left, right) {
+  return compareNumAsc(right, left);
+}
+
 function comparePremiumMonitorRows(a, b) {
-  const compareDesc = (left, right) => {
-    const aValue = toNum(left);
-    const bValue = toNum(right);
-    if (aValue === null && bValue === null) return 0;
-    if (aValue === null) return 1;
-    if (bValue === null) return -1;
-    return bValue - aValue;
-  };
-  const compareAsc = (left, right) => {
-    const aValue = toNum(left);
-    const bValue = toNum(right);
-    if (aValue === null && bValue === null) return 0;
-    if (aValue === null) return 1;
-    if (bValue === null) return -1;
-    return aValue - bValue;
-  };
-
-  const weightedDiff = compareDesc(a?.weightedDiscountRate, b?.weightedDiscountRate);
-  if (weightedDiff !== 0) return weightedDiff;
-
-  const premiumDiff = compareAsc(a?.premiumRate, b?.premiumRate);
+  const premiumDiff = compareNumAsc(a?.premiumRate, b?.premiumRate);
   if (premiumDiff !== 0) return premiumDiff;
 
-  const atrDiff = (toNum(b?.atrCoefficient) ?? Number.NEGATIVE_INFINITY) - (toNum(a?.atrCoefficient) ?? Number.NEGATIVE_INFINITY);
-  if (atrDiff !== 0) return atrDiff;
+  const discountAtrDiff = compareNumDesc(a?.discountAtrRatio, b?.discountAtrRatio);
+  if (discountAtrDiff !== 0) return discountAtrDiff;
+
+  const marketValueRatioDiff = compareNumAsc(a?.bondToStockMarketValueRatio, b?.bondToStockMarketValueRatio);
+  if (marketValueRatioDiff !== 0) return marketValueRatioDiff;
 
   return String(a?.code || "").localeCompare(String(b?.code || ""), "zh-CN");
 }
@@ -179,73 +115,8 @@ function buildDiscountStrategyOptions(options = {}) {
   return {
     buyThreshold: toNum(options.buyThreshold) ?? -2,
     sellThreshold: toNum(options.sellThreshold) ?? -0.5,
-    boardCoefficients: normalizeBoardCoefficients(options.boardCoefficients),
     nowIsoText: String(options.nowIsoText || new Date().toISOString()),
     todayDate: String(options.todayDate || todayShanghaiDate()),
-  };
-}
-
-/**
- * 低溢价策略只做真实字段派生，不负责推送和持久化。
- */
-function enrichDiscountStrategyRow(row, options = {}) {
-  const config = buildDiscountStrategyOptions(options);
-  const {
-    discountRate: _legacyDiscountRate,
-    lowPremiumMagnitude: _legacyLowPremiumMagnitude,
-    ...baseRow
-  } = row || {};
-  const premiumRate = toNum(baseRow?.premiumRate);
-  const stockPrice = toNum(baseRow?.stockPrice);
-  const stockAtr20 = toNum(baseRow?.stockAtr20);
-  const remainingSizeYi = toNum(baseRow?.remainingSizeYi);
-  const stockAvgTurnoverAmount20Yi = toNum(baseRow?.stockAvgTurnoverAmount20Yi);
-  const negativePremiumRate = premiumRate === null ? null : (-premiumRate);
-  const premiumMagnitude = negativePremiumRate === null ? null : Math.abs(negativePremiumRate);
-  const stockAtr20Pct = (stockPrice !== null && stockPrice > 0 && stockAtr20 !== null)
-    ? (stockAtr20 / stockPrice) * 100
-    : null;
-  const atrRatio = (premiumMagnitude !== null && stockAtr20Pct !== null && stockAtr20Pct > 0)
-    ? premiumMagnitude / stockAtr20Pct
-    : null;
-  const atrCoefficient = atrRatio;
-  const sellPressureRatio = (
-    remainingSizeYi !== null &&
-    stockAvgTurnoverAmount20Yi !== null &&
-    remainingSizeYi > 0
-  )
-    ? stockAvgTurnoverAmount20Yi / remainingSizeYi
-    : null;
-  const sellPressureCoefficient = sellPressureRatio;
-  const boardType = normalizeBoardType(row?.stockCode);
-  const boardCoefficient = toNum(config.boardCoefficients[boardType]);
-  const weightedDiscountRate = (
-    negativePremiumRate !== null &&
-    atrCoefficient !== null &&
-    sellPressureCoefficient !== null &&
-    boardCoefficient !== null
-  )
-    ? negativePremiumRate * atrCoefficient * sellPressureCoefficient * boardCoefficient
-    : null;
-  const buyZoneActive = Boolean(
-    premiumRate !== null &&
-    premiumRate < config.buyThreshold &&
-    hasPassedConvertStart(row)
-  );
-  const sellZoneActive = Boolean(premiumRate !== null && premiumRate > config.sellThreshold);
-
-  return {
-    ...baseRow,
-    stockAtr20Pct,
-    atrRatio,
-    atrCoefficient,
-    sellPressureRatio,
-    sellPressureCoefficient,
-    boardType,
-    boardCoefficient,
-    weightedDiscountRate,
-    buyZoneActive,
-    sellZoneActive,
   };
 }
 
@@ -255,136 +126,6 @@ function normalizeDiscountStrategyState(input = {}) {
     lastBootstrapDate: String(input?.lastBootstrapDate || "").trim() || null,
     monitorMap: (input?.monitorMap && typeof input.monitorMap === "object") ? { ...input.monitorMap } : {},
     signalStateMap: (input?.signalStateMap && typeof input.signalStateMap === "object") ? { ...input.signalStateMap } : {},
-  };
-}
-
-function buildDiscountMonitorSummaryItems(rows) {
-  return [...rows]
-    .sort(comparePremiumMonitorRows)
-    .map((row) => ({
-      code: pickText(row.code),
-      bondName: pickText(row.bondName),
-      stockCode: pickText(row.stockCode),
-      stockName: pickText(row.stockName),
-      convertValue: row.convertValue,
-      premiumRate: row.premiumRate,
-      weightedDiscountRate: row.weightedDiscountRate,
-      stockAtr20Pct: row.stockAtr20Pct,
-      atrCoefficient: row.atrCoefficient,
-      sellPressureRatio: row.sellPressureRatio,
-      sellPressureCoefficient: row.sellPressureCoefficient,
-      boardType: row.boardType,
-      boardCoefficient: row.boardCoefficient,
-    }));
-}
-
-function buildDiscountSignal(row, signalType) {
-  return {
-    signalType,
-    code: pickText(row.code),
-    bondName: pickText(row.bondName),
-    stockCode: pickText(row.stockCode),
-    stockName: pickText(row.stockName),
-    price: row.price,
-    stockPrice: row.stockPrice,
-    stockChangePercent: row.stockChangePercent,
-    convertValue: row.convertValue,
-    premiumRate: row.premiumRate,
-    weightedDiscountRate: row.weightedDiscountRate,
-    stockAtr20Pct: row.stockAtr20Pct,
-    atrCoefficient: row.atrCoefficient,
-    sellPressureRatio: row.sellPressureRatio,
-    sellPressureCoefficient: row.sellPressureCoefficient,
-    boardType: row.boardType,
-    reason: signalType === "buy"
-      ? "转股溢价率进入低溢价买入区"
-      : "转股溢价率回到卖出区",
-  };
-}
-
-/**
- * 这里统一产出低溢价策略快照：
- * 1. enrichedRows 给页面与接口使用
- * 2. buySignals / sellSignals 给推送服务使用
- * 3. nextState 只描述下一状态，不在这里直接写文件
- */
-function buildConvertibleBondDiscountSnapshot(rows, runtimeState = {}, options = {}) {
-  const config = buildDiscountStrategyOptions(options);
-  const cleanRows = sanitizeCbArbRows(rows).map((row) => enrichDiscountStrategyRow(row, config));
-  const pushEligibleRows = cleanRows.filter((row) => !isCbArbRowActiveForceRedeem(row));
-  const previousState = normalizeDiscountStrategyState(runtimeState);
-  const previousMonitorMap = { ...previousState.monitorMap };
-  const previousSignalStateMap = { ...previousState.signalStateMap };
-  const rowMap = new Map(pushEligibleRows.map((row) => [pickText(row.code), row]));
-  const nextMonitorMap = { ...previousMonitorMap };
-  const nextSignalStateMap = {};
-  const buySignals = [];
-  const sellSignals = [];
-  const isBootstrap = !previousState.initializedDate;
-
-  pushEligibleRows.forEach((row) => {
-    const code = pickText(row.code);
-    if (!code) return;
-    const previousSignalState = previousSignalStateMap[code] || {};
-    const buyZoneActive = Boolean(row.buyZoneActive);
-    const sellZoneActive = Boolean(row.sellZoneActive);
-
-    nextSignalStateMap[code] = {
-      buyZoneActive,
-      sellZoneActive,
-    };
-
-    if (isBootstrap) {
-      if (buyZoneActive) {
-        nextMonitorMap[code] = {
-          code,
-          enteredAt: previousMonitorMap[code]?.enteredAt || config.nowIsoText,
-        };
-      }
-      return;
-    }
-
-    if (!previousSignalState.buyZoneActive && buyZoneActive) {
-      nextMonitorMap[code] = {
-        code,
-        enteredAt: previousMonitorMap[code]?.enteredAt || config.nowIsoText,
-      };
-      buySignals.push(buildDiscountSignal(row, "buy"));
-    }
-
-    if (nextMonitorMap[code] && !previousSignalState.sellZoneActive && sellZoneActive) {
-      sellSignals.push(buildDiscountSignal(row, "sell"));
-      delete nextMonitorMap[code];
-    }
-  });
-
-  Object.keys(nextMonitorMap).forEach((code) => {
-    if (!rowMap.has(code)) delete nextMonitorMap[code];
-  });
-
-  const activeCodes = new Set(Object.keys(nextMonitorMap));
-  const enrichedRows = cleanRows.map((row) => ({
-    ...row,
-    isDiscountMonitorActive: activeCodes.has(pickText(row.code)),
-  }));
-  const monitorRows = pushEligibleRows.filter((row) => activeCodes.has(pickText(row.code)));
-  const monitorItems = buildDiscountMonitorSummaryItems(monitorRows);
-
-  return {
-    rows: enrichedRows,
-    buySignals,
-    sellSignals,
-    isBootstrap,
-    premiumMonitorSummary: {
-      count: monitorItems.length,
-      items: monitorItems,
-    },
-    nextState: {
-      initializedDate: previousState.initializedDate || config.todayDate,
-      lastBootstrapDate: isBootstrap ? config.todayDate : previousState.lastBootstrapDate,
-      monitorMap: nextMonitorMap,
-      signalStateMap: nextSignalStateMap,
-    },
   };
 }
 
@@ -451,8 +192,179 @@ function sanitizeCbArbRows(rows) {
 }
 
 /**
- * 转债顶部摘要与定时主推送共用这一套候选规则，避免页面前三与推送口径再次分叉。
- * 当前只收口两类排除：终态/非 live、活跃强赎；不再额外做剩余期限时间门槛。
+ * 低溢价策略只做真实字段派生，不做推送和持久化。
+ */
+function enrichDiscountStrategyRow(row, options = {}) {
+  const config = buildDiscountStrategyOptions(options);
+  const {
+    discountRate: _legacyDiscountRate,
+    lowPremiumMagnitude: _legacyLowPremiumMagnitude,
+    atrRatio: _legacyAtrRatio,
+    atrCoefficient: _legacyAtrCoefficient,
+    sellPressureRatio: _legacySellPressureRatio,
+    sellPressureCoefficient: _legacySellPressureCoefficient,
+    boardCoefficient: _legacyBoardCoefficient,
+    weightedDiscountRate: _legacyWeightedDiscountRate,
+    ...baseRow
+  } = row || {};
+  const premiumRate = toNum(baseRow?.premiumRate);
+  const stockPrice = toNum(baseRow?.stockPrice);
+  const stockAtr20 = toNum(baseRow?.stockAtr20);
+  const remainingSizeYi = toNum(baseRow?.remainingSizeYi);
+  const stockMarketValueYi = toNum(baseRow?.stockMarketValueYi);
+  const premiumMagnitude = premiumRate === null ? null : Math.abs(premiumRate);
+  const stockAtr20Pct = (stockPrice !== null && stockPrice > 0 && stockAtr20 !== null)
+    ? (stockAtr20 / stockPrice) * 100
+    : null;
+  const discountAtrRatio = (premiumMagnitude !== null && stockAtr20Pct !== null && stockAtr20Pct > 0)
+    ? premiumMagnitude / stockAtr20Pct
+    : null;
+  const bondToStockMarketValueRatio = (
+    remainingSizeYi !== null &&
+    stockMarketValueYi !== null &&
+    stockMarketValueYi > 0
+  )
+    ? remainingSizeYi / stockMarketValueYi
+    : null;
+  const forceRedeemActive = isCbArbRowActiveForceRedeem(baseRow);
+  const buyZoneActive = Boolean(
+    premiumRate !== null &&
+    premiumRate < config.buyThreshold &&
+    hasPassedConvertStart(row)
+  );
+  const sellZoneActive = Boolean(premiumRate !== null && premiumRate > config.sellThreshold);
+
+  return {
+    ...baseRow,
+    stockAtr20Pct,
+    discountAtrRatio,
+    bondToStockMarketValueRatio,
+    boardType: normalizeBoardType(baseRow?.stockCode),
+    forceRedeemActive,
+    forceRedeemLabel: forceRedeemActive ? "强赎中" : "非强赎",
+    buyZoneActive,
+    sellZoneActive,
+  };
+}
+
+function buildDiscountMonitorSummaryItems(rows) {
+  return [...rows]
+    .sort(comparePremiumMonitorRows)
+    .map((row) => ({
+      code: pickText(row.code),
+      bondName: pickText(row.bondName),
+      premiumRate: row.premiumRate,
+      bondToStockMarketValueRatio: row.bondToStockMarketValueRatio,
+      discountAtrRatio: row.discountAtrRatio,
+      forceRedeemActive: row.forceRedeemActive === true,
+      forceRedeemLabel: pickText(row.forceRedeemLabel, "非强赎"),
+    }));
+}
+
+function buildDiscountSignal(row, signalType) {
+  return {
+    signalType,
+    code: pickText(row.code),
+    bondName: pickText(row.bondName),
+    stockCode: pickText(row.stockCode),
+    stockName: pickText(row.stockName),
+    price: row.price,
+    stockPrice: row.stockPrice,
+    stockChangePercent: row.stockChangePercent,
+    convertValue: row.convertValue,
+    premiumRate: row.premiumRate,
+    bondToStockMarketValueRatio: row.bondToStockMarketValueRatio,
+    discountAtrRatio: row.discountAtrRatio,
+    forceRedeemActive: row.forceRedeemActive === true,
+    forceRedeemLabel: pickText(row.forceRedeemLabel, "非强赎"),
+    reason: signalType === "buy"
+      ? "转股溢价率进入低溢价买入区"
+      : "转股溢价率回到卖出区",
+  };
+}
+
+/**
+ * 统一生成低溢价策略快照。
+ * 首次启动时如果已经处于买入区，也直接发一次信号，避免因运行态丢失吞掉真实穿越。
+ */
+function buildConvertibleBondDiscountSnapshot(rows, runtimeState = {}, options = {}) {
+  const config = buildDiscountStrategyOptions(options);
+  const cleanRows = sanitizeCbArbRows(rows).map((row) => enrichDiscountStrategyRow(row, config));
+  const pushEligibleRows = cleanRows.filter((row) => !row.forceRedeemActive);
+  const previousState = normalizeDiscountStrategyState(runtimeState);
+  const previousMonitorMap = { ...previousState.monitorMap };
+  const previousSignalStateMap = { ...previousState.signalStateMap };
+  const rowMap = new Map(pushEligibleRows.map((row) => [pickText(row.code), row]));
+  const nextMonitorMap = { ...previousMonitorMap };
+  const nextSignalStateMap = {};
+  const buySignals = [];
+  const sellSignals = [];
+  const isBootstrap = !previousState.initializedDate;
+
+  pushEligibleRows.forEach((row) => {
+    const code = pickText(row.code);
+    if (!code) return;
+
+    const previousSignalState = previousSignalStateMap[code] || {};
+    const buyZoneActive = Boolean(row.buyZoneActive);
+    const sellZoneActive = Boolean(row.sellZoneActive);
+
+    nextSignalStateMap[code] = { buyZoneActive, sellZoneActive };
+
+    if (buyZoneActive) {
+      nextMonitorMap[code] = {
+        code,
+        enteredAt: previousMonitorMap[code]?.enteredAt || config.nowIsoText,
+      };
+    }
+
+    if (isBootstrap) {
+      if (buyZoneActive) buySignals.push(buildDiscountSignal(row, "buy"));
+      return;
+    }
+
+    if (!previousSignalState.buyZoneActive && buyZoneActive) {
+      buySignals.push(buildDiscountSignal(row, "buy"));
+    }
+
+    if (nextMonitorMap[code] && !previousSignalState.sellZoneActive && sellZoneActive) {
+      sellSignals.push(buildDiscountSignal(row, "sell"));
+      delete nextMonitorMap[code];
+    }
+  });
+
+  Object.keys(nextMonitorMap).forEach((code) => {
+    if (!rowMap.has(code)) delete nextMonitorMap[code];
+  });
+
+  const activeCodes = new Set(Object.keys(nextMonitorMap));
+  const enrichedRows = cleanRows.map((row) => ({
+    ...row,
+    isDiscountMonitorActive: activeCodes.has(pickText(row.code)),
+  }));
+  const monitorRows = pushEligibleRows.filter((row) => activeCodes.has(pickText(row.code)));
+  const monitorItems = buildDiscountMonitorSummaryItems(monitorRows);
+
+  return {
+    rows: enrichedRows,
+    buySignals,
+    sellSignals,
+    isBootstrap,
+    premiumMonitorSummary: {
+      count: monitorItems.length,
+      items: monitorItems,
+    },
+    nextState: {
+      initializedDate: previousState.initializedDate || config.todayDate,
+      lastBootstrapDate: isBootstrap ? config.todayDate : previousState.lastBootstrapDate,
+      monitorMap: nextMonitorMap,
+      signalStateMap: nextSignalStateMap,
+    },
+  };
+}
+
+/**
+ * 转债顶部摘要与定时主推送共用同一套候选规则，避免页面前三与推送口径再次分叉。
  */
 function isCbArbSummaryEligibleRow(row, today = todayShanghaiDate()) {
   if (!row || typeof row !== "object") return false;
@@ -469,7 +381,7 @@ function selectCbArbSummaryRows(rows, today = todayShanghaiDate()) {
 function cbArbOpportunitySets(rows) {
   const cleanRows = selectCbArbSummaryRows(rows);
   const formatDate = (value) => String(value || "").trim();
-  const hasPassedConvertStart = (row) => {
+  const hasStartedConvert = (row) => {
     const text = formatDate(row.convertStartDate || row.convertStartDateTime);
     if (!text) return false;
     const t = Date.parse(text);
@@ -531,12 +443,12 @@ function cbArbOpportunitySets(rows) {
     ).map((row) => ({
       code: pickText(row.code),
       name: pickText(row.bondName),
-      reason: `正股接近/触及涨停：${pctText(row.stockChangePercent)}`,
+      reason: `正股接近/触及涨停，${pctText(row.stockChangePercent)}`,
     })),
     convert: topN(
       cleanRows.filter((row) => {
         const spread = convertSpreadRate(row);
-        return spread !== null && spread > 2 && hasPassedConvertStart(row);
+        return spread !== null && spread > 2 && hasStartedConvert(row);
       }),
       3,
       (a, b) => (convertSpreadRate(b) ?? Number.NEGATIVE_INFINITY) - (convertSpreadRate(a) ?? Number.NEGATIVE_INFINITY)
@@ -559,7 +471,6 @@ function cbArbOpportunitySets(rows) {
 
 /**
  * 构建可转债异动提醒候选。
- * 输入是转债套利公开行，输出是满足阈值的提醒对象，不负责发送与冷却。
  */
 function buildConvertibleBondAlertCandidates(rows, options = {}) {
   const cleanRows = sanitizeCbArbRows(rows);
@@ -605,4 +516,3 @@ module.exports = {
   buildConvertibleBondDiscountSnapshot,
   enrichDiscountStrategyRow,
 };
-

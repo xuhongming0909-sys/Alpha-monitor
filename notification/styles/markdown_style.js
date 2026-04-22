@@ -5,7 +5,6 @@ const { selectCbArbSummaryRows } = require("../../strategy/convertible_bond/serv
 
 /**
  * 企业微信 Markdown 长度有限，这里统一做裁剪。
- * 样式层只处理文本展示，不参与业务判断。
  */
 function trimMarkdownForWeCom(markdown, maxLength = 3900) {
   const raw = String(markdown || "");
@@ -138,7 +137,7 @@ function computeOptionDiscountRate(row) {
   return (implicitOptionValue / theoreticalOptionValue - 1) * 100;
 }
 
-function buildCbSummaryLines(rows, options = {}) {
+function buildCbSummaryLines(rows) {
   const topCount = 3;
   const summaryRows = selectCbArbSummaryRows(rows);
   const doubleLowRows = topN(
@@ -164,18 +163,6 @@ function buildCbSummaryLines(rows, options = {}) {
     );
   });
   return picked;
-  const seen = new Set();
-  for (const item of flattened) {
-    if (!item?.code || seen.has(item.code)) continue;
-    const row = rowMap.get(item.code);
-    if (!row) continue;
-    seen.add(item.code);
-    picked.push(
-      `- ${pickText(row.bondName)} ${pickText(row.code)} | 现价 ${priceText(row.price)} | 转股溢价 ${pctText(row.premiumRate)} | 转股价值 ${priceText(row.convertValue)} | 双低 ${priceText(row.doubleLow)} | 理论溢价 ${pctText(row.theoreticalPremiumRate)} | ${pickText(item.reason)}`
-    );
-    if (picked.length >= topCount) break;
-  }
-  return picked;
 }
 
 function buildSubscriptionLines(input, todayText) {
@@ -184,18 +171,6 @@ function buildSubscriptionLines(input, todayText) {
 }
 
 function buildMonitorLines(monitors) {
-  return buildMonitorLinesPrecise(monitors);
-  return (Array.isArray(monitors) ? monitors : []).map((item) => {
-    const stock = toNum(item.stockYieldRate);
-    const cash = toNum(item.cashYieldRate);
-    const maxYield = Number.isFinite(stock) && Number.isFinite(cash)
-      ? Math.max(stock, cash)
-      : Number.isFinite(stock) ? stock : cash;
-    return `- ${pickText(item.name)} | 换股 ${pctText(stock)} | 现金 ${pctText(cash)} | 最大 ${pctText(maxYield)}`;
-  });
-}
-
-function buildMonitorLinesPrecise(monitors) {
   return (Array.isArray(monitors) ? monitors : []).map((item) => {
     const stock = toNum(item.stockYieldRate);
     const cash = toNum(item.cashYieldRate);
@@ -206,23 +181,9 @@ function buildMonitorLinesPrecise(monitors) {
   });
 }
 
-function buildDividendLines(rows) {
-  return (Array.isArray(rows) ? rows : []).map((row) => (
-    `- ${pickText(row.name)} ${pickText(row.code)} | 登记日 ${pickText(row.dividendData?.recordDate)} | 除权日 ${pickText(row.dividendData?.exDividendDate)}`
-  ));
-}
-
-function buildEventArbSummaryLines(items, topCount) {
-  return (Array.isArray(items) ? items : [])
-    .slice(0, Math.max(1, topCount))
-    .map((item) => (
-      `- ${pickText(item.name)} ${pickText(item.symbol)} | ${pickText(item.eventType)} | ${pickText(item.eventStage || item.categoryLabel || item.category)} | ${pickText(item.spreadText, "") || "新进入事件池"}`
-    ));
-}
-
 /**
  * 构建定时摘要 Markdown。
- * 输入必须是已经准备好的真实数据和通知运行态摘要。
+ * 只保留 5 个固定分区，并严格保持顺序。
  */
 function buildSummaryMarkdown(input, modules, options = {}) {
   const selected = modules || {};
@@ -231,8 +192,6 @@ function buildSummaryMarkdown(input, modules, options = {}) {
   const abRows = Array.isArray(input?.ab?.data) ? input.ab.data : [];
   const cbRows = Array.isArray(input?.cbArb?.data) ? input.cbArb.data : [];
   const monitors = Array.isArray(input?.monitors) ? input.monitors : [];
-  const todayDividendRecord = Array.isArray(options.todayDividendRecord) ? options.todayDividendRecord : [];
-  const eventArbNewItems = Array.isArray(input?.eventArbNextDaySummary) ? input.eventArbNextDaySummary : [];
   const nowText = String(
     options.generatedAtText || new Date().toLocaleString("zh-CN", { hour12: false })
   ).trim();
@@ -243,38 +202,21 @@ function buildSummaryMarkdown(input, modules, options = {}) {
     "",
   ];
 
-  if (selected.ahab) {
-    buildSection(lines, "AH / AB 极值", [
-      ...buildPremiumRows(ahRows, "AH", Math.max(1, Number(summaryConfig.ahTopN) || 2)),
-      ...buildPremiumRows(abRows, "AB", Math.max(1, Number(summaryConfig.abTopN) || 2)),
-    ]);
-  }
-
-  if (selected.cbArb) {
-    buildSection(lines, "可转债机会", buildCbSummaryLines(cbRows, {
-      cbTopN: summaryConfig.cbTopN,
-      pushCategories: options.cbPushCategories,
-    }));
-  }
-
   if (selected.subscription) {
     buildSection(lines, "今日打新", buildSubscriptionLines(input, todayText));
   }
 
-  if (selected.dividend) {
-    buildSection(lines, "分红提醒", buildDividendLines(todayDividendRecord));
+  if (selected.cbArb) {
+    buildSection(lines, "可转债机会", buildCbSummaryLines(cbRows, summaryConfig));
   }
 
   if (selected.monitor) {
-    buildSection(lines, "自定义监控（全量）", buildMonitorLines(monitors));
+    buildSection(lines, "自定义监控", buildMonitorLines(monitors));
   }
 
-  if (selected.eventArb) {
-    buildSection(
-      lines,
-      "昨日新增事件套利",
-      buildEventArbSummaryLines(eventArbNewItems, Number(summaryConfig.eventArbitrageTopN) || 6)
-    );
+  if (selected.ahab) {
+    buildSection(lines, "AH", buildPremiumRows(ahRows, "AH", Math.max(1, Number(summaryConfig.ahTopN) || 2)));
+    buildSection(lines, "AB", buildPremiumRows(abRows, "AB", Math.max(1, Number(summaryConfig.abTopN) || 2)));
   }
 
   return lines.join("\n");

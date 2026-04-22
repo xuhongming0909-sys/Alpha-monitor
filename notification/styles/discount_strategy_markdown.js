@@ -16,6 +16,16 @@ function pctText(value, digits = 2) {
   return `${sign}${num.toFixed(digits)}%`;
 }
 
+function ratioText(value, digits = 3) {
+  const num = toNum(value);
+  return num === null ? "--" : num.toFixed(digits);
+}
+
+function buildForceRedeemText(item) {
+  if (String(item?.forceRedeemLabel || "").trim()) return String(item.forceRedeemLabel).trim();
+  return item?.forceRedeemActive ? "强赎中" : "非强赎";
+}
+
 /**
  * 低溢价策略推送模板统一在这里收口，保证页面与推送字段口径一致。
  */
@@ -48,22 +58,8 @@ function buildConvertibleBondDiscountMarkdown(signalType, items, options = {}) {
   }
 
   list.forEach((item) => {
-    const weightedText = pctText(item.weightedDiscountRate);
-    const premiumText = pctText(item.premiumRate);
-    const convertValueText = toNum(item.convertValue)?.toFixed(2) ?? "--";
-
-    if (signalType === "monitor") {
-      lines.push(
-        `- ${pickText(item.bondName)} ${pickText(item.code)} | 转股溢价率 ${premiumText} | 加权折价率 ${weightedText} | 转股价值 ${convertValueText}`
-      );
-      return;
-    }
-
     lines.push(
-      `- ${pickText(item.bondName)} ${pickText(item.code)} | ${pickText(item.stockName)} ${pickText(item.stockCode)} | 转股溢价率 ${premiumText} | 加权折价率 ${weightedText} | 转股价值 ${convertValueText}`
-    );
-    lines.push(
-      `  正股现价 ${toNum(item.stockPrice)?.toFixed(2) ?? "--"} | 板块 ${pickText(item.boardType)} | ${pickText(item.reason)}`
+      `- ${pickText(item.code)} ${pickText(item.bondName)} | 溢价率 ${pctText(item.premiumRate)} | 转债市值比 ${ratioText(item.bondToStockMarketValueRatio)} | 折价ATR比 ${ratioText(item.discountAtrRatio)} | ${buildForceRedeemText(item)}`
     );
   });
 

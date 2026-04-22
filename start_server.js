@@ -1,4 +1,4 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -178,26 +178,6 @@ function normalizeSessionWindowListConfig(values, fallback = []) {
   return items.length ? items : [...fallback];
 }
 
-function normalizeAnchorConfig(values, fallback) {
-  const normalized = (Array.isArray(values) ? values : [])
-    .map((item) => ({
-      x: Number(item?.x),
-      y: Number(item?.y),
-    }))
-    .filter((item) => Number.isFinite(item.x) && Number.isFinite(item.y))
-    .sort((a, b) => a.x - b.x);
-  return normalized.length >= 2 ? normalized : fallback;
-}
-
-function normalizeBoardCoefficientsConfig(values, fallback) {
-  const source = values && typeof values === 'object' ? values : {};
-  return {
-    科创板: toPositiveNumberConfig(source.科创板, fallback.科创板),
-    创业板: toPositiveNumberConfig(source.创业板, fallback.创业板),
-    主板: toPositiveNumberConfig(source.主板, fallback.主板),
-  };
-}
-
 function isLoopbackHost(hostname) {
   const text = String(hostname || '').trim().toLowerCase();
   return text === '127.0.0.1' || text === 'localhost' || text === '0.0.0.0';
@@ -304,23 +284,6 @@ const DEFAULT_DISCOUNT_STRATEGY_CONFIG = {
   sellThreshold: -0.5,
   monitorIntervalMinutes: 10,
   monitorSessionTimes: DEFAULT_DISCOUNT_STRATEGY_MONITOR_TIMES,
-  atrAnchors: [
-    { x: 0, y: 0 },
-    { x: 0.25, y: 0.5 },
-    { x: 0.5, y: 0.8 },
-    { x: 1, y: 1 },
-  ],
-  sellPressureAnchors: [
-    { x: 0.5, y: 1 },
-    { x: 1, y: 0.8 },
-    { x: 5, y: 0.5 },
-    { x: 20, y: 0 },
-  ],
-  boardCoefficients: {
-    科创板: 1,
-    创业板: 0.85,
-    主板: 0.8,
-  },
 };
 const DISCOUNT_STRATEGY_CONFIG = {
   tradingDaysOnly: toBooleanConfig(
@@ -340,15 +303,6 @@ const DISCOUNT_STRATEGY_CONFIG = {
       DEFAULT_DISCOUNT_STRATEGY_MONITOR_TIMES[0]
     )
     : DEFAULT_DISCOUNT_STRATEGY_MONITOR_TIMES,
-  atrAnchors: normalizeAnchorConfig(CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.atr_anchor_points, DEFAULT_DISCOUNT_STRATEGY_CONFIG.atrAnchors),
-  sellPressureAnchors: normalizeAnchorConfig(
-    CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.sell_pressure_anchor_points,
-    DEFAULT_DISCOUNT_STRATEGY_CONFIG.sellPressureAnchors
-  ),
-  boardCoefficients: normalizeBoardCoefficientsConfig(
-    CONVERTIBLE_BOND_STRATEGY_CONFIG?.discount_strategy?.board_coefficients,
-    DEFAULT_DISCOUNT_STRATEGY_CONFIG.boardCoefficients
-  ),
 };
 const DEFAULT_PUSH_CONFIG = {
   enabled: Boolean(NOTIFICATION_CONFIG?.scheduler?.enabled),
@@ -1338,9 +1292,6 @@ function getDiscountStrategyConfig() {
     ...DISCOUNT_STRATEGY_CONFIG,
     sessionWindows: [...DISCOUNT_STRATEGY_CONFIG.sessionWindows],
     monitorSessionTimes: [...DISCOUNT_STRATEGY_CONFIG.monitorSessionTimes],
-    atrAnchors: DISCOUNT_STRATEGY_CONFIG.atrAnchors.map((item) => ({ ...item })),
-    sellPressureAnchors: DISCOUNT_STRATEGY_CONFIG.sellPressureAnchors.map((item) => ({ ...item })),
-    boardCoefficients: { ...DISCOUNT_STRATEGY_CONFIG.boardCoefficients },
   };
 }
 
@@ -1527,16 +1478,13 @@ const CB_ARB_PUBLIC_ROW_KEYS = [
   'convertPrice',
   'convertValue',
   'premiumRate',
-  'weightedDiscountRate',
   'bondValue',
   'doubleLow',
   'stockAtr20Pct',
-  'atrRatio',
-  'atrCoefficient',
-  'sellPressureRatio',
-  'sellPressureCoefficient',
+  'discountAtrRatio',
   'boardType',
-  'boardCoefficient',
+  'bondToStockMarketValueRatio',
+  'stockMarketValueYi',
   'isDiscountMonitorActive',
   'redeemTriggerPrice',
   'putbackPrice',
@@ -1556,6 +1504,8 @@ const CB_ARB_PUBLIC_ROW_KEYS = [
   'theoreticalPremiumRate',
   'yieldToMaturityPretax',
   'rating',
+  'forceRedeemActive',
+  'forceRedeemLabel',
   'forceRedeemStatus',
   'forceRedeemNoticeDate',
   'delistDate',

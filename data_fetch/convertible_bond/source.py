@@ -52,6 +52,8 @@ INLINE_HISTORY_HYDRATE_LIMIT = max(1, int(_CB_FETCH_CONFIG.get("inline_history_h
 AUX_CACHE_SCHEMA_VERSION = 1
 FORCE_REDEEM_NOTICE_LOOKBACK_DAYS = 120
 FORCE_REDEEM_DELIST_FORWARD_DAYS = 120
+EASTMONEY_QUOTE_URL = "https://push2.eastmoney.com/api/qt/ulist.np/get"
+MARKET_VALUE_TIMEOUT_SECONDS = 20
 
 
 def _blank_volatility_metrics() -> Dict[str, Optional[float]]:
@@ -131,6 +133,109 @@ def _to_date_str(value: Any) -> Optional[str]:
         return None
 
 
+def _normalize_market_value_to_yi(value: Any) -> Optional[float]:
+    market_value = _to_float(value)
+    if market_value is None or market_value <= 0:
+        return None
+    if market_value >= 100000:
+        return market_value / 100000000.0
+    return market_value
+
+
+def _to_eastmoney_secid(stock_code: str) -> str:
+    code = _to_code6(stock_code)
+    if not code:
+        return ""
+    return f"{1 if code.startswith(('5', '6', '9')) else 0}.{code}"
+
+
+def _load_stock_market_value_map_from_eastmoney(stock_codes: list[str]) -> Dict[str, Optional[float]]:
+    target_codes = sorted({_to_code6(code) for code in stock_codes if _to_code6(code)})
+    if not target_codes:
+        return {}
+
+    result: Dict[str, Optional[float]] = {}
+    for index in range(0, len(target_codes), 80):
+        batch = target_codes[index:index + 80]
+        secids = [secid for secid in (_to_eastmoney_secid(code) for code in batch) if secid]
+        if not secids:
+            continue
+        try:
+            response = requests.get(
+                EASTMONEY_QUOTE_URL,
+                params={
+                    "fltt": "2",
+                    "invt": "2",
+                    "fields": "f12,f20",
+                    "secids": ",".join(secids),
+                },
+                headers={
+                    "User-Agent": "Mozilla/5.0",
+                    "Referer": "https://quote.eastmoney.com/",
+                    "Accept": "application/json,text/plain,*/*",
+                },
+                timeout=MARKET_VALUE_TIMEOUT_SECONDS,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except Exception:
+            continue
+
+        for item in (((payload or {}).get("data") or {}).get("diff") or []):
+            code = _to_code6(item.get("f12"))
+            if not code:
+                continue
+            market_value_yi = _normalize_market_value_to_yi(item.get("f20"))
+            if market_value_yi is not None:
+                result[code] = market_value_yi
+    return result
+
+
+def _load_stock_market_value_map(stock_codes: list[str]) -> Dict[str, Optional[float]]:
+    target_codes = {_to_code6(code) for code in stock_codes if _to_code6(code)}
+    if not target_codes:
+        return {}
+
+    result: Dict[str, Optional[float]] = {}
+    for fetcher in (getattr(ak, "stock_zh_a_spot_em", None), getattr(ak, "stock_zh_a_spot", None)):
+        if fetcher is None:
+            continue
+        try:
+            df = fetcher()
+        except Exception:
+            continue
+        if df is None or df.empty:
+            continue
+
+        code_col = next((name for name in ("代码", "code", "symbol") if name in df.columns), None)
+        market_value_col = next(
+            (
+                name
+                for name in ("总市值", "总市值(元)", "market_value", "marketValue")
+                if name in df.columns
+            ),
+            None,
+        )
+        if not code_col or not market_value_col:
+            continue
+
+        for _, series in df.iterrows():
+            code = _to_code6(series.get(code_col))
+            if not code or code not in target_codes:
+                continue
+            market_value_yi = _normalize_market_value_to_yi(series.get(market_value_col))
+            if market_value_yi is not None:
+                result[code] = market_value_yi
+        if result:
+            break
+
+    missing_codes = sorted(code for code in target_codes if code not in result)
+    if missing_codes:
+        result.update(_load_stock_market_value_map_from_eastmoney(missing_codes))
+
+    return result
+
+
 def _load_jisilu_cookie() -> str:
     cookie = os.getenv("JISILU_COOKIE", "").strip()
     if cookie:
@@ -153,6 +258,7 @@ def _cb_arb_aux_cache_fallback() -> Dict[str, Any]:
         "covBasicMap": {"date": "", "value": {}},
         "thsCovInfoMap": {"date": "", "value": {}},
         "pureBondMap": {"date": "", "value": {}},
+        "stockMarketValueByStock": {"date": "", "value": {}},
         "historyMetricsByStock": {"date": "", "value": {}},
         "financialMetricsByStock": {"date": "", "value": {}},
         "updatedAt": None,
@@ -1594,6 +1700,23 @@ def get_bond_cb_data() -> Dict[str, Any]:
     cb_jsl_items = _build_cb_jsl_map(jisilu_cookie)
     ths_cov_info_items = _load_daily_cached_map(aux_cache, "thsCovInfoMap", as_of_date_text, _build_ths_cov_info_map)
     pure_bond_value_items = _load_daily_cached_map(aux_cache, "pureBondMap", as_of_date_text, _build_latest_pure_bond_map)
+    stock_codes = sorted({
+        stock_code
+        for bond_code in realtime_items.keys()
+        for stock_code in [
+            _to_code6((cov_quote_items.get(bond_code) or {}).get("stockCode"))
+            or _to_code6((cov_basic_items.get(bond_code) or {}).get("stockCode"))
+            or _to_code6((ths_cov_info_items.get(bond_code) or {}).get("stockCode"))
+            or _to_code6((previous_row_map.get(bond_code) or {}).get("stockCode"))
+        ]
+        if stock_code
+    })
+    stock_market_value_items = _load_daily_cached_map(
+        aux_cache,
+        "stockMarketValueByStock",
+        as_of_date_text,
+        lambda: _load_stock_market_value_map(stock_codes),
+    )
     if not pure_bond_value_items:
         pure_bond_value_items = {}
         for previous_code, previous_row in previous_row_map.items():
@@ -1636,6 +1759,9 @@ def get_bond_cb_data() -> Dict[str, Any]:
         listing_date_from_quote = _to_date_str((quote_row or {}).get("listingDate")) or _to_date_str((previous_row or {}).get("listingDate"))
         remaining_size_from_quote = _to_positive_float((quote_row or {}).get("issueScaleYi")) or _to_positive_float((previous_row or {}).get("remainingSizeYi"))
         stock_change_percent = stock_spot_change if stock_spot_change is not None else _to_float(stock_change_cache_items.get(stock_code))
+        stock_market_value_yi = stock_market_value_items.get(stock_code) if stock_code else None
+        if stock_market_value_yi is None:
+            stock_market_value_yi = _to_positive_float((previous_row or {}).get("stockMarketValueYi"))
         double_low = (price + premium_rate) if (price is not None and premium_rate is not None) else None
 
         row = {
@@ -1663,6 +1789,7 @@ def get_bond_cb_data() -> Dict[str, Any]:
             "ceaseDate": None,
             "remainingYears": None,
             "remainingSizeYi": remaining_size_from_quote,
+            "stockMarketValueYi": stock_market_value_yi,
             "turnoverAmountYi": turnover_amount_yi,
             "turnoverRate": None,
             "stockAtr20": None,

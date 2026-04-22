@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 function normalizeApiBase(value) {
   const text = String(value || '').trim();
@@ -341,6 +341,20 @@ function normalizeAutoRefreshConfig(payload) {
   };
 }
 
+function normalizeDashboardTheme(value) {
+  const normalized = String(value || 'classic').trim().toLowerCase();
+  return normalized === 'clean_data' ? 'clean_data' : 'classic';
+}
+
+function readDashboardTheme() {
+  const payload = state.resources.uiConfig?.data?.data || {};
+  return normalizeDashboardTheme(payload.dashboardTheme || payload.dashboard_theme);
+}
+
+function applyDashboardTheme(theme = readDashboardTheme()) {
+  document.documentElement.dataset.dashboardTheme = normalizeDashboardTheme(theme);
+}
+
 function applyTableUiConfig(rawPayload) {
   const tableUi = normalizeTableUiConfig(rawPayload);
   const root = document.documentElement;
@@ -414,6 +428,7 @@ function renderModuleFootnote(moduleKey) {
 }
 
 function renderDashboardUiState() {
+  applyDashboardTheme();
   applyTableUiConfigFromState();
   restartAutoRefreshLoop();
   renderEverything();
@@ -1552,6 +1567,7 @@ async function revalidateCriticalResourcesOnce() {
 
 async function bootstrap(options = {}) {
   bindEvents();
+  applyDashboardTheme();
   applyTableUiConfigFromState();
   renderAll();
   const forceMarket = Boolean(options.forceMarket);
@@ -3096,30 +3112,31 @@ function buildConvertibleColumns() {
       ),
     },
     {
-      key: 'atrCoefficient',
-      label: 'ATR系数/ATR%',
-      headerHtml: 'ATR系数<br>ATR%',
+      key: 'bondToStockMarketValueRatio',
+      label: '转债市值比',
+      headerHtml: '转债<br>市值比',
       columnClassName: 'col-name col-cb-factor',
       sortable: true,
       sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.atrCoefficient),
+      defaultDir: 'asc',
+      sortValue: (row) => toNumber(row.bondToStockMarketValueRatio),
       render: (row) => renderCompactCell(
-        formatNumber(row.atrCoefficient, 3),
-        [`ATR% ${formatPercent(row.stockAtr20Pct, 2)}`]
+        formatNumber(row.bondToStockMarketValueRatio, 3),
+        [`剩余规模 ${formatNumber(row.remainingSizeYi, 2)}亿 / 正股市值 ${formatNumber(row.stockMarketValueYi, 2)}亿`]
       ),
     },
     {
-      key: 'sellPressureCoefficient',
-      label: '抛压系数',
+      key: 'discountAtrRatio',
+      label: '折价ATR比',
+      headerHtml: '折价<br>ATR比',
       columnClassName: 'col-name col-cb-factor',
       sortable: true,
       sortType: 'number',
       defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.sellPressureCoefficient),
+      sortValue: (row) => toNumber(row.discountAtrRatio),
       render: (row) => renderCompactCell(
-        formatNumber(row.sellPressureCoefficient, 3),
-        [`成交/规模 ${formatNumber(row.sellPressureRatio, 2)}`]
+        formatNumber(row.discountAtrRatio, 3),
+        [`ATR% ${formatPercent(row.stockAtr20Pct, 2)}`]
       ),
     },
     {
@@ -3130,26 +3147,7 @@ function buildConvertibleColumns() {
       sortType: 'text',
       defaultDir: 'asc',
       sortValue: (row) => String(readConvertibleBoardLabel(row) || ''),
-      render: (row) => renderCompactCell(
-        escapeHtml(readConvertibleBoardLabel(row)),
-        [`系数 ${formatNumber(row.boardCoefficient, 2)}`]
-      ),
-    },
-    {
-      key: 'weightedDiscountRate',
-      label: '加权折价',
-      headerHtml: '加权<br>折价',
-      columnClassName: 'col-percent col-cb-percent',
-      sortable: true,
-      sortType: 'number',
-      defaultDir: 'desc',
-      sortValue: (row) => toNumber(row.weightedDiscountRate),
-      className: (row) => statusClass(row.weightedDiscountRate),
-      render: (row) => renderCompactCell(
-        formatPercent(row.weightedDiscountRate, 2),
-        [`折价额 ${formatSignedNumber(computeConvertibleWeightedDiscountAmount(row), 2)}`],
-        statusClass(row.weightedDiscountRate)
-      ),
+      render: (row) => escapeHtml(readConvertibleBoardLabel(row)),
     },
     { key: 'doubleLow', label: '双低', columnClassName: 'col-num col-cb-num', sortable: true, sortType: 'number', defaultDir: 'asc', sortValue: (row) => toNumber(row.doubleLow), render: (row) => formatNumber(row.doubleLow, 2) },
     {
@@ -3370,7 +3368,7 @@ function renderConvertibleBondPanel() {
       premiumMonitorItems.length
         ? premiumMonitorItems.map((row) => ({
           title: `${row.bondName || "--"}`.trim(),
-          subtitle: `加权折价率 ${formatPercent(row.weightedDiscountRate, 2)} / 转债代码 ${row.code || "--"}`,
+          subtitle: `转债市值比 ${formatNumber(row.bondToStockMarketValueRatio, 3)} / 折价ATR比 ${formatNumber(row.discountAtrRatio, 3)} / 转债代码 ${row.code || "--"}`,
           value: formatPercent(row.premiumRate, 2),
           valueClass: statusClass(row.premiumRate),
         }))
@@ -4829,12 +4827,7 @@ function computeConvertiblePremiumAmount(row) {
   return price - convertValue;
 }
 
-function computeConvertibleWeightedDiscountAmount(row) {
-  const price = toNumber(row?.price);
-  const convertValue = toNumber(row?.convertValue);
-  if (price === null || convertValue === null) return null;
-  return convertValue - price;
-}
+
 
 function computeConvertibleTheoreticalPremiumAmount(row) {
   const price = toNumber(row?.price);

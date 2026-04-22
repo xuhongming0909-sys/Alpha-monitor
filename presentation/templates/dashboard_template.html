@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -91,8 +91,8 @@
       }
 
       .app-shell {
-        /* 核心布局：尽量接近满屏，减少无意义外边距 */
-        width: calc(100vw - 12px);
+        /* 闁哄秶顭堢缓鍓ф暜閸愩劎婀伴柨娑欒壘閺佹牠鏌岃箛鏂垮閺夆晜鍨跺褏浠﹁箛銉х闁告垵绻愰惃顖炲籍閻樺啿澹堝☉鏂款槸椤︾粯娼忕涵鍛崺 */
+        width: max(1320px, calc(100vw - 12px));
         max-width: 1980px;
         margin: 0 auto;
         padding: 10px 0 18px;
@@ -131,7 +131,7 @@
 
       .hero {
         overflow: hidden;
-        /* 首屏压缩：减少标题区高度，让主表更早进入视野 */
+        /* 濡絾鐗曢惈鍡涘储鐎ｎ剛绱氶柨娑欒壘閸ｈ櫣浜搁幋鐐靛灱濡増锚鐏忣垱顨囧Ο鍝勵唺闁挎稑鐭侀鈧☉鎾存閵嗗啴寮寸€涙ɑ锛嶉弶鈺傜☉閸欏棛鎲撮崱娑樻 */
         padding: 12px 16px 8px;
         box-shadow: var(--shadow-lg);
         background:
@@ -212,7 +212,7 @@
 
       .subscription-panel,
       .module-shell {
-        /* 统一模块密度，避免卡片壳层过厚 */
+        /* 缂備胶鍠嶇粩鏉懳熼垾铏仴閻庨潧妫楃€规娊鏁嶅畝鍕級闁稿繐绉村畷閬嶆偋閸パ嶇处閻忕偛鍊界换鍐储?*/
         padding: 10px 12px;
       }
 
@@ -488,7 +488,7 @@
       }
 
       .tab-nav {
-        /* 主导航压缩为更像信息切换条，而不是大卡片按钮组 */
+        /* 濞戞捁顕ч閬嶆嚋椤忓嫬绔剧紓鍌楁櫃鐠愮喖寮撮弶鎴濆壖濞ｅ洠鍓濇导鍛村礆閸ャ劌搴婇柡澶嗘缁辨繈鎳撶仦鑲╃憹闁哄嫷鍨伴妵鍥础閿涘嫬顣婚柟绋款樀閹稿磭绱?*/
         display: grid;
         grid-template-columns: repeat(8, minmax(0, 1fr));
         gap: 6px;
@@ -925,11 +925,11 @@
       }
 
       table {
-        /* 让列宽优先跟随内容，横向滚动用于承载更多真实字段 */
+        /* 閻犱讲鏅涢崹顏嗏偓瑙勫灊缁鳖參宕楅崼锝囶€€闂傚懎绻愰崬瀵糕偓鍦缁辨繂螣椤忓嫭鍊绘繝濠冭壘婵晠鎮介妸銈囪壘闁逛絻鍎诲ù鍥即閺夋埈妯嬮柣顏嗗枎閻ゅ嫮鈧稒顨嗛?*/
         width: max-content;
         min-width: 100%;
         border-collapse: collapse;
-        /* 表格以数据可读性优先，避免 fixed 布局导致无意义折行 */
+        /* 閻炴稏鍔嶉悧鍛婄閵夛附娈堕柟璇″枛瑜拌尙鎷犵紒妯峰亾瑜岀槐顓㈠礂閸剛绀夐梺顒€鐏濋崢?fixed 閻㈩垰鍟惇顒傗偓浣冨閸ぱ囧籍閻樺啿澹堝☉鏂款槹婵瞼鎮?*/
         table-layout: auto;
       }
 
@@ -1038,7 +1038,7 @@
         white-space: nowrap;
       }
 
-      /* 宽表压缩规则：把代码/日期/数值列收窄，让核心字段尽量留在首屏 */
+      /* 閻庣懓鈧喆鈧啴宕㈢€ｎ剛绱氶悷娆忓閸垶鏁嶅顓炍╁ù鐙呯悼閻?闁哄啨鍎插﹢?闁轰焦婢橀埀顒傚帶閸亪寮ㄩ崜浣哄磿闁挎稑鐭侀鈧柡宥囶焾缁哄墽鈧稒顨嗛宀€浜告禒瀣闁伙絾鐟ュ﹢顏咃純閺嵮呮綄 */
       th.col-index,
       td.col-index {
         width: 46px;
@@ -1471,155 +1471,6 @@
           transform: translateY(0);
         }
       }
-
-      @media (max-width: 1379px) and (min-width: 861px) {
-        th,
-        td {
-          font-size: var(--table-font-size-tablet);
-          padding:
-            calc(var(--table-cell-padding-y-desktop) - 1px)
-            calc(var(--table-cell-padding-x-desktop) - 2px);
-        }
-
-        th {
-          font-size: var(--table-font-size-tablet);
-        }
-
-        .section-note,
-        .panel-meta,
-        .slim-note,
-        .detail-label,
-        .pagination-status,
-        .expand-button {
-          font-size: calc(var(--table-font-size-tablet) - 1px);
-        }
-
-        .detail-value {
-          font-size: var(--table-font-size-tablet);
-        }
-      }
-
-      @media (max-width: 1380px) {
-        .module-grid,
-        .summary-grid.summary-grid-three,
-        .module-footnote-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .tab-nav {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-
-        .monitor-form-grid {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-
-        .monitor-form-grid.monitor-form-grid-simple {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .button-row.inline {
-          margin-left: 0;
-        }
-      }
-
-      @media (max-width: 860px) {
-        .app-shell {
-          width: calc(100vw - 18px);
-          padding-top: 10px;
-        }
-
-        .hero,
-        .subscription-panel,
-        .module-shell {
-          padding: 14px;
-        }
-
-        .hero-top,
-        .section-head,
-        .module-toolbar,
-        .premium-toolbar {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-
-        .summary-grid,
-        .module-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .tab-nav {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 8px;
-        }
-
-        .button-row .btn-primary,
-        .button-row .btn-secondary {
-          flex: 1 1 100%;
-        }
-
-        .push-form {
-          align-items: stretch;
-        }
-
-        .push-form .input-group {
-          min-width: 100%;
-        }
-
-        .monitor-form-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .monitor-form-grid.monitor-form-grid-simple {
-          grid-template-columns: 1fr;
-        }
-
-        .pagination-bar {
-          align-items: flex-start;
-        }
-
-        .pagination-buttons {
-          width: 100%;
-        }
-
-        .pagination-button {
-          flex: 1 1 calc(50% - 6px);
-        }
-
-        .detail-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        th,
-        td {
-          font-size: calc(var(--table-font-size-tablet) - 0.5px);
-          padding: 8px 9px;
-        }
-
-        th {
-          font-size: var(--table-font-size-tablet);
-        }
-
-        .section-note,
-        .panel-meta,
-        .slim-note,
-        .detail-label,
-        .pagination-status,
-        .expand-button {
-          font-size: calc(var(--table-font-size-tablet) - 1px);
-        }
-
-        .detail-value {
-          font-size: var(--table-font-size-tablet);
-          line-height: 1.55;
-        }
-      }
-
-      @media (max-width: 560px) {
-        .monitor-form-grid {
-          grid-template-columns: 1fr;
-        }
-      }
     </style>
   </head>
   <body>
@@ -1633,30 +1484,30 @@
         </div>
         <div class="hero-status-row">
           <div id="status-line" class="status-inline"></div>
-          <div id="status-update-text" class="status-inline-note">正在连接市场接口</div>
+          <div id="status-update-text" class="status-inline-note">婵繐绲藉﹢顏呮交閻愭潙澶嶉悽顖氬€稿┃鈧柟鎭掑劚瑜?/div>
         </div>
       </header>
 
       <section class="top-section">
         <section class="panel-surface subscription-panel">
           <div class="section-head">
-            <h2>股债打新</h2>
-            <div id="last-refresh-text" class="section-note">等待数据返回</div>
+            <h2>闁兼祴鈧枼鍋撻悜妯衡叺闁?/h2>
+            <div id="last-refresh-text" class="section-note">缂佹稑顦欢鐔煎极閻楀牆绁﹂弶鈺傛煥濞?/div>
           </div>
           <div id="subscription-summary" class="subscription-table-wrap"></div>
         </section>
 
       </section>
 
-      <nav id="tab-nav" class="tab-nav" aria-label="主功能切换">
-        <button class="tab-button active" data-tab="cb-arb" type="button">转债套利</button>
-        <button class="tab-button" data-tab="ah" type="button">AH溢价</button>
-        <button class="tab-button" data-tab="ab" type="button">AB溢价</button>
-        <button class="tab-button" data-tab="lof-arb" type="button">LOF套利</button>
-        <button class="tab-button" data-tab="monitor" type="button">监控套利</button>
-        <button class="tab-button" data-tab="dividend" type="button">分红提醒</button>
-        <button class="tab-button" data-tab="merger" type="button">事件套利</button>
-        <button class="tab-button" data-tab="cb-rights-issue" type="button">可转债抢权配售</button>
+      <nav id="tab-nav" class="tab-nav" aria-label="濞戞捁顕ф慨娑㈡嚄閽樺鐎奸柟?>
+        <button class="tab-button active" data-tab="cb-arb" type="button">閺夌儐鍓欓埀顒€鎼〃婊堝礆?/button>
+        <button class="tab-button" data-tab="ah" type="button">AH婵犙屾線閻?/button>
+        <button class="tab-button" data-tab="ab" type="button">AB婵犙屾線閻?/button>
+        <button class="tab-button" data-tab="lof-arb" type="button">LOF濠靛倹顨呴崺?/button>
+        <button class="tab-button" data-tab="monitor" type="button">闁烩晜鍨剁敮鑸电附濡も偓閸?/button>
+        <button class="tab-button" data-tab="dividend" type="button">闁告帒妫涚€涒晠骞撻幇鏉挎櫔</button>
+        <button class="tab-button" data-tab="merger" type="button">濞存粌顑勫▎銏＄附濡も偓閸?/button>
+        <button class="tab-button" data-tab="cb-rights-issue" type="button">闁告瑯鍨靛ù鍡涘磹閻戞ê顫ラ柡澶婂暣閸樸倝宕?/button>
       </nav>
 
       <section id="tab-panels">
@@ -1670,26 +1521,26 @@
         <section id="panel-cb-rights-issue" class="panel-surface tab-panel"></section>
       </section>
 
-      <section class="push-strip" aria-label="推送设置">
+      <section class="push-strip" aria-label="闁规亽鍔戦埀顑挎祰椤旀洜绱?>
         <div class="push-strip-head">
-          <h2 class="push-strip-title">推送设置</h2>
+          <h2 class="push-strip-title">闁规亽鍔戦埀顑挎祰椤旀洜绱?/h2>
           <div class="push-strip-status">
-            <div id="push-state-text" class="push-strip-note">正在读取定时推送状态</div>
-            <div id="push-alert-state-text" class="push-strip-note">正在读取折价策略推送状态</div>
+            <div id="push-state-text" class="push-strip-note">婵繐绲藉﹢顏嗘嫚鐠囨彃绲块悗瑙勭濡炲倿骞掗妸鈹惧亾娴ｅ搫笑闁?/div>
+            <div id="push-alert-state-text" class="push-strip-note">婵繐绲藉﹢顏嗘嫚鐠囨彃绲块柟鑸得奸悳顖滅驳閺嶎偅娈ｉ柟鎭掑姂閳ь兛鑳舵慨鎼佸箑?/div>
           </div>
         </div>
         <form id="push-form" class="push-form">
           <div class="input-group">
-            <label for="push-time-1">定时推送 1</label>
+            <label for="push-time-1">閻庤纰嶅鍌炲箳閵娾斁鍋?1</label>
             <input id="push-time-1" type="time" />
           </div>
           <div class="input-group">
-            <label for="push-time-2">定时推送 2</label>
+            <label for="push-time-2">閻庤纰嶅鍌炲箳閵娾斁鍋?2</label>
             <input id="push-time-2" type="time" />
           </div>
           <div class="button-row inline">
-            <button id="save-push-button" type="submit" class="btn-primary">保存</button>
-            <button id="reload-data-button" type="button" class="btn-secondary">刷新</button>
+            <button id="save-push-button" type="submit" class="btn-primary">濞ｅ洦绻傞悺?/button>
+            <button id="reload-data-button" type="button" class="btn-secondary">闁告帡鏀遍弻?/button>
           </div>
         </form>
       </section>

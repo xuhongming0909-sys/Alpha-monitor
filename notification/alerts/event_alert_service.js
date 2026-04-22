@@ -1,11 +1,10 @@
 "use strict";
 
 /**
- * 低溢价策略推送服务：
+ * 低溢价推送服务：
  * 1. 读取最新可转债结果
  * 2. 调用策略层生成买入/卖出/监控名单快照
  * 3. 负责发送与运行态记录
- * 不在这里做页面展示逻辑。
  */
 function createEventAlertService(options = {}) {
   const collectAlertDatasets = options.collectAlertDatasets;
@@ -68,7 +67,6 @@ function createEventAlertService(options = {}) {
 
   /**
    * 可转债低溢价推送遵循 A 股交易日和交易时段。
-   * 这里独立判定，避免把其他模块的更宽交易窗口误带到折价推送里。
    */
   function shouldRunDiscountPush(strategyConfig, force = false) {
     if (force) {
@@ -115,6 +113,40 @@ function createEventAlertService(options = {}) {
       if (sessionWindows.length && !isInsideSessionWindows(targetMinutes, sessionWindows)) return false;
       return true;
     });
+  }
+
+  function cloneStrategyState(state) {
+    return {
+      initializedDate: String(state?.initializedDate || "").trim() || null,
+      lastBootstrapDate: String(state?.lastBootstrapDate || "").trim() || null,
+      monitorMap: (state?.monitorMap && typeof state.monitorMap === "object") ? { ...state.monitorMap } : {},
+      signalStateMap: (state?.signalStateMap && typeof state.signalStateMap === "object") ? { ...state.signalStateMap } : {},
+    };
+  }
+
+  function commitSignalRows(currentState, nextState, signals) {
+    const committed = cloneStrategyState(currentState);
+    committed.initializedDate = String(nextState?.initializedDate || "").trim() || committed.initializedDate;
+    committed.lastBootstrapDate = String(nextState?.lastBootstrapDate || "").trim() || committed.lastBootstrapDate;
+
+    (Array.isArray(signals) ? signals : []).forEach((item) => {
+      const code = String(item?.code || "").trim();
+      if (!code) return;
+
+      if (nextState?.signalStateMap && Object.prototype.hasOwnProperty.call(nextState.signalStateMap, code)) {
+        committed.signalStateMap[code] = { ...nextState.signalStateMap[code] };
+      } else {
+        delete committed.signalStateMap[code];
+      }
+
+      if (nextState?.monitorMap && Object.prototype.hasOwnProperty.call(nextState.monitorMap, code)) {
+        committed.monitorMap[code] = { ...nextState.monitorMap[code] };
+      } else {
+        delete committed.monitorMap[code];
+      }
+    });
+
+    return committed;
   }
 
   async function sendSignalBatch(signalType, items) {
@@ -193,20 +225,17 @@ function createEventAlertService(options = {}) {
 
     const datasets = await collectAlertDatasets();
     const rows = Array.isArray(datasets?.cbArb?.data) ? datasets.cbArb.data : [];
-    const snapshot = buildDiscountSnapshot(rows, discountRuntimeStore.getState(), {
+    const currentStrategyState = cloneStrategyState(discountRuntimeStore.getState());
+    const snapshot = buildDiscountSnapshot(rows, currentStrategyState, {
       buyThreshold: strategyConfig.buyThreshold,
       sellThreshold: strategyConfig.sellThreshold,
-      atrAnchors: strategyConfig.atrAnchors,
-      sellPressureAnchors: strategyConfig.sellPressureAnchors,
-      boardCoefficients: strategyConfig.boardCoefficients,
       nowIsoText: nowIso(),
       todayDate: sessionDecision.shanghaiParts?.date || getShanghaiParts().date,
     });
 
-    discountRuntimeStore.replaceStrategyState(snapshot.nextState);
-    discountRuntimeStore.save();
-
-    if (snapshot.isBootstrap && !force) {
+    if (snapshot.isBootstrap && !force && !snapshot.buySignals.length && !snapshot.sellSignals.length) {
+      discountRuntimeStore.replaceStrategyState(snapshot.nextState);
+      discountRuntimeStore.save();
       return {
         sent: false,
         skipped: true,
@@ -218,7 +247,23 @@ function createEventAlertService(options = {}) {
     }
 
     const buyResult = await sendSignalBatch("buy", snapshot.buySignals);
+    if (buyResult.sent) {
+      discountRuntimeStore.replaceStrategyState(
+        commitSignalRows(currentStrategyState, snapshot.nextState, snapshot.buySignals)
+      );
+      discountRuntimeStore.save();
+    }
+
     const sellResult = await sendSignalBatch("sell", snapshot.sellSignals);
+    if (sellResult.sent) {
+      discountRuntimeStore.replaceStrategyState(
+        commitSignalRows(discountRuntimeStore.getState(), snapshot.nextState, snapshot.sellSignals)
+      );
+      discountRuntimeStore.save();
+    }
+
+    discountRuntimeStore.replaceStrategyState(snapshot.nextState);
+    discountRuntimeStore.save();
 
     const sh = sessionDecision.shanghaiParts || getShanghaiParts();
     const nowMinutes = Number.isFinite(sessionDecision.nowMinutes) ? sessionDecision.nowMinutes : ((sh.hour * 60) + sh.minute);
@@ -238,6 +283,7 @@ function createEventAlertService(options = {}) {
       sellResult,
       monitorResult,
       monitorCount: snapshot.premiumMonitorSummary.count,
+      isBootstrap: snapshot.isBootstrap,
     };
   }
 

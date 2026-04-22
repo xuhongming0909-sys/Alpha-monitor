@@ -27,6 +27,19 @@ const SECRET_ENV_PATHS = [
   { path: ["data_fetch", "plugins", "lof_arbitrage", "firecrawl_api_key"], env: "FIRECRAWL_API_KEY" },
 ];
 
+function buildPlatformPythonDefaults() {
+  if (process.platform !== "win32") return ["python3", "python"];
+
+  const localAppData = String(process.env.LOCALAPPDATA || "").trim();
+  const installedPythonPaths = localAppData
+    ? ["Python312", "Python311", "Python310", "Python39"].map((folder) => (
+      path.join(localAppData, "Programs", "Python", folder, "python.exe")
+    ))
+    : [];
+
+  return [...installedPythonPaths, "py", "python", "python3"];
+}
+
 function loadEnvFile(filePath = ENV_FILE) {
   if (!fs.existsSync(filePath)) return;
 
@@ -123,13 +136,18 @@ function normalizePythonCandidates(config) {
     ? config.app.python_bin_candidates.filter(Boolean)
     : [];
   const configuredPython = String(config?.app?.python_bin || "").trim();
+  const platformDefaults = buildPlatformPythonDefaults();
+  const isGenericPythonCommand = ["python", "python3", "py"].includes(configuredPython.toLowerCase());
   if (configuredPython) {
     config.app.python_bin = configuredPython;
-    config.app.python_bin_candidates = Array.from(new Set([configuredPython, ...current]));
+    config.app.python_bin_candidates = Array.from(new Set(
+      isGenericPythonCommand
+        ? [...platformDefaults, configuredPython, ...current]
+        : [configuredPython, ...current, ...platformDefaults]
+    ));
     return config;
   }
 
-  const platformDefaults = process.platform === "win32" ? ["python", "python3"] : ["python3", "python"];
   config.app.python_bin_candidates = Array.from(new Set([...current, ...platformDefaults]));
   return config;
 }
@@ -165,4 +183,3 @@ module.exports = {
   loadConfig,
   getConfig,
 };
-
