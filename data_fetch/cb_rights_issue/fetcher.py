@@ -13,7 +13,7 @@ from data_fetch.cb_rights_issue.source import get_cb_rights_issue_source_snapsho
 def fetch_cb_rights_issue_snapshot() -> dict:
     """抓取可转债抢权配售固定来源快照。"""
 
-    return get_cb_rights_issue_source_snapshot()
+    return get_cb_rights_issue_source_snapshot(allow_inline_history_hydrate=False)
 
 
 def sync_cb_rights_issue_stock_history_snapshot(*, force_full: bool = False) -> dict:

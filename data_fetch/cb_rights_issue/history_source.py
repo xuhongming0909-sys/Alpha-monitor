@@ -58,9 +58,9 @@ def _extract_hist_rows(frame: pd.DataFrame) -> List[Dict[str, Any]]:
         return []
 
     rows: List[Dict[str, Any]] = []
-    for _, record in frame.iterrows():
-        trade_date = pd.to_datetime(record.get(date_col), errors="coerce")
-        close = pd.to_numeric(pd.Series([record.get(close_col)]), errors="coerce").iloc[0]
+    dates = pd.to_datetime(frame[date_col], errors="coerce")
+    closes = pd.to_numeric(frame[close_col], errors="coerce")
+    for trade_date, close in zip(dates.tolist(), closes.tolist()):
         if pd.isna(trade_date) or pd.isna(close):
             continue
         close_value = float(close)

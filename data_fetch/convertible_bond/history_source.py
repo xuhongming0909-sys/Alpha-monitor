@@ -93,17 +93,23 @@ def _extract_rows_from_frame(frame: pd.DataFrame, *, include_amount: bool) -> Li
         return []
 
     rows: List[Dict[str, Any]] = []
-    for _, record in frame.iterrows():
-        trade_date = pd.to_datetime(record.get(date_col), errors="coerce")
-        close = pd.to_numeric(pd.Series([record.get(close_col)]), errors="coerce").iloc[0]
+    dates = pd.to_datetime(frame[date_col], errors="coerce")
+    closes = pd.to_numeric(frame[close_col], errors="coerce")
+    highs = pd.to_numeric(frame[high_col], errors="coerce") if high_col else [None] * len(frame)
+    lows = pd.to_numeric(frame[low_col], errors="coerce") if low_col else [None] * len(frame)
+    amounts = pd.to_numeric(frame[amount_col], errors="coerce") if amount_col and include_amount else [None] * len(frame)
+    for trade_date, close, high, low, amount in zip(
+        dates.tolist(),
+        closes.tolist(),
+        highs.tolist() if hasattr(highs, "tolist") else highs,
+        lows.tolist() if hasattr(lows, "tolist") else lows,
+        amounts.tolist() if hasattr(amounts, "tolist") else amounts,
+    ):
         if pd.isna(trade_date) or pd.isna(close):
             continue
         close_val = float(close)
         if close_val <= 0:
             continue
-        high = pd.to_numeric(pd.Series([record.get(high_col)]), errors="coerce").iloc[0] if high_col else None
-        low = pd.to_numeric(pd.Series([record.get(low_col)]), errors="coerce").iloc[0] if low_col else None
-        amount = pd.to_numeric(pd.Series([record.get(amount_col)]), errors="coerce").iloc[0] if amount_col and include_amount else None
         rows.append({
             "date": trade_date.date().isoformat(),
             "close": close_val,

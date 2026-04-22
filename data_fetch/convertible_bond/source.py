@@ -54,6 +54,18 @@ FORCE_REDEEM_NOTICE_LOOKBACK_DAYS = 120
 FORCE_REDEEM_DELIST_FORWARD_DAYS = 120
 EASTMONEY_QUOTE_URL = "https://push2.eastmoney.com/api/qt/ulist.np/get"
 MARKET_VALUE_TIMEOUT_SECONDS = 20
+STOCK_SPOT_CACHE_TTL_MS = max(60_000, int(_CB_FETCH_CONFIG.get("spot_cache_ttl_ms") or 180_000))
+INLINE_HISTORY_HYDRATE_ENABLED = bool(_CB_FETCH_CONFIG.get("inline_history_hydrate_enabled", False))
+
+
+_STOCK_SPOT_CACHE: Dict[str, Any] = {
+    "expiresAt": 0,
+    "data": {},
+}
+
+
+def _now_ts_ms() -> int:
+    return int(datetime.now().timestamp() * 1000)
 
 
 def _blank_volatility_metrics() -> Dict[str, Optional[float]]:
@@ -219,11 +231,12 @@ def _load_stock_market_value_map(stock_codes: list[str]) -> Dict[str, Optional[f
         if not code_col or not market_value_col:
             continue
 
-        for _, series in df.iterrows():
-            code = _to_code6(series.get(code_col))
+        records = df[[code_col, market_value_col]].to_dict("records")
+        for record in records:
+            code = _to_code6(record.get(code_col))
             if not code or code not in target_codes:
                 continue
-            market_value_yi = _normalize_market_value_to_yi(series.get(market_value_col))
+            market_value_yi = _normalize_market_value_to_yi(record.get(market_value_col))
             if market_value_yi is not None:
                 result[code] = market_value_yi
         if result:
@@ -529,20 +542,29 @@ def _extract_hfq_rows(frame: pd.DataFrame, *, include_amount: bool) -> list[Dict
         return []
 
     rows: list[Dict[str, Any]] = []
-    for _, record in frame.iterrows():
-        trade_date = pd.to_datetime(record.get(date_col), errors="coerce")
-        close = _to_float(record.get(close_col))
-        if pd.isna(trade_date) or close is None or close <= 0:
+    dates = pd.to_datetime(frame[date_col], errors="coerce")
+    closes = pd.to_numeric(frame[close_col], errors="coerce")
+    highs = pd.to_numeric(frame[high_col], errors="coerce") if high_col else [None] * len(frame)
+    lows = pd.to_numeric(frame[low_col], errors="coerce") if low_col else [None] * len(frame)
+    amounts = pd.to_numeric(frame[amount_col], errors="coerce") if amount_col and include_amount else [None] * len(frame)
+    for trade_date, close, high, low, amount in zip(
+        dates.tolist(),
+        closes.tolist(),
+        highs.tolist() if hasattr(highs, "tolist") else highs,
+        lows.tolist() if hasattr(lows, "tolist") else lows,
+        amounts.tolist() if hasattr(amounts, "tolist") else amounts,
+    ):
+        if pd.isna(trade_date) or pd.isna(close):
             continue
-        high = _to_positive_float(record.get(high_col)) if high_col else None
-        low = _to_positive_float(record.get(low_col)) if low_col else None
-        amount = _to_float(record.get(amount_col)) if amount_col and include_amount else None
+        close_value = float(close)
+        if close_value <= 0:
+            continue
         rows.append({
             "date": trade_date.date().isoformat(),
-            "close": close,
-            "high": high,
-            "low": low,
-            "amount": amount if amount is not None and amount >= 0 else None,
+            "close": close_value,
+            "high": float(high) if high is not None and not pd.isna(high) and float(high) > 0 else None,
+            "low": float(low) if low is not None and not pd.isna(low) and float(low) > 0 else None,
+            "amount": float(amount) if amount is not None and not pd.isna(amount) and float(amount) >= 0 else None,
         })
     return rows
 
@@ -1038,23 +1060,24 @@ def _build_cov_realtime_map() -> Dict[str, Dict[str, Any]]:
         return {}
 
     result: Dict[str, Dict[str, Any]] = {}
-    for _, series in df.iterrows():
-        symbol = str(series.get("symbol") or "").strip().lower()
+    records = df.to_dict("records")
+    for record in records:
+        symbol = str(record.get("symbol") or "").strip().lower()
         if not symbol.startswith(("sh", "sz")):
             continue
-        code = _to_code6(series.get("code"))
+        code = _to_code6(record.get("code"))
         if not code:
             continue
-        amount = _to_float(series.get("amount"))
-        volume = _to_float(series.get("volume"))
+        amount = _to_float(record.get("amount"))
+        volume = _to_float(record.get("volume"))
         result[code] = {
-            "bondName": str(series.get("name") or "").strip() or None,
-            "price": _to_float(series.get("trade")),
-            "changePercent": _to_float(series.get("changepercent")),
-            "priceChange": _to_float(series.get("pricechange")),
+            "bondName": str(record.get("name") or "").strip() or None,
+            "price": _to_float(record.get("trade")),
+            "changePercent": _to_float(record.get("changepercent")),
+            "priceChange": _to_float(record.get("pricechange")),
             "turnoverAmountYi": (amount / 1e8) if amount is not None else None,
             "volumeWanShou": (volume / 1e4) if volume is not None else None,
-            "tickTime": str(series.get("ticktime") or "").strip() or None,
+            "tickTime": str(record.get("ticktime") or "").strip() or None,
             "source": "sina_cov_spot",
         }
     return result
@@ -1090,22 +1113,23 @@ def _build_cov_quote_map() -> Dict[str, Dict[str, Any]]:
     price_col = pick_col(["\u503a\u73b0\u4ef7", "\u73b0\u4ef7", "\u6700\u65b0\u4ef7", "price", "bond_price"])
 
     result: Dict[str, Dict[str, Any]] = {}
-    for _, series in df.iterrows():
-        code = _to_code6(series.get(code_col))
+    records = df.to_dict("records")
+    for record in records:
+        code = _to_code6(record.get(code_col))
         if not code:
             continue
         result[code] = {
-            "bondName": str(series.get(bond_name_col) or "").strip() or None if bond_name_col else None,
-            "stockCode": _to_code6(series.get(stock_code_col)) if stock_code_col else None,
-            "stockName": str(series.get(stock_name_col) or "").strip() or None if stock_name_col else None,
-            "stockPrice": _to_float(series.get(stock_price_col)) if stock_price_col else None,
-            "convertPrice": _to_float(series.get(convert_price_col)) if convert_price_col else None,
-            "convertValue": _to_float(series.get(convert_value_col)) if convert_value_col else None,
-            "premiumRate": _to_float(series.get(premium_rate_col)) if premium_rate_col else None,
-            "rating": str(series.get(rating_col) or "").strip() or None if rating_col else None,
-            "listingDate": _to_date_str(series.get(listing_date_col)) if listing_date_col else None,
-            "issueScaleYi": _to_positive_float(series.get(issue_scale_col)) if issue_scale_col else None,
-            "price": _to_float(series.get(price_col)) if price_col else None,
+            "bondName": str(record.get(bond_name_col) or "").strip() or None if bond_name_col else None,
+            "stockCode": _to_code6(record.get(stock_code_col)) if stock_code_col else None,
+            "stockName": str(record.get(stock_name_col) or "").strip() or None if stock_name_col else None,
+            "stockPrice": _to_float(record.get(stock_price_col)) if stock_price_col else None,
+            "convertPrice": _to_float(record.get(convert_price_col)) if convert_price_col else None,
+            "convertValue": _to_float(record.get(convert_value_col)) if convert_value_col else None,
+            "premiumRate": _to_float(record.get(premium_rate_col)) if premium_rate_col else None,
+            "rating": str(record.get(rating_col) or "").strip() or None if rating_col else None,
+            "listingDate": _to_date_str(record.get(listing_date_col)) if listing_date_col else None,
+            "issueScaleYi": _to_positive_float(record.get(issue_scale_col)) if issue_scale_col else None,
+            "price": _to_float(record.get(price_col)) if price_col else None,
         }
     return result
 
@@ -1135,13 +1159,14 @@ def _build_cb_jsl_map(cookie: str = "") -> Dict[str, Dict[str, Any]]:
     remaining_years_col = pick_col(["剩余年限", "year_left"])
 
     result: Dict[str, Dict[str, Any]] = {}
-    for _, series in df.iterrows():
-        code = _to_code6(series.get(code_col))
+    records = df.to_dict("records")
+    for record in records:
+        code = _to_code6(record.get(code_col))
         if not code:
             continue
         result[code] = {
-            "yieldToMaturityPretax": _to_float(series.get(ytm_col)) if ytm_col else None,
-            "remainingYears": _to_float(series.get(remaining_years_col)) if remaining_years_col else None,
+            "yieldToMaturityPretax": _to_float(record.get(ytm_col)) if ytm_col else None,
+            "remainingYears": _to_float(record.get(remaining_years_col)) if remaining_years_col else None,
         }
     return result
 
@@ -1245,21 +1270,27 @@ def _build_ths_cov_info_map() -> Dict[str, Dict[str, Any]]:
         return {}
 
     result: Dict[str, Dict[str, Any]] = {}
-    for _, series in df.iterrows():
-        code = str(series.get(code_col) or "").strip()
+    records = df.to_dict("records")
+    for record in records:
+        code = str(record.get(code_col) or "").strip()
         if not code:
             continue
         result[code] = {
-            "listingDate": _to_date_str(series.get(listing_col)) if listing_col in df.columns else None,
-            "maturityDate": _to_date_str(series.get(maturity_col)) if maturity_col in df.columns else None,
-            "stockCode": _to_code6(series.get(stock_code_col)) if stock_code_col in df.columns else None,
-            "stockName": (str(series.get(stock_name_col) or "").strip() or None) if stock_name_col in df.columns else None,
-            "convertPrice": _to_positive_float(series.get(convert_price_col)) if convert_price_col in df.columns else None,
+            "listingDate": _to_date_str(record.get(listing_col)) if listing_col in df.columns else None,
+            "maturityDate": _to_date_str(record.get(maturity_col)) if maturity_col in df.columns else None,
+            "stockCode": _to_code6(record.get(stock_code_col)) if stock_code_col in df.columns else None,
+            "stockName": (str(record.get(stock_name_col) or "").strip() or None) if stock_name_col in df.columns else None,
+            "convertPrice": _to_positive_float(record.get(convert_price_col)) if convert_price_col in df.columns else None,
         }
     return result
 
 
-def _build_stock_spot_map_from_a_spot() -> Dict[str, Dict[str, Optional[float]]]:
+def _build_stock_spot_map_from_a_spot(force_refresh: bool = False) -> Dict[str, Dict[str, Optional[float]]]:
+    now_ts = _now_ts_ms()
+    cached = _STOCK_SPOT_CACHE.get("data")
+    expires_at = int(_STOCK_SPOT_CACHE.get("expiresAt") or 0)
+    if not force_refresh and isinstance(cached, dict) and cached and now_ts < expires_at:
+        return cached
     for fetcher in (getattr(ak, "stock_zh_a_spot_em", None), getattr(ak, "stock_zh_a_spot", None)):
         if fetcher is None:
             continue
@@ -1292,15 +1323,18 @@ def _build_stock_spot_map_from_a_spot() -> Dict[str, Dict[str, Optional[float]]]
             continue
 
         result: Dict[str, Dict[str, Optional[float]]] = {}
-        for _, series in df.iterrows():
-            code = _to_code6(series.get(code_col))
+        records = df.to_dict("records")
+        for record in records:
+            code = _to_code6(record.get(code_col))
             if not code:
                 continue
             result[code] = {
-                "price": _to_float(series.get(price_col)) if price_col else None,
-                "changePercent": _to_float(series.get(change_col)) if change_col else None,
+                "price": _to_float(record.get(price_col)) if price_col else None,
+                "changePercent": _to_float(record.get(change_col)) if change_col else None,
             }
         if result:
+            _STOCK_SPOT_CACHE["data"] = result
+            _STOCK_SPOT_CACHE["expiresAt"] = now_ts + STOCK_SPOT_CACHE_TTL_MS
             return result
 
     return {}
@@ -1631,7 +1665,7 @@ def _resolve_redeem_trigger_price(row: Dict[str, Any]) -> tuple[Optional[float],
     return None, "missing"
 
 
-def get_bond_cb_data() -> Dict[str, Any]:
+def get_bond_cb_data(allow_inline_history_hydrate: bool = False) -> Dict[str, Any]:
     now = datetime.now()
     now_iso = now.isoformat()
     jisilu_cookie = _load_jisilu_cookie()
@@ -2023,19 +2057,17 @@ def get_bond_cb_data() -> Dict[str, Any]:
 
     unique_missing_stocks = sorted(set(code for code in missing_stock_codes if code))
     if unique_missing_stocks:
-        ready_stock_metric_count = sum(
-            1
-            for metrics in vol_cache_items.values()
-            if _metrics_ready(metrics)
-        )
-        hydrate_targets = unique_missing_stocks
-        # 当 250 日历史就绪覆盖率异常偏低时，说明历史库仍停留在旧窗口阶段；
-        # 这里直接做一次真实补数，避免普通读链路整批退化成理论价/波动率全空。
-        if ready_stock_metric_count > 10 and len(unique_missing_stocks) > INLINE_HISTORY_HYDRATE_LIMIT:
-            hydrate_targets = unique_missing_stocks[:INLINE_HISTORY_HYDRATE_LIMIT]
-        if hydrate_targets:
-            _hydrate_stock_history_for_symbols(hydrate_targets)
-        # 普通读链路优先复用已有历史库；若 250 日样本明显缺失，则对缺口标的做最小真实补数。
+        if allow_inline_history_hydrate or INLINE_HISTORY_HYDRATE_ENABLED:
+            ready_stock_metric_count = sum(
+                1
+                for metrics in vol_cache_items.values()
+                if _metrics_ready(metrics)
+            )
+            hydrate_targets = unique_missing_stocks
+            if ready_stock_metric_count > 10 and len(unique_missing_stocks) > INLINE_HISTORY_HYDRATE_LIMIT:
+                hydrate_targets = unique_missing_stocks[:INLINE_HISTORY_HYDRATE_LIMIT]
+            if hydrate_targets:
+                _hydrate_stock_history_for_symbols(hydrate_targets)
         with ThreadPoolExecutor(max_workers=min(MAX_VOL_SYNC_WORKERS, max(1, len(unique_missing_stocks)))) as executor:
             future_map = {
                 executor.submit(_calc_stock_history_metrics, code): code

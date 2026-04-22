@@ -237,7 +237,9 @@ data_fetch:
       stock_history_retention_rows: 320
       max_vol_sync_workers: 8
       max_financial_workers: 10
+      inline_history_hydrate_enabled: false
       inline_history_hydrate_limit: 24
+      spot_cache_ttl_ms: 180000
       jisilu_cookie: "${JISILU_COOKIE}"
     custom_monitor:
       intraday: true
@@ -252,6 +254,7 @@ data_fetch:
       history_lookback_days: 540
       stock_history_retention_rows: 320
       max_history_sync_workers: 8
+      inline_history_hydrate_enabled: false
       inline_history_hydrate_limit: 12
       source_page_url: "https://www.jisilu.cn/web/data/cb/pre"
       source_api_url: "https://www.jisilu.cn/webapi/cb/pre/"

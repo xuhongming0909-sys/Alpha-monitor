@@ -6,6 +6,7 @@
  */
 
 const fs = require("fs");
+const path = require("path");
 const { ensureDir } = require("../paths/node_paths");
 
 function cloneFallback(value) {
@@ -28,8 +29,12 @@ function readJson(filePath, fallbackValue = null) {
 
 function writeJson(filePath, data, options = {}) {
   const spaces = Number.isFinite(Number(options.spaces)) ? Number(options.spaces) : 2;
-  ensureDir(require("path").dirname(filePath));
-  fs.writeFileSync(filePath, JSON.stringify(data, null, spaces), "utf8");
+  const dirPath = path.dirname(filePath);
+  ensureDir(dirPath);
+  const payload = JSON.stringify(data, null, spaces);
+  const tempPath = path.join(dirPath, `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`);
+  fs.writeFileSync(tempPath, payload, "utf8");
+  fs.renameSync(tempPath, filePath);
   return data;
 }
 

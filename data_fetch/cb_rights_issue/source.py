@@ -35,6 +35,7 @@ SOURCE_REFERER = str(_FETCH_CONFIG.get("source_referer") or SOURCE_PAGE_URL).str
 SOURCE_TITLE = str(_FETCH_CONFIG.get("source_title") or "集思录可转债预案").strip()
 EASTMONEY_QUOTE_URL = "https://push2.eastmoney.com/api/qt/ulist.np/get"
 REQUEST_TIMEOUT_MS = max(5000, int(_FETCH_CONFIG.get("request_timeout_ms") or 20000))
+INLINE_HISTORY_HYDRATE_ENABLED = bool(_FETCH_CONFIG.get("inline_history_hydrate_enabled", False))
 INLINE_HISTORY_HYDRATE_LIMIT = max(1, int(_FETCH_CONFIG.get("inline_history_hydrate_limit") or 12))
 ACTIVE_VOL_WINDOW = 250
 VOLATILITY_FIELD = f"volatility{ACTIVE_VOL_WINDOW}"
@@ -201,11 +202,12 @@ def _load_stock_market_value_map(stock_codes: Iterable[str]) -> Dict[str, Option
         if not code_col or not market_value_col:
             continue
 
-        for _, series in df.iterrows():
-            code = normalize_stock_code(series.get(code_col))
+        records = df[[code_col, market_value_col]].to_dict("records")
+        for record in records:
+            code = normalize_stock_code(record.get(code_col))
             if not code or code not in target_codes:
                 continue
-            market_value_yi = _normalize_market_value_to_yi(series.get(market_value_col))
+            market_value_yi = _normalize_market_value_to_yi(record.get(market_value_col))
             if market_value_yi is not None:
                 result[code] = market_value_yi
         if result:
@@ -247,7 +249,7 @@ def _load_history_metrics(stock_codes: Iterable[str]) -> Dict[str, Dict[str, Any
     return metrics
 
 
-def _hydrate_missing_history(metrics: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+def _hydrate_missing_history(metrics: Dict[str, Dict[str, Any]], *, allow_inline_history_hydrate: bool = False) -> Dict[str, Any]:
     missing = [
         code
         for code, item in metrics.items()
@@ -255,6 +257,8 @@ def _hydrate_missing_history(metrics: Dict[str, Dict[str, Any]]) -> Dict[str, An
     ]
     if not missing:
         return {"requested": 0, "success": True}
+    if not (allow_inline_history_hydrate or INLINE_HISTORY_HYDRATE_ENABLED):
+        return {"requested": len(missing), "success": False, "skipped": "inline_hydrate_disabled"}
     if len(missing) > INLINE_HISTORY_HYDRATE_LIMIT:
         return {"requested": len(missing), "success": False, "skipped": "over_inline_limit"}
 
@@ -299,7 +303,7 @@ def _load_trade_calendar_dates() -> List[str]:
     return sorted({item for item in dates if item})
 
 
-def get_cb_rights_issue_source_snapshot() -> Dict[str, Any]:
+def get_cb_rights_issue_source_snapshot(*, allow_inline_history_hydrate: bool = False) -> Dict[str, Any]:
     """抓取固定来源，并补充实时价、国债收益率、流通市值和交易日历。"""
 
     try:
@@ -319,7 +323,7 @@ def get_cb_rights_issue_source_snapshot() -> Dict[str, Any]:
         if normalize_stock_code(item.get("stock_id"))
     })
     history_metrics = _load_history_metrics(stock_codes)
-    hydrate_stats = _hydrate_missing_history(history_metrics)
+    hydrate_stats = _hydrate_missing_history(history_metrics, allow_inline_history_hydrate=allow_inline_history_hydrate)
     if hydrate_stats.get("success"):
         history_metrics = _load_history_metrics(stock_codes)
 

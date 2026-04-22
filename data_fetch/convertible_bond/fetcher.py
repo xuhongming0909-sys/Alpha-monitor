@@ -12,5 +12,5 @@ from data_fetch.convertible_bond.source import get_bond_cb_data
 def fetch_convertible_bond_snapshot() -> dict:
     """抓取convertible_bond实时套利数据。"""
 
-    return get_bond_cb_data()
+    return get_bond_cb_data(allow_inline_history_hydrate=False)
 
