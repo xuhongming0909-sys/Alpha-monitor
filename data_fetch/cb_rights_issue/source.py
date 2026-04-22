@@ -148,7 +148,7 @@ def _load_stock_market_value_map_from_eastmoney(stock_codes: Iterable[str]) -> D
                 params={
                     "fltt": "2",
                     "invt": "2",
-                    "fields": "f12,f20",
+                    "fields": "f12,f21",
                     "secids": ",".join(secids),
                 },
                 headers={
@@ -167,7 +167,7 @@ def _load_stock_market_value_map_from_eastmoney(stock_codes: Iterable[str]) -> D
             code = normalize_stock_code(item.get("f12"))
             if not code:
                 continue
-            market_value_yi = _normalize_market_value_to_yi(item.get("f20"))
+            market_value_yi = _normalize_market_value_to_yi(item.get("f21"))
             if market_value_yi is not None:
                 result[code] = market_value_yi
     return result
@@ -193,7 +193,7 @@ def _load_stock_market_value_map(stock_codes: Iterable[str]) -> Dict[str, Option
         market_value_col = next(
             (
                 name
-                for name in ("总市值", "总市值(元)", "market_value", "marketValue")
+                for name in ("流通市值", "流通市值(元)", "circulating_market_value", "circulatingMarketValue")
                 if name in df.columns
             ),
             None,
@@ -300,7 +300,7 @@ def _load_trade_calendar_dates() -> List[str]:
 
 
 def get_cb_rights_issue_source_snapshot() -> Dict[str, Any]:
-    """抓取固定来源，并补充实时价、国债收益率、总市值和交易日历。"""
+    """抓取固定来源，并补充实时价、国债收益率、流通市值和交易日历。"""
 
     try:
         raw_rows = fetch_fixed_source_rows()

@@ -166,7 +166,7 @@ def _load_stock_market_value_map_from_eastmoney(stock_codes: list[str]) -> Dict[
                 params={
                     "fltt": "2",
                     "invt": "2",
-                    "fields": "f12,f20",
+                    "fields": "f12,f21",
                     "secids": ",".join(secids),
                 },
                 headers={
@@ -185,7 +185,7 @@ def _load_stock_market_value_map_from_eastmoney(stock_codes: list[str]) -> Dict[
             code = _to_code6(item.get("f12"))
             if not code:
                 continue
-            market_value_yi = _normalize_market_value_to_yi(item.get("f20"))
+            market_value_yi = _normalize_market_value_to_yi(item.get("f21"))
             if market_value_yi is not None:
                 result[code] = market_value_yi
     return result
@@ -211,7 +211,7 @@ def _load_stock_market_value_map(stock_codes: list[str]) -> Dict[str, Optional[f
         market_value_col = next(
             (
                 name
-                for name in ("总市值", "总市值(元)", "market_value", "marketValue")
+                for name in ("流通市值", "流通市值(元)", "circulating_market_value", "circulatingMarketValue")
                 if name in df.columns
             ),
             None,

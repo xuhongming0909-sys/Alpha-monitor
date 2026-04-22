@@ -227,11 +227,27 @@ test("discount markdown uses new metric fields and force-redeem wording", () => 
     generatedAtText: "2026-04-22 14:50:00",
   });
 
-  assert.match(markdown, /转债市值比 0\.080/);
-  assert.match(markdown, /折价ATR比 1\.520/);
+  assert.match(markdown, /转债市值比 8\.000%/);
+  assert.match(markdown, /折价ATR比 152\.000%/);
   assert.match(markdown, /非强赎/);
   assert.doesNotMatch(markdown, /加权折价/);
   assert.doesNotMatch(markdown, /ATR系数/);
+});
+
+test("market value sources explicitly prefer float market value for cb arbitrage and rights issue", () => {
+  const cbSourcePath = path.resolve(__dirname, "..", "data_fetch", "convertible_bond", "source.py");
+  const cbSourceText = fs.readFileSync(cbSourcePath, "utf8");
+  assert.match(cbSourceText, /"fields":\s*"f12,f21"/);
+  assert.match(cbSourceText, /item\.get\("f21"\)/);
+  assert.match(cbSourceText, /"流通市值"/);
+  assert.doesNotMatch(cbSourceText, /for name in \("总市值", "总市值\(元\)", "market_value", "marketValue"\)/);
+
+  const rightsIssueSourcePath = path.resolve(__dirname, "..", "data_fetch", "cb_rights_issue", "source.py");
+  const rightsIssueSourceText = fs.readFileSync(rightsIssueSourcePath, "utf8");
+  assert.match(rightsIssueSourceText, /"fields":\s*"f12,f21"/);
+  assert.match(rightsIssueSourceText, /item\.get\("f21"\)/);
+  assert.match(rightsIssueSourceText, /"流通市值"/);
+  assert.doesNotMatch(rightsIssueSourceText, /for name in \("总市值", "总市值\(元\)", "market_value", "marketValue"\)/);
 });
 
 test("summary markdown keeps only the five required sections in the required order", () => {

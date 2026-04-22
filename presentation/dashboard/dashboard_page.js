@@ -3121,8 +3121,8 @@ function buildConvertibleColumns() {
       defaultDir: 'asc',
       sortValue: (row) => toNumber(row.bondToStockMarketValueRatio),
       render: (row) => renderCompactCell(
-        formatNumber(row.bondToStockMarketValueRatio, 3),
-        [`剩余规模 ${formatNumber(row.remainingSizeYi, 2)}亿 / 正股市值 ${formatNumber(row.stockMarketValueYi, 2)}亿`]
+        formatRatioPercent(row.bondToStockMarketValueRatio, 3),
+        [`剩余规模 ${formatNumber(row.remainingSizeYi, 2)}亿 / 正股流通市值 ${formatNumber(row.stockMarketValueYi, 2)}亿`]
       ),
     },
     {
@@ -3135,7 +3135,7 @@ function buildConvertibleColumns() {
       defaultDir: 'desc',
       sortValue: (row) => toNumber(row.discountAtrRatio),
       render: (row) => renderCompactCell(
-        formatNumber(row.discountAtrRatio, 3),
+        formatRatioPercent(row.discountAtrRatio, 3),
         [`ATR% ${formatPercent(row.stockAtr20Pct, 2)}`]
       ),
     },
@@ -3368,7 +3368,7 @@ function renderConvertibleBondPanel() {
       premiumMonitorItems.length
         ? premiumMonitorItems.map((row) => ({
           title: `${row.bondName || "--"}`.trim(),
-          subtitle: `转债市值比 ${formatNumber(row.bondToStockMarketValueRatio, 3)} / 折价ATR比 ${formatNumber(row.discountAtrRatio, 3)} / 转债代码 ${row.code || "--"}`,
+          subtitle: `转债市值比 ${formatRatioPercent(row.bondToStockMarketValueRatio, 3)} / 折价ATR比 ${formatRatioPercent(row.discountAtrRatio, 3)} / 转债代码 ${row.code || "--"}`,
           value: formatPercent(row.premiumRate, 2),
           valueClass: statusClass(row.premiumRate),
         }))
@@ -3760,7 +3760,7 @@ function buildCbRightsIssueColumns(options = {}) {
     { key: 'progressName', label: '方案进展', sortable: true, sortType: 'text', defaultDir: 'asc', sortValue: (row) => String(row.progressName || ''), render: (row) => escapeHtml(row.progressName || '--') },
     { key: 'progressDate', label: '进展公告日', columnClassName: 'col-date', sortable: true, sortType: 'date', defaultDir: 'desc', sortValue: (row) => normalizeDateKey(row.progressDate), render: (row) => escapeHtml(formatDateOnly(row.progressDate)) },
     { key: 'issueScaleYi', label: '发行规模', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.issueScaleYi), render: (row) => toNumber(row.issueScaleYi) === null ? '--' : `${formatNumber(row.issueScaleYi, 2)}亿` },
-    { key: 'stockMarketValueYi', label: '总市值', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.stockMarketValueYi), render: (row) => toNumber(row.stockMarketValueYi) === null ? '--' : `${formatNumber(row.stockMarketValueYi, 2)}亿` },
+    { key: 'stockMarketValueYi', label: '流通市值', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.stockMarketValueYi), render: (row) => toNumber(row.stockMarketValueYi) === null ? '--' : `${formatNumber(row.stockMarketValueYi, 2)}亿` },
     { key: 'issueRatio', label: '发行比例', columnClassName: 'col-percent', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.issueRatio), render: (row) => formatRatioPercent(row.issueRatio, 2) },
     { key: 'rawRequiredShares', label: '原始所需股数', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.rawRequiredShares), render: (row) => formatNumber(row.rawRequiredShares, 2) },
     { key: 'placementShares', label: '配售股数', columnClassName: 'col-num', sortable: true, sortType: 'number', defaultDir: 'desc', sortValue: (row) => toNumber(row.placementShares), render: (row) => formatNumber(row.placementShares, 2) },

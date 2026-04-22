@@ -18,7 +18,7 @@ function pctText(value, digits = 2) {
 
 function ratioText(value, digits = 3) {
   const num = toNum(value);
-  return num === null ? "--" : num.toFixed(digits);
+  return num === null ? "--" : `${(num * 100).toFixed(digits)}%`;
 }
 
 function buildForceRedeemText(item) {
