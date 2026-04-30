@@ -39,6 +39,10 @@ function createCustomMonitorRuntimeService(options = {}) {
 
   async function getAllMonitors(runtimeOptions = {}) {
     const monitors = loadMonitors();
+    if (!monitors.length) {
+      return [];
+    }
+
     const rateResult = await fetchExchangeRates();
     if (!rateResult?.success || !rateResult?.data) {
       throw new Error(rateResult?.error || "exchange_rate数据不可用，无法计算套利监控");
