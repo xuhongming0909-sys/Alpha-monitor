@@ -7,14 +7,18 @@
 
 ## Entries
 
-### 2026-04-30 | 项目Review修复（TDD）
+### 2026-04-30 | ES Module修复 + dashboard_page.js拆分
 
-- **Review发现**：根目录垃圾文件、data_fetch→scripts跨层导入、47个核心文件缺AI-SUMMARY、缺presentation/README.md
-- **Task 21**: 清理根目录垃圾文件 + 删除 strategy/aa_premium 空目录 → 新建 `tests/root_cleanliness.test.js`
-- **Task 20**: 修复跨层导入 — 4个数据库模块从 scripts/ 下沉到 shared/db/，更新7个data_fetch文件+3个scripts文件导入路径，删除 scripts/ 旧文件，更新架构测试识别 `from shared.db` 合法导入
-- **Task 19**: AI-SUMMARY覆盖率 — 批量给47个核心文件添加摘要（data_fetch/、strategy/、shared/、notification/、presentation/），新建 `tests/ai_summary_coverage.test.js`
-- **Task 18**: 创建 `presentation/README.md`（职责、API路由、React UI说明），新建 `tests/presentation_readme.test.js`
-- **Verification**: 全部13个测试通过 + `npm run ui:build` 通过 + `npm run check` 通过
+- **Decision**: 服务器启动失败，view_models和routes使用CommonJS但被当作ES Module加载
+- **Fix**: ui/routes/*.js → .cjs, ui/dashboard/*.js → .cjs, ui/view_models/*.js → .cjs
+- **Fix**: update start_server.js require paths to .cjs
+- **Fix**: config.yaml dashboard_entry路径从presentation改为ui/templates
+- **Fix**: tool_paths.py tools→scripts目录名修复，config.yaml C++注释→YAML
+- **Action**: 拆分 dashboard_page.js → constants.js（提取 UI 常量 ~200 行）
+- **Action**: 拆分 source.py → cb_metrics.py（提取计算密集型函数 ~570 行）
+- **Action**: 新建 server_config_loader.js（配置读取逻辑 ~300 行）
+- **Verification**: npm run check通过，npm run ui:build通过，health web:ok
+- **Updated**: INDEX.md §9.1、§9.2、§9.4 新增文件索引
 
 ### 2026-04-30 | 合并根目录 config.yaml → config/config.yaml
 
@@ -35,23 +39,6 @@
 - **Action**: `specs/react-terminal-ui.md` §4.1 更新概览页规格（打新置顶+机会筛选+转债表格三层结构）
 - **TDD**: RED → GREEN → REFACTOR（7步测试），新建 `tests/ui_overview_subscription_pin.test.js`
 - **Verification**: 全部6个UI测试通过，`npm run ui:build` 通过，`npm run check` 通过
-
-- Decision: 服务器启动失败，view_models和routes使用CommonJS但被当作ES Module加载
-- Fix: ui/routes/*.js → .cjs, ui/dashboard/*.js → .cjs, ui/view_models/*.js → .cjs
-- Fix: update start_server.js require paths to .cjs
-- Fix: config.yaml dashboard_entry路径从presentation改为ui/templates
-- Fix: tool_paths.py tools→scripts目录名修复，config.yaml C++注释→YAML
-- Verification: npm run check通过，npm run ui:build通过，health web:ok
-
-### 2026-04-30 | 大文件拆分完成
-
-- Decision: INDEX.md §9 规则要求代码文件不超过 1000 行，3 个文件超标
-- Action: 拆分 dashboard_page.js → constants.js（提取 UI 常量 ~200 行）
-- Action: 拆分 source.py → cb_metrics.py（提取计算密集型函数 ~570 行）
-- Action: 新建 server_config_loader.js（配置读取逻辑 ~300 行）
-- Verification: 所有文件语法检查通过，AI-SUMMARY 已添加
-- Updated: INDEX.md §9.1、§9.2、§9.4 新增文件索引
-- Next: start_server.js 尚未完全重构为使用 server_config_loader.js（依赖过多全局状态）
 
 ### 2026-04-30 | React UI 推送设置独立Tab + TDD工作流
 
@@ -117,16 +104,26 @@
 - Action: 更新 `presentation/README.md` — 补充 React UI 说明、/legacy 回滚、routes 细分，添加 specs/ 引用
 - Action: 更新 `notification/README.md` — 补充 4 条推送链路总览、目录结构，添加 specs/ 引用
 - Action: 更新 `shared/README.md` — 添加 specs/ 引用
-- Action: 修复 `config.yaml` C++ 风格注释（// → #），修复 YAML 解析错误
-- Verification: `npm run check` passes, `python3 tools/check_plugin_boundaries.py` passes
+- **Action**: 修复 `config.yaml` C++ 风格注释（// → #），修复 YAML 解析错误
+- **Verification**: `npm run check` passes, `python3 tools/check_plugin_boundaries.py` passes
 
 ### 2026-04-30 | React UI 模块补全（TDD）
 
-- Decision: 新版 React UI 功能覆盖不全，用 TDD 补全
-- Action: Phase 1 — 基础上线：`ui:build`/`ui:check`、`/legacy` 路由、`ui/dist` 静态服务
-- Action: Phase 2 — Tab 导航 + 8 模块详细表格（转债、AH、AB、LOF、打新、监控、分红）
-- Action: Phase 3 — 全局搜索 + 点击表头排序（useSort hook + SortableTh）
-- Action: 扩展 API fetch（subscriptions、dividend）
-- Verification: `npm run ui:build` 通过，4 个测试全部通过
-- Action: Phase 5 — 推送设置面板（推送时间、模块开关、Webhook/调度器/上次推送状态）
-- Next: 如需完整推送编辑保存功能（POST /api/push/config），可继续扩展
+- **Decision**: 新版 React UI 功能覆盖不全，用 TDD 补全
+- **Action**: Phase 1 — 基础上线：`ui:build`/`ui:check`、`/legacy` 路由、`ui/dist` 静态服务
+- **Action**: Phase 2 — Tab 导航 + 8 模块详细表格（转债、AH、AB、LOF、打新、监控、分红）
+- **Action**: Phase 3 — 全局搜索 + 点击表头排序（useSort hook + SortableTh）
+- **Action**: 扩展 API fetch（subscriptions、dividend）
+- **Verification**: `npm run ui:build` 通过，4 个测试全部通过
+- **Action**: Phase 5 — 推送设置面板（推送时间、模块开关、Webhook/调度器/上次推送状态）
+- **Next**: 如需完整推送编辑保存功能（POST /api/push/config），可继续扩展
+
+### 2026-04-30 | 修复页面崩溃 + 首屏加载优化
+
+- **Root cause**: `ConvertibleTable` 中三处未定义变量 — `discountCount`、`thDiscountCount`、`rightsCount` → JS运行时错误 → React渲染中断 → 页面卡死
+- **Fix**: 三处按钮计数改用 `.length` — `discountRows.length`、`theoreticalDiscountRows.length`、`riRows.length`
+- **Root cause 2**: `useDashboardData` 等全部 13 个接口返回后渲染，`subscriptions` 实时抓东方财富数据（6-12秒）→ 卡死整个页面
+- **Fix 2**: `subscriptions` 改为后台异步加载，12个快接口先渲染
+- **Result**: 加载时间 15s → 2s，0 错误
+- **Verification**: Playwright 验证 0 报错，`npm run ui:build` 通过
+- **Action**: 删除本地 debug 截图，`kill` 本地 node 进程，commit + push 到 `workflow-elodie`
