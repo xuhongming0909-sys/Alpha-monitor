@@ -198,7 +198,7 @@ function buildOpportunityRows(resources) {
     .sort((a, b) => (toNumber(a.premiumRate) ?? 999) - (toNumber(b.premiumRate) ?? 999))
     .slice(0, 8)
     .forEach((row) => rows.push({
-      source: '转债',
+      source: '转债套利',
       name: pickText(row.bondName, row.name),
       code: pickText(row.code, row.bondCode),
       metric: '溢价率',
@@ -406,7 +406,7 @@ function SearchBar({ value, onChange, count }) {
 function TabNav({ activeTab, onChange }) {
   const tabs = [
     { key: 'overview', label: '概览' },
-    { key: 'convertible', label: '转债' },
+    { key: 'convertible', label: '转债套利' },
     { key: 'ah', label: 'AH溢价' },
     { key: 'ab', label: 'AB溢价' },
     { key: 'lof', label: 'LOF套利' },
@@ -545,7 +545,7 @@ function SubscriptionTopSection({ data }) {
 function OpportunityCommandCenter({ opportunities, filter, onFilterChange }) {
   const filters = [
     { key: 'all', label: '全部' },
-    { key: '转债', label: '转债' },
+    { key: '转债套利', label: '转债套利' },
     { key: 'LOF', label: 'LOF' },
     { key: 'AH', label: 'AH' },
     { key: 'AB', label: 'AB' },
@@ -611,6 +611,7 @@ function OpportunityCommandCenter({ opportunities, filter, onFilterChange }) {
 function ConvertibleTable({ rows, smallRows, rightsIssueData, searchQuery }) {
   const [subTab, setSubTab] = React.useState('main');
   const { sortConfig, handleSort, sorted } = useSort();
+  const { page, setPage, paginate } = usePagination({ pageSize: 50 });
 
   function sortRows(list) {
     return sorted(list, (row, key) => {
@@ -622,13 +623,15 @@ function ConvertibleTable({ rows, smallRows, rightsIssueData, searchQuery }) {
       if (key === 'discountAtrRatio') return toNumber(row.discountAtrRatio);
       if (key === 'volatility250') return toNumber(row.volatility250);
       if (key === 'remainingYears') return toNumber(row.remainingYears);
+      if (key === 'stockMarketValueYi') return toNumber(row.stockMarketValueYi);
+      if (key === 'bondToStockMarketValueRatio') return toNumber(row.bondToStockMarketValueRatio);
       return toNumber(row[key]) ?? row[key];
     });
   }
 
   const baseFields = ['bondName', 'name', 'code', 'bondCode', 'stockName', 'aName', 'stockCode'];
   const filtered = rows.filter((r) => rowMatchesQuery(r, searchQuery, baseFields));
-  const visibleRows = sortRows(filtered).slice(0, 50);
+  const { rows: visibleRows, total, totalPages } = paginate(sortRows(filtered));
 
   const smallFiltered = (smallRows || []).filter((r) => rowMatchesQuery(r, searchQuery, baseFields));
   const smallVisible = sortRows(smallFiltered).slice(0, 50);
@@ -669,7 +672,12 @@ function ConvertibleTable({ rows, smallRows, rightsIssueData, searchQuery }) {
   // 主页/折价/理论折价 共用同一套渲染
   function renderMainTable(dataRows, title, eyebrow, extraFilter) {
     const shown = extraFilter ? dataRows.filter(extraFilter) : dataRows;
-    const vis = sortRows(shown).slice(0, 50);
+    const sortedData = sortRows(shown);
+    const vis = sortedData.slice(0, 50);
+    const safePage = page || 1;
+    const safeTotalPages = Math.max(1, Math.ceil(sortedData.length / 50));
+    const start = (safePage - 1) * 50;
+    const paginatedVis = sortedData.slice(start, start + 50);
     return (
       <section className="terminal-panel main-table-panel">
         <div className="panel-head compact-head">
@@ -680,29 +688,43 @@ function ConvertibleTable({ rows, smallRows, rightsIssueData, searchQuery }) {
           <table className="dense-table wide-table">
             <thead>
               <tr>
-                <th>转债</th>
+                <th>转债名称</th>
                 <th className="mono">代码</th>
-                <SortableTh label="转债价" sortKey="price" sortConfig={sortConfig} onSort={handleSort} className="num" />
-                <SortableTh label="涨跌" sortKey="changePercent" sortConfig={sortConfig} onSort={handleSort} className="num" />
-                <th>正股</th>
-                <SortableTh label="溢价率" sortKey="premiumRate" sortConfig={sortConfig} onSort={handleSort} className="num" />
+                <SortableTh label="转债价格" sortKey="price" sortConfig={sortConfig} onSort={handleSort} className="num" />
+                <SortableTh label="涨跌幅" sortKey="changePercent" sortConfig={sortConfig} onSort={handleSort} className="num" />
+                <th>正股名称</th>
+                <SortableTh label="正股价格" sortKey="stockPrice" sortConfig={sortConfig} onSort={handleSort} className="num" />
+                <SortableTh label="转股价格" sortKey="convertPrice" sortConfig={sortConfig} onSort={handleSort} className="num" />
+                <SortableTh label="转股价值" sortKey="convertValue" sortConfig={sortConfig} onSort={handleSort} className="num" />
+                <SortableTh label="转股溢价率" sortKey="premiumRate" sortConfig={sortConfig} onSort={handleSort} className="num" />
                 <SortableTh label="剩余规模" sortKey="remainingSizeYi" sortConfig={sortConfig} onSort={handleSort} className="num" />
                 <SortableTh label="正股流通市值" sortKey="stockMarketValueYi" sortConfig={sortConfig} onSort={handleSort} className="num" />
                 <th className="num muted" style={{ fontSize: '10px' }}>转债占比</th>
-                <th className="num muted" style={{ fontSize: '10px' }}>正股成交(万)</th>
-                <th className="num muted" style={{ fontSize: '10px' }}>成交占比</th>
-                <th>市场</th>
-                <th>强赎状态</th>
+                <SortableTh label="纯债价值" sortKey="pureBondValue" sortConfig={sortConfig} onSort={handleSort} className="num" />
+                <SortableTh label="波动率" sortKey="volatility250" sortConfig={sortConfig} onSort={handleSort} className="num" />
+                <SortableTh label="期权价值" sortKey="optionValue" sortConfig={sortConfig} onSort={handleSort} className="num" />
+                <SortableTh label="理论价值" sortKey="theoreticalPrice" sortConfig={sortConfig} onSort={handleSort} className="num" />
+                <SortableTh label="理论套利空间" sortKey="theoreticalPremiumRate" sortConfig={sortConfig} onSort={handleSort} className="num" />
                 <SortableTh label="到期日" sortKey="maturityDate" sortConfig={sortConfig} onSort={handleSort} />
+                <th>评级</th>
+                <th>强赎状态</th>
+                <th>转股状态</th>
               </tr>
             </thead>
             <tbody>
-              {vis.length ? vis.map((row, index) => {
-                const stockTurnover = toNumber(row.stockAvgTurnoverAmount20Yi);
+              {paginatedVis.length ? paginatedVis.map((row, index) => {
                 const stockMarketValueYi = toNumber(row.stockMarketValueYi);
                 const remainingSizeYi = toNumber(row.remainingSizeYi);
                 const bondToStockRatio = stockMarketValueYi > 0 && remainingSizeYi !== null ? remainingSizeYi / stockMarketValueYi : null;
-                const turnoverRatio = stockTurnover > 0 && remainingSizeYi !== null ? remainingSizeYi / stockTurnover : null;
+                const volatility = toNumber(row.volatility250) ?? toNumber(row.volatility60);
+                const convertStatus = (() => {
+                  const today = new Date().toISOString().slice(0, 10);
+                  if (row.isUnlisted || (row.delistDate && row.delistDate <= today)) return '已退市';
+                  if (row.isBeforeConvertStart || (row.convertStartDate && row.convertStartDate > today)) return '未到转股期';
+                  if (row.forceRedeemStatus && row.forceRedeemStatus.includes('强赎')) return '强赎中';
+                  if (row.maturityDate && row.maturityDate <= today) return '已到期';
+                  return '正常';
+                })();
                 return (
                   <tr key={`${row.code || row.bondCode || index}`}>
                     <td>{pickText(row.bondName, row.name)}</td>
@@ -710,23 +732,31 @@ function ConvertibleTable({ rows, smallRows, rightsIssueData, searchQuery }) {
                     <td className="num mono">{formatNumber(row.price)}</td>
                     <td className={`num mono ${signedClass(row.changePercent)}`}>{formatPercent(row.changePercent)}</td>
                     <td>{pickText(row.stockName, row.aName)}</td>
+                    <td className="num mono">{formatNumber(row.stockPrice)}</td>
+                    <td className="num mono">{formatNumber(row.convertPrice)}</td>
+                    <td className={`num mono ${signedClass(row.convertValue)}`}>{formatNumber(row.convertValue)}</td>
                     <td className={`num mono ${signedClass(row.premiumRate)}`}>{formatPercent(row.premiumRate)}</td>
                     <td className="num mono">{formatNumber(row.remainingSizeYi, '亿')}</td>
                     <td className="num mono">{stockMarketValueYi !== null ? formatNumber(stockMarketValueYi, '亿') : '--'}</td>
                     <td className="num mono muted">{bondToStockRatio !== null ? `${(bondToStockRatio * 100).toFixed(1)}%` : '--'}</td>
-                    <td className="num mono muted">{stockTurnover !== null ? formatNumber(stockTurnover) : '--'}</td>
-                    <td className="num mono muted">{turnoverRatio !== null ? `${(turnoverRatio * 100).toFixed(1)}%` : '--'}</td>
-                    <td className="muted">{pickText(row.boardType)}</td>
-                    <td className="muted">{pickText(row.forceRedeemStatus)}</td>
+                    <td className="num mono">{row.pureBondValue != null ? Number(row.pureBondValue).toFixed(2) : '--'}</td>
+                    <td className="num mono">{volatility !== null ? `${(volatility * 100).toFixed(2)}%` : '--'}</td>
+                    <td className="num mono">{row.optionValue != null ? Number(row.optionValue).toFixed(2) : '--'}</td>
+                    <td className="num mono">{row.theoreticalPrice != null ? Number(row.theoreticalPrice).toFixed(2) : '--'}</td>
+                    <td className={`num mono ${signedClass(row.theoreticalPremiumRate)}`}>{formatPercent(row.theoreticalPremiumRate)}</td>
                     <td className="mono">{row.maturityDate || '--'}</td>
+                    <td className="muted">{pickText(row.rating)}</td>
+                    <td className="muted">{pickText(row.forceRedeemStatus)}</td>
+                    <td className="muted">{convertStatus}</td>
                   </tr>
                 );
               }) : (
-                <tr><td colSpan="14" className="empty-cell">暂无数据</td></tr>
+                <tr><td colSpan="21" className="empty-cell">暂无数据</td></tr>
               )}
             </tbody>
           </table>
         </div>
+        <Pagination page={safePage} totalPages={safeTotalPages} total={sortedData.length} onChange={setPage} />
       </section>
     );
   }

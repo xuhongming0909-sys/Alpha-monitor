@@ -20,6 +20,18 @@
 - **Verification**: npm run check通过，npm run ui:build通过，health web:ok
 - **Updated**: INDEX.md §9.1、§9.2、§9.4 新增文件索引
 
+### 2026-04-30 | 转债套利主页修复
+
+- **Task**: 修复转债套利标签页名称、数据列、缺失字段、波动率显示、分页
+- **Changes**:
+  - Tab 标签: `转债` → `转债套利`
+  - 主表列重排为20列: 转债名称/价格/涨跌幅、正股名称/价格、转股价格/价值/溢价率、剩余规模/正股流通市值/转债占比、纯债价值/波动率/期权价值/理论价值/理论套利空间、到期日/评级/强赎状态/转股状态
+  - 波动率显示修复: 原始值为年化小数(如0.225)，显示时×100并带%符号
+  - 分页: 每页50条，支持翻页
+  - 转股状态: 根据delistDate/convertStartDate/forceRedeemStatus/maturityDate推导
+- **Verification**: `npx esbuild src/App.jsx --bundle` 编译通过
+- **Files**: `ui/src/App.jsx`
+
 ### 2026-04-30 | 合并根目录 config.yaml → config/config.yaml
 
 - **Decision**: 用户质问两个 config.yaml 未合并，过渡期应结束
