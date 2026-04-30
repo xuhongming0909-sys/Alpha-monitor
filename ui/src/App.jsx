@@ -685,33 +685,24 @@ function ConvertibleTable({ rows, smallRows, rightsIssueData, searchQuery }) {
                 <SortableTh label="转债价" sortKey="price" sortConfig={sortConfig} onSort={handleSort} className="num" />
                 <SortableTh label="涨跌" sortKey="changePercent" sortConfig={sortConfig} onSort={handleSort} className="num" />
                 <th>正股</th>
-                <SortableTh label="正股价" sortKey="stockPrice" sortConfig={sortConfig} onSort={handleSort} className="num" />
-                <th className="num muted" style={{ fontSize: '10px' }}>正股成交(万)</th>
-                <SortableTh label="转股价" sortKey="convertPrice" sortConfig={sortConfig} onSort={handleSort} className="num" />
-                <SortableTh label="转股价值" sortKey="convertValue" sortConfig={sortConfig} onSort={handleSort} className="num" />
                 <SortableTh label="溢价率" sortKey="premiumRate" sortConfig={sortConfig} onSort={handleSort} className="num" />
-                <th className="num muted" style={{ fontSize: '10px' }}>转债市值比</th>
+                <SortableTh label="剩余规模" sortKey="remainingSizeYi" sortConfig={sortConfig} onSort={handleSort} className="num" />
+                <SortableTh label="正股流通市值" sortKey="stockMarketValueYi" sortConfig={sortConfig} onSort={handleSort} className="num" />
+                <th className="num muted" style={{ fontSize: '10px' }}>转债占比</th>
+                <th className="num muted" style={{ fontSize: '10px' }}>正股成交(万)</th>
+                <th className="num muted" style={{ fontSize: '10px' }}>成交占比</th>
                 <th>市场</th>
-                <SortableTh label="双低" sortKey="doubleLow" sortConfig={sortConfig} onSort={handleSort} className="num" />
-                <th className="num muted" style={{ fontSize: '10px' }}>纯债溢价</th>
-                <th className="num muted" style={{ fontSize: '10px' }}>理论溢价</th>
-                <th className="num muted" style={{ fontSize: '10px' }}>理论期权</th>
-                <th className="num muted" style={{ fontSize: '10px' }}>隐含期权</th>
-                <SortableTh label="波动率" sortKey="volatility250" sortConfig={sortConfig} onSort={handleSort} className="num" />
-                <SortableTh label="剩余期限" sortKey="remainingYears" sortConfig={sortConfig} onSort={handleSort} className="num" />
-                <SortableTh label="规模" sortKey="remainingSizeYi" sortConfig={sortConfig} onSort={handleSort} className="num" />
-                <th>状态</th>
+                <th>强赎状态</th>
+                <SortableTh label="到期日" sortKey="maturityDate" sortConfig={sortConfig} onSort={handleSort} />
               </tr>
             </thead>
             <tbody>
               {vis.length ? vis.map((row, index) => {
                 const stockTurnover = toNumber(row.stockAvgTurnoverAmount20Yi);
-                const convertValue = toNumber(row.convertValue);
-                const pureBond = toNumber(row.pureBondValue);
-                const theoreticalPremium = toNumber(row.theoreticalPremiumRate);
-                const optionVal = toNumber(row.optionValue);
-                const bondToStockRatio = toNumber(row.bondToStockMarketValueRatio);
-                const price = toNumber(row.price);
+                const stockMarketValueYi = toNumber(row.stockMarketValueYi);
+                const remainingSizeYi = toNumber(row.remainingSizeYi);
+                const bondToStockRatio = stockMarketValueYi > 0 && remainingSizeYi !== null ? remainingSizeYi / stockMarketValueYi : null;
+                const turnoverRatio = stockTurnover > 0 && remainingSizeYi !== null ? remainingSizeYi / stockTurnover : null;
                 return (
                   <tr key={`${row.code || row.bondCode || index}`}>
                     <td>{pickText(row.bondName, row.name)}</td>
@@ -719,26 +710,19 @@ function ConvertibleTable({ rows, smallRows, rightsIssueData, searchQuery }) {
                     <td className="num mono">{formatNumber(row.price)}</td>
                     <td className={`num mono ${signedClass(row.changePercent)}`}>{formatPercent(row.changePercent)}</td>
                     <td>{pickText(row.stockName, row.aName)}</td>
-                    <td className="num mono">{formatNumber(row.stockPrice)}</td>
-                    <td className="num mono muted">{stockTurnover !== null ? formatNumber(stockTurnover) : '--'}</td>
-                    <td className="num mono">{formatNumber(row.convertPrice)}</td>
-                    <td className={`num mono ${signedClass(convertValue)}`}>{convertValue !== null ? formatNumber(convertValue) : '--'}</td>
                     <td className={`num mono ${signedClass(row.premiumRate)}`}>{formatPercent(row.premiumRate)}</td>
-                    <td className="num mono muted">{bondToStockRatio !== null ? `${(bondToStockRatio * 100).toFixed(1)}%` : '--'}</td>
-                    <td className="muted">{pickText(row.boardType)}</td>
-                    <td className="num mono">{formatNumber(row.doubleLow)}</td>
-                    <td className="num mono muted">{pureBond !== null && price !== null ? ((price - pureBond) / pureBond * 100).toFixed(2) + '%' : '--'}</td>
-                    <td className={`num mono muted ${signedClass(theoreticalPremium)}`}>{theoreticalPremium !== null ? formatPercent(theoreticalPremium) : '--'}</td>
-                    <td className="num mono muted">{optionVal !== null ? optionVal.toFixed(2) : '--'}</td>
-                    <td className="num mono muted">{pureBond !== null && price !== null ? (price - pureBond).toFixed(2) : '--'}</td>
-                    <td className="num mono">{formatPercent(row.volatility250 ?? row.volatility60)}</td>
-                    <td className="num mono">{toNumber(row.remainingYears) !== null ? row.remainingYears.toFixed(1) + '年' : '--'}</td>
                     <td className="num mono">{formatNumber(row.remainingSizeYi, '亿')}</td>
-                    <td className="muted">{pickText(row.forceRedeemStatus, row.status, row.rating)}</td>
+                    <td className="num mono">{stockMarketValueYi !== null ? formatNumber(stockMarketValueYi, '亿') : '--'}</td>
+                    <td className="num mono muted">{bondToStockRatio !== null ? `${(bondToStockRatio * 100).toFixed(1)}%` : '--'}</td>
+                    <td className="num mono muted">{stockTurnover !== null ? formatNumber(stockTurnover) : '--'}</td>
+                    <td className="num mono muted">{turnoverRatio !== null ? `${(turnoverRatio * 100).toFixed(1)}%` : '--'}</td>
+                    <td className="muted">{pickText(row.boardType)}</td>
+                    <td className="muted">{pickText(row.forceRedeemStatus)}</td>
+                    <td className="mono">{row.maturityDate || '--'}</td>
                   </tr>
                 );
               }) : (
-                <tr><td colSpan="22" className="empty-cell">暂无数据</td></tr>
+                <tr><td colSpan="14" className="empty-cell">暂无数据</td></tr>
               )}
             </tbody>
           </table>
