@@ -1289,10 +1289,94 @@ function SubscriptionTable({ data, searchQuery }) {
   );
 }
 
-function MonitorTable({ rows, searchQuery }) {
+const MONITOR_CURRENCIES = ['CNY', 'HKD', 'USD'];
+
+function buildMonitorDetail(row) {
+  const stockLeg = toNumber(row.stockRatio) !== 0 || toNumber(row.cashDistribution) !== 0;
+  const cashLeg = toNumber(row.cashOptionPrice) !== 0;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px 16px' }}>
+      <div><span style={{ color: 'var(--text-faint)' }}>收购方股价: </span>{formatNumber(row.acquirerPrice)}</div>
+      <div><span style={{ color: 'var(--text-faint)' }}>目标方股价: </span>{formatNumber(row.targetPrice)}</div>
+      <div><span style={{ color: 'var(--text-faint)' }}>换股比例: </span>{formatNumber(row.stockRatio)}</div>
+      <div><span style={{ color: 'var(--text-faint)' }}>安全系数: </span>{formatNumber(row.safetyFactor)}</div>
+      <div><span style={{ color: 'var(--text-faint)' }}>现金对价: </span>{formatNumber(row.cashDistributionCny)}</div>
+      <div><span style={{ color: 'var(--text-faint)' }}>股票腿理论对价: </span>{stockLeg ? formatNumber(row.stockPayout) : '未配置'}</div>
+      <div><span style={{ color: 'var(--text-faint)' }}>股票腿价差: </span>{stockLeg ? formatNumber(row.stockSpread) : '未配置'}</div>
+      <div><span style={{ color: 'var(--text-faint)' }}>现金选择权: </span>{cashLeg ? formatNumber(row.cashPayout) : '未配置'}</div>
+      <div><span style={{ color: 'var(--text-faint)' }}>现金腿价差: </span>{cashLeg ? formatNumber(row.cashSpread) : '未配置'}</div>
+      <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--text-faint)' }}>备注: </span>{pickText(row.note) || '无'}</div>
+    </div>
+  );
+}
+
+function MonitorTable({ rows, searchQuery, onRefresh }) {
   const { sortConfig, handleSort, sorted } = useSort();
+  const [editing, setEditing] = React.useState(null);
+  const [saving, setSaving] = React.useState(false);
+  const [editorOpen, setEditorOpen] = React.useState(false);
+
   const filtered = rows.filter((r) => rowMatchesQuery(r, searchQuery, ['name', 'acquirerName', 'targetName', 'code']));
   const visibleRows = sorted(filtered, (row, key) => toNumber(row[key]) ?? row[key]).slice(0, 50);
+
+  const openCreate = () => {
+    setEditing({
+      id: '', name: '', acquirerName: '', acquirerCode: '', acquirerMarket: 'A', targetName: '', targetCode: '', targetMarket: 'A',
+      stockRatio: '', safetyFactor: 1, cashDistribution: '', cashDistributionCurrency: 'CNY',
+      cashOptionPrice: '', cashOptionCurrency: 'CNY', note: '',
+    });
+    setEditorOpen(true);
+  };
+
+  const openEdit = (row) => {
+    setEditing({
+      id: row.id || '', name: row.name || '',
+      acquirerName: row.acquirerName || '', acquirerCode: row.acquirerCode || '', acquirerMarket: row.acquirerMarket || 'A',
+      targetName: row.targetName || '', targetCode: row.targetCode || '', targetMarket: row.targetMarket || 'A',
+      stockRatio: row.stockRatio ?? '', safetyFactor: row.safetyFactor ?? 1,
+      cashDistribution: row.cashDistribution ?? '', cashDistributionCurrency: row.cashDistributionCurrency || 'CNY',
+      cashOptionPrice: row.cashOptionPrice ?? '', cashOptionCurrency: row.cashOptionCurrency || 'CNY',
+      note: row.note || '',
+    });
+    setEditorOpen(true);
+  };
+
+  const closeEditor = () => { setEditorOpen(false); setEditing(null); };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!editing.acquirerName || !editing.targetName) return;
+    setSaving(true);
+    try {
+      await fetch(API_ENDPOINTS.monitor, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editing),
+      });
+      closeEditor();
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert('保存失败: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('确认删除这个监控项目吗？')) return;
+    setSaving(true);
+    try {
+      await fetch(`${API_ENDPOINTS.monitor}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert('删除失败: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateField = (field, value) => setEditing((prev) => ({ ...prev, [field]: value }));
+
   return (
     <section className="terminal-panel main-table-panel">
       <div className="panel-head compact-head">
@@ -1300,8 +1384,89 @@ function MonitorTable({ rows, searchQuery }) {
           <p className="eyebrow">Custom Monitor</p>
           <h2>自定义监控</h2>
         </div>
-        <span className="panel-count">{filtered.length} / {rows.length}</span>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <span className="panel-count">{filtered.length} / {rows.length}</span>
+          <button className="tab-button" onClick={openCreate} disabled={saving}>新增监控</button>
+        </div>
       </div>
+
+      {editorOpen && editing && (
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+          <form onSubmit={handleSubmit}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>监控名称</label>
+                <input type="text" value={editing.name} onChange={(e) => updateField('name', e.target.value)} style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>收购方名称</label>
+                <input type="text" value={editing.acquirerName} onChange={(e) => updateField('acquirerName', e.target.value)} required style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>收购方代码</label>
+                <input type="text" value={editing.acquirerCode} onChange={(e) => updateField('acquirerCode', e.target.value)} required style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>收购方市场</label>
+                <select value={editing.acquirerMarket} onChange={(e) => updateField('acquirerMarket', e.target.value)} style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }}>
+                  <option value="A">A股</option><option value="H">港股</option><option value="B">B股</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>目标方名称</label>
+                <input type="text" value={editing.targetName} onChange={(e) => updateField('targetName', e.target.value)} required style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>目标方代码</label>
+                <input type="text" value={editing.targetCode} onChange={(e) => updateField('targetCode', e.target.value)} required style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>目标方市场</label>
+                <select value={editing.targetMarket} onChange={(e) => updateField('targetMarket', e.target.value)} style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }}>
+                  <option value="A">A股</option><option value="H">港股</option><option value="B">B股</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>换股比例</label>
+                <input type="number" step="0.0001" value={editing.stockRatio} onChange={(e) => updateField('stockRatio', e.target.value)} style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>安全系数</label>
+                <input type="number" min="0" max="1" step="0.0001" value={editing.safetyFactor} onChange={(e) => updateField('safetyFactor', e.target.value)} style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>现金对价</label>
+                <input type="number" step="0.0001" value={editing.cashDistribution} onChange={(e) => updateField('cashDistribution', e.target.value)} style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>现金对价币种</label>
+                <select value={editing.cashDistributionCurrency} onChange={(e) => updateField('cashDistributionCurrency', e.target.value)} style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }}>
+                  {MONITOR_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>现金选择权</label>
+                <input type="number" step="0.0001" value={editing.cashOptionPrice} onChange={(e) => updateField('cashOptionPrice', e.target.value)} style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>现金选择权币种</label>
+                <select value={editing.cashOptionCurrency} onChange={(e) => updateField('cashOptionCurrency', e.target.value)} style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }}>
+                  {MONITOR_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '4px' }}>备注</label>
+                <input type="text" value={editing.note} onChange={(e) => updateField('note', e.target.value)} style={{ width: '100%', background: 'var(--terminal-bg)', border: '1px solid var(--terminal-line)', color: 'var(--text)', padding: '4px 8px', fontSize: '13px' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button type="submit" className="tab-button active" disabled={saving}>{editing.id ? '保存修改' : '新增监控'}</button>
+              <button type="button" className="tab-button" onClick={closeEditor} disabled={saving}>取消</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       <div className="dense-table-wrap table-scroll">
         <table className="dense-table wide-table">
           <thead>
@@ -1313,6 +1478,7 @@ function MonitorTable({ rows, searchQuery }) {
               <SortableTh label="现金腿收益率" sortKey="cashYieldRate" sortConfig={sortConfig} onSort={handleSort} className="num" />
               <SortableTh label="最优收益率" sortKey="bestYield" sortConfig={sortConfig} onSort={handleSort} className="num" />
               <th>备注</th>
+              <th style={{ width: '100px' }}>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -1322,7 +1488,7 @@ function MonitorTable({ rows, searchQuery }) {
                 toNumber(row.cashYieldRate) ?? -Infinity
               );
               return (
-                <tr key={`${row.id || row.code || index}`}>
+                <ExpandableRow key={`${row.id || row.code || index}`} detail={buildMonitorDetail(row)}>
                   <td>{pickText(row.name)}</td>
                   <td className="mono">{pickText(row.acquirerName)}→{pickText(row.targetName)}</td>
                   <td className="num mono">{formatNumber(row.targetPrice)}</td>
@@ -1332,10 +1498,14 @@ function MonitorTable({ rows, searchQuery }) {
                     {bestYield === -Infinity ? '--' : `${PERCENT_FORMAT.format(bestYield)}%`}
                   </td>
                   <td className="muted">{pickText(row.note)}</td>
-                </tr>
+                  <td>
+                    <button className="tab-button" style={{ padding: '2px 8px', fontSize: '11px' }} onClick={(e) => { e.stopPropagation(); openEdit(row); }} disabled={saving}>编辑</button>
+                    <button className="tab-button" style={{ padding: '2px 8px', fontSize: '11px', marginLeft: '4px' }} onClick={(e) => { e.stopPropagation(); handleDelete(row.id); }} disabled={saving}>删除</button>
+                  </td>
+                </ExpandableRow>
               );
             }) : (
-              <tr><td colSpan="7" className="empty-cell">监控接口暂无数据</td></tr>
+              <tr><td colSpan="8" className="empty-cell">监控接口暂无数据</td></tr>
             )}
           </tbody>
         </table>
@@ -2066,7 +2236,7 @@ function App() {
           {activeTab === 'ab' && <AbTable rows={abRows} searchQuery={searchQuery} />}
           {activeTab === 'lof' && <LofTable rows={lofRows} searchQuery={searchQuery} />}
           {activeTab === 'subscription' && <SubscriptionTable data={subscriptionData} searchQuery={searchQuery} />}
-          {activeTab === 'monitor' && <MonitorTable rows={monitorRows} searchQuery={searchQuery} />}
+          {activeTab === 'monitor' && <MonitorTable rows={monitorRows} searchQuery={searchQuery} onRefresh={state.reload} />}
           {activeTab === 'dividend' && <DividendTable rows={dividendRows} searchQuery={searchQuery} />}
           {activeTab === 'merger' && <MergerTable data={mergerData} searchQuery={searchQuery} />}
           {activeTab === 'push' && <PushSettingsPage config={resources?.pushConfig?.data} />}
