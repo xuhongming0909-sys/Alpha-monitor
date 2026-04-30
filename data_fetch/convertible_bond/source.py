@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import io
 import math
 import os
 import re
@@ -44,12 +45,14 @@ TURNOVER_AVG_WINDOWS = tuple(
     sorted({max(1, int(item)) for item in (_CB_FETCH_CONFIG.get("turnover_avg_windows") or [5, 20])})
 ) or (5, 20)
 HISTORY_LOOKBACK_DAYS = max(120, int(_CB_FETCH_CONFIG.get("history_lookback_days") or 420))
+REQUEST_TIMEOUT = max(1, int(_CB_FETCH_CONFIG.get("request_timeout_seconds") or 20))
+LONG_REQUEST_TIMEOUT = max(1, int(_CB_FETCH_CONFIG.get("long_request_timeout_seconds") or 30))
 MAX_VOL_SYNC_WORKERS = max(1, int(_CB_FETCH_CONFIG.get("max_vol_sync_workers") or 8))
 REQUIRED_CLOSE_ROWS = max(VOL_WINDOWS) + 1
 REQUIRED_HISTORY_BAR_ROWS = max(REQUIRED_CLOSE_ROWS, ATR_WINDOW + 1, max(TURNOVER_AVG_WINDOWS))
 MAX_FINANCIAL_WORKERS = max(1, int(_CB_FETCH_CONFIG.get("max_financial_workers") or 10))
 INLINE_HISTORY_HYDRATE_LIMIT = max(1, int(_CB_FETCH_CONFIG.get("inline_history_hydrate_limit") or 24))
-AUX_CACHE_SCHEMA_VERSION = 1
+AUX_CACHE_SCHEMA_VERSION = 2
 FORCE_REDEEM_NOTICE_LOOKBACK_DAYS = 120
 FORCE_REDEEM_DELIST_FORWARD_DAYS = 120
 EASTMONEY_QUOTE_URL = "https://push2.eastmoney.com/api/qt/ulist.np/get"
@@ -274,6 +277,7 @@ def _cb_arb_aux_cache_fallback() -> Dict[str, Any]:
         "stockMarketValueByStock": {"date": "", "value": {}},
         "historyMetricsByStock": {"date": "", "value": {}},
         "financialMetricsByStock": {"date": "", "value": {}},
+        "holderInfoByStock": {"date": "", "value": {}},
         "updatedAt": None,
     }
 
@@ -379,7 +383,14 @@ def _build_cached_history_metrics_map(previous_rows: Dict[str, Dict[str, Any]], 
 
 
 def _build_cached_financial_metrics_map(previous_rows: Dict[str, Dict[str, Any]], aux_cache: Dict[str, Any]) -> Dict[str, Dict[str, Optional[float]]]:
-    metric_fields = ["stockAvgRoe3Y", "stockDebtRatio"]
+    metric_fields = [
+        "stockAvgRoe3Y",
+        "stockDebtRatio",
+        "stockNetAssetsYi",
+        "stockInterestBearingDebtYi",
+        "stockBroadCashYi",
+        "stockNetDebtExposureYi",
+    ]
     result: Dict[str, Dict[str, Optional[float]]] = {}
     _, cached_value = _read_aux_cache_entry(aux_cache, "financialMetricsByStock")
     for stock_code, metrics in cached_value.items():
@@ -393,13 +404,70 @@ def _build_cached_financial_metrics_map(previous_rows: Dict[str, Dict[str, Any]]
     return result
 
 
+def _build_cached_holder_info_map(previous_rows: Dict[str, Dict[str, Any]], aux_cache: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    text_fields = ["holderCountReportPeriod", "holderCountReportSourceUrl", "holderCountLastCheckedAt"]
+    number_fields = ["holderCount"]
+    bool_fields = ["holderCountFallbackUsed"]
+    result: Dict[str, Dict[str, Any]] = {}
+    _, cached_value = _read_aux_cache_entry(aux_cache, "holderInfoByStock")
+    for stock_code, metrics in cached_value.items():
+        if not isinstance(metrics, dict):
+            continue
+        payload: Dict[str, Any] = {}
+        for field in text_fields:
+            text = str(metrics.get(field) or "").strip()
+            payload[field] = text or None
+        for field in number_fields:
+            payload[field] = _to_float(metrics.get(field))
+        for field in bool_fields:
+            payload[field] = metrics.get(field) is True
+        result[str(stock_code).strip()] = payload
+    for row in previous_rows.values():
+        stock_code = _to_code6(row.get("stockCode"))
+        if not stock_code:
+            continue
+        payload = {
+            "holderCount": _to_float(row.get("holderCount")),
+            "holderCountReportPeriod": str(row.get("holderCountReportPeriod") or "").strip() or None,
+            "holderCountReportSourceUrl": str(row.get("holderCountReportSourceUrl") or "").strip() or None,
+            "holderCountFallbackUsed": row.get("holderCountFallbackUsed") is True,
+            "holderCountLastCheckedAt": str(row.get("holderCountLastCheckedAt") or "").strip() or None,
+        }
+        result[stock_code] = payload
+    return result
+
+
 def _persist_runtime_metric_cache(
     aux_cache: Dict[str, Any],
     as_of_date: str,
     rows: list[Dict[str, Any]],
 ) -> None:
     history_metrics_by_stock: Dict[str, Dict[str, Optional[float]]] = {}
-    financial_metrics_by_stock: Dict[str, Dict[str, Optional[float]]] = {}
+    _, cached_financial_value = _read_aux_cache_entry(aux_cache, "financialMetricsByStock")
+    _, cached_holder_value = _read_aux_cache_entry(aux_cache, "holderInfoByStock")
+    financial_metrics_by_stock: Dict[str, Dict[str, Optional[float]]] = {
+        str(stock_code).strip(): _pick_row_metrics(metrics, [
+            "stockAvgRoe3Y",
+            "stockDebtRatio",
+            "stockNetAssetsYi",
+            "stockInterestBearingDebtYi",
+            "stockBroadCashYi",
+            "stockNetDebtExposureYi",
+        ])
+        for stock_code, metrics in (cached_financial_value or {}).items()
+        if isinstance(metrics, dict)
+    }
+    holder_info_by_stock: Dict[str, Dict[str, Any]] = {
+        str(stock_code).strip(): {
+            "holderCount": _to_float(metrics.get("holderCount")),
+            "holderCountReportPeriod": str(metrics.get("holderCountReportPeriod") or "").strip() or None,
+            "holderCountReportSourceUrl": str(metrics.get("holderCountReportSourceUrl") or "").strip() or None,
+            "holderCountFallbackUsed": metrics.get("holderCountFallbackUsed") is True,
+            "holderCountLastCheckedAt": str(metrics.get("holderCountLastCheckedAt") or "").strip() or None,
+        }
+        for stock_code, metrics in (cached_holder_value or {}).items()
+        if isinstance(metrics, dict)
+    }
     for row in rows:
         stock_code = _to_code6(row.get("stockCode"))
         if not stock_code:
@@ -410,10 +478,38 @@ def _persist_runtime_metric_cache(
             "stockAvgTurnoverAmount20Yi",
             "stockAvgTurnoverAmount5Yi",
         ])
-        financial_metrics_by_stock[stock_code] = _pick_row_metrics(row, [
+        current_financial = financial_metrics_by_stock.get(stock_code) if isinstance(financial_metrics_by_stock.get(stock_code), dict) else {}
+        next_financial = {**current_financial}
+        for field in [
             "stockAvgRoe3Y",
             "stockDebtRatio",
-        ])
+            "stockNetAssetsYi",
+            "stockInterestBearingDebtYi",
+            "stockBroadCashYi",
+            "stockNetDebtExposureYi",
+        ]:
+            value = _to_float(row.get(field))
+            if value is not None:
+                next_financial[field] = value
+        financial_metrics_by_stock[stock_code] = next_financial
+
+        current_holder = holder_info_by_stock.get(stock_code) if isinstance(holder_info_by_stock.get(stock_code), dict) else {}
+        next_holder = {**current_holder}
+        holder_count = _to_positive_float(row.get("holderCount"))
+        if holder_count is not None:
+            next_holder["holderCount"] = int(round(holder_count))
+        report_period = str(row.get("holderCountReportPeriod") or "").strip()
+        if report_period:
+            next_holder["holderCountReportPeriod"] = report_period
+        report_source_url = str(row.get("holderCountReportSourceUrl") or "").strip()
+        if report_source_url:
+            next_holder["holderCountReportSourceUrl"] = report_source_url
+        if any((holder_count is not None, report_period, report_source_url)):
+            next_holder["holderCountFallbackUsed"] = row.get("holderCountFallbackUsed") is True
+        checked_at = str(row.get("holderCountLastCheckedAt") or "").strip()
+        if checked_at:
+            next_holder["holderCountLastCheckedAt"] = checked_at
+        holder_info_by_stock[stock_code] = next_holder
 
     aux_cache["historyMetricsByStock"] = {
         "date": as_of_date,
@@ -422,6 +518,10 @@ def _persist_runtime_metric_cache(
     aux_cache["financialMetricsByStock"] = {
         "date": as_of_date,
         "value": financial_metrics_by_stock,
+    }
+    aux_cache["holderInfoByStock"] = {
+        "date": as_of_date,
+        "value": holder_info_by_stock,
     }
     _write_cb_arb_aux_cache(aux_cache)
 
@@ -527,6 +627,524 @@ def _to_tx_symbol(stock_code: str) -> str:
         return ""
     market = "sh" if code.startswith(("5", "6", "9")) else "sz"
     return f"{market}{code}"
+
+
+def _to_em_stock_symbol(stock_code: str) -> str:
+    code = _to_code6(stock_code)
+    if not code:
+        return ""
+    if code.startswith(("4", "8")):
+        return f"BJ{code}"
+    if code.startswith(("5", "6", "9")):
+        return f"SH{code}"
+    return f"SZ{code}"
+
+
+def _format_report_period(period: str) -> Optional[str]:
+    text = str(period or "").strip()
+    if not re.fullmatch(r"\d{8}", text):
+        return None
+    return f"{text[:4]}-{text[4:6]}-{text[6:]}"
+
+
+def _recent_holder_report_periods(as_of: date, count: int = 8) -> list[str]:
+    result: list[str] = []
+    for year in range(as_of.year, as_of.year - 5, -1):
+        for month, day in ((12, 31), (6, 30)):
+            report_date = date(year, month, day)
+            if report_date > as_of:
+                continue
+            result.append(report_date.strftime("%Y%m%d"))
+            if len(result) >= count:
+                return result
+    return result
+
+
+def _current_holder_update_window(as_of: date) -> tuple[Optional[str], Optional[date], Optional[date]]:
+    if (as_of.month, as_of.day) >= (1, 1) and (as_of.month, as_of.day) <= (4, 30):
+        return f"{as_of.year - 1}-12-31", date(as_of.year, 1, 1), date(as_of.year, 4, 30)
+    if (as_of.month, as_of.day) >= (7, 1) and (as_of.month, as_of.day) <= (8, 31):
+        return f"{as_of.year}-06-30", date(as_of.year, 7, 1), date(as_of.year, 8, 31)
+    return None, None, None
+
+
+def _should_refresh_holder_info(cached: Dict[str, Any], as_of: date) -> bool:
+    cached_holder_count = _to_positive_float((cached or {}).get("holderCount"))
+    cached_period = str((cached or {}).get("holderCountReportPeriod") or "").strip() or None
+    last_checked_at_text = str((cached or {}).get("holderCountLastCheckedAt") or "").strip()
+    if cached_holder_count is None or not cached_period:
+        return True
+
+    target_period, window_start, window_end = _current_holder_update_window(as_of)
+    if not target_period or not window_start or not window_end:
+        return False
+    if cached_period == target_period:
+        return False
+
+    last_checked_date = _to_date_obj(last_checked_at_text)
+    if last_checked_date is None:
+        return True
+    if last_checked_date < window_start:
+        return True
+    if last_checked_date > window_end:
+        return True
+    return (as_of - last_checked_date).days >= 7
+
+
+@lru_cache(maxsize=1)
+def _load_cninfo_stock_orgid_map() -> Dict[str, str]:
+    try:
+        payload = requests.get(
+            "https://www.cninfo.com.cn/new/data/szse_stock.json",
+            headers={"User-Agent": "Mozilla/5.0", "Referer": "https://www.cninfo.com.cn/"},
+            timeout=REQUEST_TIMEOUT,
+        ).json()
+    except Exception:
+        return {}
+    stock_list = (payload or {}).get("stockList") or []
+    result: Dict[str, str] = {}
+    for item in stock_list:
+        code = _to_code6((item or {}).get("code"))
+        org_id = str((item or {}).get("orgId") or "").strip()
+        if code and org_id:
+            result[code] = org_id
+    return result
+
+
+def _pick_cninfo_regular_report_announcement(announcements: list[Dict[str, Any]], period: str) -> Optional[Dict[str, Any]]:
+    if not announcements:
+        return None
+    year = period[:4]
+    suffix = period[4:]
+    preferred_keywords = [f"{year}年年度报告"] if suffix == "1231" else [f"{year}年半年度报告"]
+    preferred: list[Dict[str, Any]] = []
+    fallback: list[Dict[str, Any]] = []
+    for item in announcements:
+        title = str((item or {}).get("announcementTitle") or "").strip()
+        if not title:
+            continue
+        if "摘要" in title:
+            fallback.append(item)
+            continue
+        if any(keyword in title for keyword in preferred_keywords):
+            preferred.append(item)
+        else:
+            fallback.append(item)
+    ordered = preferred or fallback
+    return ordered[0] if ordered else None
+
+
+@lru_cache(maxsize=256)
+def _fetch_cninfo_regular_reports(stock_code: str, as_of_date_text: str) -> list[Dict[str, Any]]:
+    code = _to_code6(stock_code)
+    if not code:
+        return []
+    org_id = _load_cninfo_stock_orgid_map().get(code)
+    if not org_id:
+        return []
+    try:
+        response = requests.post(
+            "https://www.cninfo.com.cn/new/hisAnnouncement/query",
+            data={
+                "pageNum": "1",
+                "pageSize": "12",
+                "column": "szse",
+                "tabName": "fulltext",
+                "plate": "",
+                "stock": f"{code},{org_id}",
+                "searchkey": "",
+                "secid": "",
+                "category": "category_ndbg_szsh;category_bndbg_szsh;",
+                "trade": "",
+                "seDate": f"{max(int(as_of_date_text[:4]) - 3, 2017)}-01-01~{as_of_date_text}",
+                "sortName": "time",
+                "sortType": "desc",
+                "isHLtitle": "true",
+            },
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Referer": "https://www.cninfo.com.cn/new/commonUrl/pageOfSearch?url=disclosure/list/search",
+            },
+            timeout=REQUEST_TIMEOUT,
+        )
+        announcements = (response.json() or {}).get("announcements") or []
+    except Exception:
+        return []
+
+    rows: list[Dict[str, Any]] = []
+    for item in announcements:
+        title = str((item or {}).get("announcementTitle") or "").strip()
+        if not title or "摘要" in title or "英文" in title or "取消" in title:
+            continue
+        period: Optional[str] = None
+        annual_hit = re.search(r"(\d{4})年年度报告", title)
+        semi_hit = re.search(r"(\d{4})年半年度报告", title)
+        if annual_hit:
+            period = f"{annual_hit.group(1)}-12-31"
+        elif semi_hit:
+            period = f"{semi_hit.group(1)}-06-30"
+        if not period:
+            continue
+        adjunct_url = str((item or {}).get("adjunctUrl") or "").strip()
+        rows.append({
+            "title": title,
+            "period": period,
+            "announcementTime": int((item or {}).get("announcementTime") or 0),
+            "reportSourceUrl": f"https://static.cninfo.com.cn/{adjunct_url.lstrip('/')}" if adjunct_url else None,
+        })
+    rows.sort(key=lambda item: (item.get("period") or "", int(item.get("announcementTime") or 0)), reverse=True)
+    return rows
+
+
+@lru_cache(maxsize=256)
+def _fetch_cninfo_regular_report_url(stock_code: str, period: str) -> Optional[str]:
+    code = _to_code6(stock_code)
+    formatted_period = _format_report_period(period)
+    if not code or not formatted_period:
+        return None
+    org_id = _load_cninfo_stock_orgid_map().get(code)
+    if not org_id:
+        return None
+
+    category = "category_ndbg_szsh" if period.endswith("1231") else "category_bndbg_szsh"
+    try:
+        response = requests.post(
+            "https://www.cninfo.com.cn/new/hisAnnouncement/query",
+            data={
+                "pageNum": "1",
+                "pageSize": "30",
+                "column": "szse",
+                "tabName": "fulltext",
+                "plate": "",
+                "stock": f"{code},{org_id}",
+                "searchkey": "",
+                "secid": "",
+                "category": category,
+                "trade": "",
+                "seDate": f"{formatted_period}~{datetime.now().date().isoformat()}",
+                "sortName": "",
+                "sortType": "",
+                "isHLtitle": "true",
+            },
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Referer": "https://www.cninfo.com.cn/new/commonUrl/pageOfSearch?url=disclosure/list/search",
+            },
+            timeout=REQUEST_TIMEOUT,
+        )
+        announcements = (response.json() or {}).get("announcements") or []
+    except Exception:
+        return None
+
+    picked = _pick_cninfo_regular_report_announcement(announcements, period)
+    if not picked:
+        return None
+    adjunct_url = str((picked or {}).get("adjunctUrl") or "").strip()
+    if adjunct_url:
+        return f"https://static.cninfo.com.cn/{adjunct_url.lstrip('/')}"
+    announcement_id = str((picked or {}).get("announcementId") or "").strip()
+    if not announcement_id:
+        return None
+    return f"https://www.cninfo.com.cn/new/disclosure/detail?stockCode={code}&announcementId={announcement_id}&orgId={org_id}"
+
+
+def _normalize_report_text(text: str) -> str:
+    return re.sub(r"\s+", "", str(text or ""))
+
+
+def _extract_integer_from_text(text: str) -> Optional[int]:
+    digits = re.sub(r"[^\d]", "", str(text or ""))
+    if not digits:
+        return None
+    try:
+        value = int(digits)
+    except Exception:
+        return None
+    return value if value > 0 else None
+
+
+def _extract_holder_count_from_report_text(text: str) -> Optional[int]:
+    normalized = _normalize_report_text(text)
+    if not normalized:
+        return None
+    primary_patterns = [
+        r"报告期(?:可)?转债持有人及担保人情况.*?期末(?:可)?转债持有人数[^0-9]{0,80}([0-9,，]+)",
+        r"可转换公司债券名称期末(?:可)?转债持有人数[^0-9]{0,80}([0-9,，]+)",
+        r"期末可转债持有人数(?:（户）|\(户\)|户)?[:：]?(?:为)?([\d,，]+)",
+        r"期末转债持有人数(?:（户）|\(户\)|户)?[:：]?(?:为)?([\d,，]+)",
+        r"截至报告期末可转债持有人数(?:（户）|\(户\)|户)?[:：]?(?:为)?([\d,，]+)",
+        r"截至报告期末转债持有人数(?:（户）|\(户\)|户)?[:：]?(?:为)?([\d,，]+)",
+    ]
+    for pattern in primary_patterns:
+        hit = re.search(pattern, normalized)
+        if not hit:
+            continue
+        value = _extract_integer_from_text(hit.group(1))
+        if value is not None:
+            return value
+
+    for keyword in ("可转债持有人数", "转债持有人数", "可转换公司债券持有人数"):
+        for hit in re.finditer(keyword, normalized):
+            window = normalized[max(0, hit.start() - 20):hit.start() + 80]
+            if "披露日前一个月末" in window:
+                continue
+            number_hit = re.search(r"(?:（户）|\(户\)|户)?[:：]?(?:为)?([\d,，]+)", window)
+            if not number_hit:
+                continue
+            value = _extract_integer_from_text(number_hit.group(1))
+            if value is not None:
+                return value
+    return None
+
+
+def _extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
+    if not pdf_bytes:
+        return ""
+    try:
+        import pdfplumber
+
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            return "\n".join((page.extract_text() or "") for page in pdf.pages)
+    except Exception:
+        pass
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        return "\n".join((page.extract_text() or "") for page in reader.pages)
+    except Exception:
+        return ""
+
+
+def _extract_holder_count_from_pdf_bytes(pdf_bytes: bytes) -> Optional[int]:
+    if not pdf_bytes:
+        return None
+    try:
+        from pdfminer.high_level import extract_pages
+        from pdfminer.layout import LTTextContainer
+
+        rolling_text = ""
+        for layout in extract_pages(io.BytesIO(pdf_bytes)):
+            page_text_parts: list[str] = []
+            for element in layout:
+                if isinstance(element, LTTextContainer):
+                    page_text_parts.append(element.get_text())
+            page_text = "".join(page_text_parts)
+            if not page_text:
+                continue
+            candidate_text = f"{rolling_text}\n{page_text}"
+            if any(keyword in candidate_text for keyword in (
+                "报告期转债持有人及担保人情况",
+                "报告期可转债持有人及担保人情况",
+                "期末转债持有人数",
+                "期末可转债持有人数",
+                "可转换公司债券",
+                "闻泰转债",
+            )):
+                value = _extract_holder_count_from_report_text(candidate_text)
+                if value is not None:
+                    return value
+            rolling_text = candidate_text[-6000:]
+    except Exception:
+        pass
+
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        rolling_text = ""
+        for page in reader.pages:
+            page_text = page.extract_text() or ""
+            if not page_text:
+                continue
+            candidate_text = f"{rolling_text}\n{page_text}"
+            if any(keyword in candidate_text for keyword in (
+                "报告期转债持有人及担保人情况",
+                "报告期可转债持有人及担保人情况",
+                "期末转债持有人数",
+                "期末可转债持有人数",
+                "可转换公司债券",
+            )):
+                value = _extract_holder_count_from_report_text(candidate_text)
+                if value is not None:
+                    return value
+            rolling_text = candidate_text[-6000:]
+    except Exception:
+        pass
+
+    return _extract_holder_count_from_report_text(_extract_text_from_pdf_bytes(pdf_bytes))
+
+
+@lru_cache(maxsize=256)
+def _extract_holder_count_from_cninfo_pdf(report_url: str) -> Optional[int]:
+    url = str(report_url or "").strip()
+    if not url:
+        return None
+    try:
+        response = requests.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0", "Referer": "https://www.cninfo.com.cn/"},
+            timeout=LONG_REQUEST_TIMEOUT,
+        )
+        response.raise_for_status()
+    except Exception:
+        return None
+    return _extract_holder_count_from_pdf_bytes(response.content)
+
+
+def _fetch_holder_info_for_stock(stock_code: str, as_of: date) -> Dict[str, Any]:
+    code = _to_code6(stock_code)
+    if not code:
+        return {
+            "holderCount": None,
+            "holderCountReportPeriod": None,
+            "holderCountReportSourceUrl": None,
+            "holderCountFallbackUsed": False,
+        }
+    report_rows = _fetch_cninfo_regular_reports(code, as_of.isoformat())
+    if not report_rows:
+        return {
+            "holderCount": None,
+            "holderCountReportPeriod": None,
+            "holderCountReportSourceUrl": None,
+            "holderCountFallbackUsed": False,
+            "holderCountLastCheckedAt": as_of.isoformat(),
+        }
+    latest_period = str((report_rows[0] or {}).get("period") or "").strip() or None
+    for report in report_rows:
+        report_period = str(report.get("period") or "").strip() or None
+        report_url = str(report.get("reportSourceUrl") or "").strip() or None
+        if not report_period or not report_url:
+            continue
+        holder_count = _extract_holder_count_from_cninfo_pdf(report_url)
+        if holder_count is None:
+            continue
+        return {
+            "holderCount": holder_count,
+            "holderCountReportPeriod": report_period,
+            "holderCountReportSourceUrl": report_url,
+            "holderCountFallbackUsed": latest_period is not None and report_period != latest_period,
+            "holderCountLastCheckedAt": as_of.isoformat(),
+        }
+    return {
+        "holderCount": None,
+        "holderCountReportPeriod": None,
+        "holderCountReportSourceUrl": None,
+        "holderCountFallbackUsed": False,
+        "holderCountLastCheckedAt": as_of.isoformat(),
+    }
+
+
+def _sum_positive_balance_fields(record: Dict[str, Any], fields: list[str]) -> Optional[float]:
+    values: list[float] = []
+    for field in fields:
+        value = _to_positive_float(record.get(field))
+        if value is not None:
+            values.append(value)
+    if not values:
+        return None
+    return float(sum(values))
+
+
+def _sort_balance_sheet(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+    frame = df.copy()
+    for field in ("REPORT_DATE", "NOTICE_DATE"):
+        if field in frame.columns:
+            frame[field] = pd.to_datetime(frame[field], errors="coerce")
+    sort_fields = [field for field in ("REPORT_DATE", "NOTICE_DATE") if field in frame.columns]
+    if sort_fields:
+        frame = frame.sort_values(by=sort_fields, ascending=False, na_position="last")
+    return frame
+
+
+def _extract_balance_sheet_financial_metrics(df: pd.DataFrame) -> Dict[str, Optional[float]]:
+    if df is None or df.empty:
+        return {
+            "stockNetAssetsYi": None,
+            "stockInterestBearingDebtYi": None,
+            "stockBroadCashYi": None,
+            "stockNetDebtExposureYi": None,
+        }
+    frame = _sort_balance_sheet(df)
+    if frame.empty:
+        return {
+            "stockNetAssetsYi": None,
+            "stockInterestBearingDebtYi": None,
+            "stockBroadCashYi": None,
+            "stockNetDebtExposureYi": None,
+        }
+    record = frame.iloc[0].to_dict()
+    broad_cash_fields = [
+        "MONETARYFUNDS",
+        "TRADE_FINASSET",
+        "TRADE_FINASSET_NOTFVTPL",
+        "FVTPL_FINASSET",
+        "APPOINT_FVTPL_FINASSET",
+        "DERIVE_FINASSET",
+        "CREDITOR_INVEST",
+        "OTHER_CREDITOR_INVEST",
+        "AMORTIZE_COST_FINASSET",
+        "AMORTIZE_COST_NCFINASSET",
+        "FVTOCI_FINASSET",
+        "FVTOCI_NCFINASSET",
+        "OTHER_NONCURRENT_FINASSET",
+    ]
+    interest_bearing_debt_fields = [
+        "SHORT_LOAN",
+        "BORROW_FUND",
+        "SHORT_BOND_PAYABLE",
+        "LONG_LOAN",
+        "BOND_PAYABLE",
+        "SUBBOND_PAYABLE",
+        "LEASE_LIAB",
+        "LONG_PAYABLE",
+        "PREFERRED_SHARES_PAYBALE",
+        "PERPETUAL_BOND_PAYBALE",
+    ]
+    net_assets = _to_positive_float(record.get("TOTAL_EQUITY")) or _to_positive_float(record.get("TOTAL_PARENT_EQUITY"))
+    broad_cash = _sum_positive_balance_fields(record, broad_cash_fields)
+    interest_bearing_debt = _sum_positive_balance_fields(record, interest_bearing_debt_fields)
+    return {
+        "stockNetAssetsYi": round(net_assets / 100000000.0, 4) if net_assets is not None else None,
+        "stockInterestBearingDebtYi": round(interest_bearing_debt / 100000000.0, 4) if interest_bearing_debt is not None else None,
+        "stockBroadCashYi": round(broad_cash / 100000000.0, 4) if broad_cash is not None else None,
+        "stockNetDebtExposureYi": round((interest_bearing_debt - broad_cash) / 100000000.0, 4)
+        if interest_bearing_debt is not None and broad_cash is not None
+        else None,
+    }
+
+
+def _fetch_small_redemption_financial_metrics(stock_code: str) -> Dict[str, Optional[float]]:
+    symbol = _to_em_stock_symbol(stock_code)
+    if not symbol:
+        return {
+            "stockNetAssetsYi": None,
+            "stockInterestBearingDebtYi": None,
+            "stockBroadCashYi": None,
+            "stockNetDebtExposureYi": None,
+        }
+    fetchers = [
+        getattr(ak, "stock_balance_sheet_by_report_em", None),
+        getattr(ak, "stock_balance_sheet_by_report_delisted_em", None),
+    ]
+    for fetcher in fetchers:
+        if fetcher is None:
+            continue
+        try:
+            df = fetcher(symbol=symbol)
+        except Exception:
+            continue
+        metrics = _extract_balance_sheet_financial_metrics(df)
+        if any(value is not None for value in metrics.values()):
+            return metrics
+    return {
+        "stockNetAssetsYi": None,
+        "stockInterestBearingDebtYi": None,
+        "stockBroadCashYi": None,
+        "stockNetDebtExposureYi": None,
+    }
 
 
 def _extract_hfq_rows(frame: pd.DataFrame, *, include_amount: bool) -> list[Dict[str, Any]]:
@@ -992,7 +1610,7 @@ def _build_cov_basic_map() -> Dict[str, Dict[str, Any]]:
             "pageSize": str(page_size),
         }
         try:
-            payload = requests.get(url, params=params, timeout=20).json()
+            payload = requests.get(url, params=params, timeout=REQUEST_TIMEOUT).json()
         except Exception:
             break
         data = (payload.get("result") or {}).get("data") or []
@@ -1192,7 +1810,7 @@ def _fetch_eastmoney_pure_bond_rows(
     response = requests.get(
         "https://datacenter-web.eastmoney.com/api/data/get",
         params=params,
-        timeout=20,
+        timeout=REQUEST_TIMEOUT,
     )
     payload = response.json()
     result = (payload or {}).get("result") or {}
@@ -1209,7 +1827,7 @@ def _fetch_eastmoney_pure_bond_rows(
         response = requests.get(
             "https://datacenter-web.eastmoney.com/api/data/get",
             params=params,
-            timeout=20,
+            timeout=REQUEST_TIMEOUT,
         )
         payload = response.json()
         rows.extend((((payload or {}).get("result") or {}).get("data")) or [])
@@ -1646,6 +2264,82 @@ def _build_theoretical_metrics(row: Dict[str, Any], risk_free_rate: float) -> Di
     return result
 
 
+def _build_small_redemption_option_metrics(
+    row: Dict[str, Any], risk_free_rate: float
+) -> Dict[str, Optional[float]]:
+    spot = _to_float(row.get("stockPrice"))
+    market_price = _to_positive_float(row.get("price"))
+    convert_price = _to_positive_float(row.get("convertPrice"))
+    remaining_years = _to_positive_float(row.get("remainingYears"))
+    redeem_trigger_price = _to_positive_float(row.get("redeemTriggerPrice"))
+    option_qty = (100.0 / convert_price) if convert_price else None
+    bond_value = 100.0
+    call_strike = None
+    long_call_value = None
+    short_call_value = None
+    option_value = None
+    option_yield = None
+    option_annualized_yield = None
+    total_annualized_yield = None
+    volatility = _to_float(row.get(f"volatility{PRIMARY_VOL_WINDOW}")) or _to_float(row.get("annualizedVolatility"))
+
+    if option_qty and option_qty > 0:
+        bond_floor_strike = bond_value / option_qty
+        call_strike = max(convert_price, bond_floor_strike)
+        # 小额刚兑视角下，100 元到期兑付可视为确定性债底。
+        # 现有模型的多头看涨执行价仍按 max(转股价, 债底折算行权价) 收口；
+        # 当债底固定为 100 时，债底折算行权价会退化为转股价本身。
+        bond_floor_strike = bond_value / option_qty
+        # 小额刚兑视角下，100 元兑付可视为固定债底。
+        # 多头看涨执行价仍按 max(转股价, 债底折算行权价) 计算。
+        # 当债底固定为 100 时，债底折算行权价会收敛到转股价。
+        call_strike = max(convert_price, bond_floor_strike)
+
+    if (
+        option_qty
+        and option_qty > 0
+        and spot is not None
+        and remaining_years is not None
+        and call_strike is not None
+        and redeem_trigger_price is not None
+        and volatility is not None
+    ):
+        long_call_unit = _american_option_binomial(
+            spot, call_strike, remaining_years, risk_free_rate, volatility, "call"
+        )
+        short_call_unit = _american_option_binomial(
+            spot, redeem_trigger_price, remaining_years, risk_free_rate, volatility, "call"
+        )
+        long_call_value = long_call_unit * option_qty
+        short_call_value = short_call_unit * option_qty
+        option_value = max(long_call_value - short_call_value, 0.0)
+
+    if market_price is not None and option_value is not None:
+        option_yield = option_value / market_price
+
+    if option_yield is not None and remaining_years is not None and remaining_years > 0:
+        option_annualized_yield = (1.0 + option_yield) ** (1.0 / remaining_years) - 1.0
+
+    redemption_annualized_yield = _to_float(row.get("smallRedemptionAnnualizedYield"))
+    if redemption_annualized_yield is not None and option_annualized_yield is not None:
+        total_annualized_yield = redemption_annualized_yield + option_annualized_yield
+
+    return {
+        "smallRedemptionBondValue": round(bond_value, 4),
+        "smallRedemptionCallStrike": round(call_strike, 4) if call_strike is not None else None,
+        "smallRedemptionLongCallOptionValue": round(long_call_value, 4) if long_call_value is not None else None,
+        "smallRedemptionShortCallOptionValue": round(short_call_value, 4) if short_call_value is not None else None,
+        "smallRedemptionOptionValue": round(option_value, 4) if option_value is not None else None,
+        "smallRedemptionOptionYield": round(option_yield, 6) if option_yield is not None else None,
+        "smallRedemptionOptionAnnualizedYield": (
+            round(option_annualized_yield, 6) if option_annualized_yield is not None else None
+        ),
+        "smallRedemptionTotalAnnualizedYield": (
+            round(total_annualized_yield, 6) if total_annualized_yield is not None else None
+        ),
+    }
+
+
 def _resolve_redeem_trigger_price(row: Dict[str, Any]) -> tuple[Optional[float], str]:
     # 1) Preferred: direct redeem trigger price from source payload.
     direct = _to_float(row.get("redeemTriggerPrice"))
@@ -1729,6 +2423,7 @@ def get_bond_cb_data(allow_inline_history_hydrate: bool = False) -> Dict[str, An
     previous_row_map = _read_cached_cb_arb_row_map()
     vol_cache_items: Dict[str, Dict[str, Any]] = _build_cached_history_metrics_map(previous_row_map, aux_cache)
     financial_cache_items: Dict[str, Dict[str, Optional[float]]] = _build_cached_financial_metrics_map(previous_row_map, aux_cache)
+    holder_cache_items: Dict[str, Dict[str, Any]] = _build_cached_holder_info_map(previous_row_map, aux_cache)
     stock_change_cache_items: Dict[str, Any] = {}
     cov_basic_items = _load_daily_cached_map(aux_cache, "covBasicMap", as_of_date_text, _build_cov_basic_map)
     cb_jsl_items = _build_cb_jsl_map(jisilu_cookie)
@@ -1833,6 +2528,28 @@ def get_bond_cb_data(allow_inline_history_hydrate: bool = False) -> Dict[str, An
             "doubleLow": double_low,
             "stockAvgRoe3Y": None,
             "stockDebtRatio": None,
+            "holderCount": None,
+            "holderCountReportPeriod": None,
+            "holderCountReportSourceUrl": None,
+            "holderCountFallbackUsed": False,
+            "holderCountLastCheckedAt": None,
+            "smallRedemptionYield": None,
+            "smallRedemptionExpectedYears": None,
+            "smallRedemptionAnnualizedYield": None,
+            "smallRedemptionAmount": None,
+            "smallRedemptionTotalAmount": None,
+            "smallRedemptionBondValue": None,
+            "smallRedemptionCallStrike": None,
+            "smallRedemptionLongCallOptionValue": None,
+            "smallRedemptionShortCallOptionValue": None,
+            "smallRedemptionOptionValue": None,
+            "smallRedemptionOptionYield": None,
+            "smallRedemptionOptionAnnualizedYield": None,
+            "smallRedemptionTotalAnnualizedYield": None,
+            "stockNetAssetsYi": None,
+            "stockInterestBearingDebtYi": None,
+            "stockBroadCashYi": None,
+            "stockNetDebtExposureYi": None,
             "pureBondValue": None,
             "pureBondValueDate": None,
             "pureBondValueSource": None,
@@ -2022,6 +2739,25 @@ def get_bond_cb_data(allow_inline_history_hydrate: bool = False) -> Dict[str, An
                     row["stockAvgRoe3Y"] = cached_financial.get("stockAvgRoe3Y")
                 if row.get("stockDebtRatio") is None:
                     row["stockDebtRatio"] = cached_financial.get("stockDebtRatio")
+                if row.get("stockNetAssetsYi") is None:
+                    row["stockNetAssetsYi"] = cached_financial.get("stockNetAssetsYi")
+                if row.get("stockInterestBearingDebtYi") is None:
+                    row["stockInterestBearingDebtYi"] = cached_financial.get("stockInterestBearingDebtYi")
+                if row.get("stockBroadCashYi") is None:
+                    row["stockBroadCashYi"] = cached_financial.get("stockBroadCashYi")
+                if row.get("stockNetDebtExposureYi") is None:
+                    row["stockNetDebtExposureYi"] = cached_financial.get("stockNetDebtExposureYi")
+            cached_holder = holder_cache_items.get(stock_code)
+            if isinstance(cached_holder, dict):
+                if row.get("holderCount") is None:
+                    row["holderCount"] = cached_holder.get("holderCount")
+                if row.get("holderCountReportPeriod") is None:
+                    row["holderCountReportPeriod"] = cached_holder.get("holderCountReportPeriod")
+                if row.get("holderCountReportSourceUrl") is None:
+                    row["holderCountReportSourceUrl"] = cached_holder.get("holderCountReportSourceUrl")
+                row["holderCountFallbackUsed"] = cached_holder.get("holderCountFallbackUsed") is True
+                if row.get("holderCountLastCheckedAt") is None:
+                    row["holderCountLastCheckedAt"] = cached_holder.get("holderCountLastCheckedAt")
 
         rows.append(row)
 
@@ -2178,6 +2914,7 @@ def get_bond_cb_data(allow_inline_history_hydrate: bool = False) -> Dict[str, An
         row["shortCallOptionValue"] = row.get(f"shortCallOptionValue{PRIMARY_VOL_WINDOW}")
         row["callSpreadOptionValue"] = row.get(f"callSpreadOptionValue{PRIMARY_VOL_WINDOW}")
         row["callOptionValue"] = row.get(f"callOptionValue{PRIMARY_VOL_WINDOW}")
+        row["optionValue"] = row.get("callOptionValue")
         row["putOptionValue"] = None
         row["theoreticalPrice"] = row.get(f"theoreticalPrice{PRIMARY_VOL_WINDOW}")
         row["theoreticalPremiumRate"] = row.get(f"theoreticalPremiumRate{PRIMARY_VOL_WINDOW}")
@@ -2201,6 +2938,112 @@ def get_bond_cb_data(allow_inline_history_hydrate: bool = False) -> Dict[str, An
             excluded_delisted_or_expired_count += 1
             continue
         core_ready_rows.append(row)
+
+    small_redemption_stock_codes = sorted({
+        _to_code6(row.get("stockCode"))
+        for row in core_ready_rows
+        if _to_float(row.get("price")) is not None and _to_float(row.get("price")) < 100 and _to_code6(row.get("stockCode"))
+    })
+
+    missing_holder_stock_codes = sorted({
+        code
+        for code in small_redemption_stock_codes
+        if _should_refresh_holder_info(holder_cache_items.get(code) if isinstance(holder_cache_items.get(code), dict) else {}, as_of_date)
+    })
+    if missing_holder_stock_codes:
+        with ThreadPoolExecutor(max_workers=min(MAX_FINANCIAL_WORKERS, max(1, len(missing_holder_stock_codes)))) as executor:
+            future_map = {
+                executor.submit(_fetch_holder_info_for_stock, code, as_of_date): code
+                for code in missing_holder_stock_codes
+            }
+            for future in as_completed(future_map):
+                code = future_map[future]
+                try:
+                    holder_cache_items[code] = future.result()
+                except Exception:
+                    holder_cache_items[code] = {
+                        "holderCount": None,
+                        "holderCountReportPeriod": None,
+                        "holderCountReportSourceUrl": None,
+                        "holderCountFallbackUsed": False,
+                        "holderCountLastCheckedAt": as_of_date.isoformat(),
+                    }
+
+    missing_small_redemption_financial_codes = sorted({
+        code
+        for code in small_redemption_stock_codes
+        if not any(
+            _to_float((financial_cache_items.get(code) or {}).get(field)) is not None
+            for field in ("stockNetAssetsYi", "stockInterestBearingDebtYi", "stockBroadCashYi", "stockNetDebtExposureYi")
+        )
+    })
+    if missing_small_redemption_financial_codes:
+        with ThreadPoolExecutor(max_workers=min(MAX_FINANCIAL_WORKERS, max(1, len(missing_small_redemption_financial_codes)))) as executor:
+            future_map = {
+                executor.submit(_fetch_small_redemption_financial_metrics, code): code
+                for code in missing_small_redemption_financial_codes
+            }
+            for future in as_completed(future_map):
+                code = future_map[future]
+                try:
+                    metrics = future.result()
+                except Exception:
+                    metrics = {
+                        "stockNetAssetsYi": None,
+                        "stockInterestBearingDebtYi": None,
+                        "stockBroadCashYi": None,
+                        "stockNetDebtExposureYi": None,
+                    }
+                current_metrics = financial_cache_items.get(code) if isinstance(financial_cache_items.get(code), dict) else {}
+                financial_cache_items[code] = {
+                    **current_metrics,
+                    **metrics,
+                }
+
+    for row in core_ready_rows:
+        price = _to_float(row.get("price"))
+        if price is None or price >= 100:
+            continue
+        stock_code = _to_code6(row.get("stockCode"))
+        if not stock_code:
+            continue
+
+        holder_info = holder_cache_items.get(stock_code) if isinstance(holder_cache_items.get(stock_code), dict) else {}
+        financial_metrics = financial_cache_items.get(stock_code) if isinstance(financial_cache_items.get(stock_code), dict) else {}
+
+        row["holderCount"] = _to_positive_float(holder_info.get("holderCount"))
+        if row["holderCount"] is not None:
+            row["holderCount"] = int(round(float(row["holderCount"])))
+        row["holderCountReportPeriod"] = str(holder_info.get("holderCountReportPeriod") or "").strip() or None
+        row["holderCountReportSourceUrl"] = str(holder_info.get("holderCountReportSourceUrl") or "").strip() or None
+        row["holderCountFallbackUsed"] = holder_info.get("holderCountFallbackUsed") is True
+        row["holderCountLastCheckedAt"] = str(holder_info.get("holderCountLastCheckedAt") or "").strip() or None
+
+        row["stockNetAssetsYi"] = _to_float(financial_metrics.get("stockNetAssetsYi"))
+        row["stockInterestBearingDebtYi"] = _to_float(financial_metrics.get("stockInterestBearingDebtYi"))
+        row["stockBroadCashYi"] = _to_float(financial_metrics.get("stockBroadCashYi"))
+        row["stockNetDebtExposureYi"] = _to_float(financial_metrics.get("stockNetDebtExposureYi"))
+
+        row["smallRedemptionYield"] = round(1.0 - (price / 100.0), 6)
+        remaining_years = _to_positive_float(row.get("remainingYears"))
+        if remaining_years is not None:
+            expected_years = remaining_years + 0.5
+            row["smallRedemptionExpectedYears"] = round(expected_years, 6)
+            row["smallRedemptionAnnualizedYield"] = round((1.0 + row["smallRedemptionYield"]) ** (1.0 / expected_years) - 1.0, 6)
+        else:
+            row["smallRedemptionExpectedYears"] = None
+            row["smallRedemptionAnnualizedYield"] = None
+
+        remaining_size_yi = _to_positive_float(row.get("remainingSizeYi"))
+        holder_count = _to_positive_float(row.get("holderCount"))
+        if remaining_size_yi is not None and holder_count is not None:
+            row["smallRedemptionAmount"] = round((remaining_size_yi * 100000000.0 / holder_count) * 0.825, 2)
+            row["smallRedemptionTotalAmount"] = round(row["smallRedemptionAmount"] * holder_count, 2)
+        else:
+            row["smallRedemptionAmount"] = None
+            row["smallRedemptionTotalAmount"] = None
+
+        row.update(_build_small_redemption_option_metrics(row, float(risk_free["rate"])))
 
     _persist_runtime_metric_cache(aux_cache, as_of_date_text, core_ready_rows)
 
@@ -2236,5 +3079,3 @@ def get_bond_cb_data(allow_inline_history_hydrate: bool = False) -> Dict[str, An
 
 if __name__ == "__main__":
     print(json.dumps(get_bond_cb_data(), ensure_ascii=False))
-
-

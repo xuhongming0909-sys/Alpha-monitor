@@ -21,6 +21,7 @@ function createMergerReportService(options = {}) {
   const promptTemplateCode = options.promptTemplateCode || "MERGER_DEAL_OVERVIEW_V1";
   const deepseekApiKey = String(options.deepseekApiKey || "").trim();
   const deepseekBaseUrl = String(options.deepseekBaseUrl || "https://api.deepseek.com").trim();
+  const aiModel = String(options.aiModel || "deepseek-chat").trim();
   const fetchImpl = options.fetchImpl || globalThis.fetch;
 
   async function callDeepSeekChatCompletion({ systemPrompt, userPrompt, temperature = 0.2 }) {
@@ -34,7 +35,7 @@ function createMergerReportService(options = {}) {
         Authorization: `Bearer ${deepseekApiKey}`,
       },
       body: JSON.stringify({
-        model: "deepseek-chat",
+        model: aiModel,
         temperature,
         messages: [
           { role: "system", content: systemPrompt },

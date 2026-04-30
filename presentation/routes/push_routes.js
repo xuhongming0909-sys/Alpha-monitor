@@ -15,6 +15,9 @@ function registerPushRoutes(options = {}) {
     getPushRuntimeState,
     pushByModulesToWeCom,
     pushEventAlertsToWeCom,
+    getCbArbitragePushConfig,
+    updateCbArbitragePushConfig,
+    buildCbArbitragePushConfigResponse,
     getCbRightsIssuePushConfig,
     updateCbRightsIssuePushConfig,
     buildCbRightsIssuePushConfigResponse,
@@ -32,6 +35,23 @@ function registerPushRoutes(options = {}) {
     try {
       const next = updatePushConfig(req.body || {});
       return sendSuccess(res, buildPushConfigResponse(next, getPushRuntimeState()));
+    } catch (error) {
+      return sendError(res, error, 400, null);
+    }
+  });
+
+  app.get("/api/push/cb-arbitrage-config", (_req, res) => {
+    try {
+      return sendSuccess(res, buildCbArbitragePushConfigResponse(getCbArbitragePushConfig()));
+    } catch (error) {
+      return sendError(res, error, 500, null);
+    }
+  });
+
+  app.post("/api/push/cb-arbitrage-config", (req, res) => {
+    try {
+      const next = updateCbArbitragePushConfig(req.body || {});
+      return sendSuccess(res, buildCbArbitragePushConfigResponse(next));
     } catch (error) {
       return sendError(res, error, 400, null);
     }

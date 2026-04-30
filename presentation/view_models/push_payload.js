@@ -3,7 +3,7 @@
 function buildPushConfigResponse(config, runtimeState = {}, deliveryStatus = {}, premiumMonitorStatus = {}) {
   const modules = (config?.modules && typeof config.modules === "object") ? config.modules : {};
   const selectedModules = Object.entries(modules)
-    .filter(([, enabled]) => Boolean(enabled))
+    .filter(([key, enabled]) => key !== "cbArb" && Boolean(enabled))
     .map(([key]) => key);
 
   return {

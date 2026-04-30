@@ -23,11 +23,13 @@ const { createModulePushConfigStore } = require('./notification/scheduler/module
 const { createModulePushRuntimeStore } = require('./notification/scheduler/module_push_runtime_store');
 const { createWeComClient } = require('./notification/wecom/client');
 const { buildSummaryMarkdown: buildNotificationSummaryMarkdown } = require('./notification/styles/markdown_style');
+const { buildCbArbitrageMarkdown } = require('./notification/styles/cb_arbitrage_markdown');
 const { buildCbRightsIssueMarkdown } = require('./notification/styles/cb_rights_issue_markdown');
 const { buildLofArbitrageMarkdown } = require('./notification/styles/lof_arbitrage_markdown');
 const { buildConvertibleBondDiscountMarkdown } = require('./notification/styles/discount_strategy_markdown');
 const { createMainSummaryService } = require('./notification/summary/main_summary');
 const { createEventAlertService } = require('./notification/alerts/event_alert_service');
+const { createCbArbitragePushService } = require('./notification/cb_arbitrage/service');
 const { createCbRightsIssuePushService } = require('./notification/cb_rights_issue/service');
 const { createLofArbitragePushService } = require('./notification/lof_arbitrage/service');
 const { createMergerReportService } = require('./notification/merger_report/service');
@@ -91,6 +93,9 @@ const CB_RIGHTS_ISSUE_STRATEGY_CONFIG = (STRATEGY_CONFIG?.cb_rights_issue && typ
   : {};
 const CB_RIGHTS_ISSUE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.cb_rights_issue && typeof NOTIFICATION_CONFIG.cb_rights_issue === 'object')
   ? NOTIFICATION_CONFIG.cb_rights_issue
+  : {};
+const CB_ARBITRAGE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.cb_arbitrage && typeof NOTIFICATION_CONFIG.cb_arbitrage === 'object')
+  ? NOTIFICATION_CONFIG.cb_arbitrage
   : {};
 const LOF_ARBITRAGE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.lof_arbitrage && typeof NOTIFICATION_CONFIG.lof_arbitrage === 'object')
   ? NOTIFICATION_CONFIG.lof_arbitrage
@@ -206,7 +211,6 @@ function buildNotificationModuleDefaults() {
   return {
     ahab: raw.ahab !== false,
     subscription: raw.subscription !== false,
-    cbArb: raw.cb_arb !== false,
     monitor: raw.custom_monitor !== false,
     dividend: raw.dividend !== false,
     eventArb: raw.event_arbitrage !== false,
@@ -238,6 +242,7 @@ const PUSH_HTML_URL = String(
 const WECOM_MAX_MARKDOWN_LENGTH = toIntConfig(NOTIFICATION_CONFIG?.wecom?.max_markdown_length, 3900);
 const DEEPSEEK_API_KEY = String(STRATEGY_CONFIG?.merger?.deepseek_api_key || '').trim();
 const DEEPSEEK_BASE_URL = String(STRATEGY_CONFIG?.merger?.deepseek_base_url || 'https://api.deepseek.com').trim();
+const MERGER_AI_MODEL = String(STRATEGY_CONFIG?.merger?.ai_model || 'deepseek-chat').trim();
 const MERGER_REPORT_MAX_CHARS = toIntConfig(STRATEGY_CONFIG?.merger?.report_max_chars, 500);
 const MERGER_PROMPT_TEMPLATE_CODE = String(
   STRATEGY_CONFIG?.merger?.prompt_template_code || 'MERGER_DEAL_OVERVIEW_V1'
@@ -317,6 +322,25 @@ const DEFAULT_CB_RIGHTS_ISSUE_PUSH_CONFIG = {
     '08:00'
   ).slice(0, 2),
   tradingDaysOnly: CB_RIGHTS_ISSUE_NOTIFICATION_CONFIG?.trading_days_only !== false,
+};
+const DEFAULT_CB_ARBITRAGE_PUSH_TIMES = (() => {
+  if (!Array.isArray(CB_ARBITRAGE_NOTIFICATION_CONFIG?.default_times)) {
+    return ['08:00', '14:30'];
+  }
+  const normalized = normalizeTimeListConfig(
+    CB_ARBITRAGE_NOTIFICATION_CONFIG?.default_times,
+    '08:00'
+  );
+  return normalized.slice(0, 2);
+})();
+const DEFAULT_CB_ARBITRAGE_PUSH_CONFIG = {
+  enabled: typeof CB_ARBITRAGE_NOTIFICATION_CONFIG?.enabled === 'boolean'
+    ? CB_ARBITRAGE_NOTIFICATION_CONFIG.enabled
+    : (((NOTIFICATION_CONFIG?.enabled_modules && typeof NOTIFICATION_CONFIG.enabled_modules === 'object')
+      ? NOTIFICATION_CONFIG.enabled_modules.cb_arb
+      : true) !== false),
+  times: DEFAULT_CB_ARBITRAGE_PUSH_TIMES,
+  tradingDaysOnly: CB_ARBITRAGE_NOTIFICATION_CONFIG?.trading_days_only !== false,
 };
 const DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG = {
   enabled: Boolean(LOF_ARBITRAGE_NOTIFICATION_CONFIG?.enabled),
@@ -708,6 +732,17 @@ const pushRuntimeState = STATE_REGISTRY.read('push_runtime_state', 'push_runtime
   eventArbSeenItems: {},
   eventArbDailyNewItems: {},
 });
+const cbArbitragePushConfigStore = STATE_REGISTRY.read('cb_arbitrage_push_config', 'cb_arbitrage_push_config.json', {
+  enabled: DEFAULT_CB_ARBITRAGE_PUSH_CONFIG.enabled,
+  times: [...DEFAULT_CB_ARBITRAGE_PUSH_CONFIG.times],
+  tradingDaysOnly: DEFAULT_CB_ARBITRAGE_PUSH_CONFIG.tradingDaysOnly,
+});
+const cbArbitragePushRuntimeState = STATE_REGISTRY.read('cb_arbitrage_push_runtime', 'cb_arbitrage_push_runtime.json', {
+  pushRecords: {},
+  lastAttemptAt: null,
+  lastSuccessAt: null,
+  lastError: null,
+});
 const cbRightsIssueStateStore = STATE_REGISTRY.read('cb_rights_issue_state', 'cb_rights_issue_state.json', {
   monitorList: [],
   sourceRows: [],
@@ -798,6 +833,14 @@ function savePushConfigStore() {
 
 function savePushRuntimeState() {
   STATE_REGISTRY.write('push_runtime_state', 'push_runtime_state.json', pushRuntimeState);
+}
+
+function saveCbArbitragePushConfigStore() {
+  STATE_REGISTRY.write('cb_arbitrage_push_config', 'cb_arbitrage_push_config.json', cbArbitragePushConfigStore);
+}
+
+function saveCbArbitragePushRuntimeState() {
+  STATE_REGISTRY.write('cb_arbitrage_push_runtime', 'cb_arbitrage_push_runtime.json', cbArbitragePushRuntimeState);
 }
 
 function saveCbRightsIssueStateStore() {
@@ -1135,6 +1178,16 @@ const pushRuntimeDomain = createPushRuntimeStore({
   parsePushMinutes: (value) => pushConfigDomain.parsePushMinutes(value),
   nowIso,
 });
+const cbArbitragePushConfigDomain = createModulePushConfigStore({
+  state: cbArbitragePushConfigStore,
+  defaultConfig: DEFAULT_CB_ARBITRAGE_PUSH_CONFIG,
+  save: saveCbArbitragePushConfigStore,
+});
+const cbArbitragePushRuntimeDomain = createModulePushRuntimeStore({
+  state: cbArbitragePushRuntimeState,
+  save: saveCbArbitragePushRuntimeState,
+  parsePushMinutes: (value) => cbArbitragePushConfigDomain.parsePushMinutes(value),
+});
 const cbRightsIssuePushConfigDomain = createModulePushConfigStore({
   state: cbRightsIssuePushConfigStore,
   defaultConfig: DEFAULT_CB_RIGHTS_ISSUE_PUSH_CONFIG,
@@ -1189,6 +1242,20 @@ const eventAlertService = createEventAlertService({
   isTradingSession,
   nowIso,
 });
+const cbArbitragePushService = createCbArbitragePushService({
+  getConfig: () => cbArbitragePushConfigDomain.getConfig(),
+  runtimeStore: cbArbitragePushRuntimeDomain,
+  getDataset,
+  sendMarkdown: (markdown) => weComClient.sendMarkdown(markdown),
+  buildMarkdown: buildCbArbitrageMarkdown,
+  getShanghaiParts,
+  parsePushMinutes: (value) => cbArbitragePushConfigDomain.parsePushMinutes(value),
+  isTradingWeekday,
+  isDeliveryAvailable: () => Boolean(WECOM_WEBHOOK_URL),
+  nowIso,
+  logInfo: (message) => console.info(message),
+  logError: (scope, error) => console.error(scope, error?.message || error),
+});
 const cbRightsIssuePushService = createCbRightsIssuePushService({
   getConfig: () => cbRightsIssuePushConfigDomain.getConfig(),
   runtimeStore: cbRightsIssuePushRuntimeDomain,
@@ -1233,6 +1300,7 @@ const mergerReportService = createMergerReportService({
   normalizeError,
   reportMaxChars: MERGER_REPORT_MAX_CHARS,
   promptTemplateCode: MERGER_PROMPT_TEMPLATE_CODE,
+  aiModel: MERGER_AI_MODEL,
   deepseekApiKey: DEEPSEEK_API_KEY,
   deepseekBaseUrl: DEEPSEEK_BASE_URL,
   fetchImpl: globalThis.fetch,
@@ -1258,6 +1326,19 @@ function getPushDeliveryStatus() {
     schedulerEnabled: PUSH_SCHEDULER_RUNTIME_ENABLED,
     calendarMode: PUSH_CALENDAR_MODE,
     schedulerDisabledReason: PUSH_SCHEDULER_DISABLED_REASON || null,
+  };
+}
+
+function getCbArbitragePushDeliveryStatus() {
+  const config = cbArbitragePushConfigDomain.getConfig();
+  return {
+    webhookConfigured: Boolean(WECOM_WEBHOOK_URL),
+    schedulerEnabled: PUSH_SCHEDULER_RUNTIME_ENABLED,
+    schedulerDisabledReason: PUSH_SCHEDULER_DISABLED_REASON || null,
+    tradingDaysOnly: config.tradingDaysOnly !== false,
+    lastAttemptAt: cbArbitragePushRuntimeState.lastAttemptAt || null,
+    lastSuccessAt: cbArbitragePushRuntimeState.lastSuccessAt || null,
+    lastError: cbArbitragePushRuntimeState.lastError || null,
   };
 }
 
@@ -1315,6 +1396,15 @@ function buildDiscountStrategyStatus() {
 
 function buildPushConfigViewModel(config) {
   return buildPushConfigResponse(config, pushRuntimeState, getPushDeliveryStatus(), buildDiscountStrategyStatus());
+}
+
+function buildCbArbitragePushConfigViewModel(config) {
+  return {
+    enabled: config?.enabled !== false,
+    times: Array.isArray(config?.times) ? config.times : [...DEFAULT_CB_ARBITRAGE_PUSH_CONFIG.times],
+    tradingDaysOnly: config?.tradingDaysOnly !== false,
+    deliveryStatus: getCbArbitragePushDeliveryStatus(),
+  };
 }
 
 function buildCbRightsIssuePushConfigViewModel(config) {
@@ -1499,6 +1589,7 @@ const CB_ARB_PUBLIC_ROW_KEYS = [
   'shortCallOptionValue',
   'callSpreadOptionValue',
   'callOptionValue',
+  'optionValue',
   'putOptionValue',
   'theoreticalPrice',
   'theoreticalPremiumRate',
@@ -1517,6 +1608,23 @@ const CB_ARB_PUBLIC_ROW_KEYS = [
   'turnoverAmountYi',
   'listingDate',
   'convertStartDate',
+  'holderCount',
+  'holderCountReportPeriod',
+  'holderCountReportSourceUrl',
+  'holderCountFallbackUsed',
+  'smallRedemptionYield',
+  'smallRedemptionExpectedYears',
+  'smallRedemptionAnnualizedYield',
+  'smallRedemptionAmount',
+  'smallRedemptionTotalAmount',
+  'smallRedemptionOptionValue',
+  'smallRedemptionOptionYield',
+  'smallRedemptionOptionAnnualizedYield',
+  'smallRedemptionTotalAnnualizedYield',
+  'stockNetAssetsYi',
+  'stockInterestBearingDebtYi',
+  'stockBroadCashYi',
+  'stockNetDebtExposureYi',
 ];
 
 function shapeCbArbPublicRows(rows) {
@@ -1530,6 +1638,74 @@ function shapeCbArbPublicRows(rows) {
     }
     return shaped;
   });
+}
+
+function buildCbArbSmallRedemptionRows(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => Number.isFinite(Number(row?.price)) && Number(row.price) < 100)
+    .map((row) => ({
+      ...row,
+      redemptionYield: row.smallRedemptionYield,
+      expectedDurationYears: row.smallRedemptionExpectedYears,
+      annualizedYield: row.smallRedemptionAnnualizedYield,
+      redemptionAmount: row.smallRedemptionAmount,
+      redemptionTotal: row.smallRedemptionTotalAmount,
+      optionValue: row.smallRedemptionOptionValue ?? row.optionValue,
+      optionYield: row.smallRedemptionOptionYield,
+      optionAnnualizedYield: row.smallRedemptionOptionAnnualizedYield,
+      totalAnnualizedYield: row.smallRedemptionTotalAnnualizedYield,
+      liabilityExposureYi: row.stockNetDebtExposureYi,
+      interestBearingDebtYi: row.stockInterestBearingDebtYi,
+      broadCashYi: row.stockBroadCashYi,
+      netAssetYi: row.stockNetAssetsYi,
+    }));
+}
+
+function summarizeCbArbSmallRedemptionRows(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  return {
+    rowCount: list.length,
+    holderCountAvailableCount: list.filter((row) => Number.isFinite(Number(row?.holderCount))).length,
+    financialFieldAvailableCount: list.filter((row) => (
+      Number.isFinite(Number(row?.stockNetAssetsYi)) ||
+      Number.isFinite(Number(row?.stockInterestBearingDebtYi)) ||
+      Number.isFinite(Number(row?.stockBroadCashYi)) ||
+      Number.isFinite(Number(row?.stockNetDebtExposureYi))
+    )).length,
+    fallbackUsedCount: list.filter((row) => row?.holderCountFallbackUsed === true).length,
+  };
+}
+
+function buildCbArbSmallRedemptionMeta(rows) {
+  const stats = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const reportPeriod = String(row?.holderCountReportPeriod || '').trim();
+    const reportSourceUrl = String(row?.holderCountReportSourceUrl || '').trim();
+    const holderCountFallbackUsed = row?.holderCountFallbackUsed === true;
+    if (!reportPeriod && !reportSourceUrl) continue;
+    const key = `${reportPeriod}__${reportSourceUrl}__${holderCountFallbackUsed ? '1' : '0'}`;
+    const current = stats.get(key) || {
+      reportPeriod,
+      reportSourceUrl,
+      holderCountFallbackUsed,
+      count: 0,
+    };
+    current.count += 1;
+    stats.set(key, current);
+  }
+  const picked = [...stats.values()].sort((a, b) => b.count - a.count)[0];
+  if (!picked) {
+    return {
+      reportPeriod: '',
+      reportSourceUrl: '',
+      holderCountFallbackUsed: false,
+    };
+  }
+  return {
+    reportPeriod: picked.reportPeriod || '',
+    reportSourceUrl: picked.reportSourceUrl || '',
+    holderCountFallbackUsed: picked.holderCountFallbackUsed === true,
+  };
 }
 
 function normalizeDatasetPayload(key, result) {
@@ -1553,6 +1729,7 @@ function normalizeDatasetPayload(key, result) {
       (a, b) => (Number.isFinite(Number(b?.theoreticalPremiumRate)) ? Number(b.theoreticalPremiumRate) : Number.NEGATIVE_INFINITY)
         - (Number.isFinite(Number(a?.theoreticalPremiumRate)) ? Number(a.theoreticalPremiumRate) : Number.NEGATIVE_INFINITY)
     );
+    const smallRedemptionRows = buildCbArbSmallRedemptionRows(rows);
     const { data: _rawData, list: _legacyList, rows: _legacyRows, ...rest } = result;
     return {
       ...rest,
@@ -1561,6 +1738,11 @@ function normalizeDatasetPayload(key, result) {
       summary: {
         topDoubleLow: sortedByDoubleLow.slice(0, 3),
         topTheoreticalPremiumRate: sortedByTheory.slice(0, 3),
+      },
+      smallRedemption: {
+        rows: smallRedemptionRows,
+        summary: summarizeCbArbSmallRedemptionRows(smallRedemptionRows),
+        meta: buildCbArbSmallRedemptionMeta(smallRedemptionRows),
       },
     };
   }
@@ -1909,6 +2091,7 @@ async function runPushSchedulerCycle(context = 'tick') {
 
   try {
     await weComScheduler.runTick();
+    await cbArbitragePushService.runIfNeeded();
     await cbRightsIssuePushService.runIfNeeded();
     await lofArbPushService.runIfNeeded();
     updateHealthSection('push_scheduler', 'ok', 'Push scheduler is healthy', details);
@@ -2611,12 +2794,11 @@ async function syncEventArbSummaryState() {
 }
 
 async function collectSummaryDatasets() {
-  const [ah, ab, ipo, bonds, cbArb, monitors] = await Promise.all([
+  const [ah, ab, ipo, bonds, monitors] = await Promise.all([
     getDataset('ah'),
     getDataset('ab'),
     getDataset('ipo'),
     getDataset('bonds'),
-    getDataset('cbArb'),
     getAllMonitors(),
   ]);
   const yesterday = shiftShanghaiDate(getShanghaiParts().date, -1);
@@ -2625,7 +2807,6 @@ async function collectSummaryDatasets() {
     ab,
     ipo,
     bonds,
-    cbArb,
     monitors,
     eventArbNextDaySummary: pushRuntimeDomain.getEventArbDailyNewItems(yesterday),
   };
@@ -2862,6 +3043,9 @@ registerPushRoutes({
   getPushRuntimeState: () => pushRuntimeState,
   pushByModulesToWeCom: pushManualSummaryToWeCom,
   pushEventAlertsToWeCom: pushManualEventAlertsToWeCom,
+  getCbArbitragePushConfig: () => cbArbitragePushConfigDomain.getConfig(),
+  updateCbArbitragePushConfig: (payload) => cbArbitragePushConfigDomain.updateConfig(payload),
+  buildCbArbitragePushConfigResponse: buildCbArbitragePushConfigViewModel,
   getCbRightsIssuePushConfig: () => cbRightsIssuePushConfigDomain.getConfig(),
   updateCbRightsIssuePushConfig: (payload) => cbRightsIssuePushConfigDomain.updateConfig(payload),
   buildCbRightsIssuePushConfigResponse: buildCbRightsIssuePushConfigViewModel,
@@ -2944,7 +3128,25 @@ app.use('/api', (req, res) => {
   );
 });
 
-app.get('*', (_req, res) => res.sendFile(INDEX_FILE));
+// Serve React UI build if available
+const UI_DIST_DIR = path.resolve(ROOT, 'ui/dist');
+const UI_INDEX_FILE = path.join(UI_DIST_DIR, 'index.html');
+const hasUiBuild = fs.existsSync(UI_DIST_DIR) && fs.existsSync(UI_INDEX_FILE);
+
+if (hasUiBuild) {
+  app.use(express.static(UI_DIST_DIR));
+}
+
+// Legacy dashboard route
+app.get('/legacy', (_req, res) => res.sendFile(INDEX_FILE));
+
+// Default: serve React UI if built, otherwise fallback to legacy dashboard
+app.get('*', (_req, res) => {
+  if (hasUiBuild) {
+    return res.sendFile(UI_INDEX_FILE);
+  }
+  return res.sendFile(INDEX_FILE);
+});
 
 const server = app.listen(PORT, HOST, () => {
   updateHealthSection('web', 'ok', 'HTTP service is healthy', {

@@ -536,6 +536,51 @@
         margin-bottom: 10px;
       }
 
+      .cb-arb-subtab-shell {
+        display: grid;
+        gap: 10px;
+      }
+
+      .cb-arb-meta-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 8px;
+      }
+
+      .cb-arb-meta-strip span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 0 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text-soft);
+        font-size: 12px;
+      }
+
+      th.cb-arb-highlight-head {
+        background:
+          linear-gradient(180deg, rgba(255, 222, 89, 0.28), rgba(118, 88, 0, 0.26)),
+          rgba(28, 24, 10, 0.98);
+        color: #fff0b0;
+      }
+
+      th.cb-arb-highlight-head .sort-indicator {
+        color: #ffe38a;
+      }
+
+      .cb-arb-liability-stack {
+        display: grid;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .cb-arb-push-host {
+        display: grid;
+        gap: 8px;
+      }
+
       .subtab-button {
         min-height: 34px;
         padding: 7px 12px;
@@ -1543,6 +1588,7 @@
             <button id="reload-data-button" type="button" class="btn-secondary">刷新</button>
           </div>
         </form>
+        <div id="cb-arb-push-settings-host" class="cb-arb-push-host"></div>
       </section>
 
     </div>

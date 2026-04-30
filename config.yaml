@@ -7,13 +7,13 @@ app:
   name: "Alpha Monitor"
   environment: "development"
   host: "0.0.0.0"
-  port: 5000
+  port: 5001
   scheduler_tick_interval_ms: 60000
   shutdown_grace_timeout_ms: 5000
   python_exec_timeout_ms: 60000
   python_exec_max_buffer_mb: 50
   trust_proxy: false
-  server_base_url: "http://127.0.0.1:5000"
+  server_base_url: "http://127.0.0.1:5001"
   healthcheck_path: "/api/health"
   timezone: "Asia/Shanghai"
   env_file: ".env"
@@ -186,10 +186,13 @@ data_fetch:
       intraday: false
       refresh_interval_ms: 900000
       daily_incremental_sync: true
+      request_timeout_seconds: 15
     merger:
       intraday: false
       refresh_time: "00:00"
       daily_incremental_sync: false
+      announcement_timeout_seconds: 5
+      quote_timeout_seconds: 15
       announcement_lookback_days: 90
       keyword_sets:
         search:
@@ -221,7 +224,9 @@ data_fetch:
           enabled: false
     convertible_bond:
       intraday: true
-      refresh_interval_ms: 300000
+      refresh_interval_ms: 60000
+      request_timeout_seconds: 20
+      long_request_timeout_seconds: 30
       force_request_soft_timeout_ms: 55000
       daily_incremental_sync: true
       sync_stock_history_before_strategy: true
@@ -239,7 +244,7 @@ data_fetch:
       max_financial_workers: 10
       inline_history_hydrate_enabled: false
       inline_history_hydrate_limit: 24
-      spot_cache_ttl_ms: 180000
+      spot_cache_ttl_ms: 60000
       jisilu_cookie: "${JISILU_COOKIE}"
     custom_monitor:
       intraday: true
@@ -336,6 +341,7 @@ strategy:
   merger:
     same_day_only: true
     ai_provider: "deepseek"
+    ai_model: "deepseek-chat"
     prompt_template_code: "MERGER_DEAL_OVERVIEW_V1"
     report_max_chars: 500
     deepseek_api_key: "${DEEPSEEK_API_KEY}"

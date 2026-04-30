@@ -16,7 +16,7 @@ const PAGE_SIZE = 50;
 const CRITICAL_CACHE_REVALIDATION_KEYS = ['exchangeRate', 'cbArb', 'ah', 'ab'];
 const DEFAULT_AUTO_REFRESH_CONFIG = Object.freeze({
   enabled: true,
-  intervalMs: 60 * 1000,
+  intervalMs: 30 * 1000,
   mode: 'status',
   currentTabOnly: true,
   reloadDataOnCacheChange: true,
@@ -57,11 +57,13 @@ const ENDPOINTS = {
   dividendRefresh: '/api/dividend?action=refresh',
   merger: '/api/market/event-arbitrage',
   pushConfig: '/api/push/config',
+  cbArbPushConfig: '/api/push/cb-arbitrage-config',
   cbRightsIssuePushConfig: '/api/push/cb-rights-issue-config',
   lofArbPushConfig: '/api/push/lof-arbitrage-config',
 };
 
 const TAB_SEQUENCE = ['cb-arb', 'ah', 'ab', 'lof-arb', 'monitor', 'dividend', 'merger', 'cb-rights-issue'];
+const CB_ARB_SUBTAB_SEQUENCE = ['home', 'small-redemption'];
 const CB_RIGHTS_ISSUE_SUBTAB_SEQUENCE = ['apply', 'ambush', 'wait'];
 const CB_RIGHTS_ISSUE_MARKET_SUBTAB_SEQUENCE = ['sh', 'sz'];
 const CB_RIGHTS_ISSUE_TABLE_KEYS = [
@@ -119,6 +121,7 @@ const SUBSCRIPTION_STAGES = [
 
 const TABLE_DEFAULTS = {
   cbArb: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
+  cbArbSmallRedemption: { sortKey: 'redemptionYield', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   ah: { sortKey: 'premium', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   ab: { sortKey: 'premium', sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
   monitor: { sortKey: null, sortDir: 'desc', page: 1, pageSize: PAGE_SIZE, searchQuery: '' },
@@ -139,6 +142,11 @@ const TABLE_DEFAULTS = {
 
 const TABLE_SEARCH_CONFIG = Object.freeze({
   cbArb: {
+    placeholder: '搜索转债代码/名称、正股代码/名称',
+    hint: '可按转债代码、转债名称、正股代码、正股名称搜索',
+    fields: ['code', 'bondName', 'stockCode', 'stockName'],
+  },
+  cbArbSmallRedemption: {
     placeholder: '搜索转债代码/名称、正股代码/名称',
     hint: '可按转债代码、转债名称、正股代码、正股名称搜索',
     fields: ['code', 'bondName', 'stockCode', 'stockName'],
@@ -192,11 +200,13 @@ const TABLE_SEARCH_CONFIG = Object.freeze({
 
 const state = {
   activeTab: 'cb-arb',
+  cbArbSubview: 'home',
   lofSubview: 'index',
   cbRightsIssueMarketSubview: 'sh',
   mergerSubview: 'a_event',
   eventsBound: false,
   savingPush: false,
+  savingCbArbPush: false,
   savingCbRightsIssuePush: false,
   savingLofArbPush: false,
   savingMonitor: false,
@@ -207,6 +217,7 @@ const state = {
   tableScrollOffsets: {},
   searchComposition: {
     cbArb: false,
+    cbArbSmallRedemption: false,
     ah: false,
     ab: false,
     lofArb: false,
@@ -231,6 +242,7 @@ const state = {
   },
   tables: {
     cbArb: createTableState('cbArb'),
+    cbArbSmallRedemption: createTableState('cbArbSmallRedemption'),
     ah: createTableState('ah'),
     ab: createTableState('ab'),
     monitor: createTableState('monitor'),
@@ -263,6 +275,7 @@ const state = {
     dividend: resourceState(),
     merger: resourceState(),
     pushConfig: resourceState(),
+    cbArbPushConfig: resourceState(),
     cbRightsIssuePushConfig: resourceState(),
     lofArbPushConfig: resourceState(),
   },
@@ -288,6 +301,7 @@ const dom = {
   pushStateText: document.getElementById('push-state-text'),
   pushAlertStateText: document.getElementById('push-alert-state-text'),
   pushForm: document.getElementById('push-form'),
+  cbArbPushSettingsHost: document.getElementById('cb-arb-push-settings-host'),
   pushTime1: document.getElementById('push-time-1'),
   pushTime2: document.getElementById('push-time-2'),
   savePushButton: document.getElementById('save-push-button'),
@@ -540,6 +554,28 @@ function readObject(payload) {
   return payload && typeof payload === 'object' ? payload : {};
 }
 
+function readValueByPathSafe(source, path) {
+  return String(path || '')
+    .split('.')
+    .reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), source);
+}
+
+function readFirstDefinedValue(source, paths = []) {
+  for (const path of paths) {
+    const value = readValueByPathSafe(source, path);
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return null;
+}
+
+function readFirstNumberValue(source, paths = []) {
+  for (const path of paths) {
+    const value = toNumber(readValueByPathSafe(source, path));
+    if (value !== null) return value;
+  }
+  return null;
+}
+
 function readResourceArray(key) {
   return readArray(state.resources[key].data);
 }
@@ -623,6 +659,13 @@ function formatPercent(value, digits = 2) {
   return `${sign}${formatNumber(parsed, digits)}%`;
 }
 
+function formatSmallRedemptionPercent(value, digits = 2) {
+  const parsed = toNumber(value);
+  if (parsed === null) return '--';
+  const normalized = Math.abs(parsed) <= 1 ? parsed * 100 : parsed;
+  return formatPercent(normalized, digits);
+}
+
 function statusText(value, digits = 2) {
   const parsed = toNumber(value);
   if (parsed === null) return '涨幅 --';
@@ -640,6 +683,21 @@ function formatRemainingTerm(value) {
   const parsed = toNumber(value);
   if (parsed === null) return '--';
   return `${formatNumber(parsed, 2)}年`;
+}
+
+function formatYiValue(value, digits = 2) {
+  const parsed = toNumber(value);
+  if (parsed === null) return '--';
+  return `${formatNumber(parsed, digits)}\u4ebf`;
+}
+
+function formatCurrencyCompact(value, digits = 2) {
+  const parsed = toNumber(value);
+  if (parsed === null) return '--';
+  const absolute = Math.abs(parsed);
+  if (absolute >= 100000000) return `${formatNumber(parsed / 100000000, digits)}\u4ebf`;
+  if (absolute >= 10000) return `${formatNumber(parsed / 10000, digits)}\u4e07`;
+  return `${formatNumber(parsed, absolute >= 1000 ? digits : 0)}\u5143`;
 }
 
 /**
@@ -826,7 +884,7 @@ function restoreTableSearchFocus(snapshot) {
 }
 
 function renderSearchableTablePanel(tableKey) {
-  if (tableKey === 'cbArb') {
+  if (tableKey === 'cbArb' || tableKey === 'cbArbSmallRedemption') {
     renderConvertibleBondPanel();
     return;
   }
@@ -853,8 +911,17 @@ function renderSearchableTableHostContent(tableKey) {
       tableKey: 'cbArb',
       tableKind: 'convertible',
       columns: buildConvertibleColumns(),
-      rows: readResourceArray('cbArb'),
+      rows: readCbArbMainRows(),
       emptyMessage: '转债套利暂时没有返回数据',
+    });
+  }
+  if (tableKey === 'cbArbSmallRedemption') {
+    return renderPaginatedTable({
+      tableKey: 'cbArbSmallRedemption',
+      tableKind: 'convertible',
+      columns: buildCbArbSmallRedemptionColumns(),
+      rows: readCbArbSmallRedemptionRows(),
+      emptyMessage: '\u5f53\u524d\u6ca1\u6709\u7b26\u5408\u6761\u4ef6\u7684\u5c0f\u989d\u521a\u5151\u6807\u7684',
     });
   }
   if (tableKey === 'ah' || tableKey === 'ab') {
@@ -964,6 +1031,69 @@ function readFreshnessText(keys) {
     return '当前显示缓存值';
   }
   return '实时快照';
+}
+
+function readCbArbPayload() {
+  return readResourceObject('cbArb');
+}
+
+function readCbArbMainRows() {
+  const payload = readCbArbPayload();
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (payload?.data && Array.isArray(payload.data.rows)) return payload.data.rows;
+  if (payload?.data && Array.isArray(payload.data.list)) return payload.data.list;
+  if (Array.isArray(payload?.rows)) return payload.rows;
+  return readArray(payload);
+}
+
+function readCbArbSummary() {
+  const payload = readCbArbPayload();
+  return payload?.summary && typeof payload.summary === 'object'
+    ? payload.summary
+    : (payload?.data?.summary && typeof payload.data.summary === 'object' ? payload.data.summary : {});
+}
+
+function readCbArbPremiumMonitorSummary() {
+  const payload = readCbArbPayload();
+  return payload?.premiumMonitorSummary && typeof payload.premiumMonitorSummary === 'object'
+    ? payload.premiumMonitorSummary
+    : (payload?.data?.premiumMonitorSummary && typeof payload.data.premiumMonitorSummary === 'object'
+      ? payload.data.premiumMonitorSummary
+      : { items: [] });
+}
+
+function readCbArbSmallRedemptionSection() {
+  const payload = readCbArbPayload();
+  return payload?.smallRedemption && typeof payload.smallRedemption === 'object'
+    ? payload.smallRedemption
+    : (payload?.data?.smallRedemption && typeof payload.data.smallRedemption === 'object'
+      ? payload.data.smallRedemption
+      : {});
+}
+
+function readCbArbSmallRedemptionRows() {
+  const section = readCbArbSmallRedemptionSection();
+  if (Array.isArray(section?.rows)) return section.rows;
+  if (section?.data && Array.isArray(section.data.rows)) return section.data.rows;
+  if (section?.data && Array.isArray(section.data.list)) return section.data.list;
+  return readArray(section);
+}
+
+function readCbArbSmallRedemptionSummary() {
+  const section = readCbArbSmallRedemptionSection();
+  return section?.summary && typeof section.summary === 'object' ? section.summary : {};
+}
+
+function readCbArbSmallRedemptionMeta() {
+  const section = readCbArbSmallRedemptionSection();
+  return section?.meta && typeof section.meta === 'object' ? section.meta : {};
+}
+
+function ensureCbArbSubview() {
+  if (!CB_ARB_SUBTAB_SEQUENCE.includes(state.cbArbSubview)) {
+    state.cbArbSubview = 'home';
+  }
+  return state.cbArbSubview;
 }
 
 function readCbRightsIssueDataset() {
@@ -1175,6 +1305,11 @@ function readLofArbPushConfigViewModel() {
   return payload?.data && typeof payload.data === 'object' ? payload.data : {};
 }
 
+function readCbArbPushConfigViewModel() {
+  const payload = readResourceObject('cbArbPushConfig');
+  return payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+}
+
 function showToast(message, isError = false) {
   if (!dom.toast) return;
   dom.toast.textContent = String(message || (isError ? '操作失败' : '操作成功'));
@@ -1289,6 +1424,13 @@ function bindEvents() {
   });
 
   document.addEventListener('submit', (event) => {
+    const cbArbPushForm = event.target.closest('#cb-arb-push-form');
+    if (cbArbPushForm) {
+      event.preventDefault();
+      void saveCbArbPushConfig(cbArbPushForm);
+      return;
+    }
+
     const lofArbPushForm = event.target.closest('#lof-arb-push-form');
     if (lofArbPushForm) {
       event.preventDefault();
@@ -1416,12 +1558,21 @@ function bindEvents() {
       const tableKey = expandTarget.dataset.tableKey;
       const rowId = expandTarget.dataset.rowId;
       toggleExpandedState(tableKey, rowId);
-      if (tableKey === 'cbArb') return renderConvertibleBondPanel();
+      if (tableKey === 'cbArb' || tableKey === 'cbArbSmallRedemption') return renderConvertibleBondPanel();
       if (tableKey === 'ah') return renderPremiumPanel('ah');
       if (tableKey === 'ab') return renderPremiumPanel('ab');
       if (tableKey === 'lofArb') return renderLofArbPanel();
       if (tableKey === 'monitor') return renderMonitorPanel();
       if (tableKey === 'merger' || tableKey.startsWith('eventArb')) return renderMergerPanel();
+    }
+
+    const cbArbSubtabTarget = event.target.closest('[data-cb-arb-subtab]');
+    if (cbArbSubtabTarget) {
+      const subtab = String(cbArbSubtabTarget.dataset.cbArbSubtab || '').trim();
+      if (!CB_ARB_SUBTAB_SEQUENCE.includes(subtab)) return;
+      state.cbArbSubview = subtab;
+      renderConvertibleBondPanel();
+      return;
     }
 
     const lofSubviewTarget = event.target.closest('[data-lof-subview]');
@@ -1476,8 +1627,8 @@ function renderEverything() {
 }
 
 function renderCallbackForResource(key) {
-  if (['exchangeRate', 'ipo', 'bonds', 'pushConfig'].includes(key)) {
-    return key === 'pushConfig' ? renderPushSettings : renderHeaderOnly;
+  if (['exchangeRate', 'ipo', 'bonds', 'pushConfig', 'cbArbPushConfig'].includes(key)) {
+    return (key === 'pushConfig' || key === 'cbArbPushConfig') ? renderPushSettings : renderHeaderOnly;
   }
   return renderEverything;
 }
@@ -1491,6 +1642,7 @@ function buildHeaderLoadTasks(options = {}) {
   }
   tasks.push(loadResource('health', ENDPOINTS.health, renderHeaderOnly, { background }));
   tasks.push(loadResource('pushConfig', ENDPOINTS.pushConfig, renderPushSettings, { background }));
+  tasks.push(loadResource('cbArbPushConfig', ENDPOINTS.cbArbPushConfig, renderPushSettings, { background }));
   tasks.push(loadResource('exchangeRate', ENDPOINTS.exchangeRate, renderHeaderOnly, { force: forceMarket, background }));
   tasks.push(loadResource('ipo', ENDPOINTS.ipo, renderHeaderOnly, { force: forceMarket, background }));
   tasks.push(loadResource('bonds', ENDPOINTS.bonds, renderHeaderOnly, { force: forceMarket, background }));
@@ -1620,6 +1772,7 @@ async function runAutoRefreshTick(_reason = 'interval') {
     const tasks = [
       loadResource('health', ENDPOINTS.health, renderHeaderOnly, { background: true }),
       loadResource('pushConfig', ENDPOINTS.pushConfig, renderPushSettings, { background: true }),
+      loadResource('cbArbPushConfig', ENDPOINTS.cbArbPushConfig, renderPushSettings, { background: true }),
     ];
 
     if (changedDatasetKeys.includes('exchangeRate')) {
@@ -1633,7 +1786,9 @@ async function runAutoRefreshTick(_reason = 'interval') {
     }
 
     const activeDatasetKeys = readActiveTabDatasetStatusKeys();
-    if (config.reloadDataOnCacheChange && activeDatasetKeys.some((key) => changedDatasetKeys.includes(key))) {
+    if (state.activeTab === 'cb-arb') {
+      tasks.push(...buildActiveTabLoadTasks({ background: true, forceMarket: true }));
+    } else if (config.reloadDataOnCacheChange && activeDatasetKeys.some((key) => changedDatasetKeys.includes(key))) {
       tasks.push(...buildActiveTabLoadTasks({ background: true }));
     } else if (!activeDatasetKeys.length) {
       tasks.push(...buildActiveTabLoadTasks({ background: true }));
@@ -2030,7 +2185,76 @@ function buildPushStateText(config = {}) {
   return { summaryLine, alertLine };
 }
 
+function resolveCbArbPushConfigTimes(config = {}) {
+  const times = Array.isArray(config.times) ? config.times.filter(Boolean) : [];
+  return {
+    times,
+    time1: times[0] || '08:00',
+    time2: times[1] || '14:30',
+  };
+}
+
+function buildCbArbPushStateText(config = {}) {
+  const delivery = config?.deliveryStatus && typeof config.deliveryStatus === 'object' ? config.deliveryStatus : {};
+  const next = resolveCbArbPushConfigTimes(config);
+  return [
+    config.enabled === false ? '\u72ec\u7acb\u63a8\u9001\u5df2\u5173\u95ed' : `\u65f6\u95f4 ${next.times.join(' / ') || '--'}`,
+    delivery.webhookConfigured === false ? 'Webhook \u672a\u914d\u7f6e' : 'Webhook \u5df2\u914d\u7f6e',
+    delivery.schedulerEnabled === false
+      ? (delivery.schedulerDisabledReason === 'loopback_public_base_url'
+        ? '\u672c\u5730\u8fd0\u884c\u5df2\u7981\u7528\u670d\u52a1\u7aef\u8c03\u5ea6'
+        : '\u670d\u52a1\u7aef\u8c03\u5ea6\u5df2\u5173\u95ed')
+      : '',
+    delivery.lastSuccessAt ? `\u6700\u8fd1\u6210\u529f ${formatDate(delivery.lastSuccessAt)}` : '',
+    delivery.lastError ? `\u6700\u8fd1\u5931\u8d25 ${shortErrorText(delivery.lastError)}` : '',
+  ].filter(Boolean).join(' / ');
+}
+
+function renderCbArbPushSettingsCard() {
+  const host = dom.cbArbPushSettingsHost;
+  if (!host) return;
+
+  const resource = state.resources.cbArbPushConfig;
+  const config = readCbArbPushConfigViewModel();
+  const next = resolveCbArbPushConfigTimes(config);
+  const statusText = resource.status === 'loading' && !resource.data
+    ? '\u6b63\u5728\u8bfb\u53d6\u53ef\u8f6c\u503a\u5957\u5229\u72ec\u7acb\u63a8\u9001\u72b6\u6001'
+    : resource.status === 'error' && !Object.keys(config || {}).length
+      ? '\u72ec\u7acb\u63a8\u9001\u914d\u7f6e\u8bfb\u53d6\u5931\u8d25'
+      : state.savingCbArbPush
+        ? '\u6b63\u5728\u4fdd\u5b58\u53ef\u8f6c\u503a\u5957\u5229\u63a8\u9001\u914d\u7f6e'
+        : buildCbArbPushStateText(config) || '\u5f85\u540e\u7aef\u63a5\u5165';
+
+  host.innerHTML = `
+    <div class="list-card">
+      <div class="module-toolbar">
+        <div>
+          <h3>\u53ef\u8f6c\u503a\u5957\u5229\u63a8\u9001</h3>
+          <div class="section-note">\u72ec\u7acb\u4e8e 8 \u70b9\u4e3b\u6458\u8981\u63a8\u9001\uff0c\u8fd9\u91cc\u53ea\u8d1f\u8d23\u524d\u7aef\u914d\u7f6e\u8bfb\u5199\uff1b\u5177\u4f53\u53bb\u91cd\u4e0e\u6d88\u606f\u6a21\u677f\u4ecd\u7531\u540e\u7aef\u5b9e\u73b0\u3002</div>
+        </div>
+        <div class="panel-meta">
+          <span>${escapeHtml(statusText)}</span>
+        </div>
+      </div>
+      <form id="cb-arb-push-form" class="push-form">
+        <div class="input-group">
+          <label for="cb-arb-push-time-1">\u63a8\u9001\u65f6\u95f4 1</label>
+          <input id="cb-arb-push-time-1" name="time1" type="time" value="${escapeHtml(next.time1)}" ${resource.status === 'loading' || state.savingCbArbPush ? 'disabled' : ''} />
+        </div>
+        <div class="input-group">
+          <label for="cb-arb-push-time-2">\u63a8\u9001\u65f6\u95f4 2</label>
+          <input id="cb-arb-push-time-2" name="time2" type="time" value="${escapeHtml(next.time2)}" ${resource.status === 'loading' || state.savingCbArbPush ? 'disabled' : ''} />
+        </div>
+        <div class="button-row inline">
+          <button type="submit" class="btn-primary" ${resource.status === 'loading' || state.savingCbArbPush ? 'disabled' : ''}>\u4fdd\u5b58</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
 function renderPushSettings() {
+  renderCbArbPushSettingsCard();
   const resource = state.resources.pushConfig;
   if (!dom.pushStateText || !dom.pushAlertStateText || !dom.savePushButton) return;
 
@@ -2113,6 +2337,48 @@ async function savePushConfig() {
     showToast(error.message || "推送设置保存失败", true);
   } finally {
     state.savingPush = false;
+    renderPushSettings();
+  }
+}
+
+async function saveCbArbPushConfig(form) {
+  const config = readCbArbPushConfigViewModel();
+  const formData = new FormData(form);
+  const time1 = String(formData.get('time1') || '').trim();
+  const time2 = String(formData.get('time2') || '').trim();
+  const validTimes = [time1, time2].filter(Boolean);
+
+  if (!time1 || !time2) {
+    showToast('\u53ef\u8f6c\u503a\u5957\u5229\u72ec\u7acb\u63a8\u9001\u9700\u8981\u4e24\u4e2a\u65f6\u95f4\u70b9', true);
+    return;
+  }
+
+  state.savingCbArbPush = true;
+  renderPushSettings();
+
+  try {
+    const payload = await fetchJson(ENDPOINTS.cbArbPushConfig, {
+      method: 'POST',
+      body: JSON.stringify({
+        enabled: config.enabled !== false,
+        times: validTimes,
+      }),
+    });
+
+    state.resources.cbArbPushConfig.status = 'ready';
+    state.resources.cbArbPushConfig.data = payload;
+    state.resources.cbArbPushConfig.error = null;
+    const syncedPayload = await fetchJson(ENDPOINTS.cbArbPushConfig, { method: 'GET' });
+    state.resources.cbArbPushConfig.status = 'ready';
+    state.resources.cbArbPushConfig.data = syncedPayload;
+    state.resources.cbArbPushConfig.error = null;
+    showToast('\u53ef\u8f6c\u503a\u5957\u5229\u63a8\u9001\u914d\u7f6e\u5df2\u4fdd\u5b58');
+  } catch (error) {
+    state.resources.cbArbPushConfig.status = 'error';
+    state.resources.cbArbPushConfig.error = error;
+    showToast(error.message || '\u53ef\u8f6c\u503a\u5957\u5229\u63a8\u9001\u914d\u7f6e\u4fdd\u5b58\u5931\u8d25', true);
+  } finally {
+    state.savingCbArbPush = false;
     renderPushSettings();
   }
 }
@@ -2571,7 +2837,7 @@ function handleSortClick(tableKey, sortKey) {
   }
   tableState.page = 1;
 
-  if (tableKey === 'cbArb') renderConvertibleBondPanel();
+  if (tableKey === 'cbArb' || tableKey === 'cbArbSmallRedemption') renderConvertibleBondPanel();
   if (tableKey === 'ah') renderPremiumPanel('ah');
   if (tableKey === 'ab') renderPremiumPanel('ab');
   if (tableKey === 'lofArb') renderLofArbPanel();
@@ -2592,7 +2858,7 @@ function handlePageClick(tableKey, action) {
   if (action === 'next') tableState.page = Math.min(totalPages, tableState.page + 1);
   if (action === 'last') tableState.page = totalPages;
 
-  if (tableKey === 'cbArb') renderConvertibleBondPanel();
+  if (tableKey === 'cbArb' || tableKey === 'cbArbSmallRedemption') renderConvertibleBondPanel();
   if (tableKey === 'ah') renderPremiumPanel('ah');
   if (tableKey === 'ab') renderPremiumPanel('ab');
   if (tableKey === 'lofArb') renderLofArbPanel();
@@ -2604,7 +2870,8 @@ function handlePageClick(tableKey, action) {
 }
 
 function readTableSourceRows(tableKey) {
-  if (tableKey === 'cbArb') return readResourceArray('cbArb');
+  if (tableKey === 'cbArb') return readCbArbMainRows();
+  if (tableKey === 'cbArbSmallRedemption') return readCbArbSmallRedemptionRows();
   if (tableKey === 'lofArb') return readLofArbVisibleRows();
   if (isCbRightsIssueTableKey(tableKey)) {
     const parsed = parseCbRightsIssueTableKey(tableKey);
@@ -2623,6 +2890,7 @@ function readTableSourceRows(tableKey) {
 
 function getTableColumns(tableKey) {
   if (tableKey === 'cbArb') return buildConvertibleColumns();
+  if (tableKey === 'cbArbSmallRedemption') return buildCbArbSmallRedemptionColumns();
   if (tableKey === 'lofArb') return buildLofArbColumns();
   if (isCbRightsIssueTableKey(tableKey)) {
     const parsed = parseCbRightsIssueTableKey(tableKey);
@@ -2763,7 +3031,7 @@ function renderTableHeader(columns, tableKey, options = {}) {
   const cells = columns
     .map((column) => {
       if (column.key === 'index') return '<th class="col-index">序号</th>';
-      const columnClass = escapeHtml(column.columnClassName || '');
+      const columnClass = escapeHtml([column.columnClassName || '', column.headerClassName || ''].filter(Boolean).join(' '));
       const baseLabel = column.headerHtml || escapeHtml(column.label);
       const label = column.group
         ? `${baseLabel}<span class="th-group-tag">${escapeHtml(column.group)}</span>`
@@ -2808,6 +3076,7 @@ function renderTableCell(column, row, rowNumber) {
 
 function resolveRowId(tableKey, row, fallbackIndex) {
   if (tableKey === 'cbArb') return String(row.code || row.bondName || fallbackIndex);
+  if (tableKey === 'cbArbSmallRedemption') return String(row.code || row.bondName || fallbackIndex);
   if (tableKey === 'ah') return `${row.aCode || ''}-${row.hCode || ''}-${fallbackIndex}`;
   if (tableKey === 'ab') return `${row.aCode || ''}-${row.bCode || ''}-${fallbackIndex}`;
   if (tableKey === 'lofArb') return String(row.code || row.name || fallbackIndex);
@@ -2973,7 +3242,7 @@ function renderTableSearchBar(tableKey) {
   const config = readTableSearchConfig(tableKey);
   if (!config) return '';
   const query = String(state.tables?.[tableKey]?.searchQuery || '');
-  if (tableKey === 'cbArb') {
+  if (tableKey === 'cbArb' || tableKey === 'cbArbSmallRedemption') {
     return `
       <div class="table-search-bar">
         <div class="table-search-main">
@@ -3253,6 +3522,177 @@ function buildConvertibleColumns() {
   ];
 }
 
+function buildCbArbSmallRedemptionColumns() {
+  return [
+    {
+      key: 'bondName',
+      label: '\u53ef\u8f6c\u503a\u4ee3\u7801&\u540d\u79f0',
+      columnClassName: 'col-name col-bond-sticky col-cb-identity',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'asc',
+      sortValue: (row) => String(row.bondName || row.code || ''),
+      render: (row) => renderConvertibleBondIdentity(row),
+    },
+    {
+      key: 'bondQuote',
+      label: '\u53ef\u8f6c\u503a\u4ef7\u683c&\u6da8\u8dcc\u5e45',
+      columnClassName: 'col-name col-cb-quote',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'asc',
+      sortValue: (row) => toNumber(row.price),
+      render: (row) => renderCompactCell(formatNumber(row.price, 2), [statusText(row.changePercent, 2)], statusClass(row.changePercent)),
+    },
+    {
+      key: 'stockIdentity',
+      label: '\u6b63\u80a1\u540d\u79f0&\u4ee3\u7801',
+      columnClassName: 'col-name col-cb-identity',
+      sortable: true,
+      sortType: 'text',
+      defaultDir: 'asc',
+      sortValue: (row) => String(row.stockName || row.stockCode || ''),
+      render: (row) => renderCompactCell(escapeHtml(row.stockName || '--'), [`<span class="mono-text">${escapeHtml(row.stockCode || '--')}</span>`]),
+    },
+    {
+      key: 'stockQuote',
+      label: '\u6b63\u80a1\u4ef7\u683c&\u6da8\u8dcc\u5e45',
+      columnClassName: 'col-name col-cb-quote',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => toNumber(row.stockPrice),
+      render: (row) => renderCompactCell(formatNumber(row.stockPrice, 2), [statusText(row.stockChangePercent, 2)], statusClass(row.stockChangePercent)),
+    },
+    {
+      key: 'holderCount',
+      label: '\u6301\u6709\u4eba\u6570',
+      columnClassName: 'col-num col-cb-num',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => readCbArbHolderCount(row),
+      render: (row) => formatInt(readCbArbHolderCount(row)),
+    },
+    {
+      key: 'remainingSizeYi',
+      label: '\u5269\u4f59\u89c4\u6a21',
+      columnClassName: 'col-num col-cb-num',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => readCbArbSmallRedemptionRemainingSizeYi(row),
+      render: (row) => formatYiValue(readCbArbSmallRedemptionRemainingSizeYi(row), 2),
+    },
+    {
+      key: 'redemptionAmount',
+      label: '\u521a\u5151\u91d1\u989d',
+      columnClassName: 'col-num col-cb-num',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => readCbArbSmallRedemptionAmount(row),
+      render: (row) => formatCurrencyCompact(readCbArbSmallRedemptionAmount(row), 2),
+    },
+    {
+      key: 'redemptionYield',
+      label: '\u521a\u5151\u6536\u76ca\u7387',
+      headerClassName: 'cb-arb-highlight-head',
+      columnClassName: 'col-percent col-cb-percent',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => readCbArbSmallRedemptionYield(row),
+      className: (row) => statusClass(readCbArbSmallRedemptionYield(row)),
+      render: (row) => formatSmallRedemptionPercent(readCbArbSmallRedemptionYield(row), 2),
+    },
+    {
+      key: 'expectedDurationYears',
+      label: '\u9884\u671f\u8017\u65f6',
+      headerClassName: 'cb-arb-highlight-head',
+      columnClassName: 'col-num col-cb-num',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'asc',
+      sortValue: (row) => readCbArbSmallRedemptionExpectedDurationYears(row),
+      render: (row) => renderCbArbExpectedDurationCell(row),
+    },
+    {
+      key: 'annualizedYield',
+      label: '\u521a\u5151\u5e74\u5316',
+      columnClassName: 'col-percent col-cb-percent',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => readCbArbSmallRedemptionAnnualizedYield(row),
+      className: (row) => statusClass(readCbArbSmallRedemptionAnnualizedYield(row)),
+      render: (row) => formatSmallRedemptionPercent(readCbArbSmallRedemptionAnnualizedYield(row), 2),
+    },
+    {
+      key: 'redemptionTotal',
+      label: '\u521a\u5151\u603b\u989d',
+      columnClassName: 'col-num col-cb-num',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => readCbArbSmallRedemptionTotal(row),
+      render: (row) => formatCurrencyCompact(readCbArbSmallRedemptionTotal(row), 2),
+    },
+    {
+      key: 'liabilityExposureYi',
+      label: '\u8d1f\u503a\u655e\u53e3',
+      columnClassName: 'col-name col-cb-factor',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => readCbArbLiabilityExposureYi(row),
+      render: (row) => renderCbArbLiabilityExposureCell(row),
+    },
+    {
+      key: 'netAssetYi',
+      label: '\u51c0\u8d44\u4ea7',
+      columnClassName: 'col-num col-cb-num',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => readCbArbNetAssetYi(row),
+      render: (row) => formatYiValue(readCbArbNetAssetYi(row), 2),
+    },
+    {
+      key: 'optionValue',
+      label: '\u671f\u6743\u4ef7\u503c',
+      columnClassName: 'col-num col-cb-num',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => readCbArbSmallRedemptionOptionValue(row),
+      render: (row) => formatNumber(readCbArbSmallRedemptionOptionValue(row), 2),
+    },
+    {
+      key: 'optionAnnualizedYield',
+      label: '\u671f\u6743\u5e74\u5316',
+      columnClassName: 'col-percent col-cb-percent',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => readCbArbSmallRedemptionOptionAnnualizedYield(row),
+      className: (row) => statusClass(readCbArbSmallRedemptionOptionAnnualizedYield(row)),
+      render: (row) => formatSmallRedemptionPercent(readCbArbSmallRedemptionOptionAnnualizedYield(row), 2),
+    },
+    {
+      key: 'totalAnnualizedYield',
+      label: '\u603b\u5e74\u5316\u6536\u76ca\u7387',
+      columnClassName: 'col-percent col-cb-percent',
+      sortable: true,
+      sortType: 'number',
+      defaultDir: 'desc',
+      sortValue: (row) => readCbArbSmallRedemptionTotalAnnualizedYield(row),
+      className: (row) => statusClass(readCbArbSmallRedemptionTotalAnnualizedYield(row)),
+      render: (row) => formatSmallRedemptionPercent(readCbArbSmallRedemptionTotalAnnualizedYield(row), 2),
+    },
+  ];
+}
+
 function buildPremiumColumns(type) {
   const config = getPremiumConfig(type);
   return [
@@ -3326,21 +3766,17 @@ function renderConvertibleBondPanel() {
     return;
   }
 
-  const rows = readResourceArray("cbArb");
-  const cbPayload = readResourceObject("cbArb");
-  if (!rows.length) {
+  const rows = readCbArbMainRows();
+  const smallRedemptionRows = readCbArbSmallRedemptionRows();
+  if (!rows.length && !smallRedemptionRows.length) {
     panel.innerHTML = moduleEmpty("转债套利暂时没有返回数据");
     return;
   }
 
-  const cbSummary = cbPayload.summary && typeof cbPayload.summary === 'object'
-    ? cbPayload.summary
-    : {};
+  const cbSummary = readCbArbSummary();
   const topDoubleLowItems = Array.isArray(cbSummary.topDoubleLow) ? cbSummary.topDoubleLow : [];
   const topTheoryItems = Array.isArray(cbSummary.topTheoreticalPremiumRate) ? cbSummary.topTheoreticalPremiumRate : [];
-  const premiumMonitorSummary = cbPayload.premiumMonitorSummary && typeof cbPayload.premiumMonitorSummary === 'object'
-    ? cbPayload.premiumMonitorSummary
-    : { items: [] };
+  const premiumMonitorSummary = readCbArbPremiumMonitorSummary();
   const premiumMonitorItems = Array.isArray(premiumMonitorSummary.items) ? premiumMonitorSummary.items : [];
 
   const summaryCards = [
@@ -3377,6 +3813,27 @@ function renderConvertibleBondPanel() {
     ),
   ].join("");
 
+  const activeSubview = ensureCbArbSubview();
+  const activeContent = activeSubview === 'small-redemption'
+    ? renderCbArbSmallRedemptionView(smallRedemptionRows)
+    : `
+      <div class="summary-grid summary-grid-three">${summaryCards}</div>
+      <div class="list-card">
+        <h3>鍒楄〃</h3>
+        ${renderTableSearchBar('cbArb')}
+        <div data-table-host="cbArb">
+          ${renderPaginatedTable({
+            tableKey: "cbArb",
+            tableKind: "convertible",
+            columns: buildConvertibleColumns(),
+            rows,
+            emptyMessage: "转债套利暂无数据",
+          })}
+        </div>
+        <div class="slim-note">${buildConvertibleExplainText(rows)}</div>
+      </div>
+    `;
+
   panel.innerHTML = `
     <div class="module-shell">
       <div class="module-toolbar">
@@ -3403,6 +3860,80 @@ function renderConvertibleBondPanel() {
           })}
         </div>
         <div class="slim-note">${buildConvertibleExplainText(rows)}</div>
+      </div>
+    </div>
+  `;
+  const shell = panel.querySelector('.module-shell');
+  if (shell) {
+    shell.innerHTML = `
+      <div class="module-toolbar">
+        <div>
+          <div class="tab-title">\u53ef\u8f6c\u503a\u5957\u5229</div>
+        </div>
+        <div class="panel-meta">
+          <span>\u4e3b\u9875\u6837\u672c ${escapeHtml(formatInt(rows.length))}</span>
+          <span>\u5c0f\u989d\u521a\u5151 ${escapeHtml(formatInt(smallRedemptionRows.length))}</span>
+          <span>\u6700\u8fd1\u66f4\u65b0 ${escapeHtml(formatDate(readUpdateTime("cbArb")))}</span>
+          <span>${escapeHtml(readFreshnessText('cbArb'))}</span>
+        </div>
+      </div>
+      ${renderCbArbSubtabs(activeSubview)}
+      <div class="cb-arb-subtab-shell">${activeContent}</div>
+    `;
+  }
+}
+
+function renderCbArbSubtabs(activeSubview = ensureCbArbSubview()) {
+  const tabs = [
+    { key: 'home', label: '\u4e3b\u9875' },
+    { key: 'small-redemption', label: '\u5c0f\u989d\u521a\u5151' },
+  ];
+  return `
+    <div class="subtab-nav">
+      ${tabs.map((tab) => `
+        <button
+          type="button"
+          class="subtab-button ${activeSubview === tab.key ? 'active' : ''}"
+          data-cb-arb-subtab="${escapeHtml(tab.key)}"
+        >${escapeHtml(tab.label)}</button>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderCbArbSmallRedemptionView(rows) {
+  const summary = readCbArbSmallRedemptionSummary();
+  const meta = readCbArbSmallRedemptionMeta();
+  const reportPeriod = meta.reportPeriod || meta.report_period || summary.reportPeriod || '--';
+  const reportSourceUrl = meta.reportSourceUrl || meta.report_source_url || summary.reportSourceUrl || '';
+  const holderFallback = Boolean(meta.holderCountFallbackUsed ?? meta.holder_count_fallback_used);
+  const priceThreshold = readFirstDefinedValue(summary, ['priceThreshold', 'price_threshold']) ?? 100;
+  const holderCountKnown = rows.filter((row) => readCbArbHolderCount(row) !== null).length;
+
+  return `
+    <div class="list-card">
+      <div class="module-toolbar">
+        <div>
+          <h3>\u5c0f\u989d\u521a\u5151</h3>
+          <div class="section-note">\u5165\u9009\u6807\u51c6\uff1a\u53ef\u8f6c\u503a\u4ef7\u683c &lt; ${escapeHtml(formatNumber(priceThreshold, 2))}\uff1b\u7f3a\u5931\u5b57\u6bb5\u4fdd\u7559\u6837\u672c\u5e76\u663e\u793a --\u3002</div>
+        </div>
+        <div class="panel-meta">
+          <span>\u6837\u672c ${escapeHtml(formatInt(rows.length))}</span>
+          <span>\u6709\u6301\u6709\u4eba\u6570 ${escapeHtml(formatInt(holderCountKnown))}</span>
+          <span>\u62a5\u544a\u671f ${escapeHtml(reportPeriod)}</span>
+          <span>${holderFallback ? '\u6301\u6709\u4eba\u6570\u5df2\u56de\u9000' : '\u4f18\u5148\u6700\u65b0\u62a5\u544a'}</span>
+          ${reportSourceUrl ? `<span>\u62a5\u544a ${buildAnchor(reportSourceUrl, '\u6253\u5f00')}</span>` : ''}
+        </div>
+      </div>
+      ${renderTableSearchBar('cbArbSmallRedemption')}
+      <div data-table-host="cbArbSmallRedemption">
+        ${renderPaginatedTable({
+          tableKey: 'cbArbSmallRedemption',
+          tableKind: 'convertible',
+          columns: buildCbArbSmallRedemptionColumns(),
+          rows,
+          emptyMessage: '\u5f53\u524d\u6ca1\u6709\u7b26\u5408\u6761\u4ef6\u7684\u5c0f\u989d\u521a\u5151\u6807\u7684',
+        })}
       </div>
     </div>
   `;
@@ -4890,6 +5421,122 @@ function computeOptionValueGap(row) {
   const implicitOptionValue = computeImplicitOptionValue(row);
   if (theoreticalOptionValue === null || implicitOptionValue === null) return null;
   return theoreticalOptionValue - implicitOptionValue;
+}
+
+function readScaledMoneyValue(source, options = {}) {
+  const rawValue = readFirstNumberValue(source, options.raw || []);
+  if (rawValue !== null) return rawValue;
+  const wanValue = readFirstNumberValue(source, options.wan || []);
+  if (wanValue !== null) return wanValue * 10000;
+  const yiValue = readFirstNumberValue(source, options.yi || []);
+  if (yiValue !== null) return yiValue * 100000000;
+  return null;
+}
+
+function readCbArbSmallRedemptionYield(row) {
+  return readFirstNumberValue(row, ['redemptionYield', 'smallRedemptionYield', 'rigidRedemptionYield']);
+}
+
+function readCbArbSmallRedemptionExpectedDurationYears(row) {
+  return readFirstNumberValue(row, ['expectedDurationYears', 'expectedDuration', 'expectedHoldingYears', 'redemptionDurationYears']);
+}
+
+function readCbArbSmallRedemptionRemainingYears(row) {
+  return readFirstNumberValue(row, ['remainingYears', 'remainingTermYears', 'remainingDurationYears']);
+}
+
+function readCbArbSmallRedemptionAnnualizedYield(row) {
+  return readFirstNumberValue(row, ['annualizedYield', 'smallRedemptionAnnualizedYield', 'annualizedRedemptionYield']);
+}
+
+function readCbArbSmallRedemptionRemainingSizeYi(row) {
+  return readFirstNumberValue(row, ['remainingSizeYi', 'remainingScaleYi', 'remainingIssueSizeYi', 'balanceYi', 'outstandingSizeYi']);
+}
+
+function readCbArbSmallRedemptionAmount(row) {
+  return readScaledMoneyValue(row, {
+    raw: ['redemptionAmount', 'smallRedemptionAmount', 'rigidRedemptionAmount'],
+    wan: ['redemptionAmountWan', 'smallRedemptionAmountWan', 'rigidRedemptionAmountWan'],
+    yi: ['redemptionAmountYi', 'smallRedemptionAmountYi'],
+  });
+}
+
+function readCbArbSmallRedemptionTotal(row) {
+  return readScaledMoneyValue(row, {
+    raw: ['redemptionTotal', 'smallRedemptionTotal', 'rigidRedemptionTotal'],
+    wan: ['redemptionTotalWan', 'smallRedemptionTotalWan'],
+    yi: ['redemptionTotalYi', 'smallRedemptionTotalYi'],
+  });
+}
+
+function readCbArbLiabilityExposureYi(row) {
+  return readFirstNumberValue(row, ['liabilityExposureYi', 'debtExposureYi', 'netDebtExposureYi']);
+}
+
+function readCbArbInterestBearingDebtYi(row) {
+  return readFirstNumberValue(row, ['interestBearingDebtYi', 'interestDebtYi', 'financials.interestBearingDebtYi']);
+}
+
+function readCbArbBroadCashYi(row) {
+  return readFirstNumberValue(row, ['broadCashYi', 'generalizedCashYi', 'generalCashYi', 'financials.broadCashYi']);
+}
+
+function readCbArbNetAssetYi(row) {
+  return readFirstNumberValue(row, ['netAssetYi', 'netAssetsYi', 'equityYi', 'financials.netAssetYi']);
+}
+
+function readCbArbSmallRedemptionOptionValue(row) {
+  return readFirstNumberValue(row, [
+    'smallRedemptionOptionValue',
+    'redemptionOptionValue',
+    'optionValue',
+    'theoreticalOptionValue',
+    'optionValueAmount',
+  ]);
+}
+
+function readCbArbSmallRedemptionOptionYield(row) {
+  return readFirstNumberValue(row, [
+    'smallRedemptionOptionYield',
+    'optionYield',
+    'redemptionOptionYield',
+  ]);
+}
+
+function readCbArbSmallRedemptionOptionAnnualizedYield(row) {
+  return readFirstNumberValue(row, [
+    'smallRedemptionOptionAnnualizedYield',
+    'optionAnnualizedYield',
+    'redemptionOptionAnnualizedYield',
+  ]);
+}
+
+function readCbArbSmallRedemptionTotalAnnualizedYield(row) {
+  return readFirstNumberValue(row, [
+    'smallRedemptionTotalAnnualizedYield',
+    'totalAnnualizedYield',
+  ]);
+}
+
+function readCbArbHolderCount(row) {
+  return readFirstNumberValue(row, ['holderCount', 'bondHolderCount', 'convertibleHolderCount']);
+}
+
+function renderCbArbLiabilityExposureCell(row) {
+  return `
+    <div class="cb-arb-liability-stack">
+      <div class="table-cell-primary">${escapeHtml(formatYiValue(readCbArbLiabilityExposureYi(row), 2))}</div>
+      <div class="table-cell-subtle">\u6709\u606f\u8d1f\u503a ${escapeHtml(formatYiValue(readCbArbInterestBearingDebtYi(row), 2))}</div>
+      <div class="table-cell-subtle">\u5e7f\u4e49\u73b0\u91d1 ${escapeHtml(formatYiValue(readCbArbBroadCashYi(row), 2))}</div>
+    </div>
+  `;
+}
+
+function renderCbArbExpectedDurationCell(row) {
+  return renderCompactCell(
+    escapeHtml(formatRemainingTerm(readCbArbSmallRedemptionExpectedDurationYears(row))),
+    [`\u5269\u4f59\u671f\u9650 ${escapeHtml(formatRemainingTerm(readCbArbSmallRedemptionRemainingYears(row)))}`]
+  );
 }
 
 function bestMonitorYield(row) {

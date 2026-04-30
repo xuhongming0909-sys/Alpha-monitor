@@ -9,6 +9,7 @@ runtime_logs/*.jpeg
 .DS_Store
 __pycache__/
 **/__pycache__/
+.codex/
 .codex.zip
 runtime_data/**/*.db
 runtime_data/**/*.db-shm
@@ -23,4 +24,5 @@ runtime_data/shared/并购公司报告.json
 runtime_data/shared/推送配置.json
 runtime_data/shared/推送运行状态.json
 ops/server_profile.local.yaml
+config/secrets.yaml
 

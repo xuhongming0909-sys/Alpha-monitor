@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from db_paths import shared_db_path
+from shared.paths.db_paths import shared_db_path
 
 DB_PATH = shared_db_path("premium_history.db")
 CUTOFF_3Y = (datetime.now() - timedelta(days=365 * 3)).strftime("%Y-%m-%d")

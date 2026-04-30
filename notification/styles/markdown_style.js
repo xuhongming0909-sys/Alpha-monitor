@@ -1,7 +1,6 @@
 "use strict";
 
 const { collectTodaySubscriptionEvents } = require("../../strategy/subscription/service");
-const { selectCbArbSummaryRows } = require("../../strategy/convertible_bond/service");
 
 /**
  * 企业微信 Markdown 长度有限，这里统一做裁剪。
@@ -106,65 +105,6 @@ function buildPremiumRows(rows, prefix, topCount) {
   return picked;
 }
 
-function computeOptionTheoreticalValue(row) {
-  const callValue = toNum(row?.callOptionValue);
-  const putValue = toNum(row?.putOptionValue);
-  const pricingFormula = String(row?.pricingFormula || "").trim();
-  if (pricingFormula === "bond+callspread" && callValue !== null) {
-    return callValue;
-  }
-  if (callValue !== null || putValue !== null) {
-    return (callValue ?? 0) - (putValue ?? 0);
-  }
-  const theoreticalPrice = toNum(row?.theoreticalPrice);
-  const pureBondValue = toNum(row?.pureBondValue);
-  if (theoreticalPrice === null || pureBondValue === null) return null;
-  return theoreticalPrice - pureBondValue;
-}
-
-function computeImplicitOptionValue(row) {
-  const price = toNum(row?.price);
-  const pureBondValue = toNum(row?.pureBondValue);
-  if (price === null || pureBondValue === null) return null;
-  return price - pureBondValue;
-}
-
-function computeOptionDiscountRate(row) {
-  const theoreticalOptionValue = computeOptionTheoreticalValue(row);
-  const implicitOptionValue = computeImplicitOptionValue(row);
-  if (theoreticalOptionValue === null || implicitOptionValue === null) return null;
-  if (theoreticalOptionValue === 0) return null;
-  return (implicitOptionValue / theoreticalOptionValue - 1) * 100;
-}
-
-function buildCbSummaryLines(rows) {
-  const topCount = 3;
-  const summaryRows = selectCbArbSummaryRows(rows);
-  const doubleLowRows = topN(
-    summaryRows.filter((row) => toNum(row.doubleLow) !== null),
-    topCount,
-    (a, b) => (toNum(a.doubleLow) ?? Number.POSITIVE_INFINITY) - (toNum(b.doubleLow) ?? Number.POSITIVE_INFINITY)
-  );
-  const theoryRows = topN(
-    summaryRows.filter((row) => toNum(row.theoreticalPremiumRate) !== null),
-    topCount,
-    (a, b) => (toNum(b.theoreticalPremiumRate) ?? Number.NEGATIVE_INFINITY) - (toNum(a.theoreticalPremiumRate) ?? Number.NEGATIVE_INFINITY)
-  );
-
-  const picked = [];
-  doubleLowRows.forEach((row) => {
-    picked.push(
-      `- 双低前三名 | ${pickText(row.bondName)} ${pickText(row.code)} | 双低 ${priceText(row.doubleLow)} | 转股溢价 ${pctText(row.premiumRate)} | 转股价值 ${priceText(row.convertValue)} | 现价 ${priceText(row.price)}`
-    );
-  });
-  theoryRows.forEach((row) => {
-    picked.push(
-      `- 理论溢价率前三名 | ${pickText(row.bondName)} ${pickText(row.code)} | 理论溢价 ${pctText(row.theoreticalPremiumRate)} | 期权折价率 ${pctText(computeOptionDiscountRate(row))} | 双低 ${priceText(row.doubleLow)} | 现价 ${priceText(row.price)}`
-    );
-  });
-  return picked;
-}
-
 function buildSubscriptionLines(input, todayText) {
   const events = collectTodaySubscriptionEvents(input?.ipo, input?.bonds, todayText);
   return events.map((item) => `- ${item.type}${item.event} | ${pickText(item.name)} ${pickText(item.code)} | ${pickText(item.date)}`);
@@ -183,14 +123,13 @@ function buildMonitorLines(monitors) {
 
 /**
  * 构建定时摘要 Markdown。
- * 只保留 5 个固定分区，并严格保持顺序。
+ * 可转债套利已拆为独立推送，这里兼容忽略旧 cbArb 选择。
  */
 function buildSummaryMarkdown(input, modules, options = {}) {
   const selected = modules || {};
   const summaryConfig = options.summaryConfig || {};
   const ahRows = Array.isArray(input?.ah?.data) ? input.ah.data : [];
   const abRows = Array.isArray(input?.ab?.data) ? input.ab.data : [];
-  const cbRows = Array.isArray(input?.cbArb?.data) ? input.cbArb.data : [];
   const monitors = Array.isArray(input?.monitors) ? input.monitors : [];
   const nowText = String(
     options.generatedAtText || new Date().toLocaleString("zh-CN", { hour12: false })
@@ -204,10 +143,6 @@ function buildSummaryMarkdown(input, modules, options = {}) {
 
   if (selected.subscription) {
     buildSection(lines, "今日打新", buildSubscriptionLines(input, todayText));
-  }
-
-  if (selected.cbArb) {
-    buildSection(lines, "可转债机会", buildCbSummaryLines(cbRows, summaryConfig));
   }
 
   if (selected.monitor) {

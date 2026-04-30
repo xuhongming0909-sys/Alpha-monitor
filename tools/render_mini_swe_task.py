@@ -34,11 +34,11 @@ SCOPE_RULES = {
     },
     "docs": {
         "allow": [
-            "refactor_docs/",
             "docs/",
-            "RUNBOOK.md",
-            "AGENTS.md",
-            "CONSTITUTION.md",
+            "specs/",
+            "missions/",
+            "CLAUDE.md",
+            "INDEX.md",
         ],
         "avoid": [
             "data_fetch/",
@@ -83,14 +83,14 @@ def render_prompt(
     extra_rules: list[str],
 ) -> str:
     sections = [
-        "Read CONSTITUTION.md first.",
+        "Read CLAUDE.md and INDEX.md first.",
         dedent(
             """
             Repository workflow:
+            - Read order: CLAUDE.md → INDEX.md → README.md → specs/spec.md → relevant specs/*.md → config/config.yaml → MEMORY.md
             - If behavior, config, API meaning, deployment behavior, or contract meaning changes, stop coding first and update:
-              - refactor_docs/001-monitor-refactor/plan.md
-              - refactor_docs/001-monitor-refactor/REQUIREMENTS.md
-              - refactor_docs/001-monitor-refactor/SPEC.md
+              - specs/*.md (affected module specs)
+              - specs/spec.md (project index)
             - Respect repository layering:
               - data_fetch/: fetch and normalize only
               - strategy/: business calculation and rule judgment only

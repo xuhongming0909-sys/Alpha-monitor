@@ -1,0 +1,33 @@
+#
+# 非敏感配置
+# Usage: 保持简洁，只放当前项目实际需要的配置
+#
+
+project:
+  name: "alpha_monitor"
+  summary: "Discover arbitrage opportunities from real market data and push them out"
+  stage: "active"
+
+workflow:
+  mission_retention: 30
+  memory_retention: 50
+  mission_name_pattern: "MMDD-short-name"
+  create_mission_for_non_chat_tasks: true
+  sync_formal_specs_before_requirement_changes: true
+  non_code_language: "zh-CN"
+  allow_add_template_only: true
+
+paths:
+  formal_spec_root: "specs"
+  mission_root: "missions"
+  template_root: "templates"
+  config_root: "config"
+
+runtime:
+  environment: "prod"
+  timezone: "Asia/Shanghai"
+  default_language: "zh-CN"
+
+integrations:
+  primary_api_base_url: ""
+  dashboard_url: ""

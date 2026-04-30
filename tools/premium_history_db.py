@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from db_paths import ensure_dir, shared_db_path
+from shared.paths.db_paths import ensure_dir, shared_db_path
 
 DB_PATH = shared_db_path("premium_history.db")
 

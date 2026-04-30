@@ -1,6 +1,6 @@
 "use strict";
 
-const { pickTopPremiumRows, pickBottomPremiumRows } = require("../../strategy/ah_premium/service");
+const { pickTopRowsByField, pickBottomRowsByField } = require("../../shared/utils/ranking");
 
 function buildOverviewViewModel(options = {}) {
   const ahRows = Array.isArray(options?.ah?.data) ? options.ah.data : [];
@@ -16,11 +16,11 @@ function buildOverviewViewModel(options = {}) {
     data: {
       updateTime: nowIso(),
       ah: {
-        highestPremium: pickTopPremiumRows(ahRows, 5),
-        lowestPremium: pickBottomPremiumRows(ahRows, 5),
+        highestPremium: pickTopRowsByField(ahRows, "premium", 5),
+        lowestPremium: pickBottomRowsByField(ahRows, "premium", 5),
       },
       ab: {
-        lowestPremium: pickBottomPremiumRows(abRows, 5),
+        lowestPremium: pickBottomRowsByField(abRows, "premium", 5),
       },
       subscriptions: {
         ipo: Array.isArray(options?.ipo?.upcoming) ? options.ipo.upcoming.slice(0, 5) : [],

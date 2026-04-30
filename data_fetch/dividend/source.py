@@ -15,6 +15,12 @@ from typing import Any, Dict, Optional
 import akshare as ak
 import requests
 
+from shared.config.script_config import get_config
+
+_CONFIG = get_config()
+_DIVIDEND_CONFIG = (((_CONFIG.get("data_fetch") or {}).get("plugins") or {}).get("dividend") or {})
+_REQUEST_TIMEOUT = max(1, int(_DIVIDEND_CONFIG.get("request_timeout_seconds") or 15))
+
 
 def clean_nan(obj: Any) -> Any:
     if isinstance(obj, float):
@@ -67,7 +73,7 @@ def get_stock_price(stock_code: str) -> Dict[str, Any]:
         resp = requests.get(
             f"https://qt.gtimg.cn/q={query_code}",
             headers={"User-Agent": "Mozilla/5.0", "Referer": "https://gu.qq.com/"},
-            timeout=15,
+            timeout=_REQUEST_TIMEOUT,
         )
         text = resp.content.decode("gbk", errors="ignore")
         m = re.match(r'v_([^=]+)="(.*)";?', text.strip())

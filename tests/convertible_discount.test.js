@@ -13,8 +13,14 @@ const {
   buildSummaryMarkdown,
 } = require("../notification/styles/markdown_style");
 const {
+  buildCbArbitrageMarkdown,
+} = require("../notification/styles/cb_arbitrage_markdown");
+const {
   createEventAlertService,
 } = require("../notification/alerts/event_alert_service");
+const {
+  createCbArbitragePushService,
+} = require("../notification/cb_arbitrage/service");
 const {
   createConvertibleBondDiscountRuntimeStore,
 } = require("../strategy/convertible_bond/discount_runtime_store");
@@ -136,7 +142,14 @@ test("event alert service does not swallow bootstrap buy signals", async () => {
     collectAlertDatasets: async () => ({ cbArb: { data: [makeBaseRow()] } }),
     buildDiscountSnapshot: () => ({
       isBootstrap: true,
-      buySignals: [{ code: "113579", bondName: "健友转债", premiumRate: -2.1, bondToStockMarketValueRatio: 0.05, discountAtrRatio: 2.1, forceRedeemLabel: "非强赎" }],
+      buySignals: [{
+        code: "113579",
+        bondName: "健友转债",
+        premiumRate: -2.1,
+        bondToStockMarketValueRatio: 0.05,
+        discountAtrRatio: 2.1,
+        forceRedeemLabel: "非强赎",
+      }],
       sellSignals: [],
       premiumMonitorSummary: { count: 1, items: [] },
       nextState: {},
@@ -250,7 +263,7 @@ test("market value sources explicitly prefer float market value for cb arbitrage
   assert.doesNotMatch(rightsIssueSourceText, /for name in \("总市值", "总市值\(元\)", "market_value", "marketValue"\)/);
 });
 
-test("summary markdown keeps only the five required sections in the required order", () => {
+test("summary markdown ignores legacy cbArb module after independent push split", () => {
   const markdown = buildSummaryMarkdown({
     ipo: { data: [{ code: "301000", name: "测试新股", subscribeDate: "2026-04-22" }] },
     bonds: { data: [{ code: "113000", name: "测试转债", subscribeDate: "2026-04-22" }] },
@@ -275,15 +288,98 @@ test("summary markdown keeps only the five required sections in the required ord
 
   const order = [
     markdown.indexOf("**今日打新**"),
-    markdown.indexOf("**可转债机会**"),
     markdown.indexOf("**自定义监控**"),
     markdown.indexOf("**AH**"),
     markdown.indexOf("**AB**"),
   ];
   assert.ok(order.every((value) => value >= 0));
   assert.deepEqual([...order].sort((a, b) => a - b), order);
+  assert.equal(markdown.includes("113579"), false);
+  assert.equal(markdown.includes("可转债套利"), false);
   assert.equal(markdown.includes("分红提醒"), false);
   assert.equal(markdown.includes("事件套利"), false);
+});
+
+test("cb arbitrage markdown pushes total annualized yield for small redemption rows", () => {
+  const markdown = buildCbArbitrageMarkdown({
+    updateTime: "2026-04-23 14:30:00",
+    rows: [
+      makeBaseRow({
+        bondName: "闻泰转债",
+        price: 98,
+        premiumRate: 8,
+        doubleLow: 106,
+        pureBondValue: 92,
+        theoreticalPrice: 101,
+        theoreticalPremiumRate: 4,
+        isSmallRedemption: true,
+        remainingYears: 1,
+        totalAnnualizedYield: 0.152,
+        redemptionAmount: 225641.88,
+        liabilityExposureYi: 18.68,
+      }),
+    ],
+  });
+
+  assert.match(markdown, /闻泰转债 98元/);
+  assert.match(markdown, /转股溢价率：\+8%/);
+  assert.match(markdown, /总年化收益率：\+15\.2%/);
+  assert.doesNotMatch(markdown, /刚兑收益率/);
+  assert.match(markdown, /预期耗时：1\.5年（剩余期限：1年）/);
+  assert.match(markdown, /刚兑金额：225641\.88元/);
+  assert.match(markdown, /负债敞口：18\.68亿/);
+});
+
+test("cb arbitrage push service dedupes main and small redemption candidates", async () => {
+  const service = createCbArbitragePushService({
+    runtimeStore: {},
+    getDataset: async () => ({
+      data: [
+        makeBaseRow({
+          code: "113579",
+          bondName: "闻泰转债",
+          doubleLow: 106,
+          theoreticalPremiumRate: 4,
+        }),
+      ],
+      summary: {
+        topDoubleLow: [makeBaseRow({ code: "113579", bondName: "闻泰转债", doubleLow: 106 })],
+      },
+      smallRedemption: {
+        rows: [
+          makeBaseRow({
+            code: "113579",
+            bondName: "闻泰转债",
+            expectedDurationYears: 1.5,
+            redemptionAmount: 500000,
+            liabilityExposureYi: 11.2,
+            totalAnnualizedYield: 0.188,
+          }),
+          makeBaseRow({ code: "128001", bondName: "龙大转债", price: 85 }),
+        ],
+      },
+    }),
+  });
+
+  const payload = await service.readPayload();
+
+  assert.deepEqual(payload.rows.map((row) => row.code), ["113579", "128001"]);
+  assert.equal(payload.rows[0].isSmallRedemption, true);
+  assert.equal(payload.rows[0].theoreticalPremiumRate, 4);
+  assert.equal(payload.rows[0].redemptionAmount, 500000);
+  assert.equal(payload.rows[0].liabilityExposureYi, 11.2);
+  assert.equal(payload.rows[0].totalAnnualizedYield, 0.188);
+});
+
+test("small redemption formulas expose option annualized and total annualized yields", () => {
+  const cbSourcePath = path.resolve(__dirname, "..", "data_fetch", "convertible_bond", "source.py");
+  const cbSourceText = fs.readFileSync(cbSourcePath, "utf8");
+
+  assert.match(cbSourceText, /smallRedemptionOptionYield/);
+  assert.match(cbSourceText, /smallRedemptionOptionAnnualizedYield/);
+  assert.match(cbSourceText, /smallRedemptionTotalAnnualizedYield/);
+  assert.match(cbSourceText, /option_yield = option_value \/ market_price/);
+  assert.match(cbSourceText, /total_annualized_yield = redemption_annualized_yield \+ option_annualized_yield/);
 });
 
 test("config contract includes cb_discount_strategy_state runtime file and retires old factor config", () => {
@@ -294,4 +390,12 @@ test("config contract includes cb_discount_strategy_state runtime file and retir
   assert.doesNotMatch(configText, /\batr_anchor_points:/);
   assert.doesNotMatch(configText, /\bsell_pressure_anchor_points:/);
   assert.doesNotMatch(configText, /\bboard_coefficients:/);
+});
+
+test("requirements include pdf parsing dependencies for convertible bond holder extraction", () => {
+  const requirementsPath = path.resolve(__dirname, "..", "requirements.txt");
+  const requirementsText = fs.readFileSync(requirementsPath, "utf8");
+
+  assert.match(requirementsText, /^pdfminer\.six$/m);
+  assert.match(requirementsText, /^pypdf$/m);
 });

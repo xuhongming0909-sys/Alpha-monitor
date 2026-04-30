@@ -14,6 +14,13 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from shared.config.script_config import get_config
+
+_CONFIG = get_config()
+_MERGER_CONFIG = (((_CONFIG.get("data_fetch") or {}).get("plugins") or {}).get("merger") or {})
+_ANNOUNCEMENT_TIMEOUT = max(1, int(_MERGER_CONFIG.get("announcement_timeout_seconds") or 5))
+_QUOTE_TIMEOUT = max(1, int(_MERGER_CONFIG.get("quote_timeout_seconds") or 15))
+
 # 搜索关键词配置
 SEARCH_KEYWORDS = [
     '要约收购',
@@ -188,7 +195,7 @@ class MergerArbitrageScraper:
         url = f"https://web.sqt.gtimg.cn/q={query_code}"
         
         try:
-            response = self.session.get(url, timeout=5)
+            response = self.session.get(url, timeout=_ANNOUNCEMENT_TIMEOUT)
             text = response.content.decode('gbk')
             
             match = re.match(r'v_([^=]+)="(.+)"', text.strip())
@@ -266,7 +273,7 @@ class MergerArbitrageScraper:
                 response = self.session.post(
                     self.base_url, 
                     data=data, 
-                    timeout=15
+                    timeout=_QUOTE_TIMEOUT
                 )
                 result = response.json()
                 

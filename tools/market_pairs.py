@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 
 import akshare as ak
 import requests
-from db_paths import ROOT_DATA_DIR, STATIC_DATA_DIR, ensure_dir, shared_db_path
+from shared.paths.db_paths import ROOT_DATA_DIR, STATIC_DATA_DIR, ensure_dir, shared_db_path
 
 DATA_DIR = ROOT_DATA_DIR
 DB_PATH = shared_db_path("market_pairs.db")
