@@ -1,3 +1,6 @@
+// AI-SUMMARY: 企业微信客户端：发送 Markdown 到 Webhook
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 /**

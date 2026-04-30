@@ -1,3 +1,6 @@
+// AI-SUMMARY: 推送调度器：定时 tick 触发各模块推送
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 /**

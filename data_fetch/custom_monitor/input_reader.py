@@ -1,3 +1,6 @@
+# AI-SUMMARY: 自定义监控输入读取：从运行态 JSON 读取用户组合
+# 对应 INDEX.md §9 文件摘要索引
+
 """custom_monitorinput_reader器。"""
 
 from __future__ import annotations

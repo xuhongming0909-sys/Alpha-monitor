@@ -1,3 +1,6 @@
+// AI-SUMMARY: Node 配置读取器：YAML 解析 + 环境变量/Secrets 注入
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 /**
@@ -10,7 +13,8 @@ const path = require("path");
 const { parse } = require("yaml");
 
 const ROOT_DIR = path.resolve(__dirname, "..", "..");
-const CONFIG_FILE = path.join(ROOT_DIR, "config.yaml");
+const CONFIG_FILE = path.join(ROOT_DIR, "config", "config.yaml");
+const SECRETS_FILE = path.join(ROOT_DIR, "config", "secrets.yaml");
 const ENV_FILE = path.join(ROOT_DIR, ".env");
 
 let cachedConfig = null;
@@ -59,6 +63,30 @@ function loadEnvFile(filePath = ENV_FILE) {
       value = value.slice(1, -1);
     }
     process.env[key] = value;
+  }
+}
+
+function toEnvKey(configKey) {
+  return configKey.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`).toUpperCase();
+}
+
+function loadSecretsFile(filePath = SECRETS_FILE) {
+  if (!fs.existsSync(filePath)) return;
+
+  try {
+    const text = fs.readFileSync(filePath, "utf8");
+    const secrets = parse(text);
+    if (!secrets || typeof secrets !== "object") return;
+
+    for (const [key, value] of Object.entries(secrets)) {
+      if (value === undefined || value === null) continue;
+      const envKey = toEnvKey(key);
+      if (!Object.prototype.hasOwnProperty.call(process.env, envKey)) {
+        process.env[envKey] = String(value);
+      }
+    }
+  } catch {
+    // secrets.yaml 解析失败时静默跳过，不影响主流程
   }
 }
 
@@ -163,6 +191,7 @@ function loadConfig(options = {}) {
   if (cachedConfig && !options.reload) return deepClone(cachedConfig);
 
   loadEnvFile();
+  loadSecretsFile();
   let config = readConfigFile();
   config = resolveEnvPlaceholders(config);
   config = applySecretEnv(config);
@@ -178,8 +207,10 @@ function getConfig() {
 module.exports = {
   ROOT_DIR,
   CONFIG_FILE,
+  SECRETS_FILE,
   ENV_FILE,
   loadEnvFile,
+  loadSecretsFile,
   loadConfig,
   getConfig,
 };

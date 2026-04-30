@@ -1,3 +1,6 @@
+# AI-SUMMARY: 状态注册表（Python）：运行时文件统一管理
+# 对应 INDEX.md §9 文件摘要索引
+
 """运行态state_registry。"""
 
 from __future__ import annotations

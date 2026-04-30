@@ -1,6 +1,7 @@
 # Assistant Rules
 
 Owner: user. AI must not modify this file.
+本项目基于服务器 不要本地跑网页 会卡死 每次任务后上传git 同步服务器
 
 ## Purpose
 
@@ -103,10 +104,82 @@ At the beginning of every new session, AI must read in this order:
 - When a task creates new files or moves existing files, update `INDEX.md` to reflect the change.
 - When a task changes a module's responsibilities, update both the module spec and `INDEX.md`.
 
-## Non-Goals
+## File Rules
 
-- This workflow does not enforce a source-code directory structure.
-- This workflow does not require `features/` or any specific implementation layout.
+### 根目录清洁
+
+根目录只允许以下文件和目录：
+- **白名单文件**：README.md, CLAUDE.md, INDEX.md, MEMORY.md, package.json, package-lock.json, requirements.txt, start_server.js, data_dispatch.py, config.yaml, .gitignore, .env.example
+- **允许的目录**：config, data_fetch, deploy, docs, presentation, scripts, strategy, notification, shared, tests, ui, specs, missions, templates, archive, runtime_data, node_modules
+- **禁止**在根目录放置临时文件（截图、调试、日志、截图脚本）
+
+临时文件规则：
+- 截图脚本 → `tools/screenshots/`
+- 调试脚本 → `tools/debug_scripts/`
+- 日志/截图 → 运行时写入 `runtime_data/` 或 `archive/`
+- 检查脚本：`tools/check_root_cleanliness.py`（`python tools/check_root_cleanliness.py`）
+
+### 文件大小限制
+
+任何代码文件（`.py`、`.js`、`.jsx`）不得超过 **1000 行**。
+超过 1000 行必须按功能职责拆分，拆分后登记 INDEX.md。
+
+### AI-SUMMARY 规范
+
+每份核心代码文件顶部必须有 `AI-SUMMARY:` 注释，格式：
+```python
+# AI-SUMMARY: [一句话职责描述]
+# 对应 INDEX.md §9.3 文件摘要索引
+```
+```javascript
+// AI-SUMMARY: [一句话职责描述]
+// 对应 INDEX.md §9.3 文件摘要索引
+```
+修改文件后同步更新 INDEX.md §9.3。
+
+### 脚本目录结构
+
+- `scripts/` — 所有脚本（数据库、数据抓取、检查、辅助工具）
+- `deploy/` — 部署相关（systemd、nginx/Caddy、服务器更新）
+- `scripts/debug_scripts/` — 临时调试脚本（不要放根目录）
+- `scripts/screenshots/` — UI 截图脚本
+
+## TDD 工作流
+
+实现任何功能或修复任何 bug，必须遵循 TDD 三环循环：
+
+```
+RED   → 写一个测试描述一个行为 → 测试失败
+GREEN → 写最小代码让测试通过
+REFACTOR → 重构消除重复，提升代码质量
+```
+
+### 垂直切片原则（禁止水平切片）
+
+- 每次只写一个测试，只写刚好让测试通过的代码
+- 不"提前写多个测试"或"一次性实现所有功能"
+- 每个测试验证**公开行为**而非实现细节
+
+### 规划阶段
+
+在写任何测试之前：
+1. 与用户确认公开接口设计
+2. 确认要测试的行为（优先级）
+3. 列出测试行为清单，获得用户批准
+4. 开始 TDD 循环
+
+### 循环检查清单
+
+每个 TDD 循环必须满足：
+- [ ] 测试描述行为，不描述实现
+- [ ] 测试只使用公开接口
+- [ ] 测试能在内部重构后存活
+- [ ] 代码刚好满足当前测试
+- [ ] 没有添加推测性功能
+
+**永远不要在 RED 状态下重构**。先到 GREEN，再考虑重构。
+
+## Non-Goals
 
 # Constitution
 
@@ -160,7 +233,7 @@ Shared capabilities should have clear ownership rather than being privately copi
 Project structure:
 - `data_fetch/` = fetch + normalize only
 - `strategy/` = business calculation + rule evaluation only
-- `presentation/` = page, API shaping, display logic only
+- `ui/` = page, API shaping, display logic only
 - `notification/` = push config, format, schedule only
 - `shared/` = config, paths, time, runtime state, common utilities only
 

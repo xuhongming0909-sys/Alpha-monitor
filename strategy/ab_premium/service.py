@@ -1,3 +1,6 @@
+# AI-SUMMARY: AB 溢价业务计算：AB 股溢价率排名
+# 对应 INDEX.md §9 文件摘要索引
+
 """AB 溢价策略服务。"""
 
 from __future__ import annotations

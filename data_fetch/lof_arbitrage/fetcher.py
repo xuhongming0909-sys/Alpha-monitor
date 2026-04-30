@@ -1,3 +1,6 @@
+# AI-SUMMARY: LOF 套利抓取调度：调用集思录 API
+# 对应 INDEX.md §9 文件摘要索引
+
 """LOF 套利抓取入口。"""
 
 from __future__ import annotations

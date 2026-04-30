@@ -1,3 +1,6 @@
+# AI-SUMMARY: CLI 数据调度器：根据 action 调用对应 data_fetch 抓取和 strategy 计算
+# 对应 INDEX.md §9 文件摘要索引
+
 from __future__ import annotations
 
 import json

@@ -1,3 +1,6 @@
+# AI-SUMMARY: cb_rights_issue 上游 API：实时行情与数据抓取
+# 对应 INDEX.md §9 文件摘要索引
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 

@@ -1,3 +1,6 @@
+# AI-SUMMARY: 自定义监控业务计算：组合收益率、对价计算
+# 对应 INDEX.md §9 文件摘要索引
+
 """custom_monitor策略服务。"""
 
 from __future__ import annotations

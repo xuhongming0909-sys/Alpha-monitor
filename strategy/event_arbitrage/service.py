@@ -1,3 +1,6 @@
+# AI-SUMMARY: 事件套利业务计算：事件匹配与过滤规则
+# 对应 INDEX.md §9 文件摘要索引
+
 """Build outward-facing event-arbitrage responses from normalized records."""
 
 from __future__ import annotations

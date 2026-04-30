@@ -1,3 +1,6 @@
+// AI-SUMMARY: scheduler 配置/状态存储：运行时数据持久化
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 /**

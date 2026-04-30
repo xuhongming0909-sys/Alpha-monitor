@@ -1,3 +1,6 @@
+// AI-SUMMARY: 冒烟测试：验证服务首页和 health 端点可达
+// 对应 INDEX.md §9 文件摘要索引
+
 const { getConfig } = require('../shared/config/node_config');
 
 function normalizeBaseUrl(value) {

@@ -1,3 +1,6 @@
+# AI-SUMMARY: exchange_rate 数据标准化：原始数据转为 Bus 记录
+# 对应 INDEX.md §9 文件摘要索引
+
 """exchange_ratenormalizer器。"""
 
 from __future__ import annotations

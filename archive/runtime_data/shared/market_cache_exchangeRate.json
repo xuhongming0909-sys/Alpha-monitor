@@ -1,0 +1,11 @@
+{
+  "success": true,
+  "data": {
+    "hkToCny": 0.872,
+    "usdToCny": 6.8342,
+    "updateTime": "2026-04-30T16:13:25.152783",
+    "source": "tencent"
+  },
+  "updateTime": "2026-04-30T16:13:25.152783",
+  "cacheTime": "2026-04-30T08:13:26.259Z"
+}

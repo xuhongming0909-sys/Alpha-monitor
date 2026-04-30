@@ -1,3 +1,6 @@
+# AI-SUMMARY: 并购数据抓取调度：调用巨潮公告 API
+# 对应 INDEX.md §9 文件摘要索引
+
 """mergerfetcher。"""
 
 from __future__ import annotations

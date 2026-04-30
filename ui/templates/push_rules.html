@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>推送规则 | Alpha Monitor</title>
+  <style>
+    :root {
+      --bg: #050507;
+      --bg-soft: #0d0d11;
+      --panel: rgba(16, 16, 20, 0.9);
+      --panel-edge: rgba(255, 95, 106, 0.16);
+      --text: #f5f3f1;
+      --text-soft: rgba(245, 243, 241, 0.76);
+      --text-faint: rgba(245, 243, 241, 0.48);
+      --accent: #a8142a;
+      --accent-strong: #ff5566;
+      --accent-soft: rgba(255, 85, 102, 0.14);
+      --good: #37d09a;
+      --warn: #ffb85e;
+      --bad: #ff7583;
+      --metal: #8e95a3;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --shadow-md: 0 18px 42px rgba(0, 0, 0, 0.26);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: "Bahnschrift", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--text);
+      background: radial-gradient(circle at 12% 0%, rgba(255,85,102,0.1), transparent 28%),
+                  radial-gradient(circle at 88% 6%, rgba(168,20,42,0.14), transparent 22%),
+                  linear-gradient(140deg, #040405 0%, #09090d 38%, #13080d 100%);
+    }
+    .app-shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+      margin: 0 0 8px;
+      letter-spacing: -0.5px;
+    }
+    .subtitle {
+      color: var(--text-faint);
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+    .rule-card {
+      background: var(--panel);
+      border: 1px solid var(--panel-edge);
+      border-radius: var(--radius-md);
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow-md);
+    }
+    .rule-card h2 {
+      font-size: 18px;
+      margin: 0 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .rule-card h2 .badge {
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-weight: 500;
+    }
+    .rule-card h2 .badge.scheduled { background: rgba(55, 208, 154, 0.12); color: var(--good); }
+    .rule-card h2 .badge.realtime { background: rgba(255, 184, 94, 0.12); color: var(--warn); }
+    .rule-grid {
+      display: grid;
+      grid-template-columns: 100px 1fr;
+      gap: 8px 16px;
+      font-size: 14px;
+    }
+    .rule-grid dt {
+      color: var(--text-faint);
+      font-weight: 500;
+    }
+    .rule-grid dd {
+      margin: 0;
+      color: var(--text-soft);
+    }
+    .rule-grid dd code {
+      background: rgba(255,255,255,0.05);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--accent-strong);
+    }
+    .push-content {
+      margin-top: 12px;
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.03);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--text-faint);
+      font-family: "SF Mono", "JetBrains Mono", monospace;
+      line-height: 1.7;
+    }
+    .push-content strong {
+      color: var(--text-soft);
+    }
+    .nav {
+      margin-bottom: 20px;
+    }
+    .nav a {
+      color: var(--text-faint);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .nav a:hover { color: var(--accent-strong); }
+    .field-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .field-tag {
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.04);
+      color: var(--text-faint);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="nav">
+      <a href="/legacy">&#8592; 返回看板</a>
+    </div>
+    <h1>推送规则</h1>
+    <p class="subtitle">当前生效的推送链路、触发条件与推送内容</p>
+
+    <div class="rule-card">
+      <h2>主摘要定时推送 <span class="badge scheduled">定时</span></h2>
+      <dl class="rule-grid">
+        <dt>推送内容</dt>
+        <dd>聚合所有模块摘要：打新、转债套利、AH溢价、AB溢价、自定义监控</dd>
+        <dt>推送时间</dt>
+        <dd><code>08:00</code> / <code>20:18</code></dd>
+        <dt>触发条件</dt>
+        <dd>定时触发，非交易日也推送（可配置）</dd>
+        <dt>推送格式</dt>
+        <dd>Markdown，企业微信 Webhook</dd>
+      </dl>
+      <div class="push-content">
+        <strong>包含字段：</strong>各模块 TOP N 排名、套利空间、溢价率
+      </div>
+    </div>
+
+    <div class="rule-card">
+      <h2>转债套利折价策略提醒 <span class="badge realtime">实时</span></h2>
+      <dl class="rule-grid">
+        <dt>推送内容</dt>
+        <dd>买入提醒 / 卖出提醒 / 监控名单定时推送</dd>
+        <dt>推送时间</dt>
+        <dd>交易时段内 <code>09:30 ~ 14:50</code>，每 10 分钟一档</dd>
+        <dt>触发条件</dt>
+        <dd>
+          买入：<code>premiumRate &lt; -2%</code>（且已过转股日）<br>
+          卖出：<code>premiumRate &gt; -0.5%</code>（且该标的在监控名单中）
+        </dd>
+        <dt>状态机</dt>
+        <dd>首次启动仅初始化监控名单；后续只在状态变化时触发推送</dd>
+      </dl>
+      <div class="push-content">
+        <strong>推送格式：</strong><br>
+        - 代码 名称 | 价格 X.XX | 溢价率 X% | 正股 X.XX(±X%) | 转股价值 X.XX | 强赎状态
+      </div>
+      <div class="field-list">
+        <span class="field-tag">价格</span>
+        <span class="field-tag">溢价率</span>
+        <span class="field-tag">正股价格</span>
+        <span class="field-tag">正股涨跌幅</span>
+        <span class="field-tag">转股价值</span>
+        <span class="field-tag">强赎状态</span>
+      </div>
+    </div>
+
+    <div class="rule-card">
+      <h2>转债抢权配售独立推送 <span class="badge scheduled">定时</span></h2>
+      <dl class="rule-grid">
+        <dt>推送内容</dt>
+        <dd>抢权配售正式入池项目列表</dd>
+        <dt>推送时间</dt>
+        <dd><code>08:00</code> / <code>14:30</code></dd>
+        <dt>触发条件</dt>
+        <dd>交易日才推送；监控名单为空则跳过</dd>
+        <dt>推送格式</dt>
+        <dd>Markdown，独立推送不并入主摘要</dd>
+      </dl>
+    </div>
+
+    <div class="rule-card">
+      <h2>LOF 套利独立推送 <span class="badge scheduled">定时+即时</span></h2>
+      <dl class="rule-grid">
+        <dt>推送内容</dt>
+        <dd>LOF 限购池 / 非限购池项目</dd>
+        <dt>推送时间</dt>
+        <dd>定时：<code>13:30</code> / <code>14:00</code> / <code>14:30</code>；即时：新入池时触发</dd>
+        <dt>触发条件</dt>
+        <dd>定时按时间表；即时使用 seenEntryMap 去重</dd>
+        <dt>推送格式</dt>
+        <dd>Markdown，独立推送不并入主摘要</dd>
+      </dl>
+    </div>
+
+    <div class="rule-card">
+      <h2>并购报告推送 <span class="badge scheduled">定时</span></h2>
+      <dl class="rule-grid">
+        <dt>推送内容</dt>
+        <dd>DeepSeek AI 生成的单家公司并购简报</dd>
+        <dt>推送时间</dt>
+        <dd>每日 <code>00:00</code> 抓取后触发</dd>
+        <dt>推送格式</dt>
+        <dd>Markdown，逐家公司推送</dd>
+      </dl>
+    </div>
+  </div>
+</body>
+</html>

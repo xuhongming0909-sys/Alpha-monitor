@@ -1,3 +1,6 @@
+# AI-SUMMARY: logging 日志服务：统一日志输出
+# 对应 INDEX.md §9 文件摘要索引
+
 """统一logger。"""
 
 from __future__ import annotations

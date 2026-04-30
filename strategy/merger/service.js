@@ -1,3 +1,6 @@
+// AI-SUMMARY: 并购套利 Node 适配器：报告生成调度
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 function createMergerStrategy(options = {}) {

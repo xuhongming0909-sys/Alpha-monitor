@@ -16,7 +16,7 @@
 ```
 data_fetch/     → 上游数据抓取 + 标准化到 "The Bus"
 strategy/       → 业务计算与规则判断
-presentation/   → API 整形、页面、HTML 模板、Dashboard
+ui/   → API 整形、页面、HTML 模板、Dashboard
 notification/   → 企业微信推送与调度
 shared/         → 配置、路径、时间、运行态、通用能力
 tools/          → 部署脚本、数据库维护
@@ -31,7 +31,7 @@ config/         → 配置与密钥占位
 
 - `data_fetch/`：只负责抓取与标准化
 - `strategy/`：只负责业务计算与规则判断
-- `presentation/`：只负责页面、接口整形和展示逻辑
+- `ui/`：只负责页面、接口整形和展示逻辑
 - `notification/`：只负责推送配置、推送格式和推送调度
 - `shared/`：只负责配置、路径、时间、运行态和通用能力
 

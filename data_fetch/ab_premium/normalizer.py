@@ -1,3 +1,6 @@
+# AI-SUMMARY: AB 溢价数据标准化：原始行情转为 Bus 标准化记录
+# 对应 INDEX.md §9 文件摘要索引
+
 """AB 溢价normalizer器。"""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+// AI-SUMMARY: 抢权配售推送：独立推送逻辑与格式化
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 /**

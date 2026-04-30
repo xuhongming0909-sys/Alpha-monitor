@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "times": [
+    "08:00",
+    "14:30"
+  ],
+  "tradingDaysOnly": true
+}

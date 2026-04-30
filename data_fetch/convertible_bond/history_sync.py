@@ -1,3 +1,6 @@
+# AI-SUMMARY: convertible_bond 历史数据同步：K 线历史维护
+# 对应 INDEX.md §9 文件摘要索引
+
 """convertible_bond正股history_sync器。"""
 
 from __future__ import annotations

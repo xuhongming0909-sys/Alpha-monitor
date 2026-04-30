@@ -1,3 +1,6 @@
+# AI-SUMMARY: 申购业务计算：申购事件跟踪与状态管理
+# 对应 INDEX.md §9 文件摘要索引
+
 """subscription策略服务。"""
 
 from __future__ import annotations

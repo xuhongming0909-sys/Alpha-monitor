@@ -1,3 +1,6 @@
+// AI-SUMMARY: Bus 标准化记录（JS）：跨层通信数据结构
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 /**

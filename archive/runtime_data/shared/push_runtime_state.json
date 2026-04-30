@@ -1,0 +1,119 @@
+{
+  "lastMainPushDate": "2026-04-22",
+  "lastMergerReportDate": "2026-03-18",
+  "mainPushRecords": {
+    "2026-03-18": [
+      "08:30",
+      "09:35",
+      "11:00",
+      "12:55",
+      "14:30"
+    ],
+    "2026-03-20": [
+      "08:30",
+      "11:00",
+      "14:30"
+    ],
+    "2026-03-23": [
+      "03:11",
+      "14:45"
+    ]
+  },
+  "mergerPushRecords": {
+    "2026-03-18": [
+      "08:30"
+    ],
+    "2026-03-20": [
+      "08:30"
+    ],
+    "2026-03-23": [
+      "08:00"
+    ]
+  },
+  "lastMainPushAttemptAt": "2026-04-22T06:25:59.134Z",
+  "lastMainPushError": null,
+  "eventArbSeenItems": {
+    "hk_private:02688:https://www1.hkexnews.hk/listedco/listconews/sehk/2025/0326/2025032600770_c.pdf": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "hk_private:00357:https://www1.hkexnews.hk/listedco/listconews/sehk/2025/0430/2025043004182_c.pdf": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "hk_private:09997:https://www1.hkexnews.hk/listedco/listconews/sehk/2025/0812/2025081201339_c.pdf": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "hk_private:00751:2026-01-20": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "hk_private:00489:2025-08-25": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:600095:https://www.cninfo.com.cn/new/disclosure/detail?plate=sse&orgId=gssh0600095&stockCode=600095&announcementId=1222947341&announcementTime=2025-03-29": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:601519:https://www.cninfo.com.cn/new/disclosure/detail?plate=sse&orgId=gssh0600095&stockCode=600095&announcementId=1222947341&announcementTime=2025-03-29": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:603389:https://www.cninfo.com.cn/new/disclosure/detail?plate=sse&orgId=9900026793&stockCode=603389&announcementId=1223285802&announcementTime=2025-04-25": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:605389:https://www.cninfo.com.cn/new/disclosure/detail?plate=sse&orgId=9900039835&stockCode=605389&announcementId=1224131659&announcementTime=2025-07-11": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:200581:https://www.cninfo.com.cn/new/disclosure/detail?plate=szse&orgId=gssz0000581&stockCode=000581&announcementId=1224214707&announcementTime=2025-07-19": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:605255:https://www.cninfo.com.cn/new/disclosure/detail?orgId=9900039799&announcementId=1224537136&announcementTime=2025-08-22": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:603213:603213": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:301075:https://www.cninfo.com.cn/new/disclosure/detail?plate=szse&orgId=nssc1000735&stockCode=301075&announcementId=1224710211&announcementTime=2025-10-14": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:003041:https://www.cninfo.com.cn/new/disclosure/detail?plate=szse&orgId=9900030776&stockCode=003041&announcementId=1224799771&announcementTime=2025-11-12": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:301073:https://www.cninfo.com.cn/new/disclosure/detail?plate=szse&orgId=gfbj0835939&stockCode=301073&announcementId=1224845626&announcementTime=2025-12-03": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:601995:https://www.cninfo.com.cn/new/disclosure/detail?plate=sse&orgId=qsgn0000421&stockCode=601995&announcementId=1224883392&announcementTime=2025-12-18": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:601059:https://www.cninfo.com.cn/new/disclosure/detail?plate=sse&orgId=qsgn0000421&stockCode=601995&announcementId=1224883392&announcementTime=2025-12-18": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:601198:https://www.cninfo.com.cn/new/disclosure/detail?plate=sse&orgId=qsgn0000421&stockCode=601995&announcementId=1224883392&announcementTime=2025-12-18": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    "a_event:200706:https://www.cninfo.com.cn/new/disclosure/detail?plate=szse&orgId=gssz0200706&stockCode=200706&announcementId=1224950266&announcementTime=2026-01-27": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    },
+    ":::": {
+      "firstSeenDate": "2026-03-24",
+      "lastSeenAt": "2026-03-23T21:20:36.376Z"
+    }
+  },
+  "eventArbDailyNewItems": {},
+  "lastMainPushSuccessAt": "2026-04-22T06:25:59.134Z"
+}

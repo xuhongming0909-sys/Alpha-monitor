@@ -1,3 +1,6 @@
+// AI-SUMMARY: 推送配置存储：主推送配置读写
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 /**

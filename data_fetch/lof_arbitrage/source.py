@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# AI-SUMMARY: LOF 套利上游 API：集思录 LOF/QDII 实时数据
+# 对应 INDEX.md §9 文件摘要索引
+
+
 """LOF 套利固定来源抓取。
 
 职责：

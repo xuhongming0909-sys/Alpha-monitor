@@ -1,3 +1,6 @@
+// AI-SUMMARY: styles Markdown 格式化：推送内容模板
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 function toNum(value) {
@@ -21,6 +24,11 @@ function ratioText(value, digits = 3) {
   return num === null ? "--" : `${(num * 100).toFixed(digits)}%`;
 }
 
+function priceText(value, digits = 2) {
+  const num = toNum(value);
+  return num === null ? "--" : `${num.toFixed(digits)}`;
+}
+
 function buildForceRedeemText(item) {
   if (String(item?.forceRedeemLabel || "").trim()) return String(item.forceRedeemLabel).trim();
   return item?.forceRedeemActive ? "强赎中" : "非强赎";
@@ -35,9 +43,9 @@ function buildConvertibleBondDiscountMarkdown(signalType, items, options = {}) {
     options.generatedAtText || new Date().toLocaleString("zh-CN", { hour12: false })
   ).trim();
   const titles = {
-    buy: "可转债低溢价买入提醒",
-    sell: "可转债转股溢价率卖出提醒",
-    monitor: "可转债低溢价监控",
+    buy: "转债套利低溢价买入提醒",
+    sell: "转债套利溢价率卖出提醒",
+    monitor: "转债套利低溢价监控",
   };
   const subtitleMap = {
     buy: "触发条件：转股溢价率低于买入阈值",
@@ -58,8 +66,13 @@ function buildConvertibleBondDiscountMarkdown(signalType, items, options = {}) {
   }
 
   list.forEach((item) => {
+    const stockPriceText = priceText(item.stockPrice);
+    const stockChangeText = pctText(item.stockChangePercent, 2);
+    const stockDisplay = stockChangeText !== "--"
+      ? `${stockPriceText}(${stockChangeText})`
+      : stockPriceText;
     lines.push(
-      `- ${pickText(item.code)} ${pickText(item.bondName)} | 溢价率 ${pctText(item.premiumRate)} | 转债市值比 ${ratioText(item.bondToStockMarketValueRatio)} | 折价ATR比 ${ratioText(item.discountAtrRatio)} | ${buildForceRedeemText(item)}`
+      `- ${pickText(item.code)} ${pickText(item.bondName)} | 价格 ${priceText(item.price)} | 溢价率 ${pctText(item.premiumRate)} | 正股 ${stockDisplay} | 转股价值 ${priceText(item.convertValue)} | ${buildForceRedeemText(item)}`
     );
   });
 

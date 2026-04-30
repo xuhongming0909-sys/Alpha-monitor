@@ -1,3 +1,6 @@
+// AI-SUMMARY: 可转债 Node 适配器：计算结果格式化、折价策略状态
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 const { getShanghaiParts, normalizeDateText } = require("../../shared/time/shanghai_time");
@@ -290,7 +293,7 @@ function buildDiscountSignal(row, signalType) {
 function buildConvertibleBondDiscountSnapshot(rows, runtimeState = {}, options = {}) {
   const config = buildDiscountStrategyOptions(options);
   const cleanRows = sanitizeCbArbRows(rows).map((row) => enrichDiscountStrategyRow(row, config));
-  const pushEligibleRows = cleanRows.filter((row) => !row.forceRedeemActive);
+  const pushEligibleRows = cleanRows;
   const previousState = normalizeDiscountStrategyState(runtimeState);
   const previousMonitorMap = { ...previousState.monitorMap };
   const previousSignalStateMap = { ...previousState.signalStateMap };

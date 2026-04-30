@@ -1,3 +1,6 @@
+# AI-SUMMARY: 抢权配售业务计算：预期收益、阶段判定、入池判断
+# 对应 INDEX.md §9 文件摘要索引
+
 """可转债抢权配售策略输出服务。"""
 
 from __future__ import annotations

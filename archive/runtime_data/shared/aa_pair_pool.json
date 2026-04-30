@@ -1,0 +1,67 @@
+{
+  "success": true,
+  "aa": [
+    {
+      "cnCode": "688235",
+      "cnName": "百济神州-U",
+      "cnMarket": "sh",
+      "usCode": "BGNE",
+      "usName": "百济神州",
+      "usMarket": "us",
+      "relationKind": "direct",
+      "confidenceTier": "strict",
+      "compareRatio": 13.0,
+      "comparisonBasis": "exact_ratio",
+      "matchScore": 100.0,
+      "source": "manual_seed_beigene_13x"
+    },
+    {
+      "cnCode": "688223",
+      "cnName": "晶科能源",
+      "cnMarket": "sh",
+      "usCode": "JKS",
+      "usName": "晶科能源",
+      "usMarket": "us",
+      "relationKind": "associated",
+      "confidenceTier": "high",
+      "compareRatio": 1.0,
+      "comparisonBasis": "default_1x",
+      "matchScore": 98.0,
+      "source": "manual_seed"
+    },
+    {
+      "cnCode": "688303",
+      "cnName": "大全能源",
+      "cnMarket": "sh",
+      "usCode": "DQ",
+      "usName": "大全新能源",
+      "usMarket": "us",
+      "relationKind": "associated",
+      "confidenceTier": "high",
+      "compareRatio": 1.0,
+      "comparisonBasis": "default_1x",
+      "matchScore": 96.0,
+      "source": "manual_seed"
+    },
+    {
+      "cnCode": "688082",
+      "cnName": "盛美上海",
+      "cnMarket": "sh",
+      "usCode": "ACMR",
+      "usName": "盛美半导体",
+      "usMarket": "us",
+      "relationKind": "associated",
+      "confidenceTier": "high",
+      "compareRatio": 1.0,
+      "comparisonBasis": "default_1x",
+      "matchScore": 92.0,
+      "source": "manual_seed"
+    }
+  ],
+  "seedCount": 4,
+  "autoCount": 0,
+  "total": 4,
+  "source": "seed+auto_discovery",
+  "updateTime": "2026-03-24T01:36:01.682107",
+  "forceRefresh": false
+}

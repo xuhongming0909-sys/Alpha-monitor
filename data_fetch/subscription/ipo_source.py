@@ -1,3 +1,6 @@
+# AI-SUMMARY: subscription 上游 API：实时行情与数据抓取
+# 对应 INDEX.md §9 文件摘要索引
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -12,8 +15,8 @@ from typing import Any, Dict, Iterable, Optional
 import akshare as ak
 import pandas as pd
 
-import subscription_history_db as db
 from shared.config.script_config import get_config
+from shared.db import subscription_history_db as db
 
 _CONFIG = get_config()
 _SUBSCRIPTION_CONFIG = (((_CONFIG.get("data_fetch") or {}).get("plugins") or {}).get("subscription") or {})

@@ -1,3 +1,6 @@
+// AI-SUMMARY: 并购报告推送：DeepSeek AI 报告生成与推送
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 /**

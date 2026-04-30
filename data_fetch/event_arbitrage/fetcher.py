@@ -1,3 +1,6 @@
+# AI-SUMMARY: 事件套利抓取调度：调用集思录事件 API
+# 对应 INDEX.md §9 文件摘要索引
+
 """Fetch public event-arbitrage snapshots from configured sources."""
 
 from __future__ import annotations
@@ -101,14 +104,9 @@ def _extract_rows(payload: Any) -> list[dict[str, Any]]:
 
 
 def _fetch_json(session: requests.Session, url: str, timeout_seconds: float) -> dict[str, Any]:
-    try:
-        response = session.get(url, timeout=timeout_seconds)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.SSLError:
-        response = session.get(url, timeout=timeout_seconds, verify=False)
-        response.raise_for_status()
-        return response.json()
+    response = session.get(url, timeout=timeout_seconds)
+    response.raise_for_status()
+    return response.json()
 
 
 def _read_source_enabled(source_name: str, plugin_config: dict[str, Any]) -> bool:

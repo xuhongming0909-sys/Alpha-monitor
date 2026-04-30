@@ -1,3 +1,6 @@
+# AI-SUMMARY: AH 溢价业务计算：溢价率排名、历史百分位
+# 对应 INDEX.md §9 文件摘要索引
+
 """AH 溢价策略服务。"""
 
 from __future__ import annotations

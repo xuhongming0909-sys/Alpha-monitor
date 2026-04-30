@@ -1,3 +1,6 @@
+# AI-SUMMARY: 可转债抓取调度：调用集思录/东方财富 API
+# 对应 INDEX.md §9 文件摘要索引
+
 """convertible_bondfetcher。"""
 
 from __future__ import annotations

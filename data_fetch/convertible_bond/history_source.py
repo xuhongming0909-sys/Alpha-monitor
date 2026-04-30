@@ -1,3 +1,6 @@
+# AI-SUMMARY: convertible_bond 上游 API：实时行情与数据抓取
+# 对应 INDEX.md §9 文件摘要索引
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -25,7 +28,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 from data_fetch.convertible_bond.source import _build_cov_quote_map, _build_cov_realtime_map, _to_code6
 from shared.config.script_config import get_config
-import stock_price_history_db as db
+from shared.db import stock_price_history_db as db
 
 _CONFIG = get_config()
 _CB_FETCH_CONFIG = (((_CONFIG.get("data_fetch") or {}).get("plugins") or {}).get("convertible_bond") or {})

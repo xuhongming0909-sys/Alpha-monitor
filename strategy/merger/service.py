@@ -1,3 +1,6 @@
+# AI-SUMMARY: 并购套利业务计算：Deal 分析、AI 报告生成
+# 对应 INDEX.md §9 文件摘要索引
+
 """merger策略服务。"""
 
 from __future__ import annotations

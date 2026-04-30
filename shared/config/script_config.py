@@ -1,3 +1,6 @@
+# AI-SUMMARY: Python 配置读取器：YAML 解析 + 环境变量/Secrets 注入
+# 对应 INDEX.md §9 文件摘要索引
+
 """Python 侧统一配置读取器。
 规则是“配置即合同，密钥可由环境变量注入”，不再对普通业务参数做环境变量兜底。"""
 
@@ -13,7 +16,8 @@ import yaml
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-CONFIG_FILE = ROOT_DIR / "config.yaml"
+CONFIG_FILE = ROOT_DIR / "config" / "config.yaml"
+SECRETS_FILE = ROOT_DIR / "config" / "secrets.yaml"
 ENV_FILE = ROOT_DIR / ".env"
 
 _CONFIG_CACHE: Dict[str, Any] | None = None
@@ -51,6 +55,32 @@ def load_env_file(file_path: Path = ENV_FILE) -> None:
         if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
             value = value[1:-1]
         os.environ[key] = value
+
+
+def _to_env_key(config_key: str) -> str:
+    """把 secrets.yaml 中的 snake_case 键转为环境变量名。"""
+
+    return config_key.upper()
+
+
+def load_secrets_file(file_path: Path = SECRETS_FILE) -> None:
+    """把 config/secrets.yaml 中的值注入进程环境。"""
+
+    if not file_path.exists():
+        return
+
+    try:
+        secrets = yaml.safe_load(file_path.read_text(encoding="utf-8")) or {}
+        if not isinstance(secrets, dict):
+            return
+        for key, value in secrets.items():
+            if value is None:
+                continue
+            env_key = _to_env_key(key)
+            if env_key not in os.environ:
+                os.environ[env_key] = str(value)
+    except Exception:
+        pass
 
 
 def _deep_clone(value: Any) -> Any:
@@ -144,6 +174,7 @@ def load_config(*, reload: bool = False) -> Dict[str, Any]:
         return _deep_clone(_CONFIG_CACHE)
 
     load_env_file()
+    load_secrets_file()
     config = _read_config_file()
     config = _resolve_env_placeholders(config)
     config = _apply_secret_env(config)

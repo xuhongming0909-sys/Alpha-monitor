@@ -1,3 +1,6 @@
+# AI-SUMMARY: cb_rights_issue 数据标准化：原始数据转为 Bus 记录
+# 对应 INDEX.md §9 文件摘要索引
+
 """cb_rights_issue normalizer。"""
 
 from __future__ import annotations

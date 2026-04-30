@@ -1,3 +1,6 @@
+# AI-SUMMARY: 标准响应包装（Python）：成功/错误响应格式
+# 对应 INDEX.md §9 文件摘要索引
+
 """统一服务返回模型。"""
 
 from __future__ import annotations

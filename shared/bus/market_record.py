@@ -1,3 +1,6 @@
+# AI-SUMMARY: Bus 标准化记录（Python）：跨层通信数据结构
+# 对应 INDEX.md §9 文件摘要索引
+
 """The Bus 标准记录模型。
 
 本模块只定义抓取层与策略层之间共享的normalizer数据结构，
@@ -7,6 +10,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
@@ -25,7 +29,7 @@ REQUIRED_FIELDS = (
 ALLOWED_STATUS = {"ok", "empty", "error"}
 
 
-@dataclass(slots=True)
+@dataclass
 class MarketRecord:
     """The Bus 单条标准记录。
 
@@ -106,8 +110,30 @@ def create_market_record(**kwargs: Any) -> Dict[str, Any]:
     return payload
 
 
-# 保留英文别名，方便shared内部或后续脚本按稳定英文接口引用。
-validate_market_record = validate_market_record
-create_market_record = create_market_record
+def create_error_record(
+    plugin: str,
+    message: str,
+    market: str = "",
+    symbol: str = "*",
+    name: str = "",
+    event_type: str = "",
+    source: str | None = None,
+    raw_error: dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """创建标准化的错误记录，供各插件 normalizer 统一使用。"""
+
+    return create_market_record(
+        plugin=plugin,
+        market=market or "",
+        symbol=symbol or "*",
+        name=name or f"{plugin}_error",
+        event_type=event_type or f"{plugin}_snapshot",
+        quote_time=datetime.now().isoformat(),
+        metrics={},
+        raw=raw_error if raw_error is not None else {"error": message},
+        status="error",
+        source=source,
+        message=message,
+    )
 
 

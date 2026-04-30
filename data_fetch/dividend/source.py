@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# AI-SUMMARY: 股息上游 API：AkShare CNINFO + 腾讯行情
+# 对应 INDEX.md §9 文件摘要索引
+
+
 """Dividend data loader (AkShare CNINFO + Tencent quote, no Eastmoney)."""
 
 from __future__ import annotations

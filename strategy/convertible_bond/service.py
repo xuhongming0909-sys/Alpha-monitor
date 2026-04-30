@@ -1,3 +1,6 @@
+# AI-SUMMARY: 可转债业务计算：双低策略、理论收益率、回售套利
+# 对应 INDEX.md §9 文件摘要索引
+
 """Convertible-bond strategy response service."""
 
 from __future__ import annotations

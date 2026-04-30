@@ -27,19 +27,23 @@
 
 | 模块 | 职责 | 正式规格 | 真实入口 |
 | --- | --- | --- | --- |
-| 可转债套利 | 转债折价/小额刚兑数据、计算、展示 | `specs/convertible-bond-arbitrage.md` | `data_fetch/convertible_bond/`, `strategy/convertible_bond/`, `presentation/routes/dashboard_routes.js` |
-| AH 溢价 | A/H 股溢价监控 | `specs/ah-premium.md` (待建) | `data_fetch/ah_premium/`, `presentation/routes/dashboard_routes.js` |
-| AB 溢价 | A/B 股溢价监控 | `specs/ab-premium.md` (待建) | `data_fetch/ab_premium/`, `presentation/routes/dashboard_routes.js` |
-| LOF 套利 | LOF 折溢价监控 | `specs/lof-arbitrage.md` (待建) | `data_fetch/lof/`, `presentation/routes/dashboard_routes.js` |
-| 合并套利 | 并购重组公告监控 | `specs/merger-arbitrage.md` (待建) | `data_fetch/merger/`, `presentation/routes/dashboard_routes.js` |
-| 事件套利 | 事件驱动套利监控 | `specs/event-arbitrage.md` (待建) | `data_fetch/event/`, `presentation/routes/dashboard_routes.js` |
-| 股息提醒 | 股息机会跟踪 | `specs/dividend.md` (待建) | `data_fetch/dividend/`, `presentation/routes/dashboard_routes.js` |
-| 打新/申购 | IPO、转债申购日历 | `specs/subscription.md` (待建) | `data_fetch/subscription/`, `presentation/routes/dashboard_routes.js` |
-| 自定义监控 | 用户自定义套利组合 | `specs/custom-monitor.md` (待建) | `data_fetch/custom_monitor/`, `presentation/routes/dashboard_routes.js` |
-| 汇率 | 港币/美元人民币汇率 | `specs/exchange-rate.md` (待建) | `data_fetch/exchange_rate/`, `presentation/routes/dashboard_routes.js` |
+| 转债套利 | 转债折价/小额刚兑数据、计算、展示 | `specs/convertible-bond-arbitrage.md` | `data_fetch/convertible_bond/`, `strategy/convertible_bond/`, `ui/routes/dashboard_routes.js` |
+| AH 溢价 | A/H 股溢价监控 | `specs/ah-premium.md` | `data_fetch/ah_premium/`, `ui/routes/dashboard_routes.js` |
+| AB 溢价 | A/B 股溢价监控 | `specs/ab-premium.md` | `data_fetch/ab_premium/`, `ui/routes/dashboard_routes.js` |
+| LOF 套利 | LOF 折溢价监控 | `specs/lof-arbitrage.md` | `data_fetch/lof_arbitrage/`, `ui/routes/dashboard_routes.js` |
+| 合并套利 | 并购重组公告监控 | `specs/merger-arbitrage.md` | `data_fetch/merger/`, `ui/routes/dashboard_routes.js` |
+| 事件套利 | 事件驱动套利监控 | `specs/event-arbitrage.md` | `data_fetch/event_arbitrage/`, `ui/routes/dashboard_routes.js` |
+| 股息提醒 | 股息机会跟踪 | `specs/dividend.md` | `data_fetch/dividend/`, `ui/routes/dashboard_routes.js` |
+| 打新/申购 | IPO、转债申购日历 | `specs/subscription.md` | `data_fetch/subscription/`, `ui/routes/dashboard_routes.js` |
+| 自定义监控 | 用户自定义套利组合 | `specs/custom-monitor.md` | `data_fetch/custom_monitor/`, `ui/routes/dashboard_routes.js` |
+| 汇率 | 港币/美元人民币汇率 | `specs/exchange-rate.md` | `data_fetch/exchange_rate/`, `ui/routes/dashboard_routes.js` |
+| 转债抢权配售 | 转债抢权配售计算与推送 | `specs/cb-rights-issue.md` | `data_fetch/cb_rights_issue/`, `strategy/cb_rights_issue/` |
+| 推送规则 | 推送内容/时间/条件/格式定义 | `specs/push-rules.md` | `notification/scheduler/`, `notification/summary/` |
+| 数据模型 | Dashboard 数据模型定义 | `specs/data-model.md` | 跨模块共享 |
+| API 合同 | 所有对外 API 端点定义 | `specs/api-contract.md` | `ui/routes/` |
 | UI 设计 | 全局视觉与交互规范 | `specs/ui-design.md` | `docs/UI_DESIGN.md` |
 | React 终端 UI | React + Vite 重做规格 | `specs/react-terminal-ui.md` | `ui/` |
-| 项目总览 | 技术栈、结构、通用规则 | `specs/project-overview.md` | `CONSTITUTION.md` (归档参考) |
+| 项目总览 | 技术栈、结构、通用规则 | `specs/project-overview.md` | `archive/docs-deprecated/CONSTITUTION.md` |
 
 ## 全局规则
 
@@ -52,7 +56,20 @@
 
 ## 子规格索引
 
-- `specs/convertible-bond-arbitrage.md`: 可转债套利页面规格、计算合同、接口合同、推送规则
+- `specs/convertible-bond-arbitrage.md`: 转债套利页面规格、计算合同、接口合同、推送规则
+- `specs/ah-premium.md`: AH 溢价模块规格、配对规则、溢价率计算、历史分位
+- `specs/ab-premium.md`: AB 溢价模块规格、双汇率支持、溢价率计算
+- `specs/lof-arbitrage.md`: LOF 套利模块规格、IOPV 计算、监控池规则、推送规则
+- `specs/merger-arbitrage.md`: 合并套利模块规格、公告筛选规则、AI 简报推送
+- `specs/event-arbitrage.md`: 事件套利模块规格、集思录数据源、分类展示
+- `specs/dividend.md`: 股息提醒模块规格、分红数据查询、股息率计算
+- `specs/subscription.md`: 打新/申购模块规格、IPO 与可转债、日程状态机
+- `specs/custom-monitor.md`: 自定义监控模块规格、用户配置、套利收益率计算
+- `specs/exchange-rate.md`: 汇率模块规格、港币/美元实时汇率
+- `specs/cb-rights-issue.md`: 转债抢权配售规格、三阶段列表、配售收益计算、独立推送
+- `specs/push-rules.md`: 推送规则：内容/时间/条件/格式定义
+- `specs/data-model.md`: Dashboard 数据模型定义、9 个核心数据对象
+- `specs/api-contract.md`: 所有对外 API 端点定义与合同规则
 - `specs/ui-design.md`: UI 设计规范引用与补充约束
 - `specs/react-terminal-ui.md`: React 金融终端重做范围、接口消费清单、验收标准
 - `specs/project-overview.md`: 技术栈、模块职责、数据模型概述、API 合同索引

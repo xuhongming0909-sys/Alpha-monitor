@@ -1,3 +1,6 @@
+// AI-SUMMARY: 通用排序工具：按字段升降序取 Top N
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 /**

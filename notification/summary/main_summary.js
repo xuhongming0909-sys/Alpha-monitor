@@ -1,3 +1,6 @@
+// AI-SUMMARY: 每日摘要组装：聚合所有模块生成推送 Markdown
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 /**

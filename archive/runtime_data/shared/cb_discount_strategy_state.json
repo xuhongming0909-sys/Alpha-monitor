@@ -1,0 +1,1045 @@
+{
+  "initializedDate": "2026-04-22",
+  "lastBootstrapDate": "2026-04-22",
+  "monitorMap": {},
+  "signalStateMap": {
+    "110073": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "110075": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "110076": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "110077": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "110081": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "110084": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "110086": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "110087": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "110092": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "110093": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "110097": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "110098": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "110099": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "110100": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111002": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111003": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111004": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111005": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111009": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111010": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111014": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111015": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111017": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111018": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111020": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111021": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111022": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "111024": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113037": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113042": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113043": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113046": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113048": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113049": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113051": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113052": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113053": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113054": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113056": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113059": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113062": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113066": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113067": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113070": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113584": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113588": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113589": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113597": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113605": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113610": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113615": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113616": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113624": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113625": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113627": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113631": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113632": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113634": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113636": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113640": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113643": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113644": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113647": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113648": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113649": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113650": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113652": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113656": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113658": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113659": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113660": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113661": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113665": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113666": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113670": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113671": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113674": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113678": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113679": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113680": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113681": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113682": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113688": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113692": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113693": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113694": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113696": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113698": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113699": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113700": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "113701": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118003": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118007": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118010": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118011": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118012": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118015": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118018": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118020": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118022": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118024": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118025": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118027": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118032": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118033": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118034": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118035": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118036": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118037": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118040": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118041": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118042": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118051": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118052": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118053": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118059": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118060": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118061": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118062": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118063": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118064": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118065": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118066": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "118067": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123054": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123059": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123061": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123064": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123065": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123071": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123072": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123076": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123080": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123088": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123091": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123092": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123104": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123107": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123109": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123112": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123114": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123117": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123119": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123122": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123124": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123126": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123131": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123133": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123138": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123142": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123144": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123149": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123150": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123151": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123154": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123155": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123157": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123165": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123168": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123171": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123172": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123173": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123175": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123179": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123180": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123183": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123189": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123192": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123193": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123194": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123195": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123196": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123198": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123199": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123214": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123215": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123216": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123220": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123222": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123223": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123225": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123229": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123237": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123250": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123251": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123252": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123253": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123257": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123258": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123259": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123260": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123261": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123262": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123263": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123264": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123265": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "123266": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127017": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127018": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127024": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127025": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127026": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127027": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127030": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127031": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127034": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127037": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127038": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127040": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127041": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127045": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127046": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127047": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127049": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127050": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127054": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127056": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127059": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127060": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127061": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127062": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127064": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127066": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127067": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127068": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127069": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127072": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127080": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127082": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127083": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127084": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127085": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127089": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127090": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127093": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127095": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127098": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127099": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127102": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127103": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127105": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127108": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127110": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127112": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "127113": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "128119": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "128121": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "128124": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "128125": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "128127": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "128128": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "128129": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "128134": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "128136": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "128138": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    },
+    "128141": {
+      "buyZoneActive": false,
+      "sellZoneActive": false
+    },
+    "128142": {
+      "buyZoneActive": false,
+      "sellZoneActive": true
+    }
+  },
+  "monitorPushRecords": {},
+  "lastBuySignalAttemptAt": null,
+  "lastBuySignalSuccessAt": null,
+  "lastBuySignalError": null,
+  "lastSellSignalAttemptAt": null,
+  "lastSellSignalSuccessAt": null,
+  "lastSellSignalError": null,
+  "lastMonitorPushAttemptAt": null,
+  "lastMonitorPushSuccessAt": null,
+  "lastMonitorPushError": null
+}

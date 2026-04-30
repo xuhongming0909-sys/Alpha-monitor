@@ -1,3 +1,6 @@
+# AI-SUMMARY: 抢权配售抓取调度：调用集思录预案 API
+# 对应 INDEX.md §9 文件摘要索引
+
 """cb_rights_issue fetcher。"""
 
 from __future__ import annotations

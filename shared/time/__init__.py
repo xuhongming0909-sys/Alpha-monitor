@@ -1,3 +1,6 @@
+# AI-SUMMARY: time 插件初始化模块
+# 对应 INDEX.md §9 文件摘要索引
+
 """时间工具。"""
 
 from .shanghai_time import (

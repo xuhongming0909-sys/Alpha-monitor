@@ -1,3 +1,6 @@
+# AI-SUMMARY: LOF 套利业务计算：溢价率排名与过滤
+# 对应 INDEX.md §9 文件摘要索引
+
 """LOF 套利策略输出服务。"""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+// AI-SUMMARY: 状态注册表（JS）：运行时文件统一管理
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 const { getConfig } = require("../config/node_config");

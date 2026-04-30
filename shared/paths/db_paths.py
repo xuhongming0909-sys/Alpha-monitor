@@ -1,3 +1,6 @@
+# AI-SUMMARY: paths 路径解析：运行时目录与文件路径
+# 对应 INDEX.md §9 文件摘要索引
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 

@@ -1,3 +1,6 @@
+# AI-SUMMARY: 路径解析（Python）：运行时目录、数据库路径
+# 对应 INDEX.md §9 文件摘要索引
+
 """Shared Python path policy derived from config.yaml."""
 
 from __future__ import annotations

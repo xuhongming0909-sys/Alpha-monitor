@@ -1,3 +1,6 @@
+# AI-SUMMARY: JSON 持久化（Python）：运行时状态读写
+# 对应 INDEX.md §9 文件摘要索引
+
 """统一的 JSON 运行态读写层。"""
 
 from __future__ import annotations

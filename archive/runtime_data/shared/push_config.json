@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "time": "03:11",
+  "modules": {
+    "ahab": true,
+    "subscription": true,
+    "cbArb": true,
+    "monitor": true,
+    "dividend": true
+  },
+  "times": [
+    "03:11",
+    "14:45"
+  ],
+  "mergerSchedule": {
+    "enabled": true,
+    "time": "08:00"
+  }
+}

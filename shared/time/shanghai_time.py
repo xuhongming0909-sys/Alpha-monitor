@@ -1,3 +1,6 @@
+# AI-SUMMARY: 上海时区（Python）：交易时段检测、市场时间
+# 对应 INDEX.md §9 文件摘要索引
+
 """上海时区时间工具。"""
 
 from __future__ import annotations

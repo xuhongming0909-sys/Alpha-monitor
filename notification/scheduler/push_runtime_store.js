@@ -1,3 +1,6 @@
+// AI-SUMMARY: 推送运行时存储：推送状态与历史
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 const { getShanghaiParts } = require("../../shared/time/shanghai_time");

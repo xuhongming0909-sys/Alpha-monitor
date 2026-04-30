@@ -1,3 +1,6 @@
+# AI-SUMMARY: 可转债数据标准化：含理论定价的 Bus 记录生成
+# 对应 INDEX.md §9 文件摘要索引
+
 """convertible_bondnormalizer器。"""
 
 from __future__ import annotations

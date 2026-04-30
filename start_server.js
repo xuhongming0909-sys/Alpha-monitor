@@ -1,3 +1,6 @@
+// AI-SUMMARY: Express 主入口：启动服务、挂载路由、注册调度器、管理运行时状态
+// 对应 INDEX.md §9 文件摘要索引
+
 ﻿const fs = require('fs');
 const path = require('path');
 const express = require('express');
@@ -60,11 +63,11 @@ const {
 const { createCustomMonitorRuntimeService } = require('./strategy/custom_monitor/runtime_service');
 const { createDividendRuntimeService } = require('./strategy/dividend/runtime_service');
 const { createMergerStrategy } = require('./strategy/merger/service');
-const { buildOverviewViewModel } = require('./presentation/view_models/overview');
-const { buildPushConfigResponse } = require('./presentation/view_models/push_payload');
-const { registerMarketRoutes } = require('./presentation/routes/market_routes');
-const { registerPushRoutes } = require('./presentation/routes/push_routes');
-const { registerDashboardRoutes } = require('./presentation/routes/dashboard_routes');
+const { buildOverviewViewModel } = require('./ui/view_models/overview.cjs');
+const { buildPushConfigResponse } = require('./ui/view_models/push_payload.cjs');
+const { registerMarketRoutes } = require('./ui/routes/market_routes.cjs');
+const { registerPushRoutes } = require('./ui/routes/push_routes.cjs');
+const { registerDashboardRoutes } = require('./ui/routes/dashboard_routes.cjs');
 
 const ROOT = __dirname;
 loadEnvFile();
@@ -102,7 +105,7 @@ const LOF_ARBITRAGE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.lof_arbitrage &&
   : {};
 const INDEX_FILE = path.resolve(
   ROOT,
-  PRESENTATION_CONFIG.dashboard_entry || './presentation/templates/dashboard_template.html'
+  PRESENTATION_CONFIG.dashboard_entry || './ui/templates/dashboard_template.html'
 );
 const STATIC_DATA_DIR = PATH_POLICY.dataRootDir;
 const SHARED_DATA_DIR = PATH_POLICY.sharedDataDir;
@@ -2813,7 +2816,7 @@ async function collectSummaryDatasets() {
 }
 
 async function collectAlertDatasets() {
-  const cbArb = await getDataset('cbArb');
+  const cbArb = await getDataset('cbArb', { force: true });
   return { cbArb };
 }
 
@@ -3139,6 +3142,9 @@ if (hasUiBuild) {
 
 // Legacy dashboard route
 app.get('/legacy', (_req, res) => res.sendFile(INDEX_FILE));
+
+// Push rules page
+app.get('/push-rules', (_req, res) => res.sendFile(path.resolve(ROOT, './ui/templates/push_rules.html')));
 
 // Default: serve React UI if built, otherwise fallback to legacy dashboard
 app.get('*', (_req, res) => {

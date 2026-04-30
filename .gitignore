@@ -26,3 +26,8 @@ runtime_data/shared/推送运行状态.json
 ops/server_profile.local.yaml
 config/secrets.yaml
 
+.vs/
+runtime_data/*.json
+runtime_data/*.tsv
+ui/dist/
+scripts/

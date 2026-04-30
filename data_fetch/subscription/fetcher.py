@@ -1,3 +1,6 @@
+# AI-SUMMARY: 申购抓取调度：IPO + 转债申购日历
+# 对应 INDEX.md §9 文件摘要索引
+
 """subscriptionfetcher。"""
 
 from __future__ import annotations

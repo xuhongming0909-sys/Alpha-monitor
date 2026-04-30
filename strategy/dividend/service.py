@@ -1,3 +1,6 @@
+# AI-SUMMARY: 股息业务计算：登记日跟踪、股息率计算
+# 对应 INDEX.md §9 文件摘要索引
+
 """dividend策略服务。"""
 
 from __future__ import annotations

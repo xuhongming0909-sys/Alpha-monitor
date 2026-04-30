@@ -39,7 +39,7 @@ a {
 }
 
 .terminal-shell {
-  min-width: 1180px;
+  min-width: 1920px;
   padding: 10px;
 }
 
@@ -240,7 +240,7 @@ h2 {
 }
 
 .wide-table {
-  min-width: 980px;
+  min-width: 1800px;
 }
 
 .dense-table th,
@@ -271,7 +271,7 @@ h2 {
 }
 
 .num {
-  text-align: right !important;
+  text-align: center !important;
 }
 
 .muted {
@@ -306,6 +306,37 @@ h2 {
   height: 46px !important;
   color: var(--terminal-muted) !important;
   text-align: center;
+}
+
+.search-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--terminal-line);
+  background: var(--terminal-panel);
+}
+
+.search-input {
+  flex: 1;
+  min-width: 200px;
+  max-width: 400px;
+  padding: 5px 10px;
+  border: 1px solid var(--terminal-line-soft);
+  border-radius: 0;
+  background: var(--terminal-panel-2);
+  color: var(--terminal-text);
+  font-size: 12px;
+}
+
+.search-input::placeholder {
+  color: var(--terminal-faint);
+}
+
+.search-count {
+  color: var(--terminal-muted);
+  font-size: 11px;
 }
 
 .tab-nav {

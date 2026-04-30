@@ -1,3 +1,6 @@
+// AI-SUMMARY: 推送 Markdown 样式：通用格式化模板
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 const { collectTodaySubscriptionEvents } = require("../../strategy/subscription/service");

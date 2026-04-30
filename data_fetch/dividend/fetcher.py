@@ -1,3 +1,6 @@
+# AI-SUMMARY: 股息抓取调度：调用 AkShare/巨潮 API
+# 对应 INDEX.md §9 文件摘要索引
+
 """dividendfetcher。"""
 
 from __future__ import annotations

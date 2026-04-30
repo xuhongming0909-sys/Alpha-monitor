@@ -1,3 +1,6 @@
+// AI-SUMMARY: styles Markdown 格式化：推送内容模板
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 function formatNumber(value, digits = 2) {

@@ -1,3 +1,6 @@
+// AI-SUMMARY: custom_monitor 业务计算：策略规则与推送逻辑
+// 对应 INDEX.md §9 文件摘要索引
+
 "use strict";
 
 const MONITOR_DECIMALS = 3;

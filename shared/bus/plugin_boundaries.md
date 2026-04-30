@@ -19,13 +19,13 @@
   - `shared/*`
   - `shared/bus/*`
   - 自己插件目录内的文件
-- `presentation/*` 可以依赖：
+- `ui/*` 可以依赖：
   - `strategy/*`
   - `shared/*`
   - `notification/*` 的稳定接口结果，但不能反向驱动推送样式实现
 - `notification/*` 可以依赖：
   - `strategy/*` 产出的统一结果
-  - `presentation/view_models/*` 的稳定展示模型
+  - `ui/view_models/*` 的稳定展示模型
   - `shared/*`
 
 ## 明确禁止
