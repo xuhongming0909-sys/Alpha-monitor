@@ -2109,7 +2109,6 @@ function PushSettingsPage({ config }) {
   const modules = config?.modules || {};
   const times = Array.isArray(config?.times) ? config.times : (config?.time ? [config.time] : []);
 
-  // 模块开关映射（中文标签）
   const moduleLabels = {
     ahab: 'AH/AB',
     subscription: '打新',
@@ -2123,82 +2122,148 @@ function PushSettingsPage({ config }) {
 
   const moduleEntries = Object.entries(modules);
 
+  const rc = {
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,95,106,0.12)',
+    borderRadius: '12px',
+    padding: '16px 20px',
+    marginBottom: '12px',
+  };
+  const rt = {
+    fontSize: '15px',
+    fontWeight: 600,
+    margin: '0 0 10px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  };
+  const badge = (c) => ({
+    fontSize: '11px',
+    padding: '2px 8px',
+    borderRadius: '20px',
+    background: c === 'g' ? 'rgba(55,208,154,0.12)' : c === 'y' ? 'rgba(255,184,94,0.12)' : 'rgba(255,85,102,0.12)',
+    color: c === 'g' ? '#37d09a' : c === 'y' ? '#ffb85e' : '#ff5566',
+    fontWeight: 500,
+  });
+
   return (
-    <section className="terminal-panel" style={{ marginTop: '8px' }}>
-      <div className="panel-head compact-head">
-        <div>
-          <p className="eyebrow">Push Settings</p>
-          <h2>推送设置</h2>
+    <div>
+      <section className="terminal-panel" style={{ marginTop: '8px' }}>
+        <div className="panel-head compact-head">
+          <div><p className="eyebrow">Push Settings</p><h2>推送规则</h2></div>
+          <span className="panel-count">{config?.enabled ? '已启用' : '已禁用'}</span>
         </div>
-        <span className="panel-count">{config?.enabled ? '已启用' : '已禁用'}</span>
-      </div>
-      <div className="dense-table-wrap">
-        <table className="dense-table">
-          <tbody>
-            <tr>
-              <td style={{ color: 'var(--terminal-muted)', width: '140px' }}>推送时间</td>
-              <td>
-                {times.length > 0 ? (
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {times.map((t, i) => (
-                      <span key={i} className="source-pill">{t}</span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="muted">未配置</span>
-                )}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ color: 'var(--terminal-muted)' }}>模块开关</td>
-              <td>
-                {moduleEntries.length > 0 ? (
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {moduleEntries.map(([key, enabled]) => (
-                      <span key={key} className={`source-pill ${enabled ? 'is-up' : 'muted'}`}>
-                        {moduleLabels[key] || key}: {enabled ? '开' : '关'}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="muted">无模块配置</span>
-                )}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ color: 'var(--terminal-muted)' }}>Webhook</td>
-              <td className="mono">
-                {ds.webhookConfigured ? (
-                  <span className="is-up">已配置</span>
-                ) : (
-                  <span className="is-down">未配置</span>
-                )}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ color: 'var(--terminal-muted)' }}>调度器</td>
-              <td className="mono">
-                {ds.schedulerEnabled ? (
-                  <span className="is-up">运行中</span>
-                ) : (
-                  <span className="is-down">{ds.schedulerDisabledReason || '已停用'}</span>
-                )}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ color: 'var(--terminal-muted)' }}>上次推送</td>
-              <td className="mono">
-                {ds.lastMainPushSuccessAt ? (
-                  formatTime(ds.lastMainPushSuccessAt)
-                ) : (
-                  <span className="muted">从未推送</span>
-                )}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+        <div className="dense-table-wrap">
+          <table className="dense-table">
+            <tbody>
+              <tr>
+                <td style={{ color: 'var(--terminal-muted)', width: '140px' }}>推送时间</td>
+                <td>
+                  {times.length > 0 ? (
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {times.map((t, i) => <span key={i} className="source-pill">{t}</span>)}
+                    </div>
+                  ) : <span className="muted">未配置</span>}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ color: 'var(--terminal-muted)' }}>模块开关</td>
+                <td>
+                  {moduleEntries.length > 0 ? (
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {moduleEntries.map(([key, enabled]) => (
+                        <span key={key} className={`source-pill ${enabled ? 'is-up' : 'muted'}`}>
+                          {moduleLabels[key] || key}: {enabled ? '开' : '关'}
+                        </span>
+                      ))}
+                    </div>
+                  ) : <span className="muted">无模块配置</span>}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ color: 'var(--terminal-muted)' }}>Webhook</td>
+                <td className="mono">{ds.webhookConfigured ? <span className="is-up">已配置</span> : <span className="is-down">未配置</span>}</td>
+              </tr>
+              <tr>
+                <td style={{ color: 'var(--terminal-muted)' }}>调度器</td>
+                <td className="mono">{ds.schedulerEnabled ? <span className="is-up">运行中</span> : <span className="is-down">{ds.schedulerDisabledReason || '已停用'}</span>}</td>
+              </tr>
+              <tr>
+                <td style={{ color: 'var(--terminal-muted)' }}>上次推送</td>
+                <td className="mono">{ds.lastMainPushSuccessAt ? formatTime(ds.lastMainPushSuccessAt) : <span className="muted">从未推送</span>}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="terminal-panel" style={{ marginTop: '16px' }}>
+        <div className="panel-head compact-head">
+          <div><p className="eyebrow">Push Rules</p><h2>规则详解</h2></div>
+        </div>
+        <div style={{ padding: '12px 16px' }}>
+          <div style={rc}>
+            <div style={rt}>主摘要定时推送 <span style={badge('g')}>定时</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '6px 14px', fontSize: '13px' }}>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送内容</span><span>聚合所有模块摘要：打新、转债套利、AH溢价、AB溢价、自定义监控</span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送时间</span><span><code>08:00</code> / <code>20:18</code></span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>触发条件</span><span>定时触发，非交易日也推送（可配置）</span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送格式</span><span>Markdown，企业微信 Webhook</span>
+            </div>
+            <div style={{ marginTop: '10px', padding: '10px 14px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', fontSize: '12px', color: 'var(--terminal-muted)', lineHeight: 1.6 }}>
+              <strong style={{ color: 'var(--terminal-text)' }}>包含字段：</strong>各模块 TOP N 排名、套利空间、溢价率
+            </div>
+          </div>
+
+          <div style={rc}>
+            <div style={rt}>转债套利折价策略提醒 <span style={badge('y')}>实时</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '6px 14px', fontSize: '13px' }}>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送内容</span><span>买入提醒 / 卖出提醒 / 监控名单定时推送</span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送时间</span><span>交易时段内 <code>09:30 ~ 14:50</code>，每 10 分钟一档</span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>触发条件</span><span>买入：<code>premiumRate &lt; -2%</code>（且已过转股日）<br/>卖出：<code>premiumRate &gt; -0.5%</code>（且该标的在监控名单中）</span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>状态机</span><span>首次启动仅初始化监控名单；后续只在状态变化时触发推送</span>
+            </div>
+            <div style={{ marginTop: '10px', padding: '10px 14px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', fontSize: '12px', color: 'var(--terminal-muted)', lineHeight: 1.6 }}>
+              <strong style={{ color: 'var(--terminal-text)' }}>推送格式：</strong>代码 名称 | 价格 X.XX | 溢价率 X% | 正股 X.XX(±X%) | 转股价值 X.XX | 强赎状态
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+              {['价格','溢价率','正股价格','正股涨跌幅','转股价值','强赎状态'].map(f => (
+                <span key={f} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', color: 'var(--terminal-muted)', border: '1px solid rgba(255,255,255,0.06)' }}>{f}</span>
+              ))}
+            </div>
+          </div>
+
+          <div style={rc}>
+            <div style={rt}>转债抢权配售独立推送 <span style={badge('g')}>定时</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '6px 14px', fontSize: '13px' }}>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送内容</span><span>抢权配售正式入池项目列表</span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送时间</span><span><code>08:00</code> / <code>14:30</code></span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>触发条件</span><span>交易日才推送；监控名单为空则跳过</span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送格式</span><span>Markdown，独立推送不并入主摘要</span>
+            </div>
+          </div>
+
+          <div style={rc}>
+            <div style={rt}>LOF 套利独立推送 <span style={badge('y')}>定时+即时</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '6px 14px', fontSize: '13px' }}>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送内容</span><span>LOF 限购池 / 非限购池项目</span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送时间</span><span>定时：<code>13:30</code> / <code>14:00</code> / <code>14:30</code>；即时：新入池时触发</span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>触发条件</span><span>定时按时间表；即时使用 seenEntryMap 去重</span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送格式</span><span>Markdown，独立推送不并入主摘要</span>
+            </div>
+          </div>
+
+          <div style={rc}>
+            <div style={rt}>并购报告推送 <span style={badge('g')}>定时</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '6px 14px', fontSize: '13px' }}>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送内容</span><span>DeepSeek AI 生成的单家公司并购简报</span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送时间</span><span>每日 <code>00:00</code> 抓取后触发</span>
+              <span style={{ color: 'var(--terminal-muted)', fontWeight: 500 }}>推送格式</span><span>Markdown，逐家公司推送</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 
