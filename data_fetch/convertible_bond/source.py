@@ -417,19 +417,8 @@ def _build_cached_holder_info_map(previous_rows: Dict[str, Dict[str, Any]], aux_
     number_fields = ["holderCount"]
     bool_fields = ["holderCountFallbackUsed"]
     result: Dict[str, Dict[str, Any]] = {}
-    _, cached_value = _read_aux_cache_entry(aux_cache, "holderInfoByStock")
-    for stock_code, metrics in cached_value.items():
-        if not isinstance(metrics, dict):
-            continue
-        payload: Dict[str, Any] = {}
-        for field in text_fields:
-            text = str(metrics.get(field) or "").strip()
-            payload[field] = text or None
-        for field in number_fields:
-            payload[field] = _to_float(metrics.get(field))
-        for field in bool_fields:
-            payload[field] = metrics.get(field) is True
-        result[str(stock_code).strip()] = payload
+
+    # 先读旧快照，作为兜底
     for row in previous_rows.values():
         stock_code = _to_code6(row.get("stockCode"))
         if not stock_code:
@@ -442,6 +431,25 @@ def _build_cached_holder_info_map(previous_rows: Dict[str, Dict[str, Any]], aux_
             "holderCountLastCheckedAt": str(row.get("holderCountLastCheckedAt") or "").strip() or None,
         }
         result[stock_code] = payload
+
+    # 再用辅助缓存覆盖（辅助缓存保存了最近一次成功抓取的结果）
+    _, cached_value = _read_aux_cache_entry(aux_cache, "holderInfoByStock")
+    for stock_code, metrics in cached_value.items():
+        if not isinstance(metrics, dict):
+            continue
+        payload: Dict[str, Any] = {}
+        for field in text_fields:
+            text = str(metrics.get(field) or "").strip()
+            payload[field] = text or None
+        for field in number_fields:
+            payload[field] = _to_float(metrics.get(field))
+        for field in bool_fields:
+            payload[field] = metrics.get(field) is True
+        code = str(stock_code).strip()
+        # 只有当辅助缓存有实际数据时才覆盖
+        if payload.get("holderCount") is not None or payload.get("holderCountLastCheckedAt"):
+            result[code] = payload
+
     return result
 
 
