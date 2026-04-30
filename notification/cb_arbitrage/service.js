@@ -111,7 +111,7 @@ function createCbArbitragePushService(options = {}) {
   const logError = options.logError || ((scope, error) => console.error(scope, error));
 
   async function readPayload() {
-    const result = await getDataset("cbArb", { force: true });
+    const result = await getDataset("cbArb");
     if (!result || result.success === false) {
       throw new Error(result?.error || "cb_arbitrage_dataset_unavailable");
     }

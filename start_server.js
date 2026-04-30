@@ -2816,7 +2816,7 @@ async function collectSummaryDatasets() {
 }
 
 async function collectAlertDatasets() {
-  const cbArb = await getDataset('cbArb', { force: true });
+  const cbArb = await getDataset('cbArb');
   return { cbArb };
 }
 
