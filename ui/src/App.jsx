@@ -358,33 +358,22 @@ function useDashboardData() {
 
 function StatusStrip({ state }) {
   const health = state.resources?.health?.data || {};
-  const sections = health.sections || {};
-  const resourceStatus = state.resources?.resourceStatus?.data || {};
-  const failedResources = Object.entries(resourceStatus).filter(([, item]) => item?.status && item.status !== 'ok');
+  const status = health.status || 'loading';
+  const isOk = status === 'ok';
   return (
-    <header className="terminal-status">
+    <header className="terminal-status minimal">
       <div className="brand-block">
         <span className="brand-mark">ALPHA</span>
         <span className="brand-subtitle">Opportunity Terminal</span>
       </div>
-      <div className="status-grid">
-        <StatusCell label="系统" value={health.status || 'loading'} tone={health.status === 'ok' ? 'good' : 'warn'} />
-        <StatusCell label="Web" value={sections.web?.status || '--'} tone={sections.web?.status === 'ok' ? 'good' : 'warn'} />
-        <StatusCell label="数据异常" value={failedResources.length} tone={failedResources.length ? 'bad' : 'good'} />
-        <StatusCell label="刷新" value={state.loading ? 'loading' : formatTime(state.updatedAt)} tone="neutral" />
+      <div className="status-line">
+        <span className={isOk ? 'status-ok' : 'status-warn'}>
+          {isOk ? '系统正常' : `系统异常: ${status}`}
+        </span>
+        {state.loading && <span className="status-loading">刷新中...</span>}
       </div>
       <button className="terminal-action" type="button" onClick={state.reload}>刷新</button>
-      <a className="terminal-link" href="/legacy">旧版</a>
     </header>
-  );
-}
-
-function StatusCell({ label, value, tone }) {
-  return (
-    <div className={`status-cell tone-${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
   );
 }
 
@@ -433,43 +422,6 @@ function TabNav({ activeTab, onChange }) {
   );
 }
 
-function MetricMatrix({ resources, opportunities }) {
-  const cbRows = toArray(resources.cbArb.data);
-  const smallRows = toArray(resources.cbArb.smallRedemption?.rows);
-  const ahRows = toArray(resources.ah.data);
-  const abRows = toArray(resources.ab.data);
-  const lofRows = toArray(resources.lofArb.data);
-  const monitors = toArray(resources.monitor.data);
-  const subsData = resources?.subscriptions?.data || {};
-  const ipoRows = toArray(subsData.ipo?.data);
-  const bondRows = toArray(subsData.bonds?.data);
-  const todaySubs = [...ipoRows, ...bondRows].filter((r) => r.subscribeDate && r.subscribeDate.startsWith(new Date().toISOString().slice(0, 10)));
-  const todayPay = [...ipoRows, ...bondRows].filter((r) => r.paymentDate && r.paymentDate.startsWith(new Date().toISOString().slice(0, 10)));
-  const todayList = [...ipoRows, ...bondRows].filter((r) => r.listingDate && r.listingDate.startsWith(new Date().toISOString().slice(0, 10)));
-  return (
-    <section className="metric-matrix" aria-label="核心数据矩阵">
-      <MetricCard label="机会总数" value={opportunities.length} hint="跨策略候选" />
-      <MetricCard label="转债样本" value={cbRows.length + smallRows.length} hint="含小额刚兑" />
-      <MetricCard label="AH / AB" value={`${ahRows.length}/${abRows.length}`} hint="溢价监控" />
-      <MetricCard label="LOF" value={lofRows.length} hint="套利候选" />
-      <MetricCard label="自定义监控" value={monitors.length} hint="跟踪规则" />
-      {todaySubs.length > 0 && <MetricCard label="今日申购" value={todaySubs.length} hint="打新候选" />}
-      {todayPay.length > 0 && <MetricCard label="今日中签" value={todayPay.length} hint="待缴款" />}
-      {todayList.length > 0 && <MetricCard label="今日上市" value={todayList.length} hint="打新上市" />}
-    </section>
-  );
-}
-
-function MetricCard({ label, value, hint }) {
-  return (
-    <div className="metric-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <em>{hint}</em>
-    </div>
-  );
-}
-
 function getSubscriptionStage(row, today) {
   if (row.subscribeDate && row.subscribeDate.startsWith(today)) return { label: '今日申购', tone: 'is-up' };
   if (row.paymentDate && row.paymentDate.startsWith(today)) return { label: '今日中签缴款', tone: 'is-down' };
@@ -477,66 +429,119 @@ function getSubscriptionStage(row, today) {
   return null;
 }
 
-function SubscriptionTopSection({ data }) {
+function TodayActions({ data }) {
   if (!data) return null;
   const ipoRows = toArray(data.ipo?.data);
   const bondRows = toArray(data.bonds?.data);
   const allRows = [...ipoRows, ...bondRows];
-
   const today = new Date().toISOString().slice(0, 10);
+
   const todaySubs = allRows.filter((r) => r.subscribeDate && r.subscribeDate.startsWith(today));
   const todayPay = allRows.filter((r) => r.paymentDate && r.paymentDate.startsWith(today));
   const todayList = allRows.filter((r) => r.listingDate && r.listingDate.startsWith(today));
 
-  if (allRows.length === 0) return null;
+  const actions = [
+    ...todayPay.map((r) => ({ ...r, stage: '今日中签缴款', urgency: 3, tone: 'is-down' })),
+    ...todaySubs.map((r) => ({ ...r, stage: '今日申购', urgency: 2, tone: 'is-up' })),
+    ...todayList.map((r) => ({ ...r, stage: '今日上市', urgency: 1, tone: 'is-flat' })),
+  ];
+
+  if (actions.length === 0) {
+    return (
+      <section className="terminal-panel today-actions">
+        <div className="panel-head compact-head">
+          <div><p className="eyebrow">TODAY</p><h2>今日行动</h2></div>
+        </div>
+        <div className="today-empty">今日无申购/缴款/上市事项</div>
+      </section>
+    );
+  }
 
   return (
-    <section className="terminal-panel subscription-top-section">
+    <section className="terminal-panel today-actions">
       <div className="panel-head compact-head">
-        <div>
-          <p className="eyebrow">IPO & BOND SUBSCRIPTION</p>
-          <h2>新股打新</h2>
-        </div>
-        <span className="panel-count">{allRows.length} 条</span>
+        <div><p className="eyebrow">TODAY</p><h2>今日行动</h2></div>
+        <span className="panel-count">{actions.length} 项</span>
       </div>
-      <div className="metric-matrix" style={{ marginBottom: '12px' }}>
-        {todaySubs.length > 0 && <MetricCard label="今日申购" value={todaySubs.length} hint="打新候选" />}
-        {todayPay.length > 0 && <MetricCard label="今日中签缴款" value={todayPay.length} hint="待缴款" />}
-        {todayList.length > 0 && <MetricCard label="今日上市" value={todayList.length} hint="打新上市" />}
+      <div className="today-list">
+        {actions.map((row, i) => {
+          const isIpo = ipoRows.includes(row);
+          return (
+            <div key={`${row.code || i}`} className="today-item">
+              <span className={`today-stage ${row.tone}`}>{row.stage}</span>
+              <span className="today-name">{pickText(row.name, row.stockName)}</span>
+              <span className="mono muted">{pickText(row.code, row.stockCode)}</span>
+              <span className="today-type">{isIpo ? '新股' : '债券'}</span>
+            </div>
+          );
+        })}
       </div>
-      <div className="dense-table-wrap table-scroll">
-        <table className="dense-table">
-          <thead>
-            <tr>
-              <th>当前阶段</th>
-              <th>类型</th>
-              <th>名称/代码</th>
-              <th>申购日</th>
-              <th>中签缴款日</th>
-              <th>上市日</th>
-              <th className="num">申购上限</th>
-              <th className="num">发行价/转股价</th>
-            </tr>
-          </thead>
-          <tbody>
-            {allRows.slice(0, 30).map((row, i) => {
-              const stage = getSubscriptionStage(row, today);
-              const isIpo = ipoRows.includes(row);
-              return (
-                <tr key={`${row.code || i}`}>
-                  <td>{stage ? <span className={`source-pill ${stage.tone}`}>{stage.label}</span> : '--'}</td>
-                  <td><span className="source-pill">{isIpo ? '新股' : '债券'}</span></td>
-                  <td>{pickText(row.name, row.stockName)} <span className="mono muted">{pickText(row.code, row.stockCode)}</span></td>
-                  <td>{formatDate(row.subscribeDate)}</td>
-                  <td>{formatDate(row.paymentDate)}</td>
-                  <td>{formatDate(row.listingDate)}</td>
-                  <td className="num mono">{formatNumber(row.subscribeLimit, '手')}</td>
-                  <td className="num mono">{isIpo ? `发行价 ${formatNumber(row.issuePrice)}` : `转股价 ${formatNumber(row.convertPrice)}`}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+    </section>
+  );
+}
+
+function BestOpportunities({ opportunities, onNavigate }) {
+  const top5 = opportunities.slice(0, 5);
+  const sourceTabMap = {
+    '转债套利': 'convertible',
+    'AH': 'ah',
+    'AB': 'ab',
+    'LOF': 'lof',
+    '事件套利': 'merger',
+  };
+
+  return (
+    <section className="terminal-panel best-opportunities">
+      <div className="panel-head compact-head">
+        <div><p className="eyebrow">TOP 5</p><h2>最佳机会</h2></div>
+        <span className="panel-count">{opportunities.length} 候选</span>
+      </div>
+      <div className="best-list">
+        {top5.length ? top5.map((row, i) => (
+          <div
+            key={`${row.source}-${row.code}-${i}`}
+            className="best-item"
+            onClick={() => onNavigate(sourceTabMap[row.source] || 'overview')}
+            role="button"
+            tabIndex={0}
+          >
+            <span className="best-rank">{i + 1}</span>
+            <span className="source-pill">{row.source}</span>
+            <span className="best-name">{row.name}</span>
+            <span className="mono muted">{row.code}</span>
+            <span className="best-metric">{row.metric}</span>
+            <span className={`best-value mono ${signedClass(row.rawValue)}`}>{row.value}</span>
+          </div>
+        )) : (
+          <div className="today-empty">暂无候选机会</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function MonitorAlerts({ rows, onNavigate }) {
+  if (!rows || rows.length === 0) return null;
+  const alerts = rows.slice(0, 3);
+  return (
+    <section className="terminal-panel monitor-alerts">
+      <div className="panel-head compact-head">
+        <div><p className="eyebrow">ALERT</p><h2>监控提醒</h2></div>
+        <span className="panel-count">{rows.length} 条</span>
+      </div>
+      <div className="alert-list">
+        {alerts.map((row, i) => {
+          const best = Math.max(toNumber(row.stockYieldRate) ?? -Infinity, toNumber(row.cashYieldRate) ?? -Infinity);
+          return (
+            <div key={row.id || i} className="alert-item" onClick={() => onNavigate('monitor')} role="button" tabIndex={0}>
+              <span className="alert-name">{pickText(row.name)}</span>
+              <span className="mono muted">{pickText(row.acquirerName)}&rarr;{pickText(row.targetName)}</span>
+              <span className={`alert-yield mono ${signedClass(best === -Infinity ? null : best)}`}>
+                {best === -Infinity ? '--' : `${PERCENT_FORMAT.format(best)}%`}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -1958,26 +1963,11 @@ function App() {
           )}
           {activeTab === 'overview' && (
             <>
-              <MetricMatrix resources={resources} opportunities={opportunities} />
-              <SubscriptionTopSection data={subscriptionData} />
-              <div className="terminal-grid">
-                <OpportunityCommandCenter
-                  opportunities={searchQuery
-                    ? filteredOpportunities
-                    : opportunities}
-                  filter={oppFilter}
-                  onFilterChange={setOppFilter}
-                />
-                <ConvertibleTable rows={cbRows} smallRows={smallRedemptionRows} rightsIssueData={cbRightsIssueData} searchQuery={searchQuery} />
+              <div className="dashboard-grid">
+                <TodayActions data={subscriptionData} />
+                <BestOpportunities opportunities={opportunities} onNavigate={setActiveTab} />
               </div>
-              <OverviewConvertibleGrid rows={cbRows} />
-              <div className="terminal-grid">
-                <AhTable rows={ahRows} searchQuery="" />
-                <AbTable rows={abRows} searchQuery="" />
-              </div>
-              <LofTable rows={lofRows} searchQuery="" />
-              <OverviewMonitorSummary rows={monitorRows} />
-              <OverviewDividendSummary rows={dividendRows} />
+              <MonitorAlerts rows={monitorRows} onNavigate={setActiveTab} />
             </>
           )}
           {activeTab === 'convertible' && <ConvertibleTable rows={cbRows} smallRows={smallRedemptionRows} rightsIssueData={cbRightsIssueData} searchQuery={searchQuery} />}

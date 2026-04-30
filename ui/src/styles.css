@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   color-scheme: dark;
   --terminal-bg: #050608;
   --terminal-panel: #0b0f14;
@@ -53,6 +53,11 @@ a {
   background: #070a0e;
 }
 
+.terminal-status.minimal {
+  grid-template-columns: 220px 1fr auto;
+  gap: 0;
+}
+
 .brand-block {
   display: flex;
   align-items: center;
@@ -75,33 +80,23 @@ a {
   text-transform: uppercase;
 }
 
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
-}
-
-.status-cell {
+.status-line {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 10px;
-  border-right: 1px solid var(--terminal-line-soft);
-  color: var(--terminal-muted);
+  gap: 12px;
+  padding: 0 12px;
+  font-size: 12px;
 }
 
-.status-cell strong,
-.metric-card strong,
+.status-ok { color: var(--terminal-green); }
+.status-warn { color: var(--terminal-yellow); }
+.status-loading { color: var(--terminal-faint); }
+
 .panel-count,
 .mono,
 .num {
   font-family: var(--terminal-mono);
   font-variant-numeric: tabular-nums;
-}
-
-.status-cell strong {
-  color: var(--terminal-text);
-  text-transform: uppercase;
 }
 
 .tone-good strong { color: var(--terminal-green); }
@@ -136,39 +131,11 @@ a {
   background: rgba(255, 77, 94, .08);
 }
 
-.metric-matrix {
+.dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: minmax(320px, .4fr) minmax(480px, .6fr);
   gap: 8px;
   margin-top: 8px;
-}
-
-.metric-card {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 2px 8px;
-  min-height: 54px;
-  padding: 8px 10px;
-  border: 1px solid var(--terminal-line);
-  background: var(--terminal-panel);
-}
-
-.metric-card span {
-  color: var(--terminal-muted);
-  font-size: 12px;
-}
-
-.metric-card strong {
-  color: var(--terminal-yellow);
-  font-size: 22px;
-  line-height: 1;
-}
-
-.metric-card em {
-  grid-column: 1 / -1;
-  color: var(--terminal-faint);
-  font-style: normal;
-  font-size: 11px;
 }
 
 .terminal-grid {
@@ -308,6 +275,146 @@ h2 {
   text-align: center;
 }
 
+.today-actions .today-list {
+  padding: 4px 0;
+}
+
+.today-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--terminal-line-soft);
+  font-size: 12px;
+}
+
+.today-item:last-child {
+  border-bottom: none;
+}
+
+.today-stage {
+  flex-shrink: 0;
+  min-width: 72px;
+  padding: 1px 6px;
+  border: 1px solid var(--terminal-line);
+  font-family: var(--terminal-mono);
+  font-size: 11px;
+  text-align: center;
+}
+
+.today-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.today-type {
+  flex-shrink: 0;
+  color: var(--terminal-faint);
+  font-size: 11px;
+}
+
+.today-empty {
+  padding: 24px 12px;
+  color: var(--terminal-faint);
+  font-size: 12px;
+  text-align: center;
+}
+
+.best-opportunities .best-list {
+  padding: 4px 0;
+}
+
+.best-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--terminal-line-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.best-item:last-child {
+  border-bottom: none;
+}
+
+.best-item:hover {
+  background: rgba(92, 167, 255, .08);
+}
+
+.best-rank {
+  flex-shrink: 0;
+  width: 20px;
+  color: var(--terminal-faint);
+  font-family: var(--terminal-mono);
+  font-size: 11px;
+  text-align: center;
+}
+
+.best-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.best-metric {
+  flex-shrink: 0;
+  color: var(--terminal-muted);
+  font-size: 11px;
+}
+
+.best-value {
+  flex-shrink: 0;
+  min-width: 60px;
+  text-align: right;
+}
+
+.monitor-alerts {
+  margin-top: 8px;
+  border-left: 3px solid var(--terminal-red);
+}
+
+.monitor-alerts .alert-list {
+  padding: 4px 0;
+}
+
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--terminal-line-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.alert-item:last-child {
+  border-bottom: none;
+}
+
+.alert-item:hover {
+  background: rgba(92, 167, 255, .08);
+}
+
+.alert-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alert-yield {
+  flex-shrink: 0;
+  min-width: 60px;
+  text-align: right;
+}
+
 .search-bar {
   display: flex;
   gap: 8px;
@@ -376,12 +483,8 @@ h2 {
 
   .terminal-status,
   .terminal-grid,
-  .metric-matrix {
+  .dashboard-grid {
     grid-template-columns: 1fr;
-  }
-
-  .status-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 
   .brand-block,
