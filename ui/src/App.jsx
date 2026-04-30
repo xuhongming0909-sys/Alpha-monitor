@@ -436,23 +436,30 @@ function TodayActions({ data }) {
   const allRows = [...ipoRows, ...bondRows];
   const today = new Date().toISOString().slice(0, 10);
 
-  const todaySubs = allRows.filter((r) => r.subscribeDate && r.subscribeDate.startsWith(today));
-  const todayPay = allRows.filter((r) => r.paymentDate && r.paymentDate.startsWith(today));
-  const todayList = allRows.filter((r) => r.listingDate && r.listingDate.startsWith(today));
+  // 过滤：还没申购、还没上市；无上市日认为未上市
+  const futureRows = allRows.filter((r) => {
+    const notSubscribed = !r.subscribeDate || r.subscribeDate >= today;
+    const notListed = !r.listingDate || r.listingDate >= today;
+    return notSubscribed && notListed;
+  });
 
-  const actions = [
-    ...todayPay.map((r) => ({ ...r, stage: '今日中签缴款', urgency: 3, tone: 'is-down' })),
-    ...todaySubs.map((r) => ({ ...r, stage: '今日申购', urgency: 2, tone: 'is-up' })),
-    ...todayList.map((r) => ({ ...r, stage: '今日上市', urgency: 1, tone: 'is-flat' })),
-  ];
+  // 排序：今日申购置顶，其他按申购日升序
+  const sorted = futureRows.sort((a, b) => {
+    const aTodaySub = a.subscribeDate && a.subscribeDate.startsWith(today) ? 1 : 0;
+    const bTodaySub = b.subscribeDate && b.subscribeDate.startsWith(today) ? 1 : 0;
+    if (aTodaySub !== bTodaySub) return bTodaySub - aTodaySub;
+    const aSub = a.subscribeDate || '9999-99-99';
+    const bSub = b.subscribeDate || '9999-99-99';
+    return aSub.localeCompare(bSub);
+  });
 
-  if (actions.length === 0) {
+  if (sorted.length === 0) {
     return (
       <section className="terminal-panel today-actions">
         <div className="panel-head compact-head">
           <div><p className="eyebrow">TODAY</p><h2>今日行动</h2></div>
         </div>
-        <div className="today-empty">今日无申购/缴款/上市事项</div>
+        <div className="today-empty">近期无申购/上市事项</div>
       </section>
     );
   }
@@ -461,14 +468,17 @@ function TodayActions({ data }) {
     <section className="terminal-panel today-actions">
       <div className="panel-head compact-head">
         <div><p className="eyebrow">TODAY</p><h2>今日行动</h2></div>
-        <span className="panel-count">{actions.length} 项</span>
+        <span className="panel-count">{sorted.length} 项</span>
       </div>
       <div className="today-list">
-        {actions.map((row, i) => {
+        {sorted.map((row, i) => {
           const isIpo = ipoRows.includes(row);
+          const isTodaySub = row.subscribeDate && row.subscribeDate.startsWith(today);
+          const stage = isTodaySub ? '今日申购' : (row.subscribeDate ? `申购 ${formatDate(row.subscribeDate)}` : '待申购');
+          const tone = isTodaySub ? 'is-up' : 'is-flat';
           return (
             <div key={`${row.code || i}`} className="today-item">
-              <span className={`today-stage ${row.tone}`}>{row.stage}</span>
+              <span className={`today-stage ${tone}`}>{stage}</span>
               <span className="today-name">{pickText(row.name, row.stockName)}</span>
               <span className="mono muted">{pickText(row.code, row.stockCode)}</span>
               <span className="today-type">{isIpo ? '新股' : '债券'}</span>
@@ -480,8 +490,22 @@ function TodayActions({ data }) {
   );
 }
 
-function BestOpportunities({ opportunities, onNavigate }) {
-  const top5 = opportunities.slice(0, 5);
+function BestOpportunities({ opportunities, onNavigate, pushConfig }) {
+  const modules = pushConfig?.modules || {};
+  const moduleToSource = {
+    cbArb: ['转债套利'],
+    ahab: ['AH', 'AB'],
+    lofArb: ['LOF'],
+    eventArb: ['事件套利'],
+  };
+  const enabledSources = new Set();
+  Object.entries(moduleToSource).forEach(([modKey, sources]) => {
+    if (modules[modKey] !== false) {
+      sources.forEach((s) => enabledSources.add(s));
+    }
+  });
+  const filtered = opportunities.filter((o) => enabledSources.has(o.source));
+  const top5 = filtered.slice(0, 5);
   const sourceTabMap = {
     '转债套利': 'convertible',
     'AH': 'ah',
@@ -2032,7 +2056,7 @@ function App() {
             <>
               <div className="dashboard-grid">
                 <TodayActions data={subscriptionData} />
-                <BestOpportunities opportunities={opportunities} onNavigate={setActiveTab} />
+                <BestOpportunities opportunities={opportunities} onNavigate={setActiveTab} pushConfig={resources?.pushConfig?.data} />
               </div>
               <MonitorAlerts rows={monitorRows} onNavigate={setActiveTab} />
             </>
