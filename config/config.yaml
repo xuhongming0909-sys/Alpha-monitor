@@ -191,37 +191,37 @@ plugins:
 data_fetch:
   # Fetch layer config only controls upstream access and normalization cadence
   realtime:
-    price_refresh_interval_ms: 300000
-    exchange_rate_refresh_interval_ms: 300000
+    price_refresh_interval_ms: 60000
+    exchange_rate_refresh_interval_ms: 60000
   daily_sync:
     cutoff_time: "16:10"
   plugins:
     ah_premium:
       intraday: true
-      refresh_interval_ms: 300000
+      refresh_interval_ms: 60000
       daily_incremental_sync: true
       force_pair_sync_on_daily_job: true
     ab_premium:
       intraday: true
-      refresh_interval_ms: 300000
+      refresh_interval_ms: 60000
       daily_incremental_sync: true
       force_pair_sync_on_daily_job: true
     exchange_rate:
       intraday: true
-      refresh_interval_ms: 300000
+      refresh_interval_ms: 60000
       daily_incremental_sync: false
       source: "tencent"
     subscription:
       intraday: true
-      refresh_interval_ms: 900000
+      refresh_interval_ms: 60000
       daily_incremental_sync: true
       history_retention_days: 1095
       supported_kinds:
         - "ipo"
         - "bond"
     dividend:
-      intraday: false
-      refresh_interval_ms: 900000
+      intraday: true
+      refresh_interval_ms: 60000
       daily_incremental_sync: true
       request_timeout_seconds: 15
     merger:
@@ -246,10 +246,10 @@ data_fetch:
           - "restructuring_report"
     event_arbitrage:
       intraday: true
-      refresh_interval_ms: 300000
+      refresh_interval_ms: 60000
       daily_incremental_sync: false
       timeout_ms: 30000
-      cache_ttl_ms: 300000
+      cache_ttl_ms: 60000
       sources:
         hk_private:
           enabled: true
@@ -285,11 +285,11 @@ data_fetch:
       jisilu_cookie: "${JISILU_COOKIE}"
     custom_monitor:
       intraday: true
-      refresh_interval_ms: 300000
+      refresh_interval_ms: 60000
       data_source: "runtime_state"
     cb_rights_issue:
       intraday: true
-      refresh_interval_ms: 900000
+      refresh_interval_ms: 60000
       daily_incremental_sync: true
       sync_stock_history_before_strategy: true
       request_timeout_ms: 20000
@@ -304,7 +304,7 @@ data_fetch:
       source_referer: "https://www.jisilu.cn/web/data/cb/pre"
     lof_arbitrage:
       intraday: true
-      refresh_interval_ms: 300000
+      refresh_interval_ms: 60000
       daily_incremental_sync: false
       default_group: "index"
       source_page_urls:
