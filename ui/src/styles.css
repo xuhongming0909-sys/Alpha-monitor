@@ -323,6 +323,22 @@ h2 {
   text-align: center;
 }
 
+.action-panel .action-section {
+  border-bottom: 1px solid var(--terminal-line-soft);
+}
+
+.action-panel .action-section:last-child {
+  border-bottom: none;
+}
+
+.action-panel .today-item {
+  cursor: pointer;
+}
+
+.action-panel .today-item:hover {
+  background: rgba(92, 167, 255, .08);
+}
+
 .best-opportunities .best-list {
   padding: 4px 0;
 }

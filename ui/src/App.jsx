@@ -429,63 +429,243 @@ function getSubscriptionStage(row, today) {
   return null;
 }
 
-function TodayActions({ data }) {
-  if (!data) return null;
-  const ipoRows = toArray(data.ipo?.data);
-  const bondRows = toArray(data.bonds?.data);
-  const allRows = [...ipoRows, ...bondRows];
+function ActionPanel({ resources, onNavigate }) {
   const today = new Date().toISOString().slice(0, 10);
 
-  // 过滤：还没申购、还没上市；无上市日认为未上市
-  const futureRows = allRows.filter((r) => {
+  // -- 新股新债 --
+  const subData = resources?.subscriptions?.data;
+  const ipoRows = toArray(subData?.ipo?.data);
+  const bondRows = toArray(subData?.bonds?.data);
+  const allSubRows = [...ipoRows, ...bondRows];
+  const futureSubRows = allSubRows.filter((r) => {
     const notSubscribed = !r.subscribeDate || r.subscribeDate >= today;
     const notListed = !r.listingDate || r.listingDate >= today;
     return notSubscribed && notListed;
+  }).sort((a, b) => {
+    const aToday = a.subscribeDate && a.subscribeDate.startsWith(today) ? 1 : 0;
+    const bToday = b.subscribeDate && b.subscribeDate.startsWith(today) ? 1 : 0;
+    if (aToday !== bToday) return bToday - aToday;
+    return (a.subscribeDate || '9999-99-99').localeCompare(b.subscribeDate || '9999-99-99');
   });
 
-  // 排序：今日申购置顶，其他按申购日升序
-  const sorted = futureRows.sort((a, b) => {
-    const aTodaySub = a.subscribeDate && a.subscribeDate.startsWith(today) ? 1 : 0;
-    const bTodaySub = b.subscribeDate && b.subscribeDate.startsWith(today) ? 1 : 0;
-    if (aTodaySub !== bTodaySub) return bTodaySub - aTodaySub;
-    const aSub = a.subscribeDate || '9999-99-99';
-    const bSub = b.subscribeDate || '9999-99-99';
-    return aSub.localeCompare(bSub);
-  });
+  // -- 转债 --
+  const cbData = toArray(resources?.cbArb?.data);
+  const smallRows = toArray(resources?.cbArb?.smallRedemption?.rows);
+  const discountCB = cbData
+    .filter((r) => toNumber(r.premiumRate) !== null && toNumber(r.premiumRate) < 0)
+    .sort((a, b) => (toNumber(a.premiumRate) ?? 0) - (toNumber(b.premiumRate) ?? 0))
+    .slice(0, 3);
+  const smallRedeem = smallRows
+    .filter((r) => toNumber(r.smallRedemptionAnnualizedYield) !== null)
+    .sort((a, b) => (toNumber(b.smallRedemptionAnnualizedYield) ?? 0) - (toNumber(a.smallRedemptionAnnualizedYield) ?? 0))
+    .slice(0, 3);
+  const theoreticalCB = cbData
+    .filter((r) => {
+      const price = toNumber(r.price);
+      const tp = toNumber(r.theoreticalPrice);
+      return price !== null && tp !== null && price < tp;
+    })
+    .sort((a, b) => (toNumber(a.theoreticalPremiumRate) ?? 999) - (toNumber(b.theoreticalPremiumRate) ?? 999))
+    .slice(0, 3);
 
-  if (sorted.length === 0) {
+  // -- AH --
+  const ahData = toArray(resources?.ah?.data);
+  const ahPremium = ahData
+    .filter((r) => toNumber(r.premium) > 0)
+    .sort((a, b) => (toNumber(b.premium) ?? 0) - (toNumber(a.premium) ?? 0))
+    .slice(0, 3);
+  const ahDiscount = ahData
+    .filter((r) => toNumber(r.premium) < 0)
+    .sort((a, b) => (toNumber(a.premium) ?? 0) - (toNumber(b.premium) ?? 0))
+    .slice(0, 3);
+
+  // -- AB --
+  const abData = toArray(resources?.ab?.data);
+  const abPremium = abData
+    .filter((r) => toNumber(r.premium) > 0)
+    .sort((a, b) => (toNumber(b.premium) ?? 0) - (toNumber(a.premium) ?? 0))
+    .slice(0, 3);
+  const abDiscount = abData
+    .filter((r) => toNumber(r.premium) < 0)
+    .sort((a, b) => (toNumber(a.premium) ?? 0) - (toNumber(b.premium) ?? 0))
+    .slice(0, 3);
+
+  // -- 监控 --
+  const monitorData = toArray(resources?.monitor?.data);
+
+  const hasAny = futureSubRows.length > 0 || discountCB.length > 0 || smallRedeem.length > 0 ||
+    theoreticalCB.length > 0 || ahPremium.length > 0 || ahDiscount.length > 0 ||
+    abPremium.length > 0 || abDiscount.length > 0 || monitorData.length > 0;
+
+  if (!hasAny) {
     return (
-      <section className="terminal-panel today-actions">
+      <section className="terminal-panel action-panel">
         <div className="panel-head compact-head">
-          <div><p className="eyebrow">TODAY</p><h2>今日行动</h2></div>
+          <div><p className="eyebrow">ACTION</p><h2>行动面板</h2></div>
         </div>
-        <div className="today-empty">近期无申购/上市事项</div>
+        <div className="today-empty">暂无值得关注的机会</div>
       </section>
     );
   }
 
   return (
-    <section className="terminal-panel today-actions">
-      <div className="panel-head compact-head">
-        <div><p className="eyebrow">TODAY</p><h2>今日行动</h2></div>
-        <span className="panel-count">{sorted.length} 项</span>
-      </div>
-      <div className="today-list">
-        {sorted.map((row, i) => {
-          const isIpo = ipoRows.includes(row);
-          const isTodaySub = row.subscribeDate && row.subscribeDate.startsWith(today);
-          const stage = isTodaySub ? '今日申购' : (row.subscribeDate ? `申购 ${formatDate(row.subscribeDate)}` : '待申购');
-          const tone = isTodaySub ? 'is-up' : 'is-flat';
-          return (
-            <div key={`${row.code || i}`} className="today-item">
-              <span className={`today-stage ${tone}`}>{stage}</span>
-              <span className="today-name">{pickText(row.name, row.stockName)}</span>
-              <span className="mono muted">{pickText(row.code, row.stockCode)}</span>
-              <span className="today-type">{isIpo ? '新股' : '债券'}</span>
-            </div>
-          );
-        })}
-      </div>
+    <section className="terminal-panel action-panel">
+      {futureSubRows.length > 0 && (
+        <div className="action-section">
+          <div className="panel-head compact-head">
+            <div><p className="eyebrow">IPO & BOND</p><h2>新股新债</h2></div>
+            <span className="panel-count">{futureSubRows.length} 项</span>
+          </div>
+          <div className="today-list">
+            {futureSubRows.map((row, i) => {
+              const isIpo = ipoRows.includes(row);
+              const isToday = row.subscribeDate && row.subscribeDate.startsWith(today);
+              const stage = isToday ? '今日申购' : (row.subscribeDate ? `申购 ${formatDate(row.subscribeDate)}` : '待申购');
+              return (
+                <div key={`sub-${row.code || i}`} className="today-item" onClick={() => onNavigate('subscription')} role="button" tabIndex={0}>
+                  <span className={`today-stage ${isToday ? 'is-up' : 'is-flat'}`}>{stage}</span>
+                  <span className="today-name">{pickText(row.name, row.stockName)}</span>
+                  <span className="mono muted">{pickText(row.code, row.stockCode)}</span>
+                  <span className="today-type">{isIpo ? '新股' : '债券'}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {discountCB.length > 0 && (
+        <div className="action-section">
+          <div className="panel-head compact-head">
+            <div><p className="eyebrow">CB DISCOUNT</p><h2>转债折价套利</h2></div>
+            <span className="panel-count">{discountCB.length} 条</span>
+          </div>
+          <div className="today-list">
+            {discountCB.map((row, i) => (
+              <div key={`cb-d-${i}`} className="today-item" onClick={() => onNavigate('convertible')} role="button" tabIndex={0}>
+                <span className="source-pill">折价</span>
+                <span className="today-name">{pickText(row.bondName, row.name)}</span>
+                <span className="mono muted">{pickText(row.code, row.bondCode)}</span>
+                <span className="best-value mono is-down">{formatPercent(row.premiumRate)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {smallRedeem.length > 0 && (
+        <div className="action-section">
+          <div className="panel-head compact-head">
+            <div><p className="eyebrow">SMALL REDEMPTION</p><h2>小额刚兑</h2></div>
+            <span className="panel-count">{smallRedeem.length} 条</span>
+          </div>
+          <div className="today-list">
+            {smallRedeem.map((row, i) => (
+              <div key={`cb-s-${i}`} className="today-item" onClick={() => onNavigate('convertible')} role="button" tabIndex={0}>
+                <span className="source-pill">刚兑</span>
+                <span className="today-name">{pickText(row.bondName, row.name)}</span>
+                <span className="mono muted">{pickText(row.code, row.bondCode)}</span>
+                <span className="best-value mono is-up">{formatPercent(row.smallRedemptionAnnualizedYield)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {theoreticalCB.length > 0 && (
+        <div className="action-section">
+          <div className="panel-head compact-head">
+            <div><p className="eyebrow">THEORETICAL</p><h2>理论折价套利</h2></div>
+            <span className="panel-count">{theoreticalCB.length} 条</span>
+          </div>
+          <div className="today-list">
+            {theoreticalCB.map((row, i) => (
+              <div key={`cb-t-${i}`} className="today-item" onClick={() => onNavigate('convertible')} role="button" tabIndex={0}>
+                <span className="source-pill">理论</span>
+                <span className="today-name">{pickText(row.bondName, row.name)}</span>
+                <span className="mono muted">{pickText(row.code, row.bondCode)}</span>
+                <span className="best-value mono is-down">{formatPercent(row.theoreticalPremiumRate)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(ahPremium.length > 0 || ahDiscount.length > 0) && (
+        <div className="action-section">
+          <div className="panel-head compact-head">
+            <div><p className="eyebrow">AH PREMIUM</p><h2>AH 机会</h2></div>
+          </div>
+          <div className="today-list">
+            {ahPremium.map((row, i) => (
+              <div key={`ah-p-${i}`} className="today-item" onClick={() => onNavigate('ah')} role="button" tabIndex={0}>
+                <span className="source-pill">溢价</span>
+                <span className="today-name">{pickText(row.aName, row.name)}</span>
+                <span className="mono muted">{pickText(row.aCode, row.code)}</span>
+                <span className="best-value mono is-up">{formatPercent(row.premium)}</span>
+              </div>
+            ))}
+            {ahDiscount.map((row, i) => (
+              <div key={`ah-d-${i}`} className="today-item" onClick={() => onNavigate('ah')} role="button" tabIndex={0}>
+                <span className="source-pill">折价</span>
+                <span className="today-name">{pickText(row.aName, row.name)}</span>
+                <span className="mono muted">{pickText(row.aCode, row.code)}</span>
+                <span className="best-value mono is-down">{formatPercent(row.premium)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(abPremium.length > 0 || abDiscount.length > 0) && (
+        <div className="action-section">
+          <div className="panel-head compact-head">
+            <div><p className="eyebrow">AB PREMIUM</p><h2>AB 机会</h2></div>
+          </div>
+          <div className="today-list">
+            {abPremium.map((row, i) => (
+              <div key={`ab-p-${i}`} className="today-item" onClick={() => onNavigate('ab')} role="button" tabIndex={0}>
+                <span className="source-pill">溢价</span>
+                <span className="today-name">{pickText(row.aName, row.name)}</span>
+                <span className="mono muted">{pickText(row.aCode, row.code)}</span>
+                <span className="best-value mono is-up">{formatPercent(row.premium)}</span>
+              </div>
+            ))}
+            {abDiscount.map((row, i) => (
+              <div key={`ab-d-${i}`} className="today-item" onClick={() => onNavigate('ab')} role="button" tabIndex={0}>
+                <span className="source-pill">折价</span>
+                <span className="today-name">{pickText(row.aName, row.name)}</span>
+                <span className="mono muted">{pickText(row.aCode, row.code)}</span>
+                <span className="best-value mono is-down">{formatPercent(row.premium)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {monitorData.length > 0 && (
+        <div className="action-section">
+          <div className="panel-head compact-head">
+            <div><p className="eyebrow">MONITOR</p><h2>自定义监控</h2></div>
+            <span className="panel-count">{monitorData.length} 条</span>
+          </div>
+          <div className="today-list">
+            {monitorData.map((row, i) => {
+              const best = Math.max(toNumber(row.stockYieldRate) ?? -Infinity, toNumber(row.cashYieldRate) ?? -Infinity);
+              return (
+                <div key={`mon-${row.id || i}`} className="today-item" onClick={() => onNavigate('monitor')} role="button" tabIndex={0}>
+                  <span className="today-name">{pickText(row.name)}</span>
+                  <span className="mono muted">{pickText(row.acquirerName)}&rarr;{pickText(row.targetName)}</span>
+                  <span className="best-value mono">{formatNumber(row.targetPrice)}</span>
+                  <span className={`best-value mono ${signedClass(best === -Infinity ? null : best)}`}>
+                    {best === -Infinity ? '--' : `${PERCENT_FORMAT.format(best)}%`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -539,33 +719,6 @@ function BestOpportunities({ opportunities, onNavigate, pushConfig }) {
         )) : (
           <div className="today-empty">暂无候选机会</div>
         )}
-      </div>
-    </section>
-  );
-}
-
-function MonitorAlerts({ rows, onNavigate }) {
-  if (!rows || rows.length === 0) return null;
-  const alerts = rows.slice(0, 3);
-  return (
-    <section className="terminal-panel monitor-alerts">
-      <div className="panel-head compact-head">
-        <div><p className="eyebrow">ALERT</p><h2>监控提醒</h2></div>
-        <span className="panel-count">{rows.length} 条</span>
-      </div>
-      <div className="alert-list">
-        {alerts.map((row, i) => {
-          const best = Math.max(toNumber(row.stockYieldRate) ?? -Infinity, toNumber(row.cashYieldRate) ?? -Infinity);
-          return (
-            <div key={row.id || i} className="alert-item" onClick={() => onNavigate('monitor')} role="button" tabIndex={0}>
-              <span className="alert-name">{pickText(row.name)}</span>
-              <span className="mono muted">{pickText(row.acquirerName)}&rarr;{pickText(row.targetName)}</span>
-              <span className={`alert-yield mono ${signedClass(best === -Infinity ? null : best)}`}>
-                {best === -Infinity ? '--' : `${PERCENT_FORMAT.format(best)}%`}
-              </span>
-            </div>
-          );
-        })}
       </div>
     </section>
   );
@@ -2224,11 +2377,8 @@ function App() {
           )}
           {activeTab === 'overview' && (
             <>
-              <div className="dashboard-grid">
-                <TodayActions data={subscriptionData} />
-                <BestOpportunities opportunities={opportunities} onNavigate={setActiveTab} pushConfig={resources?.pushConfig?.data} />
-              </div>
-              <MonitorAlerts rows={monitorRows} onNavigate={setActiveTab} />
+              <ActionPanel resources={resources} onNavigate={setActiveTab} />
+              <BestOpportunities opportunities={opportunities} onNavigate={setActiveTab} pushConfig={resources?.pushConfig?.data} />
             </>
           )}
           {activeTab === 'convertible' && <ConvertibleTable rows={cbRows} smallRows={smallRedemptionRows} rightsIssueData={cbRightsIssueData} searchQuery={searchQuery} />}
