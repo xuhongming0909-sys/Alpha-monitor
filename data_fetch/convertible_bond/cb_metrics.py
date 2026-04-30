@@ -550,9 +550,12 @@ def _build_small_redemption_option_metrics(
         option_value = max(long_call_value - short_call_value, 0.0)
 
         if market_price := _to_positive_float(row.get("price")):
-            option_yield = (option_value - market_price) if option_value else None
-            if option_yield and remaining_years and remaining_years > 0:
-                option_annualized_yield = (option_yield / market_price / remaining_years) if market_price else None
+            option_yield = (option_value / market_price) if option_value is not None else None
+            if option_yield is not None and remaining_years and remaining_years > 0:
+                option_annualized_yield = (1.0 + option_yield) ** (1.0 / remaining_years) - 1.0
+            small_redemption_annualized = _to_float(row.get("smallRedemptionAnnualizedYield"))
+            if small_redemption_annualized is not None and option_annualized_yield is not None:
+                total_annualized_yield = small_redemption_annualized + option_annualized_yield
 
     return {
         "smallRedemptionBondValue": bond_value,
