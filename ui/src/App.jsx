@@ -2400,6 +2400,7 @@ function App() {
     : opportunities;
 
   return (
+    <>
     <main className="terminal-shell">
       <StatusStrip state={state} />
       {state.error ? <div className="error-strip">接口加载失败：{state.error}</div> : null}
@@ -2430,6 +2431,7 @@ function App() {
       )}
     </main>
     <BottomNav activeTab={activeTab} onChange={setActiveTab} />
+    </>
   );
 }
 
