@@ -1,6 +1,8 @@
 import React from 'react';
 import ConvertibleCardList from './components/ConvertibleCardList.jsx';
 import BottomNav from './components/BottomNav.jsx';
+import AhCardList from './components/AhCardList.jsx';
+import LofCardList from './components/LofCardList.jsx';
 
 const API_ENDPOINTS = {
   health: '/api/health',
@@ -1114,7 +1116,7 @@ function ConvertibleTable({ rows, smallRows, rightsIssueData, searchQuery }) {
         <button className={`tab-button ${subTab === 'rights' ? 'active' : ''}`} onClick={() => setSubTab('rights')}>抢权配售 ({riRows.length})</button>
       </div>
 
-      {subTab === 'main' && (isMobile ? <ConvertibleCardList rows={rows} searchQuery={searchQuery} /> : renderHomeTable(rows))}
+      {subTab === 'main' && <ConvertibleCardList rows={rows} searchQuery={searchQuery} />}
       {subTab === 'discount' && renderDiscountTable(discountRows, '折价套利', 'DISCOUNT ARB')}
       {subTab === 'theoretical' && renderDiscountTable(theoreticalDiscountRows, '理论折价套利', 'THEORETICAL DISCOUNT')}
       {subTab === 'small' && renderSmallTable()}
@@ -2414,9 +2416,9 @@ function App() {
             </>
           )}
           {activeTab === 'convertible' && <ConvertibleTable rows={cbRows} smallRows={smallRedemptionRows} rightsIssueData={cbRightsIssueData} searchQuery={searchQuery} />}
-          {activeTab === 'ah' && <AhTable rows={ahRows} searchQuery={searchQuery} />}
+          {activeTab === 'ah' && <AhCardList rows={ahRows} searchQuery={searchQuery} />}
           {activeTab === 'ab' && <AbTable rows={abRows} searchQuery={searchQuery} />}
-          {activeTab === 'lof' && <LofTable rows={lofRows} searchQuery={searchQuery} />}
+          {activeTab === 'lof' && <LofCardList rows={lofRows} searchQuery={searchQuery} />}
           {activeTab === 'subscription' && <SubscriptionTable data={subscriptionData} searchQuery={searchQuery} />}
           {activeTab === 'monitor' && <MonitorTable rows={monitorRows} searchQuery={searchQuery} onRefresh={state.reload} />}
           {activeTab === 'dividend' && <DividendTable rows={dividendRows} searchQuery={searchQuery} />}
@@ -2427,7 +2429,7 @@ function App() {
         <section className="terminal-panel loading-panel">正在连接真实市场接口...</section>
       )}
     </main>
-    {isMobile && <BottomNav activeTab={activeTab} onChange={setActiveTab} />}
+    <BottomNav activeTab={activeTab} onChange={setActiveTab} />
   );
 }
 

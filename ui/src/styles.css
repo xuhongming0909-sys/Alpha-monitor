@@ -39,8 +39,8 @@ a {
 }
 
 .terminal-shell {
-  min-width: 1920px;
-  padding: 10px;
+  min-width: 0;
+  padding: 10px 10px 60px;
 }
 
 .terminal-status {
@@ -133,14 +133,14 @@ a {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(320px, .4fr) minmax(480px, .6fr);
+  grid-template-columns: 1fr;
   gap: 8px;
   margin-top: 8px;
 }
 
 .terminal-grid {
   display: grid;
-  grid-template-columns: minmax(460px, .85fr) minmax(680px, 1.15fr);
+  grid-template-columns: 1fr;
   gap: 8px;
   margin-top: 8px;
 }
@@ -207,7 +207,7 @@ h2 {
 }
 
 .wide-table {
-  min-width: 1800px;
+  min-width: 0;
 }
 
 .dense-table th,

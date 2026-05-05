@@ -7,6 +7,16 @@
 
 ## Entries
 
+### 2026-05-06 | 手机端浏览适配
+
+- **Decision**: 用户主要用手机看网页，需要针对手机端做专门适配
+- **Action**: styles.css 新增 `@media (max-width: 768px)`，取消 1920px 强制宽度、搜索栏全宽、隐藏副标题、增大触控区
+- **Action**: 新增 `ui/src/components/ConvertibleCardList.jsx` — 转债套利手机卡片视图（核心6字段 + 展开详情）
+- **Action**: 新增 `ui/src/components/BottomNav.jsx` — 手机端底部固定导航（概览/转债/AH/LOF/更多）
+- **Action**: `App.jsx` 新增 `useIsMobile` hook，`ConvertibleTable` 手机端渲染卡片列表替代宽表格
+- **Verification**: 4 个 TDD 测试全部通过，git 已提交 `e22e224`
+- **Mission**: `missions/0506-mobile-adaptation/`
+
 ### 2026-05-05 | Server Profile 恢复与 CLI 配置
 
 - **Decision**: 用户要求恢复 SSH 服务器配置文件，并统一放到 config/ 目录
