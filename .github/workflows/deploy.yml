@@ -73,6 +73,29 @@ jobs:
           echo "Service: $SERVER_SERVICE_NAME"
           echo "Deploy mode: ${{ steps.deploy_mode.outputs.deploy_mode }}"
 
+      - name: Diagnose remote state
+        run: |
+          set -euo pipefail
+          SERVER_APP_DIR="${SERVER_APP_DIR:-/home/ubuntu/Alpha monitor}"
+          SERVER_SERVICE_NAME="${SERVER_SERVICE_NAME:-alpha-monitor}"
+          echo "[stage] Diagnose remote state"
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
+            echo '--- project root ls ---'
+            ls -la \"$SERVER_APP_DIR/\" || true
+            echo '--- deploy dir ls ---'
+            ls -la \"$SERVER_APP_DIR/deploy/\" || true
+            echo '--- tools/deploy dir ls ---'
+            ls -la \"$SERVER_APP_DIR/tools/deploy/\" || true
+            echo '--- git status ---'
+            cd \"$SERVER_APP_DIR\" && git status --short || true
+            echo '--- git log ---'
+            cd \"$SERVER_APP_DIR\" && git log --oneline -3 || true
+            echo '--- systemd status ---'
+            systemctl is-active \"$SERVER_SERVICE_NAME\" || true
+            echo '--- recent journal ---'
+            journalctl -u \"$SERVER_SERVICE_NAME\" -n 20 --no-pager || true
+          "
+
       - name: Deploy over SSH
         run: |
           set -euo pipefail
