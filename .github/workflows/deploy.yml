@@ -86,10 +86,17 @@ jobs:
           echo "[stage] Trigger remote script"
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
             set -euo pipefail
-            test -f \"$SERVER_APP_DIR/$DEPLOY_SCRIPT\" || {
-              echo \"Missing remote deploy script: $SERVER_APP_DIR/$DEPLOY_SCRIPT\" >&2
-              exit 1
-            }
-            PROJECT_ROOT=\"$SERVER_APP_DIR\" PROJECT_OWNER=\"$SERVER_USER\" SERVICE_NAME=\"$SERVER_SERVICE_NAME\" TARGET_BRANCH=\"$TARGET_BRANCH\" DEPLOY_MODE=\"$DEPLOY_MODE\" GIT_RETRY_COUNT=10 GIT_RETRY_DELAY_SECONDS=10 SERVICE_RETRY_COUNT=10 SERVICE_RETRY_DELAY_SECONDS=2 bash \"$SERVER_APP_DIR/$DEPLOY_SCRIPT\"
+            REMOTE_SCRIPT=\"$SERVER_APP_DIR/$DEPLOY_SCRIPT\"
+            if [ ! -f \"\$REMOTE_SCRIPT\" ]; then
+              FALLBACK_SCRIPT=\"$SERVER_APP_DIR/tools/${DEPLOY_SCRIPT#deploy/}\"
+              if [ -f \"\$FALLBACK_SCRIPT\" ]; then
+                echo \"Using fallback deploy script: \$FALLBACK_SCRIPT\" >&2
+                REMOTE_SCRIPT=\"\$FALLBACK_SCRIPT\"
+              else
+                echo \"Missing remote deploy script: $SERVER_APP_DIR/$DEPLOY_SCRIPT\" >&2
+                exit 1
+              fi
+            fi
+            PROJECT_ROOT=\"$SERVER_APP_DIR\" PROJECT_OWNER=\"$SERVER_USER\" SERVICE_NAME=\"$SERVER_SERVICE_NAME\" TARGET_BRANCH=\"$TARGET_BRANCH\" DEPLOY_MODE=\"$DEPLOY_MODE\" GIT_RETRY_COUNT=10 GIT_RETRY_DELAY_SECONDS=10 SERVICE_RETRY_COUNT=10 SERVICE_RETRY_DELAY_SECONDS=2 bash \"\$REMOTE_SCRIPT\"
           "
           echo "[stage] Deployment done"
