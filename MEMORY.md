@@ -7,14 +7,28 @@
 
 ## Entries
 
-### 2026-05-06 | 手机端浏览适配
+### 2026-05-06 | 部署最新版本到服务器
 
-- **Decision**: 用户主要用手机看网页，需要针对手机端做专门适配
-- **Action**: styles.css 新增 `@media (max-width: 768px)`，取消 1920px 强制宽度、搜索栏全宽、隐藏副标题、增大触控区
-- **Action**: 新增 `ui/src/components/ConvertibleCardList.jsx` — 转债套利手机卡片视图（核心6字段 + 展开详情）
-- **Action**: 新增 `ui/src/components/BottomNav.jsx` — 手机端底部固定导航（概览/转债/AH/LOF/更多）
-- **Action**: `App.jsx` 新增 `useIsMobile` hook，`ConvertibleTable` 手机端渲染卡片列表替代宽表格
-- **Verification**: 4 个 TDD 测试全部通过，git 已提交 `e22e224`
+- **Decision**: 先把服务器对齐当前最新提交，确保用户能立刻看到最新页面
+- **Action**: 服务器执行 `git pull`、`cd ui && npm run build`、`sudo systemctl restart alpha-monitor`
+- **Verification**: 公网 `/api/health` 正常，`ui/dist` 新资源 `index-DAsT1b9e.js` / `index-DfyVk25X.css` 仍在使用
+- **Action**: 服务器当前分支 `workflow-elodie` 已改为跟踪 `origin/main`
+- **Risk**: 服务器工作树有未跟踪 `tools/` 文件，暂不能直接切到 `main`
+- **Mission**: `missions/0506-deploy-latest/`
+
+### 2026-05-06 | 全局移动端化（手机优先，所有设备统一）
+
+- **Decision**: 用户主要用手机看网页，要求所有设备（手机/电脑/平板）统一显示移动端界面，废弃桌面端大表格
+- **Action**: `styles.css` 改为 Mobile-First — 默认无 1920px 锁死、无 1800px 表格、垂直堆叠布局
+- **Action**: 底部导航 `BottomNav` 全局显示，不再依赖屏幕宽度
+- **Action**: 新增 `ui/src/components/ConvertibleCardList.jsx` — 转债套利全局卡片视图
+- **Action**: 新增 `ui/src/components/AhCardList.jsx` — AH溢价全局卡片视图
+- **Action**: 新增 `ui/src/components/LofCardList.jsx` — LOF套利全局卡片视图
+- **Fix**: `App.jsx` return 缺少 Fragment 包裹导致 vite build 失败，已修复 `<></>`
+- **Deploy**: GitHub push 因网络超时失败（临时），后恢复；服务器通过 expect SSH + 密码部署成功
+- **Server**: 43.139.35.190, ubuntu/DellG77588, app_dir: /home/ubuntu/Alpha monitor, systemd: alpha-monitor
+- **Verification**: 服务已重启，新资源文件 `index-DAsT1b9e.js` + `index-DfyVk25X.css` 已上线
+- **Remaining**: AB溢价、打新/申购、自定义监控、分红提醒、抢权配售、事件套利仍为表格（未卡片化）
 - **Mission**: `missions/0506-mobile-adaptation/`
 
 ### 2026-05-05 | Server Profile 恢复与 CLI 配置
@@ -38,125 +52,3 @@
 - **Action**: 拆分 dashboard_page.js → constants.js（提取 UI 常量 ~200 行）
 - **Action**: 拆分 source.py → cb_metrics.py（提取计算密集型函数 ~570 行）
 - **Action**: 新建 server_config_loader.js（配置读取逻辑 ~300 行）
-- **Verification**: npm run check通过，npm run ui:build通过，health web:ok
-- **Updated**: INDEX.md §9.1、§9.2、§9.4 新增文件索引
-
-### 2026-04-30 | 转债套利主页修复
-
-- **Task**: 修复转债套利标签页名称、数据列、缺失字段、波动率显示、分页
-- **Changes**:
-  - Tab 标签: `转债` → `转债套利`
-  - 主表列重排为20列: 转债名称/价格/涨跌幅、正股名称/价格、转股价格/价值/溢价率、剩余规模/正股流通市值/转债占比、纯债价值/波动率/期权价值/理论价值/理论套利空间、到期日/评级/强赎状态/转股状态
-  - 波动率显示修复: 原始值为年化小数(如0.225)，显示时×100并带%符号
-  - 分页: 每页50条，支持翻页
-  - 转股状态: 根据delistDate/convertStartDate/forceRedeemStatus/maturityDate推导
-- **Verification**: `npx esbuild src/App.jsx --bundle` 编译通过
-- **Files**: `ui/src/App.jsx`
-
-### 2026-04-30 | 合并根目录 config.yaml → config/config.yaml
-
-- **Decision**: 用户质问两个 config.yaml 未合并，过渡期应结束
-- **Action**: 将根目录 `config.yaml`（564行业务配置）合并入 `config/config.yaml`（33行元数据）→ 598行统一配置
-- **Action**: 更新 `shared/config/node_config.js` — `CONFIG_FILE` 指向 `config/config.yaml`
-- **Action**: 更新 `shared/config/script_config.py` — `CONFIG_FILE` 指向 `config/config.yaml`
-- **Action**: 删除根目录 `config.yaml`
-- **Verification**: `npm run check` 通过，全部UI测试通过
-
-### 2026-04-30 | 概览页面重构：打新置顶+策略混排+事件套利
-
-- **Decision**: 概览页改造：打新/申购置顶展示，机会总览支持策略类型筛选
-- **Action**: 新增 `SubscriptionTopSection` 组件（打新置顶区）— 放在概览页 MetricMatrix 之后
-- **Action**: `SubscriptionTopSection` 对齐老UI面板 — 标题"新股打新"、当前阶段标签列（今日申购/今日中签缴款/今日上市高亮）、类型（新股/债券）、名称/代码合并、申购上限、发行价/转股价
-- **Action**: `OpportunityCommandCenter` 增加策略筛选器 — 全部|转债|LOF|AH|AB|事件套利 过滤芯片
-- **Action**: `buildOpportunityRows` 扩展事件套利数据来源（A股套利+港股私有），取前3条
-- **Action**: `specs/react-terminal-ui.md` §4.1 更新概览页规格（打新置顶+机会筛选+转债表格三层结构）
-- **TDD**: RED → GREEN → REFACTOR（7步测试），新建 `tests/ui_overview_subscription_pin.test.js`
-- **Verification**: 全部6个UI测试通过，`npm run ui:build` 通过，`npm run check` 通过
-
-### 2026-04-30 | React UI 推送设置独立Tab + TDD工作流
-
-- Decision: 用户批评未遵循TDD工作流（文档先行→RED→GREEN），要求推送设置从每页底部移至独立顶级Tab
-- Fix Phase 1: `specs/react-terminal-ui.md` 更新Tab结构文档（10个顶级Tab含推送设置）
-- Fix Phase 2: TabNav新增push tab：`{ key: 'push', label: '推送设置' }`
-- Fix Phase 3: 移除页面底部PushSettings，改为条件渲染 `{activeTab === 'push' && <PushSettingsPage />}`
-- Fix Phase 4: SearchBar排除push tab：`activeTab !== 'overview' && activeTab !== 'push'`
-- Fix Phase 5: `toNumber(null/undefined)` 修复 → 返回null而非0（流通市值显示"--"而非"0"）
-- Fix Phase 6: 表格+数据内容居中（`.num { text-align: center !important; }`）
-- Fix Phase 7: PushSettingsPage完善（推送时间、模块开关、Webhook、调度器、上次推送、推送总开关）
-- Tests: 新建 `ui_push_tab.test.js`（推送设为顶级Tab）和 `ui_rights_issue.test.js`（抢权配售子Tab）
-- Verification: 全部6个UI测试通过 + `npm run ui:build` 通过
-- 之前工作: Phase 1-6 信息补全（抢权配售/事件套利板块、ConvertibleTable 22列、小额刚兑子tab等）
-
-### 2026-04-30 | 数据获取层结构审查与修复（Review + TDD）
-
-- Decision: `shared/market_service.py` 越界引入 `tools/` 模块（`market_pairs`、`premium_history_db`），违反分层规则
-- Action: 将 `build_ah_snapshot` + `build_ab_snapshot` 及依赖助手迁移至 `data_fetch/ah_premium/source.py` 和 `data_fetch/ab_premium/source.py`
-- Action: 删除 `tools/fetch_convertible_bond.py`、`tools/fetch_dividend.py`（与 `data_fetch/` 完全重复）
-- Action: 删除 `event_arbitrage/fetcher.py` 中 `verify=False` SSL 回退（安全隐患）
-- Action: `shared/bus/market_record.py` 新增 `create_error_record()` 统一错误记录构造
-- Verification: `python3 tests/test_data_fetch_structure.py` 6/6 通过，`python3 tools/check_plugin_boundaries.py` 通过
-- Verification: `python3 data_dispatch.py ah`、`python3 data_dispatch.py ab` 数据正常获取
-- Next: 可用 `create_error_record()` 逐步替换 8 个 normalizer 中的内联错误构造
-
-### 2026-04-30 | ELODIE workflow migration completed
-
-- Decision: adopt ELODIE workflow structure for AI collaboration
-- Action: created `CLAUDE.md`, `specs/` (5 files), `missions/0430-migrate-to-elodie/`, `MEMORY.md`, `config/`, `templates/`
-- Action: archived `refactor_docs/001-monitor-refactor/` → `archive/`
-- Action: deprecated `AGENTS.md` and `CONSTITUTION.md`
-- Verification: `python3 tools/check_plugin_boundaries.py` passes
-- Next: use new workflow for subsequent tasks
-
-### 2026-04-30 | 根目录简化
-
-- Decision: 根目录文件过多，需要清理
-- Action: 归档 `AGENTS.md` + `CONSTITUTION.md` → `archive/docs-deprecated/`
-- Action: 移动 `db_paths.py` → `shared/paths/db_paths.py`，更新 6 个 tools/ 脚本引用
-- Action: 移动 `smoke_check.js` → `tests/smoke_check.js`，更新 `package.json`
-- Action: 移动 `RUNBOOK.md` → `docs/RUNBOOK.md`
-- Action: 删除 `tools/check_constitution_sync.py`（引用已删除的 `.specify/`）
-- Action: 更新 `tools/render_mini_swe_task.py` 工作流引用
-- Action: 更新 `INDEX.md` 和 `package.json`
-- Verification: `python3 tools/check_plugin_boundaries.py` passes, `node tests/smoke_check.js` passes
-
-### 2026-04-30 | 补齐所有缺失 specs
-
-- Decision: specs/ 目录严重不全，11 个模块 spec 缺失，2 个已有现成文档未迁移
-- Action: 从 archive 迁移 5 份现成文档 → specs/（data-model, api-contract, lof-arbitrage, cb-rights-issue, push-system）
-- Action: 从代码逆向提取 8 份模块 spec（ah-premium, ab-premium, merger-arbitrage, event-arbitrage, dividend, subscription, custom-monitor, exchange-rate）
-- Action: 更新 `specs/spec.md` 模块地图，移除全部 "(待建)" 标记，新增 4 个 spec 引用
-- Verification: `npm run check` passes, `python3 tools/check_plugin_boundaries.py` passes
-- Next: 后续新模块开发时直接遵循 specs/ 格式创建 spec
-
-### 2026-04-30 | 修复工作流文件缺失
-
-- Decision: 审查发现根目录 README.md 缺失，各层 README 内容过时
-- Action: 创建根目录 `README.md` — 项目总览、快速导航、技术栈、启动命令
-- Action: 更新 `data_fetch/README.md` — 补充 cb_rights_issue、event_arbitrage、exchange_rate 插件，添加 specs/ 引用
-- Action: 更新 `strategy/README.md` — 补充 cb_rights_issue、event_arbitrage 插件，添加 specs/ 引用
-- Action: 更新 `presentation/README.md` — 补充 React UI 说明、/legacy 回滚、routes 细分，添加 specs/ 引用
-- Action: 更新 `notification/README.md` — 补充 4 条推送链路总览、目录结构，添加 specs/ 引用
-- Action: 更新 `shared/README.md` — 添加 specs/ 引用
-- **Action**: 修复 `config.yaml` C++ 风格注释（// → #），修复 YAML 解析错误
-- **Verification**: `npm run check` passes, `python3 tools/check_plugin_boundaries.py` passes
-
-### 2026-04-30 | React UI 模块补全（TDD）
-
-- **Decision**: 新版 React UI 功能覆盖不全，用 TDD 补全
-- **Action**: Phase 1 — 基础上线：`ui:build`/`ui:check`、`/legacy` 路由、`ui/dist` 静态服务
-- **Action**: Phase 2 — Tab 导航 + 8 模块详细表格（转债、AH、AB、LOF、打新、监控、分红）
-- **Action**: Phase 3 — 全局搜索 + 点击表头排序（useSort hook + SortableTh）
-- **Action**: 扩展 API fetch（subscriptions、dividend）
-- **Verification**: `npm run ui:build` 通过，4 个测试全部通过
-- **Action**: Phase 5 — 推送设置面板（推送时间、模块开关、Webhook/调度器/上次推送状态）
-- **Next**: 如需完整推送编辑保存功能（POST /api/push/config），可继续扩展
-
-### 2026-04-30 | 修复页面崩溃 + 首屏加载优化
-
-- **Root cause**: `ConvertibleTable` 中三处未定义变量 — `discountCount`、`thDiscountCount`、`rightsCount` → JS运行时错误 → React渲染中断 → 页面卡死
-- **Fix**: 三处按钮计数改用 `.length` — `discountRows.length`、`theoreticalDiscountRows.length`、`riRows.length`
-- **Root cause 2**: `useDashboardData` 等全部 13 个接口返回后渲染，`subscriptions` 实时抓东方财富数据（6-12秒）→ 卡死整个页面
-- **Fix 2**: `subscriptions` 改为后台异步加载，12个快接口先渲染
-- **Result**: 加载时间 15s → 2s，0 错误
-- **Verification**: Playwright 验证 0 报错，`npm run ui:build` 通过
-- **Action**: 删除本地 debug 截图，`kill` 本地 node 进程，commit + push 到 `workflow-elodie`
