@@ -1639,6 +1639,9 @@ function shapeCbArbPublicRows(rows) {
         shaped[key] = row[key];
       }
     }
+    if (shaped.optionValue == null && row.callOptionValue != null) {
+      shaped.optionValue = row.callOptionValue;
+    }
     return shaped;
   });
 }
