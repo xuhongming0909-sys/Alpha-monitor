@@ -300,9 +300,25 @@ function useDashboardData() {
       if (result.status === 'fulfilled') {
         if (key === 'cbArb') {
           const raw = result.value || fallback;
+          const rows = unwrap(raw, fallback);
+          if (Array.isArray(rows)) {
+            for (const row of rows) {
+              if (row && row.optionValue == null && row.callOptionValue != null) {
+                row.optionValue = row.callOptionValue;
+              }
+            }
+          }
+          const smallRedemption = raw?.smallRedemption || null;
+          if (smallRedemption && Array.isArray(smallRedemption.rows)) {
+            for (const row of smallRedemption.rows) {
+              if (row && row.optionValue == null && row.callOptionValue != null) {
+                row.optionValue = row.callOptionValue;
+              }
+            }
+          }
           resources[key] = {
-            data: unwrap(raw, fallback),
-            smallRedemption: raw?.smallRedemption || null,
+            data: rows,
+            smallRedemption,
           };
         } else {
           resources[key] = { data: unwrap(result.value, fallback) };
