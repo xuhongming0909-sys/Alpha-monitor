@@ -5,7 +5,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SERVICE_NAME="${1:-alpha-monitor}"
 SERVICE_USER="${SUDO_USER:-${USER}}"
-TEMPLATE_PATH="$PROJECT_ROOT/tools/deploy/alpha-monitor.service"
+TEMPLATE_PATH="$PROJECT_ROOT/deploy/alpha-monitor.service"
 TARGET_PATH="/etc/systemd/system/${SERVICE_NAME}.service"
 
 if [[ "${EUID}" -ne 0 ]]; then
@@ -21,7 +21,7 @@ sed \
   "$TEMPLATE_PATH" > "$TARGET_PATH"
 
 chmod 644 "$TARGET_PATH"
-chmod +x "$PROJECT_ROOT/tools/deploy/start_linux.sh"
+chmod +x "$PROJECT_ROOT/deploy/start_linux.sh"
 
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"

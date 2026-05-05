@@ -2005,7 +2005,7 @@ async function runIntradayRefreshCycle() {
 }
 
 async function runPremiumHistorySync() {
-  const result = await runPython('tools/rebuild_premium_db.py', ['--mode', 'update'], {
+  const result = await runPython('scripts/rebuild_premium_db.py', ['--mode', 'update'], {
     timeout: 1000 * 60 * 20,
     maxBuffer: 1024 * 1024 * 50,
   });

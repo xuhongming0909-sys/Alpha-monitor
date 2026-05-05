@@ -4,7 +4,7 @@ set -euo pipefail
 # 用模板生成并安装 Nginx 站点配置，让公网 80 端口转发到应用内部端口。
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-TEMPLATE_PATH="$PROJECT_ROOT/tools/deploy/nginx-alpha-monitor.conf"
+TEMPLATE_PATH="$PROJECT_ROOT/deploy/nginx-alpha-monitor.conf"
 SERVICE_NAME="${1:-alpha-monitor}"
 SERVER_NAME="${2:-_}"
 UPSTREAM_PORT="${3:-5000}"

@@ -230,8 +230,8 @@
 | JSON 状态持久化 | `shared/runtime/json_store.js` / `json_store.py` |
 | 上海时区/交易时段 | `shared/time/shanghai_time.js` / `shanghai_time.py` |
 | The Bus 记录格式 | `shared/bus/market_record.js` / `market_record.py` |
-| 架构边界检查 | `tools/check_plugin_boundaries.py` |
-| 自动部署脚本 | `tools/deploy/update_from_github.sh` |
+| 架构边界检查 | `scripts/check_plugin_boundaries.py` |
+| 自动部署脚本 | `deploy/update_from_github.sh` |
 | 服务器启动 | `start_server.js` |
 | 数据调度 CLI | `data_dispatch.py` |
 

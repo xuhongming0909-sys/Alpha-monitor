@@ -79,9 +79,9 @@ jobs:
           SERVER_APP_DIR="${SERVER_APP_DIR:-/home/ubuntu/Alpha monitor}"
           SERVER_SERVICE_NAME="${SERVER_SERVICE_NAME:-alpha-monitor}"
           DEPLOY_MODE="${{ steps.deploy_mode.outputs.deploy_mode }}"
-          DEPLOY_SCRIPT="tools/deploy/update_from_github.sh"
+          DEPLOY_SCRIPT="deploy/update_from_github.sh"
           if [ "$DEPLOY_MODE" = "fast" ]; then
-            DEPLOY_SCRIPT="tools/deploy/update_fast.sh"
+            DEPLOY_SCRIPT="deploy/update_fast.sh"
           fi
           echo "[stage] Trigger remote script"
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "

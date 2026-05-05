@@ -295,7 +295,7 @@ repair_project_permissions_if_needed() {
   local needs_repair=0
   local check_path
   local direct_targets=("$PROJECT_ROOT" "$PROJECT_ROOT/package.json" "$PROJECT_ROOT/package-lock.json" "$PROJECT_ROOT/requirements.txt")
-  local recursive_targets=("$PROJECT_ROOT/.git" "$PROJECT_ROOT/runtime_data" "$PROJECT_ROOT/runtime_logs" "$PROJECT_ROOT/tools/deploy")
+  local recursive_targets=("$PROJECT_ROOT/.git" "$PROJECT_ROOT/runtime_data" "$PROJECT_ROOT/runtime_logs" "$PROJECT_ROOT/deploy")
 
   if [[ "$INSTALL_NODE_MODULES" == "1" ]]; then
     recursive_targets+=("$PROJECT_ROOT/node_modules")
@@ -439,8 +439,8 @@ apply_deploy_mode() {
         changed_files_match '^(package\.json|package-lock\.json)$' && auto_install_node="1" || auto_install_node="0"
         changed_files_match '^requirements\.txt$' && auto_install_python="1" || auto_install_python="0"
         auto_verify_python="$auto_install_python"
-        changed_files_match '^tools/deploy/(alpha-monitor\.service|start_linux\.sh)$' && auto_refresh_systemd="1" || auto_refresh_systemd="0"
-        if changed_files_match '^(data_fetch/|strategy/|presentation/|notification/|shared/|start_server\.js$|config\.yaml$|package\.json$|package-lock\.json$|requirements\.txt$|data_dispatch\.py$|db_paths\.py$|tools/deploy/(start_linux\.sh|alpha-monitor\.service)$)'; then
+        changed_files_match '^deploy/(alpha-monitor\.service|start_linux\.sh)$' && auto_refresh_systemd="1" || auto_refresh_systemd="0"
+        if changed_files_match '^(data_fetch/|strategy/|presentation/|notification/|shared/|start_server\.js$|config\.yaml$|package\.json$|package-lock\.json$|requirements\.txt$|data_dispatch\.py$|db_paths\.py$|deploy/(start_linux\.sh|alpha-monitor\.service)$)'; then
           auto_restart_service="1"
         else
           auto_restart_service="0"
@@ -460,7 +460,7 @@ apply_deploy_mode() {
 }
 
 refresh_systemd_unit() {
-  local template_path="$PROJECT_ROOT/tools/deploy/alpha-monitor.service"
+  local template_path="$PROJECT_ROOT/deploy/alpha-monitor.service"
   local target_path="/etc/systemd/system/${SERVICE_NAME}.service"
   local rendered_unit
   local unit_written=0
@@ -751,7 +751,7 @@ if [[ "$SKIP_GIT_SYNC" != "1" ]]; then
       PYTHON_BIN_CANDIDATES="$PYTHON_BIN_CANDIDATES" \
       RUNTIME_PRESERVE_DIR="$RUNTIME_PRESERVE_DIR" \
       CHANGED_FILES_FILE="$CHANGED_FILES_FILE" \
-      bash "$PROJECT_ROOT/tools/deploy/update_from_github.sh"
+      bash "$PROJECT_ROOT/deploy/update_from_github.sh"
   fi
 else
   log "skipping git sync because SKIP_GIT_SYNC=1"
@@ -789,7 +789,7 @@ install_python_requirements "$PYTHON_BIN"
 verify_python_imports "$PYTHON_BIN"
 
 log "ensuring Linux entrypoint is executable"
-chmod +x "$PROJECT_ROOT/tools/deploy/start_linux.sh"
+chmod +x "$PROJECT_ROOT/deploy/start_linux.sh"
 
 restart_service_if_needed "$RESOLVED_APP_PORT"
 run_health_check "$RESOLVED_APP_PORT"

@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Install the bundled Caddy reverse-proxy template for Alpha Monitor.
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-TEMPLATE_PATH="$PROJECT_ROOT/tools/deploy/Caddyfile"
+TEMPLATE_PATH="$PROJECT_ROOT/deploy/Caddyfile"
 SERVER_NAME="${1:-YOUR_DOMAIN_OR_IP}"
 UPSTREAM_PORT="${2:-5000}"
 TARGET_PATH="/etc/caddy/Caddyfile"
