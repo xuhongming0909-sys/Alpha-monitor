@@ -170,7 +170,15 @@
 | `install_*.sh` | 安装脚本（Caddy/Nginx/systemd） |
 | `update_*.sh` | 自动更新脚本 |
 | `server_doctor.sh` | 服务器健康检查 |
-| `sync_remote_env_from_profile.py` | 同步远程环境变量 |
+| `sync_remote_env_from_profile.py` | 同步远程环境变量（读取 `config/server_profile.local.yaml`） |
+
+### 2.6a config/ — 配置文件
+
+| 文件 | 职责 |
+|------|------|
+| `config/config.yaml` | 非敏感业务配置：参数、阈值、URL、开关 |
+| `config/secrets.yaml` | 敏感配置：API Key、Webhook、密码（gitignored） |
+| `config/server_profile.local.yaml` | 服务器连接配置：SSH host/user/port/password（gitignored） |
 
 ### 2.7 docs/ — 项目文档（UI 设计规范、运维手册、mini-SWE-agent 使用指南）
 
@@ -531,3 +539,11 @@ npm run ui:build
 | 文件 | 职责摘要 |
 |------|----------|
 | `tests/smoke_check.js` | 冒烟测试：验证服务首页和 health 端点可达 |
+
+### 9.9 config/ — 配置文件
+
+| 文件 | 职责摘要 |
+|------|----------|
+| `config/config.yaml` | 业务配置合同：所有参数、阈值、URL、开关的单一来源 |
+| `config/secrets.yaml` | 敏感配置：API Key、Webhook、密码（gitignored） |
+| `config/server_profile.local.yaml` | 服务器连接配置：SSH host/user/port/password（gitignored） |

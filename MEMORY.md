@@ -7,6 +7,17 @@
 
 ## Entries
 
+### 2026-05-05 | Server Profile 恢复与 CLI 配置
+
+- **Decision**: 用户要求恢复 SSH 服务器配置文件，并统一放到 config/ 目录
+- **Action**: 从 `archive/ops/server_profile.local.yaml` 恢复备份
+- **Action**: 移动到 `config/server_profile.local.yaml`，删除 `ops/` 空目录
+- **Action**: 更新 `deploy/sync_remote_env_from_profile.py` 中 `PROFILE_PATH` 指向 `config/`
+- **Action**: 更新 `.gitignore` 忽略 `config/server_profile.local.yaml`
+- **Action**: 修改 `~/.kimi/config.toml` — `default_yolo=true`, `default_caveman=true`
+- **Verification**: 文件位置正确，代码引用已更新，gitignore 正确
+- **Mission**: `missions/0505-server-profile-config/`
+
 ### 2026-04-30 | ES Module修复 + dashboard_page.js拆分
 
 - **Decision**: 服务器启动失败，view_models和routes使用CommonJS但被当作ES Module加载

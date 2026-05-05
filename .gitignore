@@ -23,7 +23,7 @@ runtime_data/shared/dividend组合.json
 runtime_data/shared/并购公司报告.json
 runtime_data/shared/推送配置.json
 runtime_data/shared/推送运行状态.json
-ops/server_profile.local.yaml
+config/server_profile.local.yaml
 config/secrets.yaml
 
 .vs/
@@ -31,4 +31,5 @@ runtime_data/*.json
 runtime_data/*.tsv
 # ui/dist/ 不忽略，因为服务器部署时直接引用静态文件
 # ui/dist/
-scripts/
+scripts/debug_scripts/
+scripts/screenshots/

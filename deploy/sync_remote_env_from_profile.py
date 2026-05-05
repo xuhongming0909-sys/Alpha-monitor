@@ -16,7 +16,7 @@ import yaml
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-PROFILE_PATH = ROOT_DIR / "ops" / "server_profile.local.yaml"
+PROFILE_PATH = ROOT_DIR / "config" / "server_profile.local.yaml"
 DEFAULT_HEALTH_PATH = "/api/health"
 HEALTH_RETRY_COUNT = 20
 HEALTH_RETRY_DELAY_SECONDS = 2
