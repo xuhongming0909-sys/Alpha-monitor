@@ -491,10 +491,10 @@ h2 {
   background: rgba(242, 184, 75, .08);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .terminal-shell {
     min-width: 0;
-    padding: 8px;
+    padding: 8px 8px 60px;
   }
 
   .terminal-status,
@@ -508,5 +508,19 @@ h2 {
   .terminal-link {
     border-right: 0;
     border-left: 0;
+  }
+
+  .tab-button {
+    padding: 8px 14px;
+    font-size: 13px;
+    min-height: 40px;
+  }
+
+  .search-input {
+    max-width: none;
+  }
+
+  .brand-subtitle {
+    display: none;
   }
 }

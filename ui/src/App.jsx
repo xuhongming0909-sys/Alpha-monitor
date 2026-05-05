@@ -1,4 +1,6 @@
 import React from 'react';
+import ConvertibleCardList from './components/ConvertibleCardList.jsx';
+import BottomNav from './components/BottomNav.jsx';
 
 const API_ENDPOINTS = {
   health: '/api/health',
@@ -132,6 +134,18 @@ function usePagination({ pageSize = 50 } = {}) {
     return { rows: rows.slice(start, start + pageSize), total, totalPages, page: safePage };
   }, [page, pageSize]);
   return { page, setPage, paginate };
+}
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = React.useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+  React.useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return isMobile;
 }
 
 function Pagination({ page, totalPages, total, onChange }) {
@@ -810,6 +824,7 @@ function ConvertibleTable({ rows, smallRows, rightsIssueData, searchQuery }) {
   const [subTab, setSubTab] = React.useState('main');
   const { sortConfig, handleSort, sorted } = useSort();
   const { page, setPage, paginate } = usePagination({ pageSize: 50 });
+  const isMobile = useIsMobile();
 
   function sortRows(list) {
     return sorted(list, (row, key) => {
@@ -1099,7 +1114,7 @@ function ConvertibleTable({ rows, smallRows, rightsIssueData, searchQuery }) {
         <button className={`tab-button ${subTab === 'rights' ? 'active' : ''}`} onClick={() => setSubTab('rights')}>抢权配售 ({riRows.length})</button>
       </div>
 
-      {subTab === 'main' && renderHomeTable(rows)}
+      {subTab === 'main' && (isMobile ? <ConvertibleCardList rows={rows} searchQuery={searchQuery} /> : renderHomeTable(rows))}
       {subTab === 'discount' && renderDiscountTable(discountRows, '折价套利', 'DISCOUNT ARB')}
       {subTab === 'theoretical' && renderDiscountTable(theoreticalDiscountRows, '理论折价套利', 'THEORETICAL DISCOUNT')}
       {subTab === 'small' && renderSmallTable()}
@@ -2363,6 +2378,7 @@ function App() {
   const [activeTab, setActiveTab] = React.useState('overview');
   const [searchQuery, setSearchQuery] = React.useState('');
   const [oppFilter, setOppFilter] = React.useState('all');
+  const isMobile = useIsMobile();
   const state = useDashboardData();
   const resources = state.resources;
   const opportunities = resources ? buildOpportunityRows(resources) : [];
@@ -2411,6 +2427,7 @@ function App() {
         <section className="terminal-panel loading-panel">正在连接真实市场接口...</section>
       )}
     </main>
+    {isMobile && <BottomNav activeTab={activeTab} onChange={setActiveTab} />}
   );
 }
 

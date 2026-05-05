@@ -483,6 +483,8 @@ npm run ui:build
 | `ui/dashboard/constants.js` | 看板 UI 常量：端点、Tab 序列、表格配置、样式默认值 |
 | `ui/dashboard/dashboard_page.js` | 旧看板页面逻辑：HTML 看板渲染与交互 |
 | `ui/templates/dashboard_template.html` | 旧看板 HTML 模板：含内联 CSS/JS |
+| `ui/src/components/ConvertibleCardList.jsx` | 转债套利手机卡片视图：手机端替代宽表格的卡片列表 |
+| `ui/src/components/BottomNav.jsx` | 手机端底部导航栏：固定底部快捷切换核心模块 |
 
 ### 9.5 notification/ — 推送与调度层
 
