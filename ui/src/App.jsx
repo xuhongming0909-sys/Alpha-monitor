@@ -36,6 +36,29 @@ const API_ENDPOINTS = {
   cbRightsIssue: '/api/market/cb-rights-issue',
 };
 
+const CACHE_KEY = 'alpha_dashboard_cache';
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+function readCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed.timestamp || Date.now() - parsed.timestamp > CACHE_TTL_MS) return null;
+    return { resources: parsed.resources, updatedAt: parsed.updatedAt };
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(resources, updatedAt) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), resources, updatedAt }));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 const MONITOR_CURRENCIES = ['CNY', 'HKD', 'USD'];
 
 function unwrap(payload, fallback) {
@@ -65,10 +88,18 @@ async function fetchJson(url) {
 }
 
 function useDashboardData() {
-  const [state, setState] = React.useState({ loading: true, error: '', resources: null, updatedAt: '' });
+  const cached = readCache();
+  const [state, setState] = React.useState({
+    loading: true,
+    error: '',
+    resources: cached?.resources || null,
+    updatedAt: cached?.updatedAt || '',
+  });
 
-  const load = React.useCallback(async () => {
-    setState((current) => ({ ...current, loading: true, error: '' }));
+  const load = React.useCallback(async (isBackground = false) => {
+    if (!isBackground) {
+      setState((current) => ({ ...current, loading: true, error: '' }));
+    }
     const criticalEndpoints = [
       { key: 'health', url: API_ENDPOINTS.health, fallback: {} },
       { key: 'resourceStatus', url: `${API_ENDPOINTS.resourceStatus}?keys=exchangeRate,cbArb,ah,ab,lofArb,cbRightsIssue`, fallback: {} },
@@ -109,20 +140,24 @@ function useDashboardData() {
       }
     });
 
-    setState({
+    const updatedAt = new Date().toISOString();
+    const nextState = {
       loading: false,
       error: errors.length > 0 ? `${errors.length} 个接口异常（${errors.slice(0, 2).join('；')}）` : '',
-      updatedAt: new Date().toISOString(),
+      updatedAt,
       resources,
-    });
+    };
+    setState(nextState);
+    writeCache(resources, updatedAt);
 
     fetchJson(API_ENDPOINTS.subscriptions).then(
       (value) => {
-        setState((current) => ({
-          ...current,
-          resources: { ...current.resources, subscriptions: { data: unwrap(value, {}) } },
-          updatedAt: new Date().toISOString(),
-        }));
+        setState((current) => {
+          const merged = { ...current.resources, subscriptions: { data: unwrap(value, {}) } };
+          const withSubs = { ...current, resources: merged, updatedAt: new Date().toISOString() };
+          writeCache(merged, withSubs.updatedAt);
+          return withSubs;
+        });
       },
       (reason) => {
         setState((current) => ({
@@ -135,12 +170,12 @@ function useDashboardData() {
   }, []);
 
   React.useEffect(() => {
-    load();
-    const timer = window.setInterval(load, 60000);
+    load(false);
+    const timer = window.setInterval(() => load(true), 60000);
     return () => window.clearInterval(timer);
   }, [load]);
 
-  return { ...state, reload: load };
+  return { ...state, reload: () => load(false) };
 }
 
 function sortByNumber(rows, getter, direction = 'desc') {
@@ -155,11 +190,14 @@ function sortByNumber(rows, getter, direction = 'desc') {
 }
 
 function todayText() {
-  return new Date().toISOString().slice(0, 10);
+  const formatter = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' });
+  return formatter.format(new Date()).replace(/\//g, '-');
 }
 
 function sameDay(value, today) {
-  return Boolean(value && String(value).startsWith(today));
+  if (!value) return false;
+  const normalized = String(value).slice(0, 10).replace(/\//g, '-');
+  return normalized === today;
 }
 
 function theoreticalOpportunity(row) {
@@ -171,8 +209,10 @@ function theoreticalOpportunity(row) {
 
 function buildSubscriptionRows(data) {
   const ipoRows = toArray(data?.ipo?.data).map((row) => ({ ...row, type: row.type || '新股' }));
+  const ipoUpcoming = toArray(data?.ipo?.upcoming).map((row) => ({ ...row, type: row.type || '新股' }));
   const bondRows = toArray(data?.bonds?.data).map((row) => ({ ...row, type: row.type || '债券' }));
-  return [...ipoRows, ...bondRows];
+  const bondUpcoming = toArray(data?.bonds?.upcoming).map((row) => ({ ...row, type: row.type || '债券' }));
+  return [...ipoRows, ...ipoUpcoming, ...bondRows, ...bondUpcoming];
 }
 
 function buildOverviewSections(resources, today = todayText()) {
