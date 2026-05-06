@@ -7,6 +7,18 @@
 
 ## Entries
 
+### 2026-05-06 | React 手机端统一化重构
+
+- **Decision**: 全设备只保留手机端单列密集 UI；移除 React 上方导航、分红提醒、事件套利、推送设置
+- **Action**: `App.jsx` 从 2600+ 行收敛到 686 行，重写为真实接口加载、概览摘要流、7 标签接线
+- **Action**: 底部导航改为两行 7 标签：概览/转债/AH/AB/LOF/打新/监控
+- **Action**: 新增/改造密集卡片：AB、打新、自定义监控、抢权配售、转债、AH、LOF
+- **Action**: 概览改为今日打新、配售登记、折价套利、小额刚兑、理论折价、AH/AB 机会、自定义监控
+- **Action**: 更新 `specs/`、`INDEX.md`、UI 测试、根目录清洁测试白名单
+- **Verification**: `npm run ui:build`、全部 `tests/ui_*.test.js`、`npm run check:boundaries`、AI-SUMMARY、root cleanliness、线上 smoke 通过
+- **Risk**: `tests/convertible_discount.test.js` 仍有历史失败，未纳入本轮 UI 改造
+- **Mission**: `missions/0506-mobile-unify-ui/`
+
 ### 2026-05-06 | 部署最新版本到服务器
 
 - **Decision**: 先把服务器对齐当前最新提交，确保用户能立刻看到最新页面

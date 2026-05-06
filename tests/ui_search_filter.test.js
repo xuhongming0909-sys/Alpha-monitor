@@ -18,7 +18,7 @@ assert.ok(/searchQuery|search.*State/i.test(app), 'App should have search state'
 assert.ok(/SearchBar|search.*input|placeholder.*搜索/i.test(app), 'App should have search input');
 
 // Sort state or click handlers
-assert.ok(/sortConfig|sortKey|onClick.*sort|handleSort/i.test(app), 'App should have sort functionality');
+assert.ok(/sortConfig|sortKey|onClick.*sort|handleSort|sortByNumber/i.test(app), 'App should have sort functionality');
 
 // Search bar styles
 assert.ok(styles.includes('search-bar') || styles.includes('search-input'), 'Styles should include search bar styles');

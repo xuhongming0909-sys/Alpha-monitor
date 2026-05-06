@@ -10,13 +10,8 @@ function read(relativePath) {
 
 const app = read('ui/src/App.jsx');
 
-// Push config state
-assert.ok(/pushConfig|push.*State/i.test(app), 'App should have push config state');
-
-// Push config API endpoint
-assert.ok(/api\/push\/config/i.test(app), 'App should consume push config API');
-
-// Push settings component or panel
-assert.ok(/PushSettings|push.*panel|推送设置/i.test(app), 'App should have push settings UI');
+assert.ok(!/pushConfig/i.test(app), 'App should not keep push config state');
+assert.ok(!/api\/push\/config/i.test(app), 'App should not consume push config API');
+assert.ok(!/PushSettings|推送设置/i.test(app), 'App should not keep push settings UI');
 
 console.log('ui push settings ok');

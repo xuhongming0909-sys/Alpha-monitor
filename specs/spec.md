@@ -1,7 +1,7 @@
 # Alpha Monitor 项目规格索引
 
 **Created**: 2026-04-30
-**Last Updated**: 2026-04-30
+**Last Updated**: 2026-05-06
 **Current Status**: active
 **Input Source**: 长期用户需求 / 历史决策 / 已确认需求
 
@@ -14,6 +14,13 @@
 
 - 从真实市场数据中发现套利机会，通过网页展示和企业微信推送完成闭环
 - 当前最重要目标：React 金融终端 UI 并行重做，旧页面保留 `/legacy` 回滚入口
+
+## 当前 React UI 正式口径
+
+- React 顶级标签固定为 7 个：概览、转债套利、AH 溢价、AB 溢价、LOF 套利、打新申购、自定义监控
+- React 导航与概览明确移除：分红提醒、事件套利、推送设置
+- React 概览页改为分块摘要流，不再承担旧版多模块总表入口
+- 自定义监控在 React UI 的对外文案统一为“自定义”，但正式模块名仍为“自定义监控”
 
 ## 当前阶段
 
@@ -34,7 +41,7 @@
 | 合并套利 | 并购重组公告监控 | `specs/merger-arbitrage.md` | `data_fetch/merger/`, `ui/routes/dashboard_routes.js` |
 | 事件套利 | 事件驱动套利监控 | `specs/event-arbitrage.md` | `data_fetch/event_arbitrage/`, `ui/routes/dashboard_routes.js` |
 | 股息提醒 | 股息机会跟踪 | `specs/dividend.md` | `data_fetch/dividend/`, `ui/routes/dashboard_routes.js` |
-| 打新/申购 | IPO、转债申购日历 | `specs/subscription.md` | `data_fetch/subscription/`, `ui/routes/dashboard_routes.js` |
+| 打新申购 | IPO、转债申购日历 | `specs/subscription.md` | `data_fetch/subscription/`, `ui/routes/dashboard_routes.js` |
 | 自定义监控 | 用户自定义套利组合 | `specs/custom-monitor.md` | `data_fetch/custom_monitor/`, `ui/routes/dashboard_routes.js` |
 | 汇率 | 港币/美元人民币汇率 | `specs/exchange-rate.md` | `data_fetch/exchange_rate/`, `ui/routes/dashboard_routes.js` |
 | 转债抢权配售 | 转债抢权配售计算与推送 | `specs/cb-rights-issue.md` | `data_fetch/cb_rights_issue/`, `strategy/cb_rights_issue/` |
@@ -83,5 +90,8 @@
 ## 当前追加约束
 
 - React UI 首屏必须使用现有真实 `/api/*` 接口，不得伪造数据
+- React UI 只保留 7 个顶级标签，分红提醒、事件套利、推送设置不进入 React 顶层导航，也不进入 React 概览摘要流
+- React 概览使用分块摘要流，按模块卡片顺序串联，不恢复宽表格概览
+- React “自定义”页面必须拆为收购方表、目标方表、收益表三个区块
 - `小额刚兑` 页收益结构已调整为：刚兑年化 + 期权年化 + 总年化收益率
 - 可转债折价套利推送前必须强制刷新 `cbArb` 数据

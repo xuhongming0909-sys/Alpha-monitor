@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '..');
 
 // 白名单文件
 const allowedFiles = new Set([
-  'README.md', 'CLAUDE.md', 'INDEX.md', 'MEMORY.md',
+  'README.md', 'CLAUDE.md', 'AGENTS.md', 'INDEX.md', 'MEMORY.md',
   'package.json', 'package-lock.json', 'requirements.txt',
   'start_server.js', 'data_dispatch.py', 'config.yaml',
   '.gitignore', '.env.example', '.env', 'server_config_loader.js',

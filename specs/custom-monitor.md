@@ -7,7 +7,7 @@ type: spec
 # Module Spec: 自定义监控
 
 **Created**: 2026-04-30
-**Last Updated**: 2026-04-30
+**Last Updated**: 2026-05-06
 **Status**: active
 
 ## 1. Scope
@@ -24,6 +24,8 @@ type: spec
 - 币种自动换算（CNY/HKD/USD）
 - 安全系数约束在 [0, 1] 区间
 - 至少填写换股比例、现金对价、现金选择权之一
+- React UI 对外文案统一显示为“自定义”
+- React UI 必须拆成收购方表、目标方表、收益表三个区块，共用同一批监控记录
 
 ## 3. Interface / API
 
@@ -48,6 +50,11 @@ type: spec
 - `GET /api/monitors?refreshPrices=0|1` — 获取所有监控
 - `POST /api/monitors` — 新增/更新监控
 - `DELETE /api/monitors/:id` — 删除监控
+
+**React UI 区块**
+- `收购方表` — 展示收购腿输入与价格换算结果
+- `目标方表` — 展示目标腿输入、现价与备注
+- `收益表` — 展示股票腿、现金腿与最优收益排序
 
 ## 4. Rules
 
@@ -105,6 +112,13 @@ cash_yield_rate = (cash_spread / target_price_cny) * 100
 - 推送时按 maxYieldRate 排序取前 5
 - 展示格式：`{name} | 换股 {stockYieldRate}% | 现金 {cashYieldRate}% | 最大 {maxYieldRate}%`
 
+**React 展示规则**
+- 顶部导航标签文案使用“自定义”，不使用“自定义监控”
+- 收购方表、目标方表、收益表使用同一刷新时间和同一数据源
+- 三个表都必须保留 `监控名称` 作为首列，便于跨表对应
+- 收益表默认按 `maxYieldRate` 降序
+- 收购方人民币价格、目标方人民币价格、现金对价人民币值、现金选择权人民币值抓不到时显示 `--`
+
 ## 5. Acceptance
 
 - [ ] 创建监控时缺少 acquirerCode 或 targetCode，返回 400 错误
@@ -112,3 +126,6 @@ cash_yield_rate = (cash_spread / target_price_cny) * 100
 - [ ] 刷新价格后，acquirerPrice 和 targetPrice 按汇率正确换算为 CNY
 - [ ] 安全系数输入 1.5，实际存储为 1.0
 - [ ] 港股监控（H 股）使用 hkToCny 汇率正确换算
+- [ ] React 标签文案显示“自定义”
+- [ ] React 页面拆为收购方表、目标方表、收益表三段
+- [ ] 收益表默认按最优收益率从高到低排序

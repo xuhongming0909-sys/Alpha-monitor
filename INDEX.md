@@ -1,7 +1,7 @@
 # Alpha Monitor — 项目索引
 
 **定位**：金融套利机会监控终端，从真实市场数据中发现套利机会，通过网页展示和企业微信推送完成闭环。
-**阶段**：React 金融终端 UI 并行重做中，旧 HTML 看板保留 `/legacy` 回滚入口。
+**阶段**：React 金融终端 UI 并行重做中，旧 HTML 看板保留 `/legacy` 回滚入口；当前 React 顶层导航收敛为 7 个标签。
 **技术栈**：Node.js 18+ + Express（API/服务层），Python 3（数据抓取/计算层），React + Vite（新前端），SQLite + JSON（运行时状态）。
 
 ---
@@ -184,11 +184,24 @@
 
 ### 2.8 ui/ — React 前端（进行中，Vite + React 重写 UI）
 
+当前 React 顶层标签固定为：概览、转债套利、AH 溢价、AB 溢价、LOF 套利、打新申购、自定义。
+React 导航与概览已排除：分红提醒、事件套利、推送设置。
+
 | 文件 | 职责 |
 |------|------|
 | `src/App.jsx` | React 应用主组件 |
 | `src/main.jsx` | 入口文件 |
 | `src/styles.css` | 样式 |
+| `src/components/BottomNav.jsx` | 手机端底部导航，负责 7 个顶级标签切换 |
+| `src/components/ConvertibleCardList.jsx` | 转债套利手机卡片列表 |
+| `src/components/AhCardList.jsx` | AH 溢价手机卡片列表 |
+| `src/components/AbCardList.jsx` | AB 溢价手机卡片列表 |
+| `src/components/LofCardList.jsx` | LOF 套利手机卡片列表 |
+| `src/components/SubscriptionCardList.jsx` | 打新申购手机卡片列表 |
+| `src/components/RightsIssueCardList.jsx` | 抢权配售手机卡片列表 |
+| `src/components/MonitorCardList.jsx` | 自定义监控手机卡片列表 |
+| `src/components/cardHelpers.jsx` | React 手机卡片公共格式化与展示积木 |
+| `src/components/cardListHelpers.jsx` | React 密集卡片列表通用帮助函数 |
 | `index.html` | HTML 模板 |
 | `package.json` | Vite + React 依赖 |
 
@@ -245,134 +258,16 @@
 
 ---
 
-## 4. 数据流速查（从 HTTP 请求到数据返回的完整链路）
+## 4. 运行与验证速查
 
-以 `/api/market/ah` 请求为例：
-
-```
-HTTP GET /api/market/ah
-    │
-    ▼
-ui/routes/market_routes.js
-    │
-    ├──► 检查内存缓存 → 有则直接返回
-    │
-    └──► 缓存过期 → 调用 data_dispatch.py ah
-              │
-              ▼
-         data_fetch/ah_premium/fetcher.py
-              │
-              ├──► source.py 调腾讯行情 API
-              │
-              └──► normalizer.py 转为 Bus 记录
-                        │
-                        ▼
-                   strategy/ah_premium/service.py
-                        │
-                        ├──► 计算溢价率
-                        ├──► 查历史百分位（premium_history.db）
-                        └──► 排序
-                                  │
-                                  ▼
-                             返回 JSON
-                                  │
-                                  ▼
-                         写入内存缓存 + JSON 文件
-                                  │
-                                  ▼
-                         返回客户端
-```
+- 数据流：`ui/routes/*` → `data_dispatch.py` → `data_fetch/*` → Bus → `strategy/*` → API JSON。
+- 运行态：关键 JSON/DB 位于 `runtime_data/shared/`，部署时保留，不提交 Git。
+- 主要验证：`npm run ui:build`、`npm run check:boundaries`、`ALPHA_MONITOR_BASE_URL=http://43.139.35.190 node tests/smoke_check.js`、`node tests/ui_*.test.js`。
+- 工作流：新任务写入 `missions/MMDD-name/{spec.md,plan.md}`，交接写入 `MEMORY.md`，正式需求写入 `specs/`。
 
 ---
 
-## 5. 运行态地图（runtime_data/ 下运行时状态文件一览）
-
-`runtime_data/shared/` 下的关键文件：
-
-| 文件 | 内容 | 谁读写 |
-|------|------|--------|
-| `market_cache_*.json` | 各模块市场数据缓存 | data_dispatch / start_server |
-| `cb_arb_aux_cache.json` | 转债辅助缓存 | convertible_bond fetcher |
-| `cb_discount_strategy_state.json` | 折价策略运行态（监控名单、买卖区状态） | notification/alerts |
-| `cb_rights_issue_state.json` | 抢权配售状态 | strategy/cb_rights_issue |
-| `lof_arbitrage_state.json` | LOF 套利状态 | strategy/lof_arbitrage |
-| `custom_monitors.json` | 用户自定义监控组合 | data_fetch/custom_monitor |
-| `dividend_portfolio.json` | 股息跟踪组合 | strategy/dividend |
-| `merger_company_reports.json` | 并购公司报告 | strategy/merger |
-| `push_config.json` | 主推送配置 | notification/scheduler |
-| `push_runtime_state.json` | 推送运行态 | notification/scheduler |
-| `cb_arbitrage_push_config.json` | CB 套利推送配置 | notification/cb_arbitrage |
-| `*_push_runtime.json` | 各模块推送运行态 | notification/* |
-| `market_refresh_state.json` | 市场刷新状态 | start_server |
-| `*.db` | SQLite 数据库（股价历史、溢价历史、配对池） | tools/ 各脚本 |
-
-**规则**：运行时 JSON 属于环境状态，不提交 Git，部署时保留不被覆盖。
-
----
-
-## 6. 配置速查（config.yaml 各段落功能速查）
-
-`config.yaml` 关键段落：
-
-| 段落 | 控制内容 |
-|------|----------|
-| `app.*` | 服务端口（5001）、host、超时、时区、Python 二进制路径 |
-| `deployment.*` | 公网 URL、反向代理类型、systemd 服务名 |
-| `storage.*` | 运行时数据目录、profile 路径、运行时 JSON 文件名 |
-| `bus.*` | Bus 模式版本、必填字段、允许状态 |
-| `plugins.*` | 各插件启用/禁用开关 |
-| `data_fetch.plugins.*` | 各插件刷新间隔、超时、数据源 URL、API key、历史保留期 |
-| `strategy.*` | 各插件排名指标、阈值、推送分类、AI prompt |
-| `presentation.*` | API 前缀、看板主题、自动刷新间隔、表格尺寸、模块注释 |
-| `notification.*` | Webhook URL、推送时间、启用模块、摘要 Top-N 数量 |
-
----
-
-## 7. 验证命令（冒烟测试、架构检查、数据管道测试）
-
-```bash
-# 冒烟测试
-npm run check
-
-# 架构边界检查
-python3 tools/check_plugin_boundaries.py
-
-# 健康检查（需服务运行）
-npm run check:health
-
-# 测试数据管道
-python data_dispatch.py exchange-rate
-python data_dispatch.py ah
-python data_dispatch.py ab
-python data_dispatch.py cb-arb
-python data_dispatch.py ipo
-python data_dispatch.py dividend
-
-# 构建 React UI
-npm run ui:build
-```
-
----
-
-## 8. ELODIE 工作流文件（AI 工作流规范文件索引）
-
-| 文件 | 职责 |
-|------|------|
-| `CLAUDE.md` | AI 规则入口（读取顺序、任务规则、宪法）— **用户所有，AI 不可修改** |
-| `INDEX.md` | 本文件 — 项目架构+文件索引 — **AI 维护** |
-| `README.md` | 项目简介 |
-| `specs/spec.md` | 项目级规格索引（模块地图、全局规则） |
-| `specs/*.md` | 模块级正式规格（业务规则、计算合同、接口合同） |
-| `missions/MMDD-名称/` | 任务闭环（spec.md + plan.md） |
-| `MEMORY.md` | 交接记忆（最近 50 条） |
-| `config/config.yaml` | 工作流配置（mission_retention、memory_retention） |
-| `templates/` | 任务/规格/子代理模板 |
-
-**AI 读取顺序**：`CLAUDE.md` → `INDEX.md` → `README.md` → `specs/spec.md` → 相关 `specs/*.md` → `config/config.yaml` → `MEMORY.md`
-
----
-
-## 9. 代码文件规范（文件大小限制、AI-SUMMARY 注释规范）
+## 5. 代码文件规范（文件大小限制、AI-SUMMARY 注释规范）
 
 ### 9.1 文件大小限制
 
@@ -484,7 +379,15 @@ npm run ui:build
 | `ui/dashboard/dashboard_page.js` | 旧看板页面逻辑：HTML 看板渲染与交互 |
 | `ui/templates/dashboard_template.html` | 旧看板 HTML 模板：含内联 CSS/JS |
 | `ui/src/components/ConvertibleCardList.jsx` | 转债套利手机卡片视图：手机端替代宽表格的卡片列表 |
-| `ui/src/components/BottomNav.jsx` | 手机端底部导航栏：固定底部快捷切换核心模块 |
+| `ui/src/components/AhCardList.jsx` | AH 溢价手机卡片视图：单列展示溢价关键字段 |
+| `ui/src/components/AbCardList.jsx` | AB 溢价手机卡片视图：单列展示溢价关键字段 |
+| `ui/src/components/LofCardList.jsx` | LOF 套利手机卡片视图：单列展示 LOF 关键字段 |
+| `ui/src/components/SubscriptionCardList.jsx` | 打新申购手机卡片视图：单列展示申购日历字段 |
+| `ui/src/components/RightsIssueCardList.jsx` | 抢权配售手机卡片视图：沪深市场与三阶段卡片切换 |
+| `ui/src/components/MonitorCardList.jsx` | 自定义监控手机卡片视图：收购方表/目标方表/收益表 |
+| `ui/src/components/cardHelpers.jsx` | 手机端卡片公共格式化与展示积木 |
+| `ui/src/components/cardListHelpers.jsx` | 手机端密集卡片列表通用帮助函数与基础卡片壳 |
+| `ui/src/components/BottomNav.jsx` | 手机端底部导航栏：固定底部切换 7 个 React 顶级标签 |
 
 ### 9.5 notification/ — 推送与调度层
 

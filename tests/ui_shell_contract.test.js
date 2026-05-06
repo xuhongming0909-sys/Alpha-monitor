@@ -25,7 +25,9 @@ assert.ok(server.includes("'/legacy'"), 'server should expose /legacy for the ol
 assert.ok(server.includes('ui/dist'), 'server should serve the new React build from ui/dist');
 
 const app = read('ui/src/App.jsx');
-assert.ok(app.includes('Opportunity Command Center'), 'new UI should include the opportunity command center');
+assert.ok(!app.includes('Opportunity Command Center'), 'new UI should remove the old opportunity command center');
+assert.ok(app.includes('/api/market/convertible-bond-arbitrage'), 'new UI should consume the real cbArb API');
+assert.ok(app.includes('今日打新'), 'new UI overview should include 今日打新');
 assert.ok(app.includes('/api/market/convertible-bond-arbitrage'), 'new UI should consume the real cbArb API');
 
 const styles = read('ui/src/styles.css');

@@ -30,4 +30,16 @@ assert.ok(
   '移动端 .brand-subtitle 应隐藏'
 );
 
+// 行为3：底部导航两行布局
+assert.ok(
+  /bottom-nav-grid|grid-template-columns\s*:\s*repeat\(4,\s*1fr\)/.test(css),
+  '应存在两行底部导航网格样式'
+);
+
+// 行为4：卡片应为密集单列字段流
+assert.ok(
+  /card-field|detail-grid|field-label|field-value/.test(css),
+  '应存在密集卡片字段流样式'
+);
+
 console.log('ui mobile overview ok');

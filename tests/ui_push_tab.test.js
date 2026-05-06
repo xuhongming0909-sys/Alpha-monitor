@@ -10,18 +10,8 @@ function read(relativePath) {
 
 const app = read('ui/src/App.jsx');
 
-// 推送设置在TabNav中存在
-assert.ok(/'push'.*'推送设置'|推送设置.*TabNav/.test(app), 'App should have 推送设置 as top-level tab');
-
-// 推送设置不在其他Tab底部显示
-const pushAtBottom = app.match(/<PushSettings.*\/\s*>[\s\S]*?<\/main>/);
-if (pushAtBottom) {
-  // PushSettings should NOT be rendered after all tab content
-  // It should only be in its own conditional
-  assert.ok(!/activeTab.*===.*push.*PushSettings|PushSettings.*activeTab.*push/.test(app) || /<PushSettings.*\/\s*>/.test(app), 'PushSettings should be standalone tab, not at bottom');
-}
-
-// TabNav包含推送设置
-assert.ok(/\{ key:.*push.*label:.*推送/.test(app), 'TabNav should include push tab');
+assert.ok(!/推送设置/.test(app), 'App should remove 推送设置 tab');
+assert.ok(!/activeTab\s*===\s*['"]push['"]/.test(app), 'App should not render push tab content');
+assert.ok(!/PushSettings|PushSettingsPage/.test(app), 'App should remove push settings UI');
 
 console.log('ui push tab ok');
