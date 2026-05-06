@@ -64,6 +64,34 @@ export function bestYieldValue(row) {
   );
 }
 
+export function readValueByPathSafe(source, path) {
+  if (typeof path !== 'string' || !path) return source?.[path];
+  return path.split('.').reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), source);
+}
+
+export function readFirstNumberValue(source, paths = []) {
+  for (const path of paths) {
+    const value = toNumber(readValueByPathSafe(source, path));
+    if (value !== null) return value;
+  }
+  return null;
+}
+
+export function formatYiValue(value, suffix = '亿') {
+  const parsed = toNumber(value);
+  if (parsed === null) return '--';
+  return `${formatNumber(parsed)}${suffix}`;
+}
+
+export function formatCurrencyCompact(value) {
+  const parsed = toNumber(value);
+  if (parsed === null) return '--';
+  const absolute = Math.abs(parsed);
+  if (absolute >= 100000000) return `${formatNumber(parsed / 100000000)}亿`;
+  if (absolute >= 10000) return `${formatNumber(parsed / 10000)}万`;
+  return `${formatNumber(parsed)}元`;
+}
+
 export function SectionPanel({ eyebrow, title, count, children, className = '' }) {
   return (
     <section className={`terminal-panel main-table-panel ${className}`.trim()}>

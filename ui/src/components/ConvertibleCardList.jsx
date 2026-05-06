@@ -3,7 +3,7 @@
 
 import React from 'react';
 import SimpleDataTable from './SimpleDataTable.jsx';
-import { formatDate, formatNumber, formatPercent, pickText, rowMatchesQuery, signedClass, toNumber } from './cardHelpers.jsx';
+import { formatDate, formatNumber, formatPercent, formatYiValue, formatCurrencyCompact, pickText, readFirstNumberValue, rowMatchesQuery, signedClass, toNumber } from './cardHelpers.jsx';
 
 function formatRatioPercent(value) {
   const number = toNumber(value);
@@ -86,15 +86,79 @@ function discountColumns() {
   ];
 }
 
+function readSmallRedemptionYield(row) {
+  return readFirstNumberValue(row, ['redemptionYield', 'smallRedemptionYield', 'rigidRedemptionYield']);
+}
+
+function readSmallRedemptionExpectedYears(row) {
+  return readFirstNumberValue(row, ['expectedDurationYears', 'smallRedemptionExpectedYears', 'expectedHoldingYears', 'redemptionDurationYears']);
+}
+
+function readSmallRedemptionAnnualizedYield(row) {
+  return readFirstNumberValue(row, ['annualizedYield', 'smallRedemptionAnnualizedYield', 'annualizedRedemptionYield']);
+}
+
+function readSmallRedemptionAmount(row) {
+  return readFirstNumberValue(row, ['redemptionAmount', 'smallRedemptionAmount', 'rigidRedemptionAmount', 'redemptionAmountWan', 'smallRedemptionAmountWan']);
+}
+
+function readSmallRedemptionTotal(row) {
+  return readFirstNumberValue(row, ['redemptionTotal', 'smallRedemptionTotal', 'rigidRedemptionTotal', 'redemptionTotalWan', 'smallRedemptionTotalWan']);
+}
+
+function readLiabilityExposureYi(row) {
+  return readFirstNumberValue(row, ['liabilityExposureYi', 'debtExposureYi', 'netDebtExposureYi', 'stockNetDebtExposureYi']);
+}
+
+function readNetAssetYi(row) {
+  return readFirstNumberValue(row, ['netAssetYi', 'netAssetsYi', 'equityYi', 'stockNetAssetsYi']);
+}
+
+function readSmallRedemptionOptionValue(row) {
+  return readFirstNumberValue(row, ['smallRedemptionOptionValue', 'redemptionOptionValue', 'optionValue']);
+}
+
+function readSmallRedemptionOptionAnnualizedYield(row) {
+  return readFirstNumberValue(row, ['smallRedemptionOptionAnnualizedYield', 'optionAnnualizedYield', 'redemptionOptionAnnualizedYield']);
+}
+
+function readSmallRedemptionTotalAnnualizedYield(row) {
+  return readFirstNumberValue(row, ['smallRedemptionTotalAnnualizedYield', 'totalAnnualizedYield']);
+}
+
+function readHolderCount(row) {
+  return readFirstNumberValue(row, ['holderCount', 'bondHolderCount', 'convertibleHolderCount']);
+}
+
+function readRemainingSizeYi(row) {
+  return readFirstNumberValue(row, ['remainingSizeYi', 'remainingScaleYi', 'balanceYi', 'outstandingSizeYi']);
+}
+
+function renderExpectedDuration(row) {
+  const value = readSmallRedemptionExpectedYears(row);
+  return value === null ? '--' : `${value.toFixed(1)}年`;
+}
+
 function smallColumns() {
   return [
     { key: 'bondName', label: '转债', render: (row) => pickText(row.bondName, row.name) },
     { key: 'code', label: '代码', render: (row) => <span className="mono">{pickText(row.code, row.bondCode)}</span> },
-    { key: 'stockName', label: '正股', render: (row) => pickText(row.stockName) },
-    { key: 'remainingSizeYi', label: '剩余规模', numeric: true, render: (row) => formatNumber(row.remainingSizeYi, '亿') },
-    { key: 'smallRedemptionAnnualizedYield', label: '刚兑年化', numeric: true, className: (row) => signedClass(row.smallRedemptionAnnualizedYield), render: (row) => formatPercent(row.smallRedemptionAnnualizedYield) },
-    { key: 'smallRedemptionOptionAnnualizedYield', label: '期权年化', numeric: true, className: (row) => signedClass(row.smallRedemptionOptionAnnualizedYield), render: (row) => formatPercent(row.smallRedemptionOptionAnnualizedYield) },
-    { key: 'smallRedemptionTotalAnnualizedYield', label: '总年化收益率', numeric: true, className: (row) => signedClass(row.smallRedemptionTotalAnnualizedYield), render: (row) => formatPercent(row.smallRedemptionTotalAnnualizedYield) },
+    { key: 'price', label: '转债价', numeric: true, render: (row) => formatNumber(row.price) },
+    { key: 'changePercent', label: '涨跌', numeric: true, className: (row) => signedClass(row.changePercent), render: (row) => formatPercent(row.changePercent) },
+    { key: 'stockName', label: '正股', render: (row) => pickText(row.stockName, row.aName) },
+    { key: 'stockPrice', label: '正股价', numeric: true, render: (row) => formatNumber(row.stockPrice) },
+    { key: 'holderCount', label: '持有人数', numeric: true, render: (row) => formatNumber(readHolderCount(row)) },
+    { key: 'remainingSizeYi', label: '剩余规模', numeric: true, render: (row) => formatYiValue(readRemainingSizeYi(row)) },
+    { key: 'smallRedemptionAmount', label: '刚兑金额', numeric: true, render: (row) => formatCurrencyCompact(readSmallRedemptionAmount(row)) },
+    { key: 'smallRedemptionYield', label: '刚兑收益率', numeric: true, className: (row) => signedClass(readSmallRedemptionYield(row)), render: (row) => formatPercent(readSmallRedemptionYield(row)) },
+    { key: 'expectedDurationYears', label: '预期耗时', numeric: true, render: (row) => renderExpectedDuration(row) },
+    { key: 'smallRedemptionAnnualizedYield', label: '刚兑年化', numeric: true, className: (row) => signedClass(readSmallRedemptionAnnualizedYield(row)), render: (row) => formatPercent(readSmallRedemptionAnnualizedYield(row)) },
+    { key: 'smallRedemptionTotal', label: '刚兑总额', numeric: true, render: (row) => formatCurrencyCompact(readSmallRedemptionTotal(row)) },
+    { key: 'liabilityExposureYi', label: '负债敞口', numeric: true, render: (row) => formatYiValue(readLiabilityExposureYi(row)) },
+    { key: 'netAssetYi', label: '净资产', numeric: true, render: (row) => formatYiValue(readNetAssetYi(row)) },
+    { key: 'optionValue', label: '期权价值', numeric: true, render: (row) => formatNumber(readSmallRedemptionOptionValue(row)) },
+    { key: 'optionAnnualizedYield', label: '期权年化', numeric: true, className: (row) => signedClass(readSmallRedemptionOptionAnnualizedYield(row)), render: (row) => formatPercent(readSmallRedemptionOptionAnnualizedYield(row)) },
+    { key: 'totalAnnualizedYield', label: '总年化收益率', numeric: true, className: (row) => signedClass(readSmallRedemptionTotalAnnualizedYield(row)), render: (row) => formatPercent(readSmallRedemptionTotalAnnualizedYield(row)) },
   ];
 }
 
