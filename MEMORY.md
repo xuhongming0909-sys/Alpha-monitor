@@ -16,6 +16,15 @@
 - **Verification**: `npm run ui:build`、全部 `tests/ui_*.test.js`、`npm run check:boundaries`、`node tests/root_cleanliness.test.js`、`node tests/ai_summary_coverage.test.js` 通过
 - **Next**: 推送 GitHub 并部署服务器，确认线上手机端已切到密集行表
 
+### 2026-05-06 | React 改回旧网页端表格风格
+
+- **Decision**: 用户认为密集行表仍然过于复杂，React 内容区改为尽量还原旧网页端的干净清爽表格风格
+- **Action**: 新增 `ui/src/components/SimpleDataTable.jsx`，将转债、AH、AB、LOF、打新、抢权配售、自定义监控切换为简洁模块表格
+- **Action**: 概览由卡片块改回轻量列表样式
+- **Action**: 更新 `specs/spec.md`、`specs/react-terminal-ui.md`、`INDEX.md`、相关 UI 测试
+- **Verification**: `npm run ui:build`、全部 `tests/ui_*.test.js`、`npm run check:boundaries`、`node tests/root_cleanliness.test.js`、`node tests/ai_summary_coverage.test.js` 通过
+- **Next**: 推送 GitHub 并部署服务器，确认线上风格接近原网页端
+
 ### 2026-05-06 | React 手机端统一化重构
 
 - **Decision**: 全设备只保留手机端单列密集 UI；移除 React 上方导航、分红提醒、事件套利、推送设置

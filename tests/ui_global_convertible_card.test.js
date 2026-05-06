@@ -1,4 +1,4 @@
-// AI-SUMMARY: 验证转债套利全局使用密集行表视图，不区分设备
+// AI-SUMMARY: 验证转债套利全局使用简洁表格视图，不区分设备
 // 对应 INDEX.md §9.8 测试索引
 
 const fs = require('fs');
@@ -23,7 +23,7 @@ assert.ok(
   'ConvertibleCardList 不应被 isMobile 条件包裹'
 );
 
-const helper = read('ui/src/components/cardListHelpers.jsx');
-assert.ok(/className="dense-row"/.test(helper), '转债列表公共层应输出 dense-row 行表');
+const table = read('ui/src/components/SimpleDataTable.jsx');
+assert.ok(/dense-table/.test(table), '转债列表公共层应输出简洁表格');
 
-console.log('ui global convertible dense row ok');
+console.log('ui global convertible table ok');

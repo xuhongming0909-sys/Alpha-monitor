@@ -36,10 +36,10 @@ assert.ok(
   '应存在两行底部导航网格样式'
 );
 
-// 行为4：主列表应为密集行表字段流
+// 行为4：主列表应为简洁表格或简洁列表
 assert.ok(
-  /dense-row|row-field|field-label|field-value/.test(css),
-  '应存在密集行表字段流样式'
+  /dense-table|today-item|best-item/.test(css),
+  '应存在简洁表格或简洁列表样式'
 );
 
 console.log('ui mobile overview ok');

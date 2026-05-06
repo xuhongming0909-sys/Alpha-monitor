@@ -193,15 +193,16 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `src/main.jsx` | 入口文件 |
 | `src/styles.css` | 样式 |
 | `src/components/BottomNav.jsx` | 手机端底部导航，负责 7 个顶级标签切换 |
-| `src/components/ConvertibleCardList.jsx` | 转债套利手机密集行表列表 |
-| `src/components/AhCardList.jsx` | AH 溢价手机密集行表列表 |
-| `src/components/AbCardList.jsx` | AB 溢价手机密集行表列表 |
-| `src/components/LofCardList.jsx` | LOF 套利手机密集行表列表 |
-| `src/components/SubscriptionCardList.jsx` | 打新申购手机密集行表列表 |
-| `src/components/RightsIssueCardList.jsx` | 抢权配售手机密集行表列表 |
-| `src/components/MonitorCardList.jsx` | 自定义监控手机密集行表列表 |
-| `src/components/cardHelpers.jsx` | React 手机密集行表公共格式化与展示积木 |
-| `src/components/cardListHelpers.jsx` | React 手机密集行表通用帮助函数 |
+| `src/components/ConvertibleCardList.jsx` | 转债套利简洁模块表格 |
+| `src/components/AhCardList.jsx` | AH 溢价简洁模块表格 |
+| `src/components/AbCardList.jsx` | AB 溢价简洁模块表格 |
+| `src/components/LofCardList.jsx` | LOF 套利简洁模块表格 |
+| `src/components/SubscriptionCardList.jsx` | 打新申购简洁模块表格 |
+| `src/components/RightsIssueCardList.jsx` | 抢权配售简洁模块表格 |
+| `src/components/MonitorCardList.jsx` | 自定义监控简洁模块表格 |
+| `src/components/cardHelpers.jsx` | React 公共格式化与轻量展示积木 |
+| `src/components/cardListHelpers.jsx` | React 历史行壳帮助函数 |
+| `src/components/SimpleDataTable.jsx` | React 简洁模块表格公共组件 |
 | `index.html` | HTML 模板 |
 | `package.json` | Vite + React 依赖 |
 
@@ -378,15 +379,16 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `ui/dashboard/constants.js` | 看板 UI 常量：端点、Tab 序列、表格配置、样式默认值 |
 | `ui/dashboard/dashboard_page.js` | 旧看板页面逻辑：HTML 看板渲染与交互 |
 | `ui/templates/dashboard_template.html` | 旧看板 HTML 模板：含内联 CSS/JS |
-| `ui/src/components/ConvertibleCardList.jsx` | 转债套利手机密集行表视图：一标的一行展示全字段 |
-| `ui/src/components/AhCardList.jsx` | AH 溢价手机密集行表视图：一标的一行展示溢价字段 |
-| `ui/src/components/AbCardList.jsx` | AB 溢价手机密集行表视图：一标的一行展示溢价字段 |
-| `ui/src/components/LofCardList.jsx` | LOF 套利手机密集行表视图：一标的一行展示 LOF 字段 |
-| `ui/src/components/SubscriptionCardList.jsx` | 打新申购手机密集行表视图：一标的一行展示申购日历字段 |
-| `ui/src/components/RightsIssueCardList.jsx` | 抢权配售手机密集行表视图：沪深市场与三阶段切换 |
-| `ui/src/components/MonitorCardList.jsx` | 自定义监控手机密集行表视图：收购方表/目标方表/收益表 |
-| `ui/src/components/cardHelpers.jsx` | 手机端密集行表公共格式化与展示积木 |
-| `ui/src/components/cardListHelpers.jsx` | 手机端密集行表列表通用帮助函数与基础行壳 |
+| `ui/src/components/ConvertibleCardList.jsx` | 转债套利简洁模块表格：尽量还原旧网页端表格风格 |
+| `ui/src/components/AhCardList.jsx` | AH 溢价简洁模块表格：尽量还原旧网页端表格风格 |
+| `ui/src/components/AbCardList.jsx` | AB 溢价简洁模块表格：尽量还原旧网页端表格风格 |
+| `ui/src/components/LofCardList.jsx` | LOF 套利简洁模块表格：尽量还原旧网页端表格风格 |
+| `ui/src/components/SubscriptionCardList.jsx` | 打新申购简洁模块表格：尽量还原旧网页端表格风格 |
+| `ui/src/components/RightsIssueCardList.jsx` | 抢权配售简洁模块表格：沪深市场与三阶段切换 |
+| `ui/src/components/MonitorCardList.jsx` | 自定义监控简洁模块表格：保留编辑删除操作 |
+| `ui/src/components/cardHelpers.jsx` | React 公共格式化与轻量展示积木 |
+| `ui/src/components/cardListHelpers.jsx` | React 历史密集行壳帮助函数 |
+| `ui/src/components/SimpleDataTable.jsx` | React 简洁模块表格公共组件 |
 | `ui/src/components/BottomNav.jsx` | 手机端底部导航栏：固定底部切换 7 个 React 顶级标签 |
 
 ### 9.5 notification/ — 推送与调度层

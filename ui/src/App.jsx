@@ -11,9 +11,7 @@ import SubscriptionCardList from './components/SubscriptionCardList.jsx';
 import RightsIssueCardList from './components/RightsIssueCardList.jsx';
 import MonitorCardList from './components/MonitorCardList.jsx';
 import {
-  DenseCard,
   EmptyState,
-  FieldPair,
   SectionPanel,
   bestYieldValue,
   formatDate,
@@ -303,79 +301,46 @@ function OverviewPage({ resources, onNavigate }) {
     <div className="overview-flow">
       <OverviewSection eyebrow="TODAY" title="今日打新" count={`${sections.todaySubscriptions.length} 项`}>
         {sections.todaySubscriptions.length ? sections.todaySubscriptions.map((row, index) => (
-          <DenseCard
-            key={`${pickText(row.code, row.stockCode, row.bondCode)}-${index}`}
-            title={pickText(row.name, row.stockName, row.bondName)}
-            code={pickText(row.code, row.stockCode, row.bondCode)}
-            subtitle={pickText(row.type)}
-            metricLabel={row.stage}
-            metricValue={formatDate(row.stageDate)}
-            metricClassName={row.stage === '今日申购' ? 'is-up' : row.stage === '今日缴款' ? 'is-down' : 'is-flat'}
-          >
-            <FieldPair label="申购日" value={formatDate(row.subscribeDate)} className="mono" />
-            <FieldPair label="缴款日" value={formatDate(row.paymentDate)} className="mono" />
-            <FieldPair label="上市日" value={formatDate(row.listingDate)} className="mono" />
-            <FieldPair label="申购上限" value={formatNumber(row.subscribeLimit)} className="mono" />
-            <FieldPair label="发行价" value={formatNumber(row.issuePrice)} className="mono" />
-            <FieldPair label="转股价" value={formatNumber(row.convertPrice)} className="mono" />
-          </DenseCard>
+          <div key={`${pickText(row.code, row.stockCode, row.bondCode)}-${index}`} className="today-item">
+            <span className={`today-stage ${row.stage === '今日申购' ? 'is-up' : row.stage === '今日缴款' ? 'is-down' : 'is-flat'}`}>{row.stage}</span>
+            <span className="today-name">{pickText(row.name, row.stockName, row.bondName)} <span className="mono muted">{pickText(row.code, row.stockCode, row.bondCode)}</span></span>
+            <span className="today-type">{pickText(row.type)}</span>
+            <span className="best-metric mono">{formatDate(row.stageDate)}</span>
+            <span className="best-value mono">{formatNumber(row.subscribeLimit)}</span>
+          </div>
         )) : <EmptyState text="今日暂无打新事项" />}
       </OverviewSection>
 
       <OverviewSection eyebrow="RIGHTS ISSUE" title="配售登记" count={`${sections.rightsRows.length} 项`}>
         {sections.rightsRows.length ? sections.rightsRows.map((row, index) => (
-          <DenseCard
-            key={`${row.stockCode || index}`}
-            title={pickText(row.stockName)}
-            code={pickText(row.stockCode)}
-            subtitle={pickText(row.progressName)}
-            metricLabel="两融去皮收益率"
-            metricValue={formatPercent(row.marginPeelReturnRate)}
-            metricClassName={signedClass(row.marginPeelReturnRate)}
-          >
-            <FieldPair label="股权登记日" value={formatDate(row.recordDate)} className="mono" />
-            <FieldPair label="两融收益率" value={formatPercent(row.marginReturnRate)} className={`mono ${signedClass(row.marginReturnRate)}`} />
-            <FieldPair label="预期收益率" value={formatPercent(row.expectedReturnRate)} className={`mono ${signedClass(row.expectedReturnRate)}`} />
-            <FieldPair label="进展状态" value={pickText(row.progressName)} long />
-          </DenseCard>
+          <div key={`${row.stockCode || index}`} className="best-item">
+            <span className="best-name">{pickText(row.stockName)} <span className="mono muted">{pickText(row.stockCode)}</span></span>
+            <span className="best-metric mono">{formatDate(row.recordDate)}</span>
+            <span className="best-metric">{pickText(row.progressName)}</span>
+            <span className={`best-value mono ${signedClass(row.marginPeelReturnRate)}`}>{formatPercent(row.marginPeelReturnRate)}</span>
+          </div>
         )) : <EmptyState text="今日暂无入推送名单的配售登记" />}
       </OverviewSection>
 
       <OverviewSection eyebrow="CB DISCOUNT" title="折价套利" count={`${sections.discountRows.length} 条`}>
         {sections.discountRows.length ? sections.discountRows.map((row, index) => (
-          <DenseCard
-            key={`${row.code || row.bondCode || index}`}
-            title={pickText(row.bondName, row.name)}
-            code={pickText(row.code, row.bondCode)}
-            subtitle={pickText(row.stockName, row.aName)}
-            metricLabel="转股溢价率"
-            metricValue={formatPercent(row.premiumRate)}
-            metricClassName={signedClass(row.premiumRate)}
-          >
-            <FieldPair label="转债价格" value={formatNumber(row.price)} className="mono" />
-            <FieldPair label="正股" value={pickText(row.stockName, row.aName)} />
-            <FieldPair label="正股价格" value={formatNumber(row.stockPrice)} className="mono" />
-            <FieldPair label="转股价值" value={formatNumber(row.convertValue)} className="mono" />
-            <FieldPair label="转股溢价率" value={formatPercent(row.premiumRate)} className={`mono ${signedClass(row.premiumRate)}`} />
-          </DenseCard>
+          <div key={`${row.code || row.bondCode || index}`} className="best-item">
+            <span className="best-name">{pickText(row.bondName, row.name)} <span className="mono muted">{pickText(row.code, row.bondCode)}</span></span>
+            <span className="best-metric">{pickText(row.stockName, row.aName)}</span>
+            <span className="best-metric mono">{formatNumber(row.convertValue)}</span>
+            <span className={`best-value mono ${signedClass(row.premiumRate)}`}>{formatPercent(row.premiumRate)}</span>
+          </div>
         )) : <EmptyState text="暂无折价套利机会" />}
       </OverviewSection>
 
       <OverviewSection eyebrow="SMALL REDEMPTION" title="小额刚兑" count={`${sections.smallRows.length} 条`}>
         {sections.smallRows.length ? sections.smallRows.map((row, index) => (
-          <DenseCard
-            key={`${row.code || row.bondCode || index}`}
-            title={pickText(row.bondName, row.name)}
-            code={pickText(row.code, row.bondCode)}
-            subtitle={pickText(row.stockName)}
-            metricLabel="总年化收益率"
-            metricValue={formatPercent(row.smallRedemptionTotalAnnualizedYield)}
-            metricClassName={signedClass(row.smallRedemptionTotalAnnualizedYield)}
-          >
-            <FieldPair label="刚兑年化" value={formatPercent(row.smallRedemptionAnnualizedYield)} className={`mono ${signedClass(row.smallRedemptionAnnualizedYield)}`} />
-            <FieldPair label="期权年化" value={formatPercent(row.smallRedemptionOptionAnnualizedYield)} className={`mono ${signedClass(row.smallRedemptionOptionAnnualizedYield)}`} />
-            <FieldPair label="总年化收益率" value={formatPercent(row.smallRedemptionTotalAnnualizedYield)} className={`mono ${signedClass(row.smallRedemptionTotalAnnualizedYield)}`} />
-          </DenseCard>
+          <div key={`${row.code || row.bondCode || index}`} className="best-item">
+            <span className="best-name">{pickText(row.bondName, row.name)} <span className="mono muted">{pickText(row.code, row.bondCode)}</span></span>
+            <span className={`best-metric mono ${signedClass(row.smallRedemptionAnnualizedYield)}`}>{formatPercent(row.smallRedemptionAnnualizedYield)}</span>
+            <span className={`best-metric mono ${signedClass(row.smallRedemptionOptionAnnualizedYield)}`}>{formatPercent(row.smallRedemptionOptionAnnualizedYield)}</span>
+            <span className={`best-value mono ${signedClass(row.smallRedemptionTotalAnnualizedYield)}`}>{formatPercent(row.smallRedemptionTotalAnnualizedYield)}</span>
+          </div>
         )) : <EmptyState text="暂无小额刚兑机会" />}
       </OverviewSection>
 
@@ -383,19 +348,12 @@ function OverviewPage({ resources, onNavigate }) {
         {sections.theoreticalRows.length ? sections.theoreticalRows.map((row, index) => {
           const space = theoreticalOpportunity(row);
           return (
-            <DenseCard
-              key={`${row.code || row.bondCode || index}`}
-              title={pickText(row.bondName, row.name)}
-              code={pickText(row.code, row.bondCode)}
-              subtitle={pickText(row.stockName, row.aName)}
-              metricLabel="套利空间"
-              metricValue={space === null ? '--' : `${space.toFixed(2)}%`}
-              metricClassName={signedClass(space)}
-            >
-              <FieldPair label="转债价格" value={formatNumber(row.price)} className="mono" />
-              <FieldPair label="理论价值" value={formatNumber(row.theoreticalPrice)} className="mono" />
-              <FieldPair label="套利空间" value={space === null ? '--' : `${space.toFixed(2)}%`} className={`mono ${signedClass(space)}`} />
-            </DenseCard>
+            <div key={`${row.code || row.bondCode || index}`} className="best-item">
+              <span className="best-name">{pickText(row.bondName, row.name)} <span className="mono muted">{pickText(row.code, row.bondCode)}</span></span>
+              <span className="best-metric mono">{formatNumber(row.price)}</span>
+              <span className="best-metric mono">{formatNumber(row.theoreticalPrice)}</span>
+              <span className={`best-value mono ${signedClass(space)}`}>{space === null ? '--' : `${space.toFixed(2)}%`}</span>
+            </div>
           );
         }) : <EmptyState text="暂无理论套利空间大于 10% 的机会" />}
       </OverviewSection>
@@ -407,20 +365,12 @@ function OverviewPage({ resources, onNavigate }) {
         {sections.monitorRows.length ? sections.monitorRows.map((row, index) => {
           const bestYield = bestYieldValue(row);
           return (
-            <DenseCard
-              key={`${row.id || index}`}
-              title="自定义"
-              code={`${pickText(row.acquirerName)} → ${pickText(row.targetName)}`}
-              subtitle={pickText(row.name, row.note)}
-              metricLabel="最优收益率"
-              metricValue={bestYield === -Infinity ? '--' : `${bestYield.toFixed(3)}%`}
-              metricClassName={signedClass(bestYield === -Infinity ? null : bestYield)}
-            >
-              <FieldPair label="目标现价" value={formatNumber(row.targetPrice)} className="mono" />
-              <FieldPair label="换股收益率" value={formatPercent(row.stockYieldRate)} className={`mono ${signedClass(row.stockYieldRate)}`} />
-              <FieldPair label="现金收益率" value={formatPercent(row.cashYieldRate)} className={`mono ${signedClass(row.cashYieldRate)}`} />
-              <FieldPair label="最优收益率" value={bestYield === -Infinity ? '--' : `${bestYield.toFixed(3)}%`} className={`mono ${signedClass(bestYield === -Infinity ? null : bestYield)}`} />
-            </DenseCard>
+            <div key={`${row.id || index}`} className="best-item">
+              <span className="best-name">{pickText(row.acquirerName)} → {pickText(row.targetName)}</span>
+              <span className={`best-metric mono ${signedClass(row.stockYieldRate)}`}>{formatPercent(row.stockYieldRate)}</span>
+              <span className={`best-metric mono ${signedClass(row.cashYieldRate)}`}>{formatPercent(row.cashYieldRate)}</span>
+              <span className={`best-value mono ${signedClass(bestYield === -Infinity ? null : bestYield)}`}>{bestYield === -Infinity ? '--' : `${bestYield.toFixed(3)}%`}</span>
+            </div>
           );
         }) : <EmptyState text="暂无最优收益率大于 30% 的自定义机会" />}
       </OverviewSection>
@@ -437,16 +387,11 @@ function PremiumOverview({ title, rows, peerCodeKey, onClick }) {
   return (
     <OverviewSection eyebrow="PREMIUM" title={title} count={`${items.length} 条`}>
       {items.length ? items.map(({ row, tag }, index) => (
-        <DenseCard
-          key={`${title}-${row.aCode || row.code || index}`}
-          title={pickText(row.aName, row.name)}
-          code={`${pickText(row.aCode, row.code)} / ${pickText(row[peerCodeKey])}`}
-          subtitle={tag}
-          metricLabel="溢价率"
-          metricValue={formatPercent(row.premium)}
-          metricClassName={signedClass(row.premium)}
-          footer={<button type="button" className="tab-button" onClick={onClick}>查看全部</button>}
-        />
+        <div key={`${title}-${row.aCode || row.code || index}`} className="best-item" onClick={onClick}>
+          <span className="best-rank">{tag}</span>
+          <span className="best-name">{pickText(row.aName, row.name)} <span className="mono muted">{pickText(row.aCode, row.code)} / {pickText(row[peerCodeKey])}</span></span>
+          <span className={`best-value mono ${signedClass(row.premium)}`}>{formatPercent(row.premium)}</span>
+        </div>
       )) : <EmptyState text={`${title} 暂无数据`} />}
     </OverviewSection>
   );
