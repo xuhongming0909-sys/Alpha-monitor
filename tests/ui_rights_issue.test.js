@@ -17,8 +17,8 @@ assert.ok(/subTab.*===.*'rights'|tab-button.*抢权配售/.test(app), 'App shoul
 // ConvertiblePage接收rightsIssueData参数
 assert.ok(/ConvertiblePage.*rightsIssueData|rightsIssueData.*ConvertiblePage/.test(app), 'ConvertiblePage should receive rightsIssueData prop');
 
-// 抢权配售卡片渲染逻辑存在
-assert.ok(/RightsIssueCardList|renderRightsIssueCards/.test(app), 'App should have 抢权配售 card render function');
+// 抢权配售密集行表渲染逻辑存在
+assert.ok(/RightsIssueCardList|renderRightsIssueCards/.test(app), 'App should have 抢权配售 dense row render function');
 
 // 抢权配售市场子Tab存在
 assert.ok(/riMarket.*sh.*sz|setRiMarket/.test(rights), 'App should have market sub-tab (sh/sz) for 抢权配售');

@@ -1,4 +1,4 @@
-// AI-SUMMARY: AH溢价手机端密集全字段卡片列表
+// AI-SUMMARY: AH溢价手机端密集全字段行表列表
 // 对应 INDEX.md §9.3 文件摘要索引
 
 import React from 'react';

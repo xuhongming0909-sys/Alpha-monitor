@@ -1,4 +1,4 @@
-// AI-SUMMARY: 抢权配售密集卡片列表与市场/阶段切换
+// AI-SUMMARY: 抢权配售密集行表列表与市场/阶段切换
 // 对应 INDEX.md §9.3 文件摘要索引
 
 import React from 'react';

@@ -1,4 +1,4 @@
-// AI-SUMMARY: 打新申购密集卡片列表
+// AI-SUMMARY: 打新申购密集行表列表
 // 对应 INDEX.md §9.3 文件摘要索引
 
 import React from 'react';

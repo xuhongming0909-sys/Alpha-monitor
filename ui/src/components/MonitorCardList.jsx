@@ -1,4 +1,4 @@
-// AI-SUMMARY: 自定义监控密集卡片列表与三表明细
+// AI-SUMMARY: 自定义监控密集行表列表与三表明细
 // 对应 INDEX.md §9.3 文件摘要索引
 
 import React from 'react';
@@ -55,7 +55,7 @@ function MonitorCard({ row, onEdit, onDelete, saving }) {
       <FieldPair label="现金收益率" value={formatPercent(row.cashYieldRate)} className={`mono ${signedClass(row.cashYieldRate)}`} />
       <FieldPair label="最优收益率" value={bestYield === -Infinity ? '--' : `${bestYield.toFixed(3)}%`} className={`mono ${signedClass(bestYield === -Infinity ? null : bestYield)}`} />
       <FieldPair label="备注" value={pickText(row.note)} long />
-      <div className="card-field card-field-long">
+      <div className="row-field row-field-long">
         <InfoTable
           title="收购方表"
           rows={[
@@ -67,7 +67,7 @@ function MonitorCard({ row, onEdit, onDelete, saving }) {
           ]}
         />
       </div>
-      <div className="card-field card-field-long">
+      <div className="row-field row-field-long">
         <InfoTable
           title="目标方表"
           rows={[
@@ -79,7 +79,7 @@ function MonitorCard({ row, onEdit, onDelete, saving }) {
           ]}
         />
       </div>
-      <div className="card-field card-field-long">
+      <div className="row-field row-field-long">
         <InfoTable
           title="收益表"
           rows={[

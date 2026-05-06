@@ -7,6 +7,15 @@
 
 ## Entries
 
+### 2026-05-06 | React 手机端改回密集行表
+
+- **Decision**: 用户不接受大卡片，React 主展示形态从卡片流改为密集行表；保留 7 标签和统一手机端导航
+- **Action**: 更新 `specs/spec.md`、`specs/react-terminal-ui.md`、`specs/custom-monitor.md`，正式口径改为“一标的一行，横向字段流，窄屏可横向滚动”
+- **Action**: 改造 `cardHelpers.jsx`、`cardListHelpers.jsx`、`styles.css`，把公共壳从 `dense-card` 调整为 `dense-row`
+- **Action**: 同步更新 `INDEX.md` 与 UI 测试断言
+- **Verification**: `npm run ui:build`、全部 `tests/ui_*.test.js`、`npm run check:boundaries`、`node tests/root_cleanliness.test.js`、`node tests/ai_summary_coverage.test.js` 通过
+- **Next**: 推送 GitHub 并部署服务器，确认线上手机端已切到密集行表
+
 ### 2026-05-06 | React 手机端统一化重构
 
 - **Decision**: 全设备只保留手机端单列密集 UI；移除 React 上方导航、分红提醒、事件套利、推送设置

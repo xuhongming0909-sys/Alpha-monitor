@@ -1,4 +1,4 @@
-// AI-SUMMARY: 手机端密集卡片列表通用帮助函数与基础卡片壳
+// AI-SUMMARY: 手机端密集行表列表通用帮助函数与基础行壳
 // 对应 INDEX.md §9.3 文件摘要索引
 
 import React from 'react';
@@ -101,13 +101,9 @@ function renderMetaValue(field, row) {
   const tone = resolveTone(field.tone || field.type, rawValue, row);
 
   return (
-    <div key={field.id || String(field.key)} style={{ minWidth: 0 }}>
-      <div style={{ fontSize: '10px', color: 'var(--terminal-faint)', marginBottom: '2px' }}>
-        {resolveLabel(field, row)}
-      </div>
-      <div className={tone ? `mono ${tone}` : 'mono'} style={{ fontSize: '13px', fontWeight: 700, lineHeight: 1.35, whiteSpace: 'pre-line', wordBreak: 'break-all' }}>
-        {value}
-      </div>
+    <div key={field.id || String(field.key)} className="row-field row-field-meta">
+      <span className="field-label">{resolveLabel(field, row)}</span>
+      <span className={`field-value mono ${tone}`.trim()}>{value}</span>
     </div>
   );
 }
@@ -119,21 +115,9 @@ function renderFieldRow(field, row) {
   const tone = resolveTone(field.tone || field.type, rawValue, row);
 
   return (
-    <div
-      key={field.id || String(field.key)}
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '88px 1fr',
-        gap: '8px',
-        alignItems: 'start',
-        padding: '5px 0',
-        borderBottom: '1px solid rgba(255,255,255,0.04)',
-      }}
-    >
-      <span style={{ fontSize: '11px', color: 'var(--terminal-faint)', lineHeight: 1.5 }}>{label}</span>
-      <span className={tone ? `mono ${tone}` : 'mono'} style={{ fontSize: '12px', lineHeight: 1.5, whiteSpace: 'pre-line', wordBreak: 'break-all' }}>
-        {value}
-      </span>
+    <div key={field.id || String(field.key)} className="row-field">
+      <span className="field-label">{label}</span>
+      <span className={`field-value mono ${tone}`.trim()}>{value}</span>
     </div>
   );
 }
@@ -161,23 +145,18 @@ export function DenseCardList({
         </div>
         <span className="panel-count">{filtered.length} 条</span>
       </div>
-      <div style={{ maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' }}>
+      <div className="dense-row-list">
         {filtered.length ? filtered.map((row, index) => (
-          <article
-            key={typeof getKey === 'function' ? getKey(row, index) : index}
-            style={{
-              padding: '12px',
-              borderBottom: '1px solid var(--terminal-line-soft)',
-              background: 'var(--terminal-panel)',
-            }}
-          >
-            {renderHeader(row, index)}
-            {metaFields.length ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px', marginBottom: '8px' }}>
-                {metaFields.map((field) => renderMetaValue(field, row))}
-              </div>
-            ) : null}
-            <div style={{ borderTop: '1px solid var(--terminal-line-soft)' }}>
+          <article key={typeof getKey === 'function' ? getKey(row, index) : index} className="dense-row">
+            <div className="dense-row-main">
+              {renderHeader(row, index)}
+              {metaFields.length ? (
+                <div className="dense-row-meta">
+                  {metaFields.map((field) => renderMetaValue(field, row))}
+                </div>
+              ) : null}
+            </div>
+            <div className="dense-row-fields">
               {fieldGroups.flatMap((group) => {
                 const items = typeof group.when === 'function' && !group.when(row) ? [] : group.fields;
                 return items.map((field) => renderFieldRow(field, row));

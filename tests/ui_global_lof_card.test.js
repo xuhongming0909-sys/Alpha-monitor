@@ -1,4 +1,4 @@
-// AI-SUMMARY: 验证 LOF 套利全局使用卡片视图
+// AI-SUMMARY: 验证 LOF 套利全局使用密集行表视图
 // 对应 INDEX.md §9.8 测试索引
 
 const fs = require('fs');

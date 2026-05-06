@@ -1,4 +1,4 @@
-// AI-SUMMARY: React 手机端卡片视图公共格式化与展示积木
+// AI-SUMMARY: React 手机端密集行表公共格式化与展示积木
 // 对应 INDEX.md §9.3 文件摘要索引
 
 import React from 'react';
@@ -81,48 +81,31 @@ export function SectionPanel({ eyebrow, title, count, children, className = '' }
 
 export function DenseCard({ title, code, metricLabel, metricValue, metricClassName = '', subtitle, children, footer }) {
   return (
-    <article
-      className="dense-card"
-      style={{
-        padding: '12px',
-        borderBottom: '1px solid var(--terminal-line-soft)',
-        background: 'var(--terminal-panel)',
-      }}
-    >
-      <div className="dense-card-head" style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '8px' }}>
-        <div className="dense-card-title-wrap" style={{ minWidth: 0 }}>
-          <div className="dense-card-title" style={{ fontSize: '15px', fontWeight: 700, lineHeight: 1.3 }}>{title}</div>
-          <div className="dense-card-code mono" style={{ fontSize: '12px', color: 'var(--terminal-muted)', marginTop: '2px', wordBreak: 'break-all' }}>{code}</div>
-          {subtitle ? <div className="dense-card-subtitle" style={{ fontSize: '11px', color: 'var(--terminal-faint)', marginTop: '2px', wordBreak: 'break-all' }}>{subtitle}</div> : null}
+    <article className="dense-row">
+      <div className="dense-row-main">
+        <div className="dense-row-id">
+          <div className="dense-row-title">{title}</div>
+          <div className="dense-row-code mono">{code}</div>
+          {subtitle ? <div className="dense-row-subtitle">{subtitle}</div> : null}
         </div>
         {metricLabel ? (
-          <div className="dense-card-metric" style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div className="dense-card-metric-label" style={{ fontSize: '11px', color: 'var(--terminal-faint)' }}>{metricLabel}</div>
-            <div className={`dense-card-metric-value mono ${metricClassName}`.trim()} style={{ fontSize: '16px', fontWeight: 700, marginTop: '2px' }}>{metricValue}</div>
+          <div className="dense-row-metric">
+            <div className="dense-row-metric-label">{metricLabel}</div>
+            <div className={`dense-row-metric-value mono ${metricClassName}`.trim()}>{metricValue}</div>
           </div>
         ) : null}
       </div>
-      <div className="dense-card-fields" style={{ borderTop: '1px solid var(--terminal-line-soft)' }}>{children}</div>
-      {footer ? <div className="dense-card-footer" style={{ paddingTop: '8px', marginTop: '4px' }}>{footer}</div> : null}
+      <div className="dense-row-fields">{children}</div>
+      {footer ? <div className="dense-row-footer">{footer}</div> : null}
     </article>
   );
 }
 
 export function FieldPair({ label, value, className = '', long = false }) {
   return (
-    <div
-      className={`card-field ${long ? 'card-field-long' : ''}`.trim()}
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '88px 1fr',
-        gap: '8px',
-        alignItems: 'start',
-        padding: '5px 0',
-        borderBottom: '1px solid rgba(255,255,255,0.04)',
-      }}
-    >
-      <span className="field-label" style={{ fontSize: '11px', color: 'var(--terminal-faint)', lineHeight: 1.5 }}>{label}</span>
-      <span className={`field-value ${className}`.trim()} style={{ fontSize: '12px', lineHeight: 1.5, whiteSpace: 'pre-line', wordBreak: 'break-all' }}>{value}</span>
+    <div className={`row-field ${long ? 'row-field-long' : ''}`.trim()}>
+      <span className="field-label">{label}</span>
+      <span className={`field-value ${className}`.trim()}>{value}</span>
     </div>
   );
 }

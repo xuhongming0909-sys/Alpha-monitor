@@ -36,10 +36,10 @@ assert.ok(
   '应存在两行底部导航网格样式'
 );
 
-// 行为4：卡片应为密集单列字段流
+// 行为4：主列表应为密集行表字段流
 assert.ok(
-  /card-field|detail-grid|field-label|field-value/.test(css),
-  '应存在密集卡片字段流样式'
+  /dense-row|row-field|field-label|field-value/.test(css),
+  '应存在密集行表字段流样式'
 );
 
 console.log('ui mobile overview ok');

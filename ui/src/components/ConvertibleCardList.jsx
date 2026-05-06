@@ -1,4 +1,4 @@
-// AI-SUMMARY: 转债套利手机端密集卡片列表，支持多字段组和多场景渲染
+// AI-SUMMARY: 转债套利手机端密集行表列表，支持多字段组和多场景渲染
 // 对应 INDEX.md §9.3 文件摘要索引
 
 import React from 'react';
