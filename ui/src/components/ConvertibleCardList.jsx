@@ -10,6 +10,11 @@ function formatRatioPercent(value) {
   return number === null ? '--' : `${(number * 100).toFixed(2)}%`;
 }
 
+function formatRateAsPercent(value) {
+  const number = toNumber(value);
+  return number === null ? '--' : formatPercent(number * 100);
+}
+
 function getConvertibleStatus(row) {
   const today = new Date().toISOString().slice(0, 10);
   if (row.isUnlisted || (row.delistDate && row.delistDate <= today)) return '已退市';
@@ -147,18 +152,18 @@ function smallColumns() {
     { key: 'changePercent', label: '涨跌', numeric: true, className: (row) => signedClass(row.changePercent), render: (row) => formatPercent(row.changePercent) },
     { key: 'stockName', label: '正股', render: (row) => pickText(row.stockName, row.aName) },
     { key: 'stockPrice', label: '正股价', numeric: true, render: (row) => formatNumber(row.stockPrice) },
-    { key: 'holderCount', label: '持有人数', numeric: true, render: (row) => formatNumber(readHolderCount(row)) },
-    { key: 'remainingSizeYi', label: '剩余规模', numeric: true, render: (row) => formatYiValue(readRemainingSizeYi(row)) },
-    { key: 'smallRedemptionAmount', label: '刚兑金额', numeric: true, render: (row) => formatCurrencyCompact(readSmallRedemptionAmount(row)) },
-    { key: 'smallRedemptionYield', label: '刚兑收益率', numeric: true, className: (row) => signedClass(readSmallRedemptionYield(row)), render: (row) => formatPercent(readSmallRedemptionYield(row)) },
-    { key: 'expectedDurationYears', label: '预期耗时', numeric: true, render: (row) => renderExpectedDuration(row) },
-    { key: 'smallRedemptionAnnualizedYield', label: '刚兑年化', numeric: true, className: (row) => signedClass(readSmallRedemptionAnnualizedYield(row)), render: (row) => formatPercent(readSmallRedemptionAnnualizedYield(row)) },
-    { key: 'smallRedemptionTotal', label: '刚兑总额', numeric: true, render: (row) => formatCurrencyCompact(readSmallRedemptionTotal(row)) },
-    { key: 'liabilityExposureYi', label: '负债敞口', numeric: true, render: (row) => formatYiValue(readLiabilityExposureYi(row)) },
-    { key: 'netAssetYi', label: '净资产', numeric: true, render: (row) => formatYiValue(readNetAssetYi(row)) },
-    { key: 'optionValue', label: '期权价值', numeric: true, render: (row) => formatNumber(readSmallRedemptionOptionValue(row)) },
-    { key: 'optionAnnualizedYield', label: '期权年化', numeric: true, className: (row) => signedClass(readSmallRedemptionOptionAnnualizedYield(row)), render: (row) => formatPercent(readSmallRedemptionOptionAnnualizedYield(row)) },
-    { key: 'totalAnnualizedYield', label: '总年化收益率', numeric: true, className: (row) => signedClass(readSmallRedemptionTotalAnnualizedYield(row)), render: (row) => formatPercent(readSmallRedemptionTotalAnnualizedYield(row)) },
+    { key: 'holderCount', label: '持有人数', numeric: true, sortValue: (row) => readHolderCount(row), render: (row) => formatNumber(readHolderCount(row)) },
+    { key: 'remainingSizeYi', label: '剩余规模', numeric: true, sortValue: (row) => readRemainingSizeYi(row), render: (row) => formatYiValue(readRemainingSizeYi(row)) },
+    { key: 'smallRedemptionAmount', label: '刚兑金额', numeric: true, sortValue: (row) => readSmallRedemptionAmount(row), render: (row) => formatCurrencyCompact(readSmallRedemptionAmount(row)) },
+    { key: 'smallRedemptionYield', label: '刚兑收益率', numeric: true, className: (row) => signedClass(readSmallRedemptionYield(row)), sortValue: (row) => readSmallRedemptionYield(row), render: (row) => formatRateAsPercent(readSmallRedemptionYield(row)) },
+    { key: 'expectedDurationYears', label: '预期耗时', numeric: true, sortValue: (row) => readSmallRedemptionExpectedYears(row), render: (row) => renderExpectedDuration(row) },
+    { key: 'smallRedemptionAnnualizedYield', label: '刚兑年化', numeric: true, className: (row) => signedClass(readSmallRedemptionAnnualizedYield(row)), sortValue: (row) => readSmallRedemptionAnnualizedYield(row), render: (row) => formatRateAsPercent(readSmallRedemptionAnnualizedYield(row)) },
+    { key: 'smallRedemptionTotal', label: '刚兑总额', numeric: true, sortValue: (row) => readSmallRedemptionTotal(row), render: (row) => formatCurrencyCompact(readSmallRedemptionTotal(row)) },
+    { key: 'liabilityExposureYi', label: '负债敞口', numeric: true, sortValue: (row) => readLiabilityExposureYi(row), render: (row) => formatYiValue(readLiabilityExposureYi(row)) },
+    { key: 'netAssetYi', label: '净资产', numeric: true, sortValue: (row) => readNetAssetYi(row), render: (row) => formatYiValue(readNetAssetYi(row)) },
+    { key: 'optionValue', label: '期权价值', numeric: true, sortValue: (row) => readSmallRedemptionOptionValue(row), render: (row) => formatNumber(readSmallRedemptionOptionValue(row)) },
+    { key: 'optionAnnualizedYield', label: '期权年化', numeric: true, className: (row) => signedClass(readSmallRedemptionOptionAnnualizedYield(row)), sortValue: (row) => readSmallRedemptionOptionAnnualizedYield(row), render: (row) => formatRateAsPercent(readSmallRedemptionOptionAnnualizedYield(row)) },
+    { key: 'totalAnnualizedYield', label: '总年化收益率', numeric: true, className: (row) => signedClass(readSmallRedemptionTotalAnnualizedYield(row)), sortValue: (row) => readSmallRedemptionTotalAnnualizedYield(row), render: (row) => formatRateAsPercent(readSmallRedemptionTotalAnnualizedYield(row)) },
   ];
 }
 
