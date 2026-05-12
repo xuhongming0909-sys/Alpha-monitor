@@ -945,7 +945,7 @@ def _extract_holder_count_from_pdf_bytes(pdf_bytes: bytes) -> Optional[int]:
             for element in layout:
                 if isinstance(element, LTTextContainer):
                     page_text_parts.append(element.get_text())
-            page_text = "".join(page_text_parts)
+            page_text = " ".join(page_text_parts)
             if not page_text:
                 continue
             candidate_text = f"{rolling_text}\n{page_text}"
