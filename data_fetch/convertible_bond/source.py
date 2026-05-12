@@ -991,7 +991,6 @@ def _extract_holder_count_from_pdf_bytes(pdf_bytes: bytes) -> Optional[int]:
     return _extract_holder_count_from_report_text(_extract_text_from_pdf_bytes(pdf_bytes))
 
 
-@lru_cache(maxsize=256)
 def _extract_holder_count_from_cninfo_pdf(report_url: str) -> Optional[int]:
     url = str(report_url or "").strip()
     if not url:
