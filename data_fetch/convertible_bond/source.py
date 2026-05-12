@@ -865,7 +865,7 @@ def _fetch_cninfo_regular_report_url(stock_code: str, period: str) -> Optional[s
 
 
 def _normalize_report_text(text: str) -> str:
-    return re.sub(r"\s+", "", str(text or ""))
+    return re.sub(r"\s+", " ", str(text or "")).strip()
 
 
 def _extract_integer_from_text(text: str) -> Optional[int]:
