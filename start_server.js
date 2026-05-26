@@ -2099,7 +2099,7 @@ async function runPushSchedulerCycle(context = 'tick') {
     await weComScheduler.runTick();
     await cbArbitragePushService.runIfNeeded();
     await cbRightsIssuePushService.runIfNeeded();
-    await lofIopvPushService.runIfNeeded();
+    await lofArbPushService.runIfNeeded();
     updateHealthSection('push_scheduler', 'ok', 'Push scheduler is healthy', details);
   } catch (error) {
     updateHealthSection('push_scheduler', 'warn', `Push scheduler degraded: ${error?.message || error}`, {
