@@ -12,7 +12,28 @@ from shared.market_service import get_fx_rates
 from shared.models.service_result import build_success
 from shared.time.shanghai_time import now_iso
 
+import os as _os
+import json as _json
+
 from strategy.lof_iopv.classifier import get_calc_mode
+
+# 加载回test结果
+_BACKTEST_DIR = _os.path.join(_os.path.dirname(__file__), "..", "..", "runtime_data", "backtest")
+_BACKTEST_RESULTS = {}
+for _fname in ("a_results.json", "b_results.json"):
+    _fpath = _os.path.join(_BACKTEST_DIR, _fname)
+    if _os.path.exists(_fpath):
+        try:
+            with open(_fpath, "r") as _f:
+                _data = _json.load(_f)
+                if isinstance(_data, list):
+                    for _r in _data:
+                        if _r.get("code"):
+                            _BACKTEST_RESULTS[_r["code"]] = _r
+                elif isinstance(_data, dict):
+                    _BACKTEST_RESULTS.update(_data)
+        except Exception:
+            pass
 
 
 def _to_float(v: Any) -> Optional[float]:
