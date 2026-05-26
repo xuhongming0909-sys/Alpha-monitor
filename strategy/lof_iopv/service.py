@@ -124,6 +124,27 @@ def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
         price = _to_float(row.get("price"))
         premium = round((price / iopv - 1) * 100, 2) if (iopv and price and price > 0 and iopv > 0) else None
 
+        # 估值方法
+        calc_method = "指数跟踪法" if est == "A" else "T10持仓法"
+        # 仓位: A类反推, B类实际
+        stock_pos = row.get("stockPosition")
+        if est == "A" and iopv and row.get("nav") and row["nav"] > 0:
+            # A类反推仓位: (IOPV/NAV - 1) / etf_ret
+            stock_pos = round((iopv / row["nav"] - 1) * 100, 2) if iopv != row["nav"] else None
+        # 溢价状态
+        if premium is not None:
+            premium_status = "溢价" if premium > 0.5 else ("折价" if premium < -0.5 else "平价")
+        else:
+            premium_status = None
+        # 基准指数
+        benchmark = row.get("etf") or f"Top10({len(row.get('holdings', []) or [])})"
+
+        # 申购状态+限额
+        apply_status = row.get("applyStatus") or ""
+        min_amt = row.get("minAmt")
+        if min_amt:
+            apply_status = f"{apply_status}(限额{min_amt}万)"
+
         result.append({
             "code": row.get("code"),
             "name": row.get("name"),
@@ -134,18 +155,15 @@ def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
             "iopv": iopv,
             "premiumRate": premium,
             "applyFee": row.get("applyFee"),
-            "applyStatus": row.get("applyStatus"),
+            "applyStatus": apply_status,
             "redeemFee": row.get("redeemFee"),
-            "redeemStatus": row.get("redeemStatus"),
             "custodianFee": row.get("custodianFee"),
             "fundCompany": row.get("fundCompany"),
-            "calcMode": get_calc_mode(est),
+            "calcMethod": calc_method,
             "calcStatus": status,
-            "stockPosition": row.get("stockPosition"),
-            "holdings": row.get("holdings"),
-            "backtest": {"r2": None, "mae": None, "maxErr": None, "samplePeriod": None},
-            "currentFxRate": fx_now,
-            "fxRatio": details.get("fxRatio") if isinstance(details, dict) else None,
+            "stockPosition": stock_pos,
+            "benchmark": benchmark,
+            "premiumStatus": premium_status,
         })
 
     for r in result:

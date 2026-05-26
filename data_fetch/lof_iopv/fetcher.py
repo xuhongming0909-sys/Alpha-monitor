@@ -119,6 +119,28 @@ def _fetch_holdings(code: str) -> List[dict]:
         return []
 
 
+def _fetch_jisilu_qdii() -> dict:
+    """从集思录获取QDII限额数据。返回 {code: {min_amt, apply_status, ...}}。"""
+    result = {}
+    try:
+        url = "https://www.jisilu.cn/data/qdii/qdii_list/A"
+        text = SESSION.get(url, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
+        import re as _re
+        m = _re.search(r'"rows"\s*:\s*(\[.*?\])', text, _re.DOTALL)
+        if m:
+            rows = _json.loads(m.group(1))
+            for row in rows:
+                cell = row.get("cell", row)
+                code = str(cell.get("fund_id", ""))
+                if code:
+                    result[code] = {
+                        "min_amt": cell.get("min_amt"),
+                        "apply_redeem_status": cell.get("apply_redeem_status", ""),
+                    }
+    except Exception:
+        pass
+    return result
+
 def _fetch_fund_info(code: str) -> dict:
     """东财基金档案页：费用/公司/状态。"""
     url = f"https://fundf10.eastmoney.com/jbgk_{code}.html"
@@ -177,6 +199,9 @@ def fetch_lof_iopv_snapshot() -> dict:
     except Exception:
         fx_rates = {}
 
+    # 从集思录获取限额数据
+    jisilu_data = _fetch_jisilu_qdii()
+
     all_rows = []
     for fund in QDII_FUNDS:
         code = fund["code"]
@@ -222,6 +247,7 @@ def fetch_lof_iopv_snapshot() -> dict:
             "currentFxRate": fx_rates.get(fund["currency"], 1.0),
             "applyFee": fund_info.get("applyFee"),
             "applyStatus": fund_info.get("applyStatus"),
+            "minAmt": jisilu_data.get(code, {}).get("min_amt"),
             "redeemFee": fund_info.get("redeemFee"),
             "redeemStatus": fund_info.get("redeemStatus"),
             "custodianFee": fund_info.get("custodianFee"),

@@ -8,21 +8,29 @@ function formatFee(value) {
   return n === null ? '--' : `${n}%`;
 }
 
-function formatHoldingsSummary(holdings) {
-  if (!Array.isArray(holdings) || holdings.length === 0) return '--';
-  const names = holdings.slice(0, 3).map(h => h.name).join(',');
-  return holdings.length > 3 ? `${names}...${holdings.length}只` : `${names}(${holdings.length})`;
+function formatStockPosition(row) {
+  const v = toNumber(row.stockPosition);
+  if (v === null) return '--';
+  const method = row.calcMethod || '';
+  return method.includes('指数') ? `反推${v.toFixed(1)}%` : `${v.toFixed(1)}%`;
+}
+
+function formatPremiumStatus(row) {
+  const ps = row.premiumStatus;
+  if (!ps) return '--';
+  const cls = ps === '溢价' ? 'positive' : ps === '折价' ? 'negative' : '';
+  return <span className={cls}>{ps}</span>;
 }
 
 export default function LofCardList({ rows = [], searchQuery = '' }) {
   const filtered = rows.filter((row) =>
-    rowMatchesQuery(row, searchQuery, ['name', 'code', 'fundCompany', 'calcMode'])
+    rowMatchesQuery(row, searchQuery, ['name', 'code', 'fundCompany', 'calcMethod'])
   );
   const sorted = [...filtered].sort(
     (a, b) => Math.abs(toNumber(b.premiumRate) ?? 0) - Math.abs(toNumber(a.premiumRate) ?? 0)
   );
 
-  // 18字段严格对齐spec
+  // 18字段
   const columns = [
     { key: 'code', label: '代码', render: (row) => <span className="mono">{pickText(row.code)}</span> },
     { key: 'name', label: '名称', render: (row) => pickText(row.name) },
@@ -35,22 +43,19 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
     { key: 'applyFee', label: '申购费', numeric: true, render: (row) => formatFee(row.applyFee) },
     { key: 'applyStatus', label: '申购状态', render: (row) => pickText(row.applyStatus) },
     { key: 'redeemFee', label: '赎回费', numeric: true, render: (row) => formatFee(row.redeemFee) },
-    { key: 'redeemStatus', label: '赎回状态', render: (row) => pickText(row.redeemStatus) },
     { key: 'custodianFee', label: '托管费', numeric: true, render: (row) => formatFee(row.custodianFee) },
     { key: 'fundCompany', label: '基金公司', render: (row) => pickText(row.fundCompany) },
-    { key: 'calcMode', label: '估值核心', render: (row) => pickText(row.calcMode) },
+    { key: 'calcMethod', label: '估值方法', render: (row) => pickText(row.calcMethod) },
     { key: 'calcStatus', label: '估值状态', render: (row) => <span className="muted">{pickText(row.calcStatus)}</span> },
-    { key: 'stockPosition', label: '动态仓位', numeric: true, render: (row) => {
-      const v = toNumber(row.stockPosition);
-      return v === null ? '--' : `${v}%`;
-    }},
-    { key: 'holdings', label: '持仓明细', render: (row) => formatHoldingsSummary(row.holdings) },
+    { key: 'stockPosition', label: '仓位', numeric: true, render: (row) => formatStockPosition(row) },
+    { key: 'benchmark', label: '基准指数', render: (row) => pickText(row.benchmark) },
+    { key: 'premiumStatus', label: '溢价状态', render: (row) => formatPremiumStatus(row) },
   ];
 
   return (
     <SimpleDataTable
       eyebrow="LOF IOPV"
-      title="QDII LOF 估值 (18字段)"
+      title="QDII LOF 估值"
       count={`${sorted.length} 条`}
       columns={columns}
       rows={sorted}
