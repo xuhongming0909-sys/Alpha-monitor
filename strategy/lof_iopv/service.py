@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""QDII LOF IOPV 双引擎估值。A类指数法 + B类T10持仓法。"""
+"""QDII LOF IOPV 双引擎估值。A类指数跟踪法 + B类T10持仓加权法。"""
 
 from __future__ import annotations
 
