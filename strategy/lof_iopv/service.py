@@ -223,7 +223,7 @@ def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
             "stockPosition": row.get("stockPosition"),
             "indexName": row.get("indexName"),
             "indexIncreaseRate": row.get("indexIncreaseRate"),
-            "holdings": details.get("holdings") if isinstance(details, dict) else None,
+            "holdings": row.get("holdings"),
             "backtest": {"r2": None, "mae": None, "maxErr": None, "samplePeriod": None},
             "currentFxRate": fx_now,
             "fxRatio": details.get("fxRatio") if isinstance(details, dict) else None,
