@@ -194,10 +194,10 @@ def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
             "fundCompany": row.get("fundCompany"),
             "calcCore": calc_core,
             "stockPosition": stock_pos,
-            "r2": _BACKTEST_RESULTS.get(code, {}).get("r2"),
-            "mae": _BACKTEST_RESULTS.get(code, {}).get("mae"),
-            "maxErr": _BACKTEST_RESULTS.get(code, {}).get("maxErr"),
-            "samplePeriod": _BACKTEST_RESULTS.get(code, {}).get("samplePeriod"),
+            "r2": _BACKTEST_RESULTS.get(row.get("code"), {}).get("r2"),
+            "mae": _BACKTEST_RESULTS.get(row.get("code"), {}).get("mae"),
+            "maxErr": _BACKTEST_RESULTS.get(row.get("code"), {}).get("maxErr"),
+            "samplePeriod": _BACKTEST_RESULTS.get(row.get("code"), {}).get("samplePeriod"),
         })
 
     for r in result:
