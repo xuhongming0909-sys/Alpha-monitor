@@ -1,4 +1,4 @@
-# AI-SUMMARY: CLI 数据调度器：根据 action 调用对应 data_fetch 抓取和 strategy 计算
+﻿# AI-SUMMARY: CLI 数据调度器：根据 action 调用对应 data_fetch 抓取和 strategy 计算
 # 对应 INDEX.md §9 文件摘要索引
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ from data_fetch.event_arbitrage.fetcher import fetch_event_arbitrage_snapshot
 from data_fetch.event_arbitrage.normalizer import normalize_event_arbitrage_snapshot
 from data_fetch.exchange_rate.fetcher import fetch_exchange_rate_snapshot
 from data_fetch.exchange_rate.normalizer import normalize_exchange_rate_snapshot
-from data_fetch.lof_arbitrage.fetcher import fetch_lof_arbitrage_snapshot
-from data_fetch.lof_arbitrage.normalizer import normalize_lof_arbitrage_snapshot
+from data_fetch.lof_iopv.fetcher import fetch_lof_iopv_snapshot
+from data_fetch.lof_iopv.normalizer import normalize_lof_iopv_snapshot
 from data_fetch.merger.fetcher import fetch_merger_snapshot
 from data_fetch.merger.normalizer import normalize_merger_snapshot
 from data_fetch.subscription.fetcher import fetch_bond_subscription_snapshot, fetch_ipo_snapshot
@@ -38,7 +38,7 @@ from strategy.convertible_bond.service import build_convertible_bond_response
 from strategy.cb_rights_issue.service import build_cb_rights_issue_response
 from strategy.dividend.service import build_dividend_response
 from strategy.event_arbitrage.service import build_event_arbitrage_response
-from strategy.lof_arbitrage.service import build_lof_arbitrage_response
+from strategy.lof_iopv.service import build_lof_iopv_response
 from strategy.merger.service import build_merger_response
 from strategy.subscription.service import build_subscription_response
 
@@ -110,10 +110,10 @@ def action_cb_rights_issue() -> dict:
     return build_cb_rights_issue_response(payload, records)
 
 
-def action_lof_arbitrage() -> dict:
-    payload = fetch_lof_arbitrage_snapshot()
-    records = normalize_lof_arbitrage_snapshot(payload)
-    return build_lof_arbitrage_response(payload, records)
+def action_lof_iopv() -> dict:
+    payload = fetch_lof_iopv_snapshot()
+    records = normalize_lof_iopv_snapshot(payload)
+    return build_lof_iopv_response(payload, records)
 
 
 def action_sync_cb_rights_issue_stock_history(force_full: bool = False) -> dict:
@@ -177,8 +177,8 @@ def main() -> None:
             dump(action_sync_cb_stock_history(force_full="--force-full" in args[1:]))
         elif action == "cb-rights-issue":
             dump(action_cb_rights_issue())
-        elif action == "lof-arbitrage":
-            dump(action_lof_arbitrage())
+        elif action in ("lof-arbitrage", "lof-iopv"):
+            dump(action_lof_iopv())
         elif action == "sync-cb-rights-issue-stock-history":
             dump(action_sync_cb_rights_issue_stock_history(force_full="--force-full" in args[1:]))
         elif action == "merger":

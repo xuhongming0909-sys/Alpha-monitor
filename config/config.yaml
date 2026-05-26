@@ -1,4 +1,4 @@
-#
+﻿#
 # 非敏感配置
 # Usage: 保持简洁，只放当前项目实际需要的配置
 #
@@ -153,9 +153,9 @@ plugins:
     cb_rights_issue:
       enabled: true
       folder: "data_fetch/cb_rights_issue"
-    lof_arbitrage:
+    lof_iopv:
       enabled: true
-      folder: "data_fetch/lof_arbitrage"
+      folder: "data_fetch/lof_iopv"
   strategy:
     ah_premium:
       enabled: true
@@ -184,9 +184,9 @@ plugins:
     cb_rights_issue:
       enabled: true
       folder: "strategy/cb_rights_issue"
-    lof_arbitrage:
+    lof_iopv:
       enabled: true
-      folder: "strategy/lof_arbitrage"
+      folder: "strategy/lof_iopv"
 
 data_fetch:
   # Fetch layer config only controls upstream access and normalization cadence
@@ -424,7 +424,7 @@ strategy:
       - "钁ｄ簨浼氶妗?"
       - "鑲′笢澶т細閫氳繃"
       - "鍙戝濮旈€氳繃"
-  lof_arbitrage:
+  lof_iopv:
     default_group: "index"
     ranking_metric: "premium_rate"
     limited_apply_cap_amount: 100000

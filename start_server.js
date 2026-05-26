@@ -1,4 +1,4 @@
-// AI-SUMMARY: Express 主入口：启动服务、挂载路由、注册调度器、管理运行时状态
+﻿// AI-SUMMARY: Express 主入口：启动服务、挂载路由、注册调度器、管理运行时状态
 // 对应 INDEX.md §9 文件摘要索引
 
 ﻿const fs = require('fs');
@@ -700,9 +700,9 @@ const DATASETS = {
     },
   },
   lofArb: {
-    intraday: pluginFetchConfig('lof_arbitrage').intraday !== false,
-    refreshIntervalMs: toIntConfig(pluginFetchConfig('lof_arbitrage').refresh_interval_ms, 5 * 60 * 1000),
-    dbDailySync: Boolean(pluginFetchConfig('lof_arbitrage').daily_incremental_sync),
+    intraday: pluginFetchConfig('lof_iopv').intraday !== false,
+    refreshIntervalMs: toIntConfig(pluginFetchConfig('lof_iopv').refresh_interval_ms, 5 * 60 * 1000),
+    dbDailySync: Boolean(pluginFetchConfig('lof_iopv').daily_incremental_sync),
     fetch: () => callDataCore(['lof-arbitrage'], { timeout: 300000, maxBuffer: 1024 * 1024 * 50 }),
   },
   merger: {
