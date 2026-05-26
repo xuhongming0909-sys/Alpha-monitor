@@ -112,12 +112,19 @@ def _fetch_fund_info(code: str) -> dict:
             ("申购费率", "applyFee"),
             ("赎回费率", "redeemFee"),
         ]:
-            m = re.search(label + r'</th><td>([\d.]+)%', text)
+            m = re.search(r'>' + label + r'</th><td>([\d.]+)%', text)
+            if not m:
+                m = re.search(label + r'.*?([\d.]+)%', text, re.DOTALL)
             if m:
                 info[key] = m.group(1)
-        m = re.search(r'基金公司.*?<a[^>]*>(.*?)<', text, re.DOTALL)
+        # 基金公司: 搜索 "基金管理人" 后面的公司名
+        m = re.search(r'基金管理人.*?<a[^>]*>(.*?)<', text, re.DOTALL)
+        if not m:
+            m = re.search(r'基金公司.*?<a[^>]*>(.*?)<', text, re.DOTALL)
         if m:
-            info["fundCompany"] = _clean(m.group(1))
+            val = _clean(m.group(1))
+            if val and "基金" not in val:
+                info["fundCompany"] = val
         # Status: search for known keywords
         if "开放申购" in text:
             info["applyStatus"] = "开放申购"
