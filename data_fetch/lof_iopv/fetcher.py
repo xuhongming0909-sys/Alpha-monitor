@@ -153,21 +153,12 @@ def _fetch_current_prices(holdings: List[dict]) -> dict:
 
 
 
-def _fetch_stock_position(code: str) -> Optional[float]:
-    """从东财 pingzhongdata 获取股票仓位比。"""
-    url = f"http://fund.eastmoney.com/pingzhongdata/{code}.js"
-    try:
-        resp = SESSION.get(url, timeout=_REQUEST_TIMEOUT)
-        text = resp.content.decode("utf-8", errors="ignore")
-        match = re.search(r'var\s+Data_netWorthTrend\s*=\s*(\[.*?\]);', text, re.DOTALL)
-        if match:
-            trend = _json.loads(match.group(1))
-            if trend:
-                latest = trend[-1]
-                return _to_float(latest.get("stockRatio"))
-    except Exception:
-        pass
-    return None
+def _calc_stock_position(holdings: List[dict]) -> float:
+    """从持仓权重推算股票仓位比（Top10持仓占比）。"""
+    if not holdings:
+        return 0.0
+    total = sum(h.get("weight", 0) or 0 for h in holdings)
+    return round(total, 2)
 
 def fetch_lof_iopv_snapshot() -> dict:
     """获取 QDII LOF IOPV 估值所需的全部原始数据。"""
@@ -206,7 +197,7 @@ def fetch_lof_iopv_snapshot() -> dict:
             price = None
 
         # 获取股票仓位比
-        stock_position = _fetch_stock_position(code)
+        stock_position = _calc_stock_position(holdings)
 
         all_rows.append({
             "code": code,
