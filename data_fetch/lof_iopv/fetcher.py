@@ -106,18 +106,18 @@ def _fetch_fund_info(code: str) -> dict:
     info = {}
     try:
         text = SESSION.get(url, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
-        for pattern, key in [
-            (r'管理费率.*?(\d+\.?\d*)%', 'managementFee'),
-            (r'托管费率.*?(\d+\.?\d*)%', 'custodianFee'),
-            (r'申购费率.*?(\d+\.?\d*)%', 'applyFee'),
-            (r'赎回费率.*?(\d+\.?\d*)%', 'redeemFee'),
-            (r'基金公司.*?<a[^>]*>(.*?)<', 'fundCompany'),
+        for label, key in [
+            ("管理费率", "managementFee"),
+            ("托管费率", "custodianFee"),
+            ("申购费率", "applyFee"),
+            ("赎回费率", "redeemFee"),
         ]:
-            m = re.search(pattern, text, re.DOTALL)
+            m = re.search(label + r'</th><td>([\d.]+)%', text)
             if m:
-                val = _clean(m.group(1))
-                if val:
-                    info[key] = val
+                info[key] = m.group(1)
+        m = re.search(r'基金公司.*?<a[^>]*>(.*?)<', text, re.DOTALL)
+        if m:
+            info["fundCompany"] = _clean(m.group(1))
         # Status: search for known keywords
         if "开放申购" in text:
             info["applyStatus"] = "开放申购"
