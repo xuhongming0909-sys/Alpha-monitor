@@ -91,9 +91,9 @@ storage:
     cb_rights_issue_state: "cb_rights_issue_state.json"
     cb_rights_issue_push_config: "cb_rights_issue_push_config.json"
     cb_rights_issue_push_runtime: "cb_rights_issue_push_runtime.json"
-    lof_arbitrage_state: "lof_arbitrage_state.json"
-    lof_arbitrage_push_config: "lof_arbitrage_push_config.json"
-    lof_arbitrage_push_runtime: "lof_arbitrage_push_runtime.json"
+    lof_iopv_state: "lof_arbitrage_state.json"
+    lof_iopv_push_config: "lof_arbitrage_push_config.json"
+    lof_iopv_push_runtime: "lof_arbitrage_push_runtime.json"
 
 logging:
   # Minimal logging defaults

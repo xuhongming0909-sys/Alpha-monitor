@@ -1,0 +1,10 @@
+﻿import paramiko, time
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect("43.139.35.190", port=22, username="ubuntu", password="DellG77588")
+stdin, stdout, stderr = ssh.exec_command("sudo systemctl restart alpha-monitor")
+stdout.read()
+time.sleep(15)
+stdin, stdout, stderr = ssh.exec_command("sudo systemctl is-active alpha-monitor")
+print(f"Service: {stdout.read().decode().strip()}")
+ssh.close()

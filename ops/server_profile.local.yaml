@@ -1,0 +1,44 @@
+# Local-only server profile for Codex server operations.
+# Fill the blank fields once; future Codex sessions should read this file first.
+
+profile_name: alpha-prod
+
+connection:
+  host: "43.139.35.190"
+  port: 22
+  user: "ubuntu"
+  auth_type: password
+  private_key: ""
+  password: "DellG77588"
+  sudo_mode: passwordless
+
+app:
+  app_dir: "/home/ubuntu/Alpha monitor"
+  service_name: "alpha-monitor"
+  env_file: "/home/ubuntu/Alpha monitor/.env"
+  app_port: 5000
+  health_path: "/api/health"
+  default_branch: "main"
+
+public_access:
+  public_url: "http://43.139.35.190/"
+  lan_url_hint: "http://172.20.10.2:5000/"
+
+notifications:
+  wecom_webhook_url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=ce5c6981-456b-41c4-a29b-4cb334d42e8e"
+
+source_notes:
+  discovered_from_repo:
+    - ".github/workflows/deploy.yml"
+    - "config.yaml"
+    - "tools/deploy/alpha-monitor.service"
+    - ".env"
+    - "RUNBOOK.md"
+  inferred_defaults:
+    app_dir: "/home/ubuntu/Alpha monitor"
+    service_name: "alpha-monitor"
+    env_file: "/home/ubuntu/Alpha monitor/.env"
+    app_port: 5000
+    health_url: "http://127.0.0.1:5000/api/health"
+  still_missing:
+    - "none"

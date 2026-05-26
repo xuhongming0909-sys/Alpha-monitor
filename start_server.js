@@ -28,13 +28,13 @@ const { createWeComClient } = require('./notification/wecom/client');
 const { buildSummaryMarkdown: buildNotificationSummaryMarkdown } = require('./notification/styles/markdown_style');
 const { buildCbArbitrageMarkdown } = require('./notification/styles/cb_arbitrage_markdown');
 const { buildCbRightsIssueMarkdown } = require('./notification/styles/cb_rights_issue_markdown');
-const { buildLofArbitrageMarkdown } = require('./notification/styles/lof_arbitrage_markdown');
+const { buildLofIopvMarkdown } = require('./notification/styles/lof_iopv_markdown');
 const { buildConvertibleBondDiscountMarkdown } = require('./notification/styles/discount_strategy_markdown');
 const { createMainSummaryService } = require('./notification/summary/main_summary');
 const { createEventAlertService } = require('./notification/alerts/event_alert_service');
 const { createCbArbitragePushService } = require('./notification/cb_arbitrage/service');
 const { createCbRightsIssuePushService } = require('./notification/cb_rights_issue/service');
-const { createLofArbitragePushService } = require('./notification/lof_arbitrage/service');
+const { createLofIopvPushService } = require('./notification/lof_iopv/service');
 const { createMergerReportService } = require('./notification/merger_report/service');
 const { createWeComScheduler } = require('./notification/scheduler/wecom_scheduler');
 const {
@@ -100,8 +100,8 @@ const CB_RIGHTS_ISSUE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.cb_rights_issu
 const CB_ARBITRAGE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.cb_arbitrage && typeof NOTIFICATION_CONFIG.cb_arbitrage === 'object')
   ? NOTIFICATION_CONFIG.cb_arbitrage
   : {};
-const LOF_ARBITRAGE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.lof_arbitrage && typeof NOTIFICATION_CONFIG.lof_arbitrage === 'object')
-  ? NOTIFICATION_CONFIG.lof_arbitrage
+const LOF_IOPV_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.lof_iopv && typeof NOTIFICATION_CONFIG.lof_iopv === 'object')
+  ? NOTIFICATION_CONFIG.lof_iopv
   : {};
 const INDEX_FILE = path.resolve(
   ROOT,
@@ -345,13 +345,13 @@ const DEFAULT_CB_ARBITRAGE_PUSH_CONFIG = {
   times: DEFAULT_CB_ARBITRAGE_PUSH_TIMES,
   tradingDaysOnly: CB_ARBITRAGE_NOTIFICATION_CONFIG?.trading_days_only !== false,
 };
-const DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG = {
-  enabled: Boolean(LOF_ARBITRAGE_NOTIFICATION_CONFIG?.enabled),
+const DEFAULT_LOF_IOPV_PUSH_CONFIG = {
+  enabled: Boolean(LOF_IOPV_NOTIFICATION_CONFIG?.enabled),
   times: normalizeTimeListConfig(
-    LOF_ARBITRAGE_NOTIFICATION_CONFIG?.default_times,
+    LOF_IOPV_NOTIFICATION_CONFIG?.default_times,
     '14:00'
   ).slice(0, 1),
-  tradingDaysOnly: LOF_ARBITRAGE_NOTIFICATION_CONFIG?.trading_days_only !== false,
+  tradingDaysOnly: LOF_IOPV_NOTIFICATION_CONFIG?.trading_days_only !== false,
 };
 
 function buildDashboardTableUiConfig(config = {}) {
@@ -769,7 +769,7 @@ const cbRightsIssuePushRuntimeState = STATE_REGISTRY.read('cb_rights_issue_push_
   lastSuccessAt: null,
   lastError: null,
 });
-const lofArbStateStore = STATE_REGISTRY.read('lof_arbitrage_state', 'lof_arbitrage_state.json', {
+const lofArbStateStore = STATE_REGISTRY.read('lof_iopv_state', 'lof_iopv_state.json', {
   rows: [],
   limitedMonitorRows: [],
   unlimitedMonitorRows: [],
@@ -784,12 +784,12 @@ const lofArbStateStore = STATE_REGISTRY.read('lof_arbitrage_state', 'lof_arbitra
   lastInstantSuccessAt: null,
   lastInstantError: null,
 });
-const lofArbPushConfigStore = STATE_REGISTRY.read('lof_arbitrage_push_config', 'lof_arbitrage_push_config.json', {
-  enabled: DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG.enabled,
-  times: [...DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG.times],
-  tradingDaysOnly: DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG.tradingDaysOnly,
+const lofArbPushConfigStore = STATE_REGISTRY.read('lof_iopv_push_config', 'lof_iopv_push_config.json', {
+  enabled: DEFAULT_LOF_IOPV_PUSH_CONFIG.enabled,
+  times: [...DEFAULT_LOF_IOPV_PUSH_CONFIG.times],
+  tradingDaysOnly: DEFAULT_LOF_IOPV_PUSH_CONFIG.tradingDaysOnly,
 });
-const lofArbPushRuntimeState = STATE_REGISTRY.read('lof_arbitrage_push_runtime', 'lof_arbitrage_push_runtime.json', {
+const lofArbPushRuntimeState = STATE_REGISTRY.read('lof_iopv_push_runtime', 'lof_iopv_push_runtime.json', {
   pushRecords: {},
   lastAttemptAt: null,
   lastSuccessAt: null,
@@ -859,21 +859,21 @@ function saveCbRightsIssuePushRuntimeState() {
 }
 
 function saveLofArbStateStore() {
-  STATE_REGISTRY.write('lof_arbitrage_state', 'lof_arbitrage_state.json', lofArbStateStore);
+  STATE_REGISTRY.write('lof_iopv_state', 'lof_iopv_state.json', lofArbStateStore);
 }
 
 function saveLofArbPushConfigStore() {
-  STATE_REGISTRY.write('lof_arbitrage_push_config', 'lof_arbitrage_push_config.json', lofArbPushConfigStore);
+  STATE_REGISTRY.write('lof_iopv_push_config', 'lof_iopv_push_config.json', lofArbPushConfigStore);
 }
 
 // LOF 推送本轮固定为交易日 14:00 一次全量推送，启动时主动把旧三时点运行态收敛到单时点。
 function migrateLofArbPushConfigStore() {
   const nextEnabled = typeof lofArbPushConfigStore.enabled === 'boolean'
     ? lofArbPushConfigStore.enabled
-    : DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG.enabled;
+    : DEFAULT_LOF_IOPV_PUSH_CONFIG.enabled;
   const nextTradingDaysOnly = typeof lofArbPushConfigStore.tradingDaysOnly === 'boolean'
     ? lofArbPushConfigStore.tradingDaysOnly
-    : DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG.tradingDaysOnly;
+    : DEFAULT_LOF_IOPV_PUSH_CONFIG.tradingDaysOnly;
   const changed = (
     lofArbPushConfigStore.enabled !== nextEnabled ||
     lofArbPushConfigStore.tradingDaysOnly !== nextTradingDaysOnly ||
@@ -888,7 +888,7 @@ function migrateLofArbPushConfigStore() {
 }
 
 function saveLofArbPushRuntimeState() {
-  STATE_REGISTRY.write('lof_arbitrage_push_runtime', 'lof_arbitrage_push_runtime.json', lofArbPushRuntimeState);
+  STATE_REGISTRY.write('lof_iopv_push_runtime', 'lof_iopv_push_runtime.json', lofArbPushRuntimeState);
 }
 
 function saveCbDiscountStrategyState() {
@@ -1204,7 +1204,7 @@ const cbRightsIssuePushRuntimeDomain = createModulePushRuntimeStore({
 migrateLofArbPushConfigStore();
 const lofArbPushConfigDomain = createModulePushConfigStore({
   state: lofArbPushConfigStore,
-  defaultConfig: DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG,
+  defaultConfig: DEFAULT_LOF_IOPV_PUSH_CONFIG,
   save: saveLofArbPushConfigStore,
   maxTimes: 1,
 });
@@ -1273,14 +1273,14 @@ const cbRightsIssuePushService = createCbRightsIssuePushService({
   logInfo: (message) => console.info(message),
   logError: (scope, error) => console.error(scope, error?.message || error),
 });
-const lofArbPushService = createLofArbitragePushService({
+const lofArbPushService = createLofIopvPushService({
   getConfig: () => lofArbPushConfigDomain.getConfig(),
   runtimeStore: lofArbPushRuntimeDomain,
   stateStore: lofArbStateStore,
   saveStateStore: saveLofArbStateStore,
   getDataset,
   sendMarkdown: (markdown) => weComClient.sendMarkdown(markdown),
-  buildMarkdown: buildLofArbitrageMarkdown,
+  buildMarkdown: buildLofIopvMarkdown,
   getShanghaiParts,
   parsePushMinutes: (value) => lofArbPushConfigDomain.parsePushMinutes(value),
   isTradingWeekday,
@@ -1358,7 +1358,7 @@ function getCbRightsIssuePushDeliveryStatus() {
   };
 }
 
-function getLofArbPushDeliveryStatus() {
+function getLofIopvPushDeliveryStatus() {
   const config = lofArbPushConfigDomain.getConfig();
   return {
     webhookConfigured: Boolean(WECOM_WEBHOOK_URL),
@@ -1419,12 +1419,12 @@ function buildCbRightsIssuePushConfigViewModel(config) {
   };
 }
 
-function buildLofArbPushConfigViewModel(config) {
+function buildLofIopvPushConfigViewModel(config) {
   return {
     enabled: config?.enabled !== false,
-    times: Array.isArray(config?.times) ? config.times : [...DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG.times],
+    times: Array.isArray(config?.times) ? config.times : [...DEFAULT_LOF_IOPV_PUSH_CONFIG.times],
     tradingDaysOnly: config?.tradingDaysOnly !== false,
-    deliveryStatus: getLofArbPushDeliveryStatus(),
+    deliveryStatus: getLofIopvPushDeliveryStatus(),
   };
 }
 
@@ -1804,7 +1804,7 @@ function persistLofArbStateFromResult(result) {
   if (result.success === false) {
     lofArbStateStore.lastRebuildAt = nowIso();
     lofArbStateStore.lastRebuildDate = getShanghaiParts().date;
-    lofArbStateStore.lastRebuildError = normalizeError(result.error || 'lof_arbitrage_refresh_failed');
+    lofArbStateStore.lastRebuildError = normalizeError(result.error || 'lof_iopv_refresh_failed');
     saveLofArbStateStore();
     return;
   }
@@ -2099,7 +2099,7 @@ async function runPushSchedulerCycle(context = 'tick') {
     await weComScheduler.runTick();
     await cbArbitragePushService.runIfNeeded();
     await cbRightsIssuePushService.runIfNeeded();
-    await lofArbPushService.runIfNeeded();
+    await lofIopvPushService.runIfNeeded();
     updateHealthSection('push_scheduler', 'ok', 'Push scheduler is healthy', details);
   } catch (error) {
     updateHealthSection('push_scheduler', 'warn', `Push scheduler degraded: ${error?.message || error}`, {
@@ -3055,12 +3055,12 @@ registerPushRoutes({
   getCbRightsIssuePushConfig: () => cbRightsIssuePushConfigDomain.getConfig(),
   updateCbRightsIssuePushConfig: (payload) => cbRightsIssuePushConfigDomain.updateConfig(payload),
   buildCbRightsIssuePushConfigResponse: buildCbRightsIssuePushConfigViewModel,
-  getLofArbPushConfig: () => lofArbPushConfigDomain.getConfig(),
-  updateLofArbPushConfig: (payload) => lofArbPushConfigDomain.updateConfig({
+  getLofIopvPushConfig: () => lofArbPushConfigDomain.getConfig(),
+  updateLofIopvPushConfig: (payload) => lofArbPushConfigDomain.updateConfig({
     ...(payload && typeof payload === 'object' ? payload : {}),
     times: ['14:00'],
   }),
-  buildLofArbPushConfigResponse: buildLofArbPushConfigViewModel,
+  buildLofIopvPushConfigResponse: buildLofIopvPushConfigViewModel,
 });
 
 registerDashboardRoutes({

@@ -141,8 +141,8 @@ function loadServerConfig() {
   const CB_ARBITRAGE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.cb_arbitrage && typeof NOTIFICATION_CONFIG.cb_arbitrage === 'object')
     ? NOTIFICATION_CONFIG.cb_arbitrage
     : {};
-  const LOF_ARBITRAGE_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.lof_arbitrage && typeof NOTIFICATION_CONFIG.lof_arbitrage === 'object')
-    ? NOTIFICATION_CONFIG.lof_arbitrage
+  const LOF_IOPV_NOTIFICATION_CONFIG = (NOTIFICATION_CONFIG?.lof_iopv && typeof NOTIFICATION_CONFIG.lof_iopv === 'object')
+    ? NOTIFICATION_CONFIG.lof_iopv
     : {};
 
   const INDEX_FILE = path.resolve(
@@ -270,13 +270,13 @@ function loadServerConfig() {
     times: DEFAULT_CB_ARBITRAGE_PUSH_TIMES,
     tradingDaysOnly: CB_ARBITRAGE_NOTIFICATION_CONFIG?.trading_days_only !== false,
   };
-  const DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG = {
-    enabled: Boolean(LOF_ARBITRAGE_NOTIFICATION_CONFIG?.enabled),
+  const DEFAULT_LOF_IOPV_PUSH_CONFIG = {
+    enabled: Boolean(LOF_IOPV_NOTIFICATION_CONFIG?.enabled),
     times: normalizeTimeListConfig(
-      LOF_ARBITRAGE_NOTIFICATION_CONFIG?.default_times,
+      LOF_IOPV_NOTIFICATION_CONFIG?.default_times,
       '08:00'
     ).slice(0, 2),
-    tradingDaysOnly: LOF_ARBITRAGE_NOTIFICATION_CONFIG?.trading_days_only !== false,
+    tradingDaysOnly: LOF_IOPV_NOTIFICATION_CONFIG?.trading_days_only !== false,
   };
 
   const DASHBOARD_TABLE_UI = {
@@ -350,7 +350,7 @@ function loadServerConfig() {
     CB_RIGHTS_ISSUE_STRATEGY_CONFIG,
     CB_RIGHTS_ISSUE_NOTIFICATION_CONFIG,
     CB_ARBITRAGE_NOTIFICATION_CONFIG,
-    LOF_ARBITRAGE_NOTIFICATION_CONFIG,
+    LOF_IOPV_NOTIFICATION_CONFIG,
     INDEX_FILE,
     STATIC_DATA_DIR: PATH_POLICY.dataRootDir,
     SHARED_DATA_DIR: PATH_POLICY.sharedDataDir,
@@ -398,7 +398,7 @@ function loadServerConfig() {
     DEFAULT_CB_RIGHTS_ISSUE_PUSH_CONFIG,
     DEFAULT_CB_ARBITRAGE_PUSH_TIMES,
     DEFAULT_CB_ARBITRAGE_PUSH_CONFIG,
-    DEFAULT_LOF_ARBITRAGE_PUSH_CONFIG,
+    DEFAULT_LOF_IOPV_PUSH_CONFIG,
     DASHBOARD_TABLE_UI,
     DASHBOARD_AUTO_REFRESH,
     DASHBOARD_THEME,

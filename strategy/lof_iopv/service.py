@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """LOF IOPV 估值策略服务。
 
 双引擎估值：A类指数法 + B类T10持仓法。
@@ -218,6 +218,33 @@ def _calc_d_type(row: dict) -> tuple:
     return nav, "直接NAV法", {"nav": nav}
 
 
+
+def _is_paused_apply(status: Any) -> bool:
+    """判断是否暂停申购。"""
+    return "暂停" in str(status or "")
+
+
+def _classify_monitor_pools(row: dict) -> tuple:
+    """根据 spec 规则判定限购池/非限池资格。"""
+    limited_eligible = False
+    unlimited_eligible = False
+    apply_status = str(row.get("applyStatus") or "")
+    paused = _is_paused_apply(apply_status)
+    premium = row.get("premiumRate")
+    turnover = _to_float(row.get("turnoverWan"))
+
+    if not paused and premium is not None and turnover is not None:
+        # 限购池：有额度限制 AND 溢价率>1% AND 成交额>100万
+        has_limit = "限" in apply_status or row.get("applyFee") is not None
+        if has_limit and premium > 1.0 and turnover > 100:
+            limited_eligible = True
+        # 非限池：不限购 AND |溢价率|>5% AND 成交额>100万
+        not_limited = "不" in apply_status or "正常" in apply_status
+        if not_limited and abs(premium) > 5.0 and turnover > 100:
+            unlimited_eligible = True
+
+    return limited_eligible, unlimited_eligible
+
 # ─── 主入口 ────────────────────────────────────────────
 
 def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
@@ -290,14 +317,23 @@ def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
             "marketGroup": row.get("marketGroup"),
         })
 
+    # 标记监控池资格
+    for r in result_rows:
+        lim, unlim = _classify_monitor_pools(r)
+        r["limitedMonitorEligible"] = lim
+        r["unlimitedMonitorEligible"] = unlim
+
     result_rows.sort(key=lambda r: 9999.0 if r.get("premiumRate") is None else -abs(r["premiumRate"]))
+
+    limited_rows = [r for r in result_rows if r.get("limitedMonitorEligible")]
+    unlimited_rows = [r for r in result_rows if r.get("unlimitedMonitorEligible")]
 
     source_summary = dict(fetch_payload.get("sourceSummary") or {})
     source_summary["computedRows"] = sum(1 for r in result_rows if r.get("iopv") is not None)
     source_summary["totalRows"] = len(result_rows)
 
     return build_success({
-        "groups": [{"key": "index", "label": "指数LOF"}, {"key": "qdii", "label": "QDII"}],
+        "groups": [{"key": "qdii", "label": "QDII"}],
         "defaultGroup": "qdii",
         "rows": result_rows,
         "sourceSummary": source_summary,
