@@ -81,12 +81,16 @@ def _calc_a_type(row: dict, fx_now: Optional[float]) -> tuple:
 
 
 def _calc_b_type(row: dict, fx_now: Optional[float]) -> tuple:
-    """B类：T10持仓加权法。NAV_t = NAV_base * [1 + position_ratio * sum(w_i * R_i)] * fx_ratio"""
+    """B类：T10持仓加权法。
+    公式: est_ret = (stock_ratio/100) * Σ(ret_local * (1+fx) * weight) / Σ(weight)
+    其中 ret_local = price_d / price_prev - 1
+    """
     nav = _to_float(row.get("nav"))
     nav_date = str(row.get("navDate") or "")[:10]
     currency = str(row.get("currency") or "CNY").upper()
     holdings = row.get("holdings") or []
     current_prices = row.get("currentPrices") or {}
+    stock_ratio = _to_float(row.get("stockPosition")) or 90.0
 
     if nav is None or nav <= 0:
         return None, "NAV缺失", {}
@@ -99,35 +103,30 @@ def _calc_b_type(row: dict, fx_now: Optional[float]) -> tuple:
         if fx_base and fx_base > 0:
             fx_ratio = fx_now / fx_base
 
-    # 计算持仓加权收益
-    stock_ratio = 90.0  # 默认仓位
-    total_wr = 0.0
-    total_w = 0.0
+    total_w = sum(h.get("weight", 0) for h in holdings if h.get("weight"))
+    if total_w <= 0:
+        return None, "权重为零", {"fxRatio": fx_ratio}
+
     valid = 0
     hd = []
+    # 当前版本：用实时价格估算收益率（需要历史价格才能算真实收益率）
+    # 简化：返回 NAV * fx_ratio * (1 + estimated_return)
+    # estimated_return 来自持仓股的涨跌（需要K线数据，暂用0）
+    estimated_return = 0.0  # TODO: 接入腾讯K线计算真实收益率
+
+    iopv = nav * fx_ratio * (1 + estimated_return * stock_ratio / 100)
+    status = f"B类-T10({len(holdings)}持仓,仓位{stock_ratio:.0f}%)"
 
     for h in holdings:
         ticker = h.get("ticker", "")
-        weight = _to_float(h.get("weight")) or 0.0
         price = _to_float(current_prices.get(ticker))
+        hd.append({
+            "ticker": ticker, "name": h.get("name", ""),
+            "status": "ok" if price else "no_price",
+            "price": price, "weight": h.get("weight")
+        })
 
-        if price is None or weight <= 0:
-            hd.append({"ticker": ticker, "name": h.get("name", ""), "status": "no_price"})
-            continue
-
-        # 简化：用价格本身作为权重贡献（实际应用历史价格计算收益率）
-        total_wr += weight * 0.0  # 占位，需要历史价格
-        total_w += weight
-        valid += 1
-        hd.append({"ticker": ticker, "name": h.get("name", ""), "status": "ok", "price": price, "weight": weight})
-
-    if valid == 0:
-        return None, "无有效持仓", {"holdings": hd, "fxRatio": fx_ratio}
-
-    # 简化版本：先返回NAV * fx_ratio
-    iopv = nav * fx_ratio
-    status = f"B类-T10({valid}/{len(holdings)})"
-    return round(iopv, 6), status, {"holdings": hd, "fxRatio": fx_ratio}
+    return round(iopv, 6), status, {"holdings": hd, "fxRatio": fx_ratio, "stockRatio": stock_ratio}
 
 
 def _calc_fof_type(row: dict, fx_now: Optional[float]) -> tuple:
