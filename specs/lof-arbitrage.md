@@ -1,132 +1,89 @@
 ---
-name: lof-arbitrage
-description: LOF 套利策略规格：范围、页面结构、数据来源、主表字段、计算口径、监控池规则、推送规则
+name: lof-iopv
+description: QDII LOF IOPV 估值策略规格：范围、数据源、估值公式、监控池规则、推送规则
 type: spec
 ---
 
-# LOF套利策略
+# QDII LOF IOPV 估值策略
 
 ## 1. 当前范围
 
-`LOF套利` 目前只保留两个有效分组：
+仅保留 QDII LOF 基金，已移除指数LOF分组。
 
-- `指数LOF`
-- `QDII亚洲`
+支持的基金列表见 `data_fetch/lof_iopv/fetcher.py` 中的 `QDII_FUNDS` 配置。
 
-已移除内容：
+## 2. 数据来源
 
-- 已下线海外分组
-- 已下线海外 IOPV 外推
-- 已下线第三方商品并入视图
-- 已下线海外专属补数链路
+| 数据 | 来源 | 接口 |
+|---|---|---|
+| 基金净值 | 东财 | `api.fund.eastmoney.com/f10/lsjz` |
+| 前十大持仓 | 东财 | `fundf10.eastmoney.com/FundArchivesDatas.aspx` |
+| LOF场内价格 | 腾讯 | `shared.market_service.get_quotes()` |
+| 持仓股价 | 腾讯 | `shared.market_service.get_quotes()` |
+| 汇率 | 腾讯 | `shared.market_service.get_fx_rates()` |
 
-## 2. 页面结构
+不依赖集思录、Yahoo Finance 等外部数据源。
 
-页面固定结构为：
+## 3. 估值公式
 
-1. 顶部监控池
-2. 分组切换
-3. 主表
-4. 独立推送卡
+### 3.1 A类 - 指数跟踪法
 
-顶部监控池保留：
+`IOPV = NAV_base * (1 + index_change) * (1 + fx_change)`
 
-- `限购池`
-- `非限池`
+当前版本简化为 `IOPV = NAV * fx_ratio`，后续接入指数行情。
 
-## 3. 数据来源
+### 3.2 B类 - T10持仓加权法
 
-当前仅使用以下集思录来源：
-
-1. `指数LOF`：`https://www.jisilu.cn/data/lof/#index`
-2. `QDII亚洲`：`https://www.jisilu.cn/data/qdii/#qdiia`
-
-对应列表接口：
-
-1. `https://www.jisilu.cn/data/lof/index_lof_list/`
-2. `https://www.jisilu.cn/data/qdii/qdii_list/A`
-
-## 4. 主表保留字段
-
-主表当前保留：
-
-- 代码/名称
-- 现价/涨幅
-- 成交额/份额
-- 净值/日期
-- 相关指数/人民币涨幅
-- 申购
-- 赎回/托管
-- IOPV
-- 溢价
-
-## 5. 计算口径
-
-### 5.1 溢价率
-
-正式口径：
-
-`溢价率 = (现价 / IOPV - 1) × 100%`
-
-### 5.2 IOPV
-
-当前只保留 `指数LOF / QDII亚洲` 分支：
-
-- 当 `navDate = 当日`：
-  - `IOPV = 当日净值`
-- 当 `navDate = T-1`：
-  - `IOPV = T-1日净值 × (1 + 指数涨幅) × (今日汇率 / 基准汇率)`
+`IOPV = NAV_base * [1 + stock_position * sum(w_i * R_i)] * fx_ratio`
 
 其中：
+- `stock_position` = 股票仓位比例（默认90%）
+- `w_i` = 第i只持仓股权重
+- `R_i` = 第i只持仓股当期收益率
+- `fx_ratio` = 当日汇率 / 基准汇率
 
-- 指数涨幅优先使用源侧真实字段
-- 人民币资产汇率修正视为 `1`
-- 输入不足时允许结果为空，不伪造 IOPV
+### 3.3 C类 - FOF拟合法
 
-### 5.3 相关指数涨幅
+当前返回 NAV 作为 IOPV。
 
-页面正式显示口径为：
+## 4. 基金分类
 
-`相关指数涨幅 = (IOPV / 净值 - 1) × 100%`
+- `T10`: 有持仓数据 → B类（T10持仓加权法）
+- `ETF`: 单指数跟踪 → A类（指数跟踪法）
+- `FOF`: 多ETF拟合 → C类（FOF拟合法）
 
-这是一条对用户展示的人民币口径结果，不再直接等同于原始源字段。
+分类依据：配置文件中的 `estimationMethod` 字段。
+
+## 5. 主表字段
+
+18个字段全部展示：
+
+code, name, currency, nav, navDate, price, iopv, premiumRate,
+applyFee, applyStatus, redeemFee, redeemStatus, custodianFee,
+fundCompany, calcMode, calcStatus, stockPosition, backtest
 
 ## 6. 监控池规则
 
 ### 6.1 限购池
 
-同时满足以下条件才入池：
-
-1. 存在限购
-2. 限额低于 `10万`
-3. 溢价率大于 `1%`
-4. 成交额大于 `100万`
-5. 不是 `暂停申购`
+同时满足：
+1. 存在限购（applyStatus含"限"）
+2. 溢价率 > 1%
+3. 成交额 > 100万
+4. 不是暂停申购
 
 ### 6.2 非限池
 
-同时满足以下条件才入池：
-
-1. 不限购
-2. `|溢价率| > 5%`
-3. 成交额大于 `100万`
-4. 不是 `暂停申购`
+同时满足：
+1. 不限购（applyStatus含"不"或"正常"）
+2. |溢价率| > 5%
+3. 成交额 > 100万
+4. 不是暂停申购
 
 ## 7. 推送规则
 
-`LOF套利` 保留独立推送，但当前只保留单次定时推送：
+交易日 `14:00` 单次定时推送。
 
-- 交易日 `14:00`
-
-推送内容来自：
-
-- `limitedMonitorRows`
-- `unlimitedMonitorRows`
+推送内容来自 `limitedMonitorRows` + `unlimitedMonitorRows`。
 
 空监控池不推送。
-
-## 8. 真值边界
-
-- 不再维护任何已下线海外分组的计算、页面、推送与来源说明。
-- 行缺少真实输入时，允许保留在主表，但 `IOPV / 溢价率` 为空。
-- 不得为了补齐第三个分组而伪造数据或占位结果。
