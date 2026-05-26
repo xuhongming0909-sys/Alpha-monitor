@@ -24,7 +24,7 @@
 │  strategy/          业务计算层                            │
 │  ├─ ah_premium/     AH 溢价排名                          │
 │  ├─ convertible_bond/ 转债套利（双低/折价/回售）        │
-│  ├─ lof_arbitrage/  LOF/QDII 套利                       │
+│  ├─ lof_iopv/  LOF/QDII 套利                       │
 │  └─ ... (共 10 个插件)                                   │
 └──────────────────────────────────────────────────────────┘
     │
@@ -39,7 +39,7 @@
 │  data_fetch/          数据抓取层                          │
 │  ├─ ah_premium/       腾讯行情（实时股价+汇率）           │
 │  ├─ convertible_bond/ 集思录+东财（转债行情+财务）       │
-│  ├─ lof_arbitrage/    集思录（LOF/QDII 溢价率）         │
+│  ├─ lof_iopv/    集思录（LOF/QDII 溢价率）         │
 │  └─ ... (共 11 个插件)                                   │
 └──────────────────────────────────────────────────────────┘
     │
@@ -73,7 +73,7 @@
 | `exchange_rate/` | 腾讯 | `fetcher.py`, `normalizer.py` | 港币/美元人民币汇率 |
 | `convertible_bond/` | 集思录 + 东财 | `fetcher.py`, `source.py`, `normalizer.py`, `history_sync.py`, `history_source.py` | 转债套利数据（含理论定价） |
 | `cb_rights_issue/` | 集思录 | `fetcher.py`, `source.py`, `normalizer.py`, `history_source.py` | 转债抢权配售数据 |
-| `lof_arbitrage/` | 集思录 | `fetcher.py`, `source.py`, `normalizer.py` | LOF/QDII 套利数据 |
+| `lof_iopv/` | 集思录 | `fetcher.py`, `source.py`, `normalizer.py` | LOF/QDII 套利数据 |
 | `merger/` | 公告 API | `fetcher.py`, `source.py`, `normalizer.py` | 并购重组公告 |
 | `event_arbitrage/` | 集思录 | `fetcher.py`, `normalizer.py` | 事件驱动套利 |
 | `subscription/` | 多源 | `fetcher.py`, `ipo_source.py`, `bond_source.py`, `normalizer.py` | 新股/转债申购日历 |
@@ -92,7 +92,7 @@
 | `ab_premium/` | `service.py`, `service.js` | AB 溢价排名 |
 | `convertible_bond/` | `service.py`, `service.js`, `discount_runtime_store.js` | 双低策略、理论收益率、回售套利、折价策略（买入/卖出/监控） |
 | `cb_rights_issue/` | `service.py` | 抢权配售预期收益计算、阶段判定、入池判断 |
-| `lof_arbitrage/` | `service.py` | LOF/QDII 溢价率排名 |
+| `lof_iopv/` | `service.py` | LOF/QDII 溢价率排名 |
 | `merger/` | `service.py`, `service.js` | 并购重组 deal 分析、AI 报告生成（DeepSeek） |
 | `event_arbitrage/` | `service.py` | 事件匹配与过滤 |
 | `subscription/` | `service.py`, `service.js` | 申购事件跟踪 |
@@ -123,7 +123,7 @@
 | **折价策略提醒** | `alerts/event_alert_service.js` | 实时折价买入/卖出/监控名单推送 |
 | **CB 套利推送** | `cb_arbitrage/service.js` | 转债套利独立推送逻辑 |
 | **抢权配售推送** | `cb_rights_issue/service.js` | 抢权配售独立推送逻辑 |
-| **LOF 套利推送** | `lof_arbitrage/service.js` | LOF 套利独立推送逻辑（定时+即时） |
+| **LOF 套利推送** | `lof_iopv/service.js` | LOF 套利独立推送逻辑（定时+即时） |
 | **并购报告** | `merger_report/service.js` | 并购 deal 报告推送 |
 | **Markdown 样式** | `styles/*.js` | 各推送类型的格式化模板 |
 
@@ -234,8 +234,8 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | 抢权配售计算 | `strategy/cb_rights_issue/service.py` |
 | 抢权配售数据抓取 | `data_fetch/cb_rights_issue/fetcher.py` |
 | 抢权配售推送 | `notification/cb_rights_issue/service.js` |
-| LOF 数据抓取 | `data_fetch/lof_arbitrage/fetcher.py` |
-| LOF 推送 | `notification/lof_arbitrage/service.js` |
+| LOF 数据抓取 | `data_fetch/lof_iopv/fetcher.py` |
+| LOF 推送 | `notification/lof_iopv/service.js` |
 | AH 溢价计算 | `strategy/ah_premium/service.py` |
 | AB 溢价计算 | `strategy/ab_premium/service.py` |
 | 并购套利计算+AI 报告 | `strategy/merger/service.py` |
@@ -336,8 +336,8 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `data_fetch/convertible_bond/cb_metrics.py` | 转债套利指标计算：波动率/ATR/理论定价/纯债价值/期权价值 |
 | `data_fetch/convertible_bond/source.py` | 转债套利上游 API：集思录实时行情 + 东方财富财务数据 |
 | `data_fetch/convertible_bond/normalizer.py` | 转债套利数据标准化：含理论定价的 Bus 记录生成 |
-| `data_fetch/lof_arbitrage/fetcher.py` | LOF 套利抓取调度：调用集思录 API |
-| `data_fetch/lof_arbitrage/source.py` | LOF 套利上游 API：集思录 LOF/QDII 实时数据 |
+| `data_fetch/lof_iopv/fetcher.py` | LOF 套利抓取调度：调用集思录 API |
+| `data_fetch/lof_iopv/source.py` | LOF 套利上游 API：集思录 LOF/QDII 实时数据 |
 | `data_fetch/merger/fetcher.py` | 并购数据抓取调度：调用巨潮公告 API |
 | `data_fetch/merger/source.py` | 并购公告 API：巨潮资讯公告搜索与解析 |
 | `data_fetch/dividend/fetcher.py` | 股息抓取调度：调用 AkShare/巨潮 API |
@@ -360,7 +360,7 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `strategy/convertible_bond/service.js` | 转债套利 Node 适配器：计算结果格式化、折价策略状态 |
 | `strategy/merger/service.py` | 并购套利业务计算：Deal 分析、AI 报告生成 |
 | `strategy/merger/service.js` | 并购套利 Node 适配器：报告生成调度 |
-| `strategy/lof_arbitrage/service.py` | LOF 套利业务计算：溢价率排名与过滤 |
+| `strategy/lof_iopv/service.py` | LOF 套利业务计算：溢价率排名与过滤 |
 | `strategy/custom_monitor/service.py` | 自定义监控业务计算：组合收益率、对价计算 |
 | `strategy/dividend/service.py` | 股息业务计算：登记日跟踪、股息率计算 |
 | `strategy/subscription/service.py` | 申购业务计算：申购事件跟踪与状态管理 |
@@ -403,7 +403,7 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `notification/alerts/event_alert_service.js` | 事件告警服务：折价策略买入/卖出/监控实时推送 |
 | `notification/cb_arbitrage/service.js` | 转债套利推送：独立推送逻辑与格式化 |
 | `notification/cb_rights_issue/service.js` | 抢权配售推送：独立推送逻辑与格式化 |
-| `notification/lof_arbitrage/service.js` | LOF 套利推送：独立推送逻辑与格式化 |
+| `notification/lof_iopv/service.js` | LOF 套利推送：独立推送逻辑与格式化 |
 | `notification/merger_report/service.js` | 并购报告推送：DeepSeek AI 报告生成与推送 |
 | `notification/styles/markdown_style.js` | 推送 Markdown 样式：通用格式化模板 |
 

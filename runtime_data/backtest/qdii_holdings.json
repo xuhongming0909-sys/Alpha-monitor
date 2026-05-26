@@ -1,0 +1,312 @@
+{
+  "160125": [
+    {
+      "code": "00288",
+      "name": "万洲国际",
+      "ratio": 4.78,
+      "mkt": "HK"
+    },
+    {
+      "code": "09911",
+      "name": "赤子城科技",
+      "ratio": 4.27,
+      "mkt": "HK"
+    },
+    {
+      "code": "00700",
+      "name": "腾讯控股",
+      "ratio": 4.12,
+      "mkt": "HK"
+    },
+    {
+      "code": "00883",
+      "name": "中国海洋石油",
+      "ratio": 4.11,
+      "mkt": "HK"
+    },
+    {
+      "code": "06869",
+      "name": "长飞光纤光缆",
+      "ratio": 4.0,
+      "mkt": "HK"
+    },
+    {
+      "code": "01519",
+      "name": "极兔速递-W",
+      "ratio": 3.87,
+      "mkt": "HK"
+    },
+    {
+      "code": "02590",
+      "name": "极智嘉-W",
+      "ratio": 3.45,
+      "mkt": "HK"
+    },
+    {
+      "code": "06082",
+      "name": "壁仞科技",
+      "ratio": 3.34,
+      "mkt": "HK"
+    },
+    {
+      "code": "09988",
+      "name": "阿里巴巴-W",
+      "ratio": 3.28,
+      "mkt": "HK"
+    },
+    {
+      "code": "06181",
+      "name": "老铺黄金",
+      "ratio": 2.9,
+      "mkt": "HK"
+    }
+  ],
+  "160644": [
+    {
+      "code": "TSM",
+      "name": "台积电",
+      "ratio": 9.09,
+      "mkt": "US"
+    },
+    {
+      "code": "NVDA",
+      "name": "英伟达",
+      "ratio": 9.05,
+      "mkt": "US"
+    },
+    {
+      "code": "SNDK",
+      "name": "闪迪",
+      "ratio": 8.57,
+      "mkt": "US"
+    },
+    {
+      "code": "MU",
+      "name": "美光科技",
+      "ratio": 7.49,
+      "mkt": "US"
+    },
+    {
+      "code": "00700",
+      "name": "腾讯控股",
+      "ratio": 6.58,
+      "mkt": "HK"
+    },
+    {
+      "code": "GOOGL",
+      "name": "谷歌-A",
+      "ratio": 5.69,
+      "mkt": "US"
+    },
+    {
+      "code": "09988",
+      "name": "阿里巴巴-W",
+      "ratio": 4.69,
+      "mkt": "HK"
+    },
+    {
+      "code": "00883",
+      "name": "中国海洋石油",
+      "ratio": 3.96,
+      "mkt": "HK"
+    },
+    {
+      "code": "AVGO",
+      "name": "博通",
+      "ratio": 3.49,
+      "mkt": "US"
+    },
+    {
+      "code": "ASML",
+      "name": "阿斯麦",
+      "ratio": 2.85,
+      "mkt": "US"
+    }
+  ],
+  "164906": [
+    {
+      "code": "00700",
+      "name": "腾讯控股",
+      "ratio": 9.54,
+      "mkt": "HK"
+    },
+    {
+      "code": "PDD",
+      "name": "拼多多",
+      "ratio": 8.04,
+      "mkt": "US"
+    },
+    {
+      "code": "09988",
+      "name": "阿里巴巴-W",
+      "ratio": 8.0,
+      "mkt": "HK"
+    },
+    {
+      "code": "03690",
+      "name": "美团-W",
+      "ratio": 6.62,
+      "mkt": "HK"
+    },
+    {
+      "code": "09999",
+      "name": "网易-S",
+      "ratio": 5.37,
+      "mkt": "HK"
+    },
+    {
+      "code": "09618",
+      "name": "京东集团-SW",
+      "ratio": 4.25,
+      "mkt": "HK"
+    },
+    {
+      "code": "09888",
+      "name": "百度集团-SW",
+      "ratio": 3.92,
+      "mkt": "HK"
+    },
+    {
+      "code": "02423",
+      "name": "贝壳-W",
+      "ratio": 3.88,
+      "mkt": "HK"
+    },
+    {
+      "code": "06618",
+      "name": "京东健康",
+      "ratio": 3.55,
+      "mkt": "HK"
+    },
+    {
+      "code": "YMM",
+      "name": "满帮",
+      "ratio": 3.41,
+      "mkt": "US"
+    }
+  ],
+  "501225": [
+    {
+      "code": "002371",
+      "name": "北方华创",
+      "ratio": 0.01,
+      "mkt": "CN"
+    },
+    {
+      "code": "002049",
+      "name": "紫光国微",
+      "ratio": 0.01,
+      "mkt": "CN"
+    },
+    {
+      "code": "300782",
+      "name": "卓胜微",
+      "ratio": 0.01,
+      "mkt": "CN"
+    },
+    {
+      "code": "301269",
+      "name": "华大九天",
+      "ratio": 0.0,
+      "mkt": "CN"
+    },
+    {
+      "code": "002156",
+      "name": "通富微电",
+      "ratio": 0.0,
+      "mkt": "CN"
+    },
+    {
+      "code": "300661",
+      "name": "圣邦股份",
+      "ratio": 0.0,
+      "mkt": "CN"
+    },
+    {
+      "code": "002185",
+      "name": "华天科技",
+      "ratio": 0.0,
+      "mkt": "CN"
+    },
+    {
+      "code": "300604",
+      "name": "长川科技",
+      "ratio": 0.0,
+      "mkt": "CN"
+    },
+    {
+      "code": "300474",
+      "name": "景嘉微",
+      "ratio": 0.0,
+      "mkt": "CN"
+    },
+    {
+      "code": "300223",
+      "name": "北京君正",
+      "ratio": 0.0,
+      "mkt": "CN"
+    }
+  ],
+  "161128": [
+    {
+      "code": "NVDA",
+      "name": "英伟达",
+      "ratio": 20.16,
+      "mkt": "US"
+    },
+    {
+      "code": "AAPL",
+      "name": "苹果",
+      "ratio": 17.73,
+      "mkt": "US"
+    },
+    {
+      "code": "MSFT",
+      "name": "微软",
+      "ratio": 13.08,
+      "mkt": "US"
+    },
+    {
+      "code": "AVGO",
+      "name": "博通",
+      "ratio": 6.98,
+      "mkt": "US"
+    },
+    {
+      "code": "MU",
+      "name": "美光科技",
+      "ratio": 1.81,
+      "mkt": "US"
+    },
+    {
+      "code": "PLTR",
+      "name": "Palantir Technologies Inc-A",
+      "ratio": 1.59,
+      "mkt": "US"
+    },
+    {
+      "code": "AMD",
+      "name": "超威半导体",
+      "ratio": 1.58,
+      "mkt": "US"
+    },
+    {
+      "code": "CSCO",
+      "name": "思科",
+      "ratio": 1.46,
+      "mkt": "US"
+    },
+    {
+      "code": "AMAT",
+      "name": "应用材料",
+      "ratio": 1.29,
+      "mkt": "US"
+    },
+    {
+      "code": "LRCX",
+      "name": "拉姆研究",
+      "ratio": 1.27,
+      "mkt": "US"
+    }
+  ]
+}

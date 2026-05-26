@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-"""QDII LOF IOPV 数据获取层。
+"""QDII LOF IOPV 数据获取层 - 18字段完整版。
 
-从东财获取基金净值和持仓，从腾讯获取股价和汇率。
-不依赖任何外部第三方数据源。
+东财净值+持仓+基金档案 | 腾讯行情+汇率。
 """
 
 from __future__ import annotations
@@ -25,29 +24,27 @@ SESSION.headers.update({
     "Referer": "https://fundf10.eastmoney.com/",
 })
 
-# QDII LOF 基金列表（可扩展）
+# QDII LOF 基金列表: estimation = "A"(指数跟踪) / "B"(T10持仓)
 QDII_FUNDS = [
-    {"code": "160644", "name": "南方香港优选FOF", "currency": "HKD", "estimation": "T10"},
-    {"code": "164906", "name": "交银中证海外中国互联网", "currency": "USD", "estimation": "T10"},
-    {"code": "161128", "name": "汇添富恒生指数", "currency": "HKD", "estimation": "ETF"},
-    {"code": "160125", "name": "南方香港优选", "currency": "HKD", "estimation": "T10"},
-    {"code": "501225", "name": "全球芯片LOF", "currency": "USD", "estimation": "ETF", "etf": "SMH"},
-    {"code": "501312", "name": "汇添富全球互联", "currency": "USD", "estimation": "FOF"},
-    {"code": "159202", "name": "华夏恒生科技ETF联接", "currency": "HKD", "estimation": "ETF", "etf": "HSTECH"},
-    {"code": "513660", "name": "恒生科技ETF", "currency": "HKD", "estimation": "ETF", "etf": "HSTECH"},
-    {"code": "513690", "name": "恒生高股息ETF", "currency": "HKD", "estimation": "ETF", "etf": "HSHKLI"},
-    {"code": "520600", "name": "沪港深科技ETF", "currency": "HKD", "estimation": "ETF"},
-    {"code": "161130", "name": "纳指LOF", "currency": "USD", "estimation": "ETF", "etf": "QQQ"},
-    {"code": "161125", "name": "标普500LOF", "currency": "USD", "estimation": "ETF", "etf": "SPY"},
-    {"code": "161126", "name": "标普医疗保健LOF", "currency": "USD", "estimation": "ETF", "etf": "RSPH"},
-    {"code": "161127", "name": "标普生物LOF", "currency": "USD", "estimation": "ETF", "etf": "XBI"},
-    {"code": "162415", "name": "标普可选消费LOF", "currency": "USD", "estimation": "ETF", "etf": "XLY"},
-    {"code": "160140", "name": "标普地产LOF", "currency": "USD", "estimation": "ETF", "etf": "VNQ"},
-    {"code": "501300", "name": "广发美国国债LOF", "currency": "USD", "estimation": "ETF", "etf": "AGG"},
-    {"code": "164824", "name": "工银印度基金LOF", "currency": "USD", "estimation": "ETF", "etf": "INDA"},
+    {"code": "160644", "name": "港美互联LOF", "currency": "HKD", "estimation": "B"},
+    {"code": "164906", "name": "中概互联LOF", "currency": "USD", "estimation": "B"},
+    {"code": "161128", "name": "标普信息科技LOF", "currency": "USD", "estimation": "A", "etf": "XLK"},
+    {"code": "160125", "name": "南方香港LOF", "currency": "HKD", "estimation": "B"},
+    {"code": "501225", "name": "全球芯片LOF", "currency": "USD", "estimation": "A", "etf": "SMH"},
+    {"code": "501312", "name": "全球互联LOF", "currency": "USD", "estimation": "B"},
+    {"code": "159202", "name": "恒生科技联接", "currency": "HKD", "estimation": "A", "etf": "HSTECH"},
+    {"code": "513660", "name": "恒生科技ETF", "currency": "HKD", "estimation": "A", "etf": "HSTECH"},
+    {"code": "513690", "name": "恒生高股息ETF", "currency": "HKD", "estimation": "A", "etf": "HSHKLI"},
+    {"code": "520600", "name": "沪港深科技ETF", "currency": "HKD", "estimation": "A"},
+    {"code": "161130", "name": "纳指LOF", "currency": "USD", "estimation": "A", "etf": "QQQ"},
+    {"code": "161125", "name": "标普500LOF", "currency": "USD", "estimation": "A", "etf": "SPY"},
+    {"code": "161126", "name": "标普医疗LOF", "currency": "USD", "estimation": "A", "etf": "RSPH"},
+    {"code": "161127", "name": "标普生物LOF", "currency": "USD", "estimation": "A", "etf": "XBI"},
+    {"code": "162415", "name": "标普可选消费LOF", "currency": "USD", "estimation": "A", "etf": "XLY"},
+    {"code": "160140", "name": "标普地产LOF", "currency": "USD", "estimation": "A", "etf": "VNQ"},
+    {"code": "501300", "name": "美国国债LOF", "currency": "USD", "estimation": "A", "etf": "AGG"},
+    {"code": "164824", "name": "工银印度LOF", "currency": "USD", "estimation": "A", "etf": "INDA"},
 ]
-
-_FUND_MAP = {f["code"]: f for f in QDII_FUNDS}
 
 
 def _to_float(value: Any) -> Optional[float]:
@@ -58,77 +55,84 @@ def _to_float(value: Any) -> Optional[float]:
         return None
 
 
-def _clean_text(text: Any) -> str:
+def _clean(text: Any) -> str:
     if text is None:
         return ""
-    text = str(text)
-    text = re.sub(r"<[^>]+>", "", text)
-    return text.strip() if text else ""
+    return re.sub(r"<[^>]+>", "", str(text)).strip()
 
 
-def _fetch_eastmoney_nav(code: str) -> tuple:
-    """从东财获取最新净值。返回 (nav, navDate)。"""
+def _fetch_nav(code: str) -> tuple:
+    """东财净值API。返回 (nav, navDate)。"""
     url = f"http://api.fund.eastmoney.com/f10/lsjz?fundCode={code}&pageIndex=1&pageSize=3&callback="
     try:
-        resp = SESSION.get(url, timeout=_REQUEST_TIMEOUT)
-        data = resp.json()
+        data = SESSION.get(url, timeout=_REQUEST_TIMEOUT).json()
         items = (data.get("Data") or {}).get("LSJZList") or []
         if items:
-            item = items[0]
-            nav = _to_float(item.get("DWJZ"))
-            nav_date = _clean_text(item.get("FSRQ") or "")[:10]
-            return nav, nav_date
+            return _to_float(items[0].get("DWJZ")), _clean(items[0].get("FSRQ"))[:10]
     except Exception:
         pass
     return None, None
 
 
-def _fetch_eastmoney_holdings(code: str) -> List[dict]:
-    """从东财获取前十大持仓（解析HTML表格）。"""
+def _fetch_holdings(code: str) -> List[dict]:
+    """东财F10持仓HTML表格。"""
     url = f"https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code={code}&topline=10"
     try:
-        resp = SESSION.get(url, timeout=_REQUEST_TIMEOUT)
-        text = resp.content.decode("utf-8", errors="ignore")
-
-        # 解析 var apidata={content:"..."}
+        text = SESSION.get(url, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
         m = re.search(r'content\s*:\s*"(.+)"', text, re.DOTALL)
         if not m:
             return []
-        html = m.group(1).replace('\\"', '"').replace("\\'", "'")
-
-        # 从HTML表格提取持仓
+        rows = re.findall(r'<tr>(.*?)</tr>', m.group(1), re.DOTALL)
         holdings = []
-        # 匹配 <tr> 行
-        rows = re.findall(r'<tr>(.*?)</tr>', html, re.DOTALL)
         for row_html in rows[1:]:  # skip header
             cells = re.findall(r'<td[^>]*>(.*?)</td>', row_html, re.DOTALL)
             if len(cells) < 7:
                 continue
-            # cells: 序号, 股票代码, 股票名称, 最新价, 涨跌幅, 相关资讯, 占净值比例, 持股数, 持仓市值
-            ticker = _clean_text(cells[1])
-            name = _clean_text(cells[2])
+            ticker = _clean(cells[1])
+            name = _clean(cells[2])
             weight = _to_float(cells[6].replace('%', ''))
             if not ticker or not name:
                 continue
-
-            # 判断市场
-            if ticker.startswith(("0", "2", "3")):
-                market = "sz"
-            elif ticker.startswith(("5", "6", "9")):
-                market = "sh"
-            elif len(ticker) == 5:
-                market = "hk"
-            else:
-                market = "us"
-
+            market = "hk" if len(ticker) == 5 else ("sh" if ticker.startswith(("5","6","9")) else ("sz" if ticker.startswith(("0","2","3")) else "us"))
             holdings.append({"ticker": ticker, "name": name, "weight": weight, "market": market})
         return holdings[:10]
     except Exception:
         return []
 
 
-def _build_tencent_code(ticker: str, market: str) -> str:
-    """将持仓股票代码转为腾讯行情代码。"""
+def _fetch_fund_info(code: str) -> dict:
+    """东财基金档案页：费用/公司/状态。"""
+    url = f"https://fundf10.eastmoney.com/jbgk_{code}.html"
+    info = {}
+    try:
+        text = SESSION.get(url, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
+        for pattern, key in [
+            (r'管理费率.*?(\d+\.?\d*)%', 'managementFee'),
+            (r'托管费率.*?(\d+\.?\d*)%', 'custodianFee'),
+            (r'申购费率.*?(\d+\.?\d*)%', 'applyFee'),
+            (r'赎回费率.*?(\d+\.?\d*)%', 'redeemFee'),
+            (r'基金公司.*?<a[^>]*>(.*?)<', 'fundCompany'),
+        ]:
+            m = re.search(pattern, text, re.DOTALL)
+            if m:
+                val = _clean(m.group(1))
+                if val:
+                    info[key] = val
+        # Status: search for known keywords
+        if "开放申购" in text:
+            info["applyStatus"] = "开放申购"
+        elif "暂停申购" in text:
+            info["applyStatus"] = "暂停申购"
+        if "开放赎回" in text:
+            info["redeemStatus"] = "开放赎回"
+        elif "暂停赎回" in text:
+            info["redeemStatus"] = "暂停赎回"
+    except Exception:
+        pass
+    return info
+
+
+def _build_tc_code(ticker: str, market: str) -> str:
     if market == "hk":
         return f"hk{ticker.zfill(5)}"
     elif market == "us":
@@ -140,64 +144,44 @@ def _build_tencent_code(ticker: str, market: str) -> str:
     return ticker
 
 
-def _fetch_current_prices(holdings: List[dict]) -> dict:
-    """批量获取持仓股票当前价格。"""
-    if not holdings:
-        return {}
-    codes = [_build_tencent_code(h["ticker"], h["market"]) for h in holdings]
-    try:
-        quotes = get_quotes(codes)
-        return quotes
-    except Exception:
-        return {}
-
-
-
-def _calc_stock_position(holdings: List[dict]) -> float:
-    """从持仓权重推算股票仓位比（Top10持仓占比）。"""
-    if not holdings:
-        return 0.0
-    total = sum(h.get("weight", 0) or 0 for h in holdings)
-    return round(total, 2)
-
 def fetch_lof_iopv_snapshot() -> dict:
-    """获取 QDII LOF IOPV 估值所需的全部原始数据。"""
+    """获取全部QDII LOF数据。18字段。"""
     now = now_iso()
 
-    # 1. 获取汇率
     try:
         fx_rates = get_fx_rates(["USD", "HKD"])
     except Exception:
         fx_rates = {}
 
-    # 2. 获取各基金净值和持仓
     all_rows = []
     for fund in QDII_FUNDS:
         code = fund["code"]
-        nav, nav_date = _fetch_eastmoney_nav(code)
-        holdings = _fetch_eastmoney_holdings(code)
+        nav, nav_date = _fetch_nav(code)
+        holdings = _fetch_holdings(code)
+        fund_info = _fetch_fund_info(code)
 
-        # 获取持仓股票价格
-        current_prices = {}
-        if holdings:
-            quotes = _fetch_current_prices(holdings)
-            for h in holdings:
-                tc = _build_tencent_code(h["ticker"], h["market"])
-                if tc in quotes:
-                    current_prices[h["ticker"]] = quotes[tc].get("last") or quotes[tc].get("price")
-
-        # 获取LOF场内价格
+        # LOF场内价格
         market = "sh" if code.startswith(("5", "6")) else "sz"
-        lof_code = f"{market}{code}"
         try:
-            lof_quotes = get_quotes([lof_code])
-            price_data = lof_quotes.get(lof_code, {})
-            price = _to_float(price_data.get("last")) or _to_float(price_data.get("price"))
+            q = get_quotes([f"{market}{code}"])
+            price = _to_float(q.get(f"{market}{code}", {}).get("price"))
         except Exception:
             price = None
 
-        # 获取股票仓位比
-        stock_position = _calc_stock_position(holdings)
+        # 持仓股票价格
+        current_prices = {}
+        if holdings:
+            try:
+                codes = [_build_tc_code(h["ticker"], h["market"]) for h in holdings]
+                quotes = get_quotes(codes)
+                for h in holdings:
+                    tc = _build_tc_code(h["ticker"], h["market"])
+                    if tc in quotes:
+                        current_prices[h["ticker"]] = quotes[tc].get("price")
+            except Exception:
+                pass
+
+        stock_position = sum(h.get("weight", 0) or 0 for h in holdings)
 
         all_rows.append({
             "code": code,
@@ -206,23 +190,24 @@ def fetch_lof_iopv_snapshot() -> dict:
             "nav": nav,
             "navDate": nav_date,
             "price": price,
-            "estimationMethod": fund["estimation"],
+            "estimation": fund["estimation"],
             "etf": fund.get("etf"),
             "holdings": holdings,
             "currentPrices": current_prices,
             "stockPosition": stock_position,
             "currentFxRate": fx_rates.get(fund["currency"], 1.0),
+            "applyFee": fund_info.get("applyFee"),
+            "applyStatus": fund_info.get("applyStatus"),
+            "redeemFee": fund_info.get("redeemFee"),
+            "redeemStatus": fund_info.get("redeemStatus"),
+            "custodianFee": fund_info.get("custodianFee"),
+            "fundCompany": fund_info.get("fundCompany"),
         })
-
-    source_summary = {
-        "totalRows": len(all_rows),
-        "fxRates": fx_rates,
-    }
 
     return {
         "success": True,
         "data": all_rows,
         "updateTime": now,
         "source": "eastmoney+tencent",
-        "sourceSummary": source_summary,
+        "sourceSummary": {"totalRows": len(all_rows), "fxRates": fx_rates},
     }

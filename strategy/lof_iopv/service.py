@@ -1,56 +1,43 @@
 # -*- coding: utf-8 -*-
-"""QDII LOF IOPV 估值策略服务。
-
-双引擎估值：A类指数跟踪法 + B类T10持仓法。
-"""
+"""QDII LOF IOPV 双引擎估值。A类指数法 + B类T10持仓法。"""
 
 from __future__ import annotations
 
 import math
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import requests
 
-from shared.config.script_config import get_config
-from shared.market_service import get_fx_rates, get_quotes
+from shared.market_service import get_fx_rates
 from shared.models.service_result import build_success
 from shared.time.shanghai_time import now_iso
 
-from strategy.lof_iopv.classifier import classify_fund, get_calc_mode
-
-_CONFIG = get_config()
-
-_SESSION = requests.Session()
-_SESSION.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-})
+from strategy.lof_iopv.classifier import get_calc_mode
 
 
-def _to_float(value: Any) -> Optional[float]:
+def _to_float(v: Any) -> Optional[float]:
     try:
-        v = float(value)
-        return v if math.isfinite(v) else None
+        r = float(v)
+        return r if math.isfinite(r) else None
     except (TypeError, ValueError):
         return None
 
 
 def _get_base_fx(currency: str, date_str: str) -> Optional[float]:
-    """获取指定日期央行中间价。"""
     if currency == "CNY":
         return 1.0
     if not date_str or len(date_str) < 10:
         return None
     try:
         import akshare as ak
-        symbol_map = {"USD": "美元/人民币", "HKD": "港币/人民币"}
-        symbol = symbol_map.get(currency)
-        if not symbol:
+        sym = {"USD": "美元", "HKD": "港币"}.get(currency)
+        if not sym:
             return None
+        from datetime import datetime, timedelta
         dt = datetime.strptime(date_str[:10], "%Y-%m-%d")
         start = (dt - timedelta(days=10)).strftime("%Y%m%d")
         end = dt.strftime("%Y%m%d")
-        df = ak.currency_boc_sina(symbol=symbol, start_date=start, end_date=end)
+        df = ak.currency_boc_sina(symbol=sym, start_date=start, end_date=end)
         if df is not None and not df.empty:
             return float(df.iloc[-1]["中间价"])
     except Exception:
@@ -58,114 +45,63 @@ def _get_base_fx(currency: str, date_str: str) -> Optional[float]:
     return None
 
 
-def _calc_a_type(row: dict, fx_now: Optional[float]) -> tuple:
-    """A类：指数跟踪法。NAV_t = NAV_base * (1 + index_change) * (1 + fx_change)"""
+def _calc_a(row: dict, fx_now: Optional[float]) -> tuple:
+    """A类: IOPV = NAV * (1 + etf_ret) * fx_ratio。当前简化为 NAV * fx_ratio。"""
     nav = _to_float(row.get("nav"))
-    nav_date = str(row.get("navDate") or "")[:10]
-    currency = str(row.get("currency") or "CNY").upper()
-
     if nav is None or nav <= 0:
         return None, "NAV缺失", {}
-
-    # A类基金一般用指数涨跌来估算
-    # 但当前版本先用NAV直接返回，后续可接入指数行情
+    currency = row.get("currency", "CNY").upper()
     fx_ratio = 1.0
     if currency != "CNY" and fx_now and fx_now > 0:
-        fx_base = _get_base_fx(currency, nav_date)
-        if fx_base and fx_base > 0:
-            fx_ratio = fx_now / fx_base
-
-    iopv = nav * fx_ratio
-    status = "A类-指数跟踪"
-    return round(iopv, 6), status, {"fxRatio": fx_ratio}
+        base = _get_base_fx(currency, row.get("navDate", "")[:10])
+        if base and base > 0:
+            fx_ratio = fx_now / base
+    return round(nav * fx_ratio, 6), "A类-指数跟踪", {"fxRatio": fx_ratio}
 
 
-def _calc_b_type(row: dict, fx_now: Optional[float]) -> tuple:
-    """B类：T10持仓加权法。
-    公式: est_ret = (stock_ratio/100) * Σ(ret_local * (1+fx) * weight) / Σ(weight)
-    其中 ret_local = price_d / price_prev - 1
-    """
+def _calc_b(row: dict, fx_now: Optional[float]) -> tuple:
+    """B类: T10持仓加权。est = stock_ratio * Σ(w_i * ret_i * fx_i)。"""
     nav = _to_float(row.get("nav"))
-    nav_date = str(row.get("navDate") or "")[:10]
-    currency = str(row.get("currency") or "CNY").upper()
+    if nav is None or nav <= 0:
+        return None, "NAV缺失", {}
     holdings = row.get("holdings") or []
-    current_prices = row.get("currentPrices") or {}
-    stock_ratio = _to_float(row.get("stockPosition")) or 90.0
-
-    if nav is None or nav <= 0:
-        return None, "NAV缺失", {}
     if not holdings:
-        return None, "持仓数据缺失", {}
-
+        return None, "持仓缺失", {}
+    currency = row.get("currency", "CNY").upper()
     fx_ratio = 1.0
     if currency != "CNY" and fx_now and fx_now > 0:
-        fx_base = _get_base_fx(currency, nav_date)
-        if fx_base and fx_base > 0:
-            fx_ratio = fx_now / fx_base
-
-    total_w = sum(h.get("weight", 0) for h in holdings if h.get("weight"))
+        base = _get_base_fx(currency, row.get("navDate", "")[:10])
+        if base and base > 0:
+            fx_ratio = fx_now / base
+    stock_ratio = _to_float(row.get("stockPosition")) or 90.0
+    total_w = sum(h.get("weight", 0) or 0 for h in holdings)
     if total_w <= 0:
-        return None, "权重为零", {"fxRatio": fx_ratio}
-
-    valid = 0
-    hd = []
-    # 当前版本：用实时价格估算收益率（需要历史价格才能算真实收益率）
-    # 简化：返回 NAV * fx_ratio * (1 + estimated_return)
-    # estimated_return 来自持仓股的涨跌（需要K线数据，暂用0）
-    estimated_return = 0.0  # TODO: 接入腾讯K线计算真实收益率
-
-    iopv = nav * fx_ratio * (1 + estimated_return * stock_ratio / 100)
-    status = f"B类-T10({len(holdings)}持仓,仓位{stock_ratio:.0f}%)"
-
-    for h in holdings:
-        ticker = h.get("ticker", "")
-        price = _to_float(current_prices.get(ticker))
-        hd.append({
-            "ticker": ticker, "name": h.get("name", ""),
-            "status": "ok" if price else "no_price",
-            "price": price, "weight": h.get("weight")
-        })
-
-    return round(iopv, 6), status, {"holdings": hd, "fxRatio": fx_ratio, "stockRatio": stock_ratio}
+        return nav * fx_ratio, "B类-T10(权重为零)", {"fxRatio": fx_ratio, "stockRatio": stock_ratio}
+    # 当前简化: 返回 NAV * fx_ratio（需要K线历史价格才能算真实收益率）
+    est = nav * fx_ratio
+    return round(est, 6), f"B类-T10({len(holdings)}持仓,仓位{stock_ratio:.0f}%)", {"fxRatio": fx_ratio, "stockRatio": stock_ratio}
 
 
-def _calc_fof_type(row: dict, fx_now: Optional[float]) -> tuple:
-    """FOF类：多ETF拟合。当前返回NAV。"""
-    nav = _to_float(row.get("nav"))
-    if nav is None or nav <= 0:
-        return None, "NAV缺失", {}
-    return nav, "FOF-NAV", {"fxRatio": 1.0}
-
-
-def _is_paused_apply(status: Any) -> bool:
-    """判断是否暂停申购。"""
+def _is_paused(status: Any) -> bool:
     return "暂停" in str(status or "")
 
 
-def _classify_monitor_pools(row: dict) -> tuple:
-    """根据 spec 规则判定限购池/非限池资格。"""
-    limited_eligible = False
-    unlimited_eligible = False
-    paused = _is_paused_apply(row.get("applyStatus"))
+def _monitor_pools(row: dict) -> tuple:
     premium = row.get("premiumRate")
     turnover = _to_float(row.get("turnoverWan"))
-
+    paused = _is_paused(row.get("applyStatus"))
+    lim = unlim = False
     if not paused and premium is not None and turnover is not None:
-        has_limit = "限" in str(row.get("applyStatus") or "")
-        if has_limit and premium > 1.0 and turnover > 100:
-            limited_eligible = True
-        not_limited = "不" in str(row.get("applyStatus") or "") or "正常" in str(row.get("applyStatus") or "")
-        if not_limited and abs(premium) > 5.0 and turnover > 100:
-            unlimited_eligible = True
-
-    return limited_eligible, unlimited_eligible
+        if "限" in str(row.get("applyStatus") or "") and premium > 1.0 and turnover > 100:
+            lim = True
+        if ("不" in str(row.get("applyStatus") or "") or "正常" in str(row.get("applyStatus") or "")) and abs(premium) > 5.0 and turnover > 100:
+            unlim = True
+    return lim, unlim
 
 
 def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
-    """构建 LOF IOPV 估值响应。"""
     if not fetch_payload or fetch_payload.get("success") is False:
-        error = (fetch_payload or {}).get("error", "fetch_failed")
-        return build_success({"groups": [], "rows": [], "sourceSummary": {}}, updateTime=now_iso(), source="lof_iopv", error=error)
+        return build_success({"groups": [], "rows": [], "sourceSummary": {}}, updateTime=now_iso(), source="lof_iopv", error=(fetch_payload or {}).get("error", "fetch_failed"))
 
     try:
         fx_rates = get_fx_rates(["USD", "HKD"])
@@ -173,85 +109,65 @@ def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
         fx_rates = {}
 
     rows = fetch_payload.get("data") or []
-    result_rows = []
+    result = []
 
     for row in rows:
-        estimation = row.get("estimationMethod", "ETF")
-        currency = str(row.get("currency") or "CNY").upper()
+        est = row.get("estimation", "A")
+        currency = row.get("currency", "CNY").upper()
         fx_now = fx_rates.get(currency)
 
-        if estimation == "T10":
-            fund_type = "B"
-            iopv, calc_status, details = _calc_b_type(row, fx_now)
-        elif estimation == "FOF":
-            fund_type = "C"
-            iopv, calc_status, details = _calc_fof_type(row, fx_now)
+        if est == "B":
+            iopv, status, details = _calc_b(row, fx_now)
         else:
-            fund_type = "A"
-            iopv, calc_status, details = _calc_a_type(row, fx_now)
+            iopv, status, details = _calc_a(row, fx_now)
 
         price = _to_float(row.get("price"))
-        premium_rate = None
-        if iopv is not None and price and price > 0 and iopv > 0:
-            premium_rate = round((price / iopv - 1) * 100, 2)
+        premium = round((price / iopv - 1) * 100, 2) if (iopv and price and price > 0 and iopv > 0) else None
 
-        result_rows.append({
+        result.append({
             "code": row.get("code"),
             "name": row.get("name"),
-            "market": "",
-            "marketLabel": "QDII",
             "currency": currency,
-            "fundType": fund_type,
-            "groupKey": "qdii",
-            "price": price,
             "nav": row.get("nav"),
             "navDate": row.get("navDate"),
+            "price": price,
             "iopv": iopv,
-            "premiumRate": premium_rate,
+            "premiumRate": premium,
             "applyFee": row.get("applyFee"),
             "applyStatus": row.get("applyStatus"),
             "redeemFee": row.get("redeemFee"),
             "redeemStatus": row.get("redeemStatus"),
             "custodianFee": row.get("custodianFee"),
             "fundCompany": row.get("fundCompany"),
-            "shareAmountWan": row.get("shareAmountWan"),
-            "shareAmountIncreaseWan": row.get("shareAmountIncreaseWan"),
-            "turnoverWan": row.get("turnoverWan"),
-            "changeRate": row.get("changeRate"),
-            "calcMode": get_calc_mode(fund_type),
-            "calcStatus": calc_status,
+            "calcMode": get_calc_mode(est),
+            "calcStatus": status,
             "stockPosition": row.get("stockPosition"),
-            "indexName": row.get("indexName"),
-            "indexIncreaseRate": row.get("indexIncreaseRate"),
             "holdings": row.get("holdings"),
             "backtest": {"r2": None, "mae": None, "maxErr": None, "samplePeriod": None},
             "currentFxRate": fx_now,
             "fxRatio": details.get("fxRatio") if isinstance(details, dict) else None,
-            "marketGroup": "qdii",
         })
 
-    # 标记监控池资格
-    for r in result_rows:
-        lim, unlim = _classify_monitor_pools(r)
+    for r in result:
+        lim, unlim = _monitor_pools(r)
         r["limitedMonitorEligible"] = lim
         r["unlimitedMonitorEligible"] = unlim
 
-    result_rows.sort(key=lambda r: 9999.0 if r.get("premiumRate") is None else -abs(r["premiumRate"]))
+    result.sort(key=lambda r: 9999.0 if r.get("premiumRate") is None else -abs(r["premiumRate"]))
+    limited = [r for r in result if r.get("limitedMonitorEligible")]
+    unlimited = [r for r in result if r.get("unlimitedMonitorEligible")]
 
-    limited_rows = [r for r in result_rows if r.get("limitedMonitorEligible")]
-    unlimited_rows = [r for r in result_rows if r.get("unlimitedMonitorEligible")]
-
-    source_summary = dict(fetch_payload.get("sourceSummary") or {})
-    source_summary["computedRows"] = sum(1 for r in result_rows if r.get("iopv") is not None)
-    source_summary["totalRows"] = len(result_rows)
-    source_summary["limitedMonitorCount"] = len(limited_rows)
-    source_summary["unlimitedMonitorCount"] = len(unlimited_rows)
+    src = dict(fetch_payload.get("sourceSummary") or {})
+    src["computedRows"] = sum(1 for r in result if r.get("iopv") is not None)
+    src["totalRows"] = len(result)
+    src["limitedMonitorCount"] = len(limited)
+    src["unlimitedMonitorCount"] = len(unlimited)
 
     return build_success({
         "groups": [{"key": "qdii", "label": "QDII"}],
         "defaultGroup": "qdii",
-        "rows": result_rows,
-        "limitedMonitorRows": limited_rows,
-        "unlimitedMonitorRows": unlimited_rows,
-        "sourceSummary": source_summary,
-    }, updateTime=fetch_payload.get("updateTime") or now_iso(), source=fetch_payload.get("source") or "lof_iopv")
+        "rows": result,
+        "limitedMonitorRows": limited,
+        "unlimitedMonitorRows": unlimited,
+        "sourceSummary": src,
+    }, updateTime=fetch_payload.get("updateTime") or now_iso(), source="lof_iopv")
