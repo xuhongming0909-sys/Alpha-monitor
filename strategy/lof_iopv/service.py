@@ -145,25 +145,38 @@ def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
         if min_amt:
             apply_status = f"{apply_status}(限额{min_amt}万)"
 
+        # 估值核心: A类=ETF标的, B类=前十大持仓摘要
+        if est == "A":
+            calc_core = row.get("etf") or "未知标的"
+        else:
+            holdings = row.get("holdings") or []
+            if holdings:
+                top3 = [f"{h.get('name','')}{h.get('weight',0)}%" for h in holdings[:3]]
+                calc_core = "+".join(top3) + (f"...等{len(holdings)}只" if len(holdings) > 3 else "")
+            else:
+                calc_core = "无持仓数据"
+
         result.append({
             "code": row.get("code"),
             "name": row.get("name"),
-            "currency": currency,
             "nav": row.get("nav"),
             "navDate": row.get("navDate"),
             "price": price,
             "iopv": iopv,
             "premiumRate": premium,
-            "applyFee": row.get("applyFee"),
             "applyStatus": apply_status,
+            "shareIncrease": row.get("shareIncrease"),
+            "shareTotal": row.get("shareTotal"),
+            "applyFee": row.get("applyFee"),
             "redeemFee": row.get("redeemFee"),
             "custodianFee": row.get("custodianFee"),
             "fundCompany": row.get("fundCompany"),
-            "calcMethod": calc_method,
-            "calcStatus": status,
+            "calcCore": calc_core,
             "stockPosition": stock_pos,
-            "benchmark": benchmark,
-            "premiumStatus": premium_status,
+            "r2": None,
+            "mae": None,
+            "maxErr": None,
+            "samplePeriod": None,
         })
 
     for r in result:

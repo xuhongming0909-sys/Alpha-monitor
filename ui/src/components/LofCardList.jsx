@@ -1,4 +1,4 @@
-// LOF IOPV 估值卡片 - 18字段完整版
+// LOF IOPV 估值卡片 - 用户定义字段
 import React from 'react';
 import SimpleDataTable from './SimpleDataTable.jsx';
 import { formatDate, formatNumber, formatPercent, pickText, rowMatchesQuery, signedClass, toNumber } from './cardHelpers.jsx';
@@ -8,48 +8,47 @@ function formatFee(value) {
   return n === null ? '--' : `${n}%`;
 }
 
+function formatShare(value) {
+  const n = toNumber(value);
+  if (n === null) return '--';
+  return n >= 10000 ? `${(n / 10000).toFixed(1)}亿` : `${n.toFixed(0)}万`;
+}
+
 function formatStockPosition(row) {
   const v = toNumber(row.stockPosition);
   if (v === null) return '--';
-  const method = row.calcMethod || '';
-  return method.includes('指数') ? `反推${v.toFixed(1)}%` : `${v.toFixed(1)}%`;
-}
-
-function formatPremiumStatus(row) {
-  const ps = row.premiumStatus;
-  if (!ps) return '--';
-  const cls = ps === '溢价' ? 'positive' : ps === '折价' ? 'negative' : '';
-  return <span className={cls}>{ps}</span>;
+  return `${v.toFixed(1)}%`;
 }
 
 export default function LofCardList({ rows = [], searchQuery = '' }) {
   const filtered = rows.filter((row) =>
-    rowMatchesQuery(row, searchQuery, ['name', 'code', 'fundCompany', 'calcMethod'])
+    rowMatchesQuery(row, searchQuery, ['name', 'code', 'fundCompany', 'calcCore'])
   );
   const sorted = [...filtered].sort(
     (a, b) => Math.abs(toNumber(b.premiumRate) ?? 0) - Math.abs(toNumber(a.premiumRate) ?? 0)
   );
 
-  // 18字段
   const columns = [
     { key: 'code', label: '代码', render: (row) => <span className="mono">{pickText(row.code)}</span> },
     { key: 'name', label: '名称', render: (row) => pickText(row.name) },
-    { key: 'currency', label: '币种', render: (row) => row.currency || 'CNY' },
-    { key: 'nav', label: '净值', numeric: true, render: (row) => formatNumber(row.nav) },
+    { key: 'nav', label: 'T-2净值', numeric: true, render: (row) => formatNumber(row.nav) },
     { key: 'navDate', label: '净值日期', render: (row) => formatDate(row.navDate) },
     { key: 'price', label: '现价', numeric: true, render: (row) => formatNumber(row.price) },
     { key: 'iopv', label: '实时估值', numeric: true, render: (row) => formatNumber(row.iopv) },
     { key: 'premiumRate', label: '溢价率', numeric: true, className: (row) => signedClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate) },
-    { key: 'applyFee', label: '申购费', numeric: true, render: (row) => formatFee(row.applyFee) },
     { key: 'applyStatus', label: '申购状态', render: (row) => pickText(row.applyStatus) },
+    { key: 'shareIncrease', label: '新增份额', numeric: true, render: (row) => formatShare(row.shareIncrease) },
+    { key: 'shareTotal', label: '原有份额', numeric: true, render: (row) => formatShare(row.shareTotal) },
+    { key: 'applyFee', label: '申购费', numeric: true, render: (row) => formatFee(row.applyFee) },
     { key: 'redeemFee', label: '赎回费', numeric: true, render: (row) => formatFee(row.redeemFee) },
     { key: 'custodianFee', label: '托管费', numeric: true, render: (row) => formatFee(row.custodianFee) },
     { key: 'fundCompany', label: '基金公司', render: (row) => pickText(row.fundCompany) },
-    { key: 'calcMethod', label: '估值方法', render: (row) => pickText(row.calcMethod) },
-    { key: 'calcStatus', label: '估值状态', render: (row) => <span className="muted">{pickText(row.calcStatus)}</span> },
-    { key: 'stockPosition', label: '仓位', numeric: true, render: (row) => formatStockPosition(row) },
-    { key: 'benchmark', label: '基准指数', render: (row) => pickText(row.benchmark) },
-    { key: 'premiumStatus', label: '溢价状态', render: (row) => formatPremiumStatus(row) },
+    { key: 'calcCore', label: '估值核心', render: (row) => <span className="muted" style={{fontSize: '0.85em'}}>{pickText(row.calcCore)}</span> },
+    { key: 'stockPosition', label: '动态仓位', numeric: true, render: (row) => formatStockPosition(row) },
+    { key: 'r2', label: 'R²', numeric: true, render: (row) => row.r2 != null ? row.r2.toFixed(3) : '--' },
+    { key: 'mae', label: '平均误差', numeric: true, render: (row) => row.mae != null ? `${row.mae.toFixed(2)}%` : '--' },
+    { key: 'maxErr', label: 'MAX误差', numeric: true, render: (row) => row.maxErr != null ? `${row.maxErr.toFixed(2)}%` : '--' },
+    { key: 'samplePeriod', label: '样本区间', render: (row) => pickText(row.samplePeriod) || '--' },
   ];
 
   return (

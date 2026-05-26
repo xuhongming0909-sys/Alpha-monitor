@@ -80,17 +80,23 @@ def _clean(text: Any) -> str:
     return re.sub(r"<[^>]+>", "", str(text)).strip()
 
 
-def _fetch_nav(code: str) -> tuple:
-    """东财净值API。返回 (nav, navDate)。"""
+def _fetch_nav(code: str) -> dict:
+    """东财净值API。返回 {nav, navDate, shareIncrease, shareTotal}。"""
     url = f"http://api.fund.eastmoney.com/f10/lsjz?fundCode={code}&pageIndex=1&pageSize=3&callback="
     try:
         data = SESSION.get(url, timeout=_REQUEST_TIMEOUT).json()
         items = (data.get("Data") or {}).get("LSJZList") or []
         if items:
-            return _to_float(items[0].get("DWJZ")), _clean(items[0].get("FSRQ"))[:10]
+            item = items[0]
+            return {
+                "nav": _to_float(item.get("DWJZ")),
+                "navDate": _clean(item.get("FSRQ"))[:10],
+                "shareIncrease": _to_float(item.get("SGZHBJE")),
+                "shareTotal": _to_float(item.get("JZFCR")),
+            }
     except Exception:
         pass
-    return None, None
+    return {"nav": None, "navDate": None, "shareIncrease": None, "shareTotal": None}
 
 
 def _fetch_holdings(code: str) -> List[dict]:
@@ -205,7 +211,8 @@ def fetch_lof_iopv_snapshot() -> dict:
     all_rows = []
     for fund in QDII_FUNDS:
         code = fund["code"]
-        nav, nav_date = _fetch_nav(code)
+        nav_data = _fetch_nav(code)
+        nav, nav_date = nav_data["nav"], nav_data["navDate"]
         holdings = _fetch_holdings(code)
         fund_info = _fetch_fund_info(code)
 
@@ -238,6 +245,8 @@ def fetch_lof_iopv_snapshot() -> dict:
             "currency": fund["currency"],
             "nav": nav,
             "navDate": nav_date,
+            "shareIncrease": nav_data.get("shareIncrease"),
+            "shareTotal": nav_data.get("shareTotal"),
             "price": price,
             "estimation": fund["estimation"],
             "etf": fund.get("etf"),

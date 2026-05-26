@@ -1,6 +1,6 @@
 ---
 name: lof-iopv
-description: QDII LOF IOPV 双引擎估值策略规格 - 18字段完整版
+description: QDII LOF IOPV 估值策略 - 18字段（用户定义）
 type: spec
 ---
 
@@ -10,73 +10,50 @@ type: spec
 
 仅 QDII LOF 基金，两类估值：
 
-- **A类 指数跟踪法**：`IOPV = NAV * (1 + etf_ret) * fx_ratio` → 反推仓位
-- **B类 T10持仓法**：`IOPV = NAV * [1 + stock_ratio * Σ(w_i * ret_i * fx_i)]` → 实际仓位
+- **A类 指数跟踪法**：`IOPV = NAV * (1 + etf_ret) * fx_ratio`
+- **B类 T10持仓法**：`IOPV = NAV * [1 + stock_ratio * Σ(w_i * ret_i * fx_i)]`
 
-基金列表：`data_fetch/lof_iopv/fetcher.py` → `QDII_FUNDS`
-回测参考：`strategy/lof_iopv/backtest_a.py` / `backtest_b.py`
+## 2. 数据源（已确定）
 
-## 2. 数据源（已确定，不再变更）
+| 数据 | API |
+|---|---|
+| 净值NAV | 东财 `api.fund.eastmoney.com/f10/lsjz` |
+| 持仓Top10 | 东财 `fundf10.eastmoney.com/FundArchivesDatas.aspx` |
+| LOF场内价 | 腾讯 `shared.market_service.get_quotes()` |
+| 持仓股价 | 腾讯 `shared.market_service.get_quotes()` |
+| 汇率 | 腾讯/akshare央行中间价 |
+| 基金档案 | 东财 `fundf10.eastmoney.com/jbgk_{code}.html` |
+| 份额数据 | 东财 lsjz API (份额字段) |
 
-| 数据 | API | 地址 |
-|---|---|---|
-| 净值NAV | 东财基金净值API | `http://api.fund.eastmoney.com/f10/lsjz?fundCode={code}` |
-| 持仓Top10 | 东财F10持仓HTML | `https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code={code}` |
-| LOF场内价 | 腾讯行情 | `shared.market_service.get_quotes()` → `sz{code}/sh{code}` |
-| 持仓股价 | 腾讯行情 | `shared.market_service.get_quotes()` → `hk{ticker}/us{ticker}` |
-| 汇率实时 | 腾讯行情 | `shared.market_service.get_fx_rates()` |
-| 汇率历史 | akshare央行中间价 | `akshare.currency_boc_sina()` |
-| 基金档案 | 东财基金档案HTML | `https://fundf10.eastmoney.com/jbgk_{code}.html` |
-| 申购限额 | 集思录 | `https://www.jisilu.cn/data/qdii/qdii_list/A` |
-
-**不使用**：Yahoo Finance、Open Exchange Rates
-
-## 3. 估值公式（与回测代码一致）
-
-### 3.1 A类（指数跟踪法）→ backtest_a.py
-
-```
-etf_ret = etf_price_d / etf_price_prev - 1
-fx_ret = fx_d / fx_prev - 1
-est_ret = etf_ret * fx_ratio
-IOPV = NAV * (1 + est_ret)
-仓位 = 反推: (IOPV / NAV - 1) / est_ret * 100%
-```
-
-### 3.2 B类（T10持仓加权法）→ backtest_b.py
-
-```
-for each holding i:
-    local_ret_i = price_d_i / price_prev_i - 1
-    cny_ret_i = local_ret_i * (1 + fx_ret)  # US→*usd, HK→*hkd
-    weighted_ret += cny_ret_i * (weight_i / total_weight)
-est_ret = stock_ratio * weighted_ret
-IOPV = NAV * (1 + est_ret)
-仓位 = Top10持仓权重合计
-```
-
-## 4. 主表18字段
+## 3. 主表18字段
 
 | # | 字段 | key | 来源 |
 |---|---|---|---|
-| 1 | 代码 | code | fetcher配置 |
-| 2 | 名称 | name | fetcher配置 |
-| 3 | 币种 | currency | fetcher配置 |
-| 4 | 净值 | nav | 东财lsjz |
-| 5 | 净值日期 | navDate | 东财lsjz |
-| 6 | 现价 | price | 腾讯行情 |
-| 7 | 实时估值 | iopv | 双引擎计算 |
-| 8 | 溢价率 | premiumRate | (price/iopv-1)*100 |
-| 9 | 申购费 | applyFee | 东财jbgk |
-| 10 | 申购状态 | applyStatus | 东财jbgk + 集思录限额 |
-| 11 | 赎回费 | redeemFee | 东财jbgk |
-| 12 | 托管费 | custodianFee | 东财jbgk |
-| 13 | 基金公司 | fundCompany | 东财jbgk |
-| 14 | 估值方法 | calcMethod | A类=指数跟踪法, B类=T10持仓法 |
-| 15 | 估值状态 | calcStatus | 计算过程描述 |
-| 16 | 仓位 | stockPosition | A类=反推, B类=Top10合计 |
-| 17 | 基准指数 | benchmark | A类=ETF代码, B类=持仓合计 |
-| 18 | 溢价状态 | premiumStatus | 溢价/折价/平价 |
+| 1 | 代码 | code | fetcher |
+| 2 | 名称 | name | fetcher |
+| 3 | T-2净值 | nav | 东财lsjz |
+| 4 | T-2净值日期 | navDate | 东财lsjz |
+| 5 | 现价 | price | 腾讯行情 |
+| 6 | 实时估值 | iopv | 双引擎计算 |
+| 7 | 实时溢价率 | premiumRate | (price/iopv-1)*100 核心数据 |
+| 8 | 申购状态 | applyStatus | 东财jbgk |
+| 9 | 新增份额 | shareIncrease | 东财lsjz |
+| 10 | 原有份额 | shareTotal | 东财lsjz |
+| 11 | 申购费 | applyFee | 东财jbgk |
+| 12 | 赎回费 | redeemFee | 东财jbgk |
+| 13 | 托管费 | custodianFee | 东财jbgk |
+| 14 | 基金公司 | fundCompany | 东财jbgk |
+| 15 | 估值核心 | calcCore | A类=ETF标的, B类=前十大持仓摘要 |
+| 16 | 动态仓位 | stockPosition | A类=反推, B类=Top10合计 |
+| 17 | R² | r2 | 回测结果 |
+| 18 | 平均误差 | mae | 回测结果 |
+| 19 | MAX误差 | maxErr | 回测结果 |
+| 20 | 样本区间 | samplePeriod | 回测结果 |
+
+## 4. 估值核心字段说明
+
+- A类：列出对应ETF标的代码（如 SMH、QQQ、SPY）
+- B类：写出前十大持仓摘要（如 腾讯9.5%+拼多多8.0%+...）
 
 ## 5. 监控池规则
 
@@ -89,5 +66,3 @@ IOPV = NAV * (1 + est_ret)
 ## 6. 推送规则
 
 交易日 14:00 单次推送。
-内容：limitedMonitorRows + unlimitedMonitorRows。
-空池不推送。
