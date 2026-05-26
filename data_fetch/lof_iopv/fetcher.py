@@ -81,22 +81,36 @@ def _clean(text: Any) -> str:
 
 
 def _fetch_nav(code: str) -> dict:
-    """东财净值API。返回 {nav, navDate, shareIncrease, shareTotal}。"""
+    """东财净值API + pingzhongdata份额。返回 {nav, navDate, shareIncrease, shareTotal}。"""
+    result = {"nav": None, "navDate": None, "shareIncrease": None, "shareTotal": None}
+    # 1. NAV
     url = f"http://api.fund.eastmoney.com/f10/lsjz?fundCode={code}&pageIndex=1&pageSize=3&callback="
     try:
         data = SESSION.get(url, timeout=_REQUEST_TIMEOUT).json()
         items = (data.get("Data") or {}).get("LSJZList") or []
         if items:
-            item = items[0]
-            return {
-                "nav": _to_float(item.get("DWJZ")),
-                "navDate": _clean(item.get("FSRQ"))[:10],
-                "shareIncrease": _to_float(item.get("SGZHBJE")),
-                "shareTotal": _to_float(item.get("JZFCR")),
-            }
+            result["nav"] = _to_float(items[0].get("DWJZ"))
+            result["navDate"] = _clean(items[0].get("FSRQ"))[:10]
     except Exception:
         pass
-    return {"nav": None, "navDate": None, "shareIncrease": None, "shareTotal": None}
+    # 2. 份额 from pingzhongdata
+    try:
+        js_text = SESSION.get(f"http://fund.eastmoney.com/pingzhongdata/{code}.js", timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
+        m = re.search(r'var\s+Data_buySedemption\s*=\s*(\{.*?\});', js_text, re.DOTALL)
+        if m:
+            bs = _json.loads(m.group(1))
+            for series in bs.get("series", []):
+                if series.get("name") == "总份额":
+                    data_list = series.get("data", [])
+                    if data_list:
+                        result["shareTotal"] = data_list[-1]
+                elif series.get("name") == "期间申购":
+                    data_list = series.get("data", [])
+                    if data_list:
+                        result["shareIncrease"] = data_list[-1]
+    except Exception:
+        pass
+    return result
 
 
 def _fetch_holdings(code: str) -> List[dict]:
