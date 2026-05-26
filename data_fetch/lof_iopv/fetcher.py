@@ -178,13 +178,23 @@ def fetch_lof_iopv_snapshot() -> dict:
                 if tc in quotes:
                     current_prices[h["ticker"]] = quotes[tc].get("last") or quotes[tc].get("price")
 
+        # 获取LOF场内价格
+        market = "sh" if code.startswith(("5", "6")) else "sz"
+        lof_code = f"{market}{code}"
+        try:
+            lof_quotes = get_quotes([lof_code])
+            price_data = lof_quotes.get(lof_code, {})
+            price = _to_float(price_data.get("last")) or _to_float(price_data.get("price"))
+        except Exception:
+            price = None
+
         all_rows.append({
             "code": code,
             "name": fund["name"],
             "currency": fund["currency"],
             "nav": nav,
             "navDate": nav_date,
-            "price": None,  # TODO: 获取LOF场内价格
+            "price": price,
             "estimationMethod": fund["estimation"],
             "etf": fund.get("etf"),
             "holdings": holdings,
