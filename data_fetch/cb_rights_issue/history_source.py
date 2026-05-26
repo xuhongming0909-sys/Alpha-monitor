@@ -27,6 +27,8 @@ from shared.paths.tool_paths import ensure_scripts_on_path
 
 ensure_scripts_on_path()
 
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
 import cb_rights_issue_stock_history_db as history_db
 from data_fetch.cb_rights_issue.source import fetch_fixed_source_rows, normalize_stock_code
 
