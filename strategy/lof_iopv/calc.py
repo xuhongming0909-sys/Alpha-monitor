@@ -104,5 +104,6 @@ def calc_b_iopv(nav, holdings, stock_ratio, current_prices, nav_date_prices, pre
                 has_price = True
     if not has_price:
         return round(nav * fx_ratio, 6), "B类-T10(无股价)", {"fxRatio": fx_ratio, "stockRatio": stock_ratio}
-    est = nav * (1 + stock_ratio / 100 * weighted_ret) * fx_ratio
-    return round(est, 6), "B类-T10(%d持仓,%.0f%%)" % (len(holdings), stock_ratio), {"fxRatio": fx_ratio, "stockRatio": stock_ratio, "weightedRet": weighted_ret}
+    norm_ret = weighted_ret / (total_w / 100) if total_w > 0 else 0
+    est = nav * (1 + stock_ratio / 100 * norm_ret) * fx_ratio
+    return round(est, 6), "B类-T10(%d持仓,%.0f%%)" % (len(holdings), stock_ratio), {"fxRatio": fx_ratio, "stockRatio": stock_ratio, "weightedRet": weighted_ret, "normRet": norm_ret}
