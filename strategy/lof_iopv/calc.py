@@ -84,14 +84,14 @@ def calc_b_iopv(nav, holdings, stock_ratio, current_prices, nav_date_prices, pre
         fx_ratio = fx_now / fx_base
     if stock_ratio is None:
         return None, "仓位缺失", {}
-    total_w = sum(h.get("weight", 0) or 0 for h in holdings)
+    total_w = sum(h.get("weight") or 0 for h in holdings)
     if total_w <= 0:
         return round(nav * fx_ratio, 6), "B类-T10(权重为零)", {"fxRatio": fx_ratio}
     weighted_ret = 0.0
     has_price = False
     for h in holdings:
         ticker = h.get("ticker", "")
-        w = (h.get("weight", 0) or 0) / total_w
+        w = (h.get("weight") or 0) / total_w
         cur_p = to_float(current_prices.get(ticker))
         base_p = to_float(nav_date_prices.get(ticker))
         if cur_p and base_p and base_p > 0:

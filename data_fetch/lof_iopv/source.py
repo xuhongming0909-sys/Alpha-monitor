@@ -196,7 +196,7 @@ def _fetch_holdings(code):
         for _, ticker_raw, name_raw, weight_raw in rows:
             ticker = _clean(ticker_raw)
             name = _clean(name_raw)
-            weight = _to_float(weight_raw) or 0
+            weight = _to_float(weight_raw)
             market = "hk" if (ticker.isdigit() and len(ticker) == 5) else "us"
             holdings.append({"ticker": ticker, "name": name, "weight": weight, "market": market})
         return holdings[:10]
@@ -244,7 +244,7 @@ def _fetch_stock_position(code):
         if df is not None and not df.empty:
             for _, row in df.iterrows():
                 if "\u80a1\u7968" in str(row.get("\u8d44\u4ea7\u7c7b\u578b", "")):
-                    return float(row.get("\u4ed3\u4f4d\u5360\u6bd4", 0) or 0)
+                    val = row.get("\\u4ed3\\u4f4d\\u5360\\u6bd4"); return float(val) if val else None
     except Exception:
         pass
     return None
@@ -409,7 +409,7 @@ def build_lof_snapshot():
             "holdingsPrevClose": current_prices.pop("_prev_close", None),
             "navDatePrices": nav_date_prices,
             "navDate": nav_date,
-            "currentFxRate": fx_rates.get(fund["currency"], 1.0),
+            "currentFxRate": fx_rates.get(fund["currency"]),
             "applyFee": fund_info.get("applyFee"),
             "applyStatus": purchase_status_data.get(code, {}).get("applyStatus") or fund_info.get("applyStatus"),
             "dailyLimit": purchase_status_data.get(code, {}).get("dailyLimit"),

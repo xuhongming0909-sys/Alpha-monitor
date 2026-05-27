@@ -59,9 +59,11 @@ def calc_iopv_a(code, nav, nav_date, etf, fx_now):
 
     # 获取汇率
     fx_base = get_fx_rate('USD', nav_date) if nav_date else None
-    fx_ratio = 1.0
+    fx_ratio = None
     if fx_now and fx_base and fx_base > 0:
         fx_ratio = fx_now / fx_base
+    if fx_ratio is None:
+        return None, "汇率缺失"
 
     iopv = nav * (1 + etf_ret) * fx_ratio
     return round(iopv, 3), f"A类({etf},ret={etf_ret:.4f},fx={fx_ratio:.4f})"
@@ -95,9 +97,11 @@ def calc_iopv_b(code, nav, nav_date, holdings, stock_ratio, fx_now):
         # 汇率调整
         fx_key = 'usd' if market == 'US' else 'hkd'
         fx_base = get_fx_rate(fx_key, nav_date) if nav_date else None
-        fx_ratio = 1.0
+        fx_ratio = None
         if fx_now and fx_base and fx_base > 0:
             fx_ratio = fx_now / fx_base
+        if fx_ratio is None:
+            continue
 
         cny_ret = local_ret * fx_ratio
         weighted_ret += cny_ret * (weight / total_w)
@@ -133,7 +137,7 @@ def calculate_all_iopv():
             continue
 
         nav_date, nav = nav_row
-        fx_now = fx_usd if fund['currency'] == 'USD' else (fx_hkd if fund['currency'] == 'HKD' else 1.0)
+        fx_now = fx_usd if fund['currency'] == 'USD' else (fx_hkd if fund['currency'] == 'HKD' else None)
 
         if estimation == 'A':
             iopv, status = calc_iopv_a(code, nav, nav_date, fund['etf'], fx_now)
