@@ -249,7 +249,7 @@ def _fetch_stock_position(code):
                 except (TypeError, ValueError):
                     continue
             if vals:
-                return round(100 - min(vals), 2)
+                return round(100 - min(vals), 3)
     except Exception:
         pass
     return None
