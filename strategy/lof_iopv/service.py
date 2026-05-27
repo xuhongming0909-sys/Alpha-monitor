@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """QDII LOF IOPV 双引擎估值。A类指数跟踪法 + B类T10持仓加权法。"""
 
 from __future__ import annotations
@@ -20,18 +20,21 @@ from strategy.lof_iopv.classifier import get_calc_mode
 # 加载回test结果
 _BACKTEST_DIR = _os.path.join(_os.path.dirname(__file__), "..", "..", "runtime_data", "backtest")
 _BACKTEST_RESULTS = {}
-for _fname in ("a_results.json", "b_results.json"):
+# 加载回测结果：优先加载合并文件，再加载各子文件
+for _fname in ("lof_all_r2_results.json", "lof27_r2_results.json", "a_results.json", "b_results.json"):
     _fpath = _os.path.join(_BACKTEST_DIR, _fname)
     if _os.path.exists(_fpath):
         try:
-            with open(_fpath, "r") as _f:
+            with open(_fpath, "r", encoding="utf-8") as _f:
                 _data = _json.load(_f)
                 if isinstance(_data, list):
                     for _r in _data:
-                        if _r.get("code"):
+                        if _r.get("code") and _r["code"] not in _BACKTEST_RESULTS:
                             _BACKTEST_RESULTS[_r["code"]] = _r
                 elif isinstance(_data, dict):
-                    _BACKTEST_RESULTS.update(_data)
+                    for _k, _v in _data.items():
+                        if _k not in _BACKTEST_RESULTS:
+                            _BACKTEST_RESULTS[_k] = _v
         except Exception:
             pass
 
@@ -166,16 +169,11 @@ def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
         if min_amt:
             apply_status = f"{apply_status}(限额{min_amt}万)"
 
-        # 估值核心: A类=ETF标的, B类=前十大持仓摘要
+        # 估值标的: A类=ETF标的代码, B类="前十大"
         if est == "A":
             calc_core = row.get("etf") or "未知标的"
         else:
-            holdings = row.get("holdings") or []
-            if holdings:
-                top3 = [f"{h.get('name','')}{h.get('weight',0)}%" for h in holdings[:3]]
-                calc_core = "+".join(top3) + (f"...等{len(holdings)}只" if len(holdings) > 3 else "")
-            else:
-                calc_core = "无持仓数据"
+            calc_core = "前十大"
 
         result.append({
             "code": row.get("code"),
@@ -192,7 +190,7 @@ def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
             "redeemFee": row.get("redeemFee"),
             "custodianFee": row.get("custodianFee"),
             "fundCompany": row.get("fundCompany"),
-            "calcCore": calc_core,
+            "calcTarget": calc_core,
             "stockPosition": stock_pos,
             "r2": _BACKTEST_RESULTS.get(row.get("code"), {}).get("r2"),
             "mae": _BACKTEST_RESULTS.get(row.get("code"), {}).get("mae"),

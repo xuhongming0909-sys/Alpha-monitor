@@ -348,6 +348,20 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `data_fetch/event_arbitrage/fetcher.py` | 事件套利抓取调度：调用集思录事件 API |
 | `data_fetch/cb_rights_issue/fetcher.py` | 抢权配售抓取调度：调用集思录预案 API |
 
+
+### 9.3.1 data_fetch/lof_db/ -- LOF数据库模块
+
+| 文件 | 职责摘要 |
+|------|----------|
+| `data_fetch/lof_db/schema.py` | SQLite数据库Schema定义和初始化 |
+| `data_fetch/lof_db/updater.py` | 数据更新调度器 |
+| `data_fetch/lof_db/nav_updater.py` | 基金净值增量更新 |
+| `data_fetch/lof_db/etf_updater.py` | ETF价格增量更新 |
+| `data_fetch/lof_db/fx_updater.py` | 汇率增量更新 |
+| `data_fetch/lof_db/holdings_updater.py` | 持仓数据增量更新 |
+| `data_fetch/lof_db/iopv_calculator.py` | IOPV计算引擎 |
+| `strategy/lof_iopv/backtest.py` | LOF回测脚本（从数据库读取） |
+
 ### 9.3 strategy/ — 业务计算层
 
 | 文件 | 职责摘要 |

@@ -1,4 +1,4 @@
-# Memory
+﻿# Memory
 
 **Retention**: max 50 entries. Oldest auto-deleted when exceeded.
 
@@ -7,6 +7,18 @@
 
 ## Entries
 
+
+### 2026-05-27 | LOF数据库+回测架构
+
+- **Decision**: 建立SQLite数据库存储IOPV计算和回测数据，消除硬编码和默认值
+- **Action**: 创建 data_fetch/lof_db/ 模块（schema/updater/nav/etf/fx/holdings/iopv_calculator）
+- **Action**: 创建 strategy/lof_iopv/backtest.py 回测脚本，从数据库读取
+- **Action**: 31只基金分为A类(27只指数法)/B类(4只T10法)
+- **Action**: 更新 specs/lof-arbitrage.md 为完整规格文档
+- **Verification**: 根目录清洁检查通过，AI-SUMMARY覆盖检查通过
+- **Backtest**: 13只可回测，1只OK(164701)，2只WARN，10只BAD
+- **Risk**: 东方财富美股API当前不可用，ETF数据只有8个标的
+- **Mission**: missions/0527-lof-database/
 ### 2026-05-06 | React 手机端改回密集行表
 
 - **Decision**: 用户不接受大卡片，React 主展示形态从卡片流改为密集行表；保留 7 标签和统一手机端导航
@@ -16,6 +28,18 @@
 - **Verification**: `npm run ui:build`、全部 `tests/ui_*.test.js`、`npm run check:boundaries`、`node tests/root_cleanliness.test.js`、`node tests/ai_summary_coverage.test.js` 通过
 - **Next**: 推送 GitHub 并部署服务器，确认线上手机端已切到密集行表
 
+
+### 2026-05-27 | LOF数据库+回测架构
+
+- **Decision**: 建立SQLite数据库存储IOPV计算和回测数据，消除硬编码和默认值
+- **Action**: 创建 data_fetch/lof_db/ 模块（schema/updater/nav/etf/fx/holdings/iopv_calculator）
+- **Action**: 创建 strategy/lof_iopv/backtest.py 回测脚本，从数据库读取
+- **Action**: 31只基金分为A类(27只指数法)/B类(4只T10法)
+- **Action**: 更新 specs/lof-arbitrage.md 为完整规格文档
+- **Verification**: 根目录清洁检查通过，AI-SUMMARY覆盖检查通过
+- **Backtest**: 13只可回测，1只OK(164701)，2只WARN，10只BAD
+- **Risk**: 东方财富美股API当前不可用，ETF数据只有8个标的
+- **Mission**: missions/0527-lof-database/
 ### 2026-05-06 | React 改回旧网页端表格风格
 
 - **Decision**: 用户认为密集行表仍然过于复杂，React 内容区改为尽量还原旧网页端的干净清爽表格风格
@@ -25,6 +49,18 @@
 - **Verification**: `npm run ui:build`、全部 `tests/ui_*.test.js`、`npm run check:boundaries`、`node tests/root_cleanliness.test.js`、`node tests/ai_summary_coverage.test.js` 通过
 - **Next**: 推送 GitHub 并部署服务器，确认线上风格接近原网页端
 
+
+### 2026-05-27 | LOF数据库+回测架构
+
+- **Decision**: 建立SQLite数据库存储IOPV计算和回测数据，消除硬编码和默认值
+- **Action**: 创建 data_fetch/lof_db/ 模块（schema/updater/nav/etf/fx/holdings/iopv_calculator）
+- **Action**: 创建 strategy/lof_iopv/backtest.py 回测脚本，从数据库读取
+- **Action**: 31只基金分为A类(27只指数法)/B类(4只T10法)
+- **Action**: 更新 specs/lof-arbitrage.md 为完整规格文档
+- **Verification**: 根目录清洁检查通过，AI-SUMMARY覆盖检查通过
+- **Backtest**: 13只可回测，1只OK(164701)，2只WARN，10只BAD
+- **Risk**: 东方财富美股API当前不可用，ETF数据只有8个标的
+- **Mission**: missions/0527-lof-database/
 ### 2026-05-06 | React 手机端统一化重构
 
 - **Decision**: 全设备只保留手机端单列密集 UI；移除 React 上方导航、分红提醒、事件套利、推送设置
@@ -37,6 +73,18 @@
 - **Risk**: `tests/convertible_discount.test.js` 仍有历史失败，未纳入本轮 UI 改造
 - **Mission**: `missions/0506-mobile-unify-ui/`
 
+
+### 2026-05-27 | LOF数据库+回测架构
+
+- **Decision**: 建立SQLite数据库存储IOPV计算和回测数据，消除硬编码和默认值
+- **Action**: 创建 data_fetch/lof_db/ 模块（schema/updater/nav/etf/fx/holdings/iopv_calculator）
+- **Action**: 创建 strategy/lof_iopv/backtest.py 回测脚本，从数据库读取
+- **Action**: 31只基金分为A类(27只指数法)/B类(4只T10法)
+- **Action**: 更新 specs/lof-arbitrage.md 为完整规格文档
+- **Verification**: 根目录清洁检查通过，AI-SUMMARY覆盖检查通过
+- **Backtest**: 13只可回测，1只OK(164701)，2只WARN，10只BAD
+- **Risk**: 东方财富美股API当前不可用，ETF数据只有8个标的
+- **Mission**: missions/0527-lof-database/
 ### 2026-05-06 | 部署最新版本到服务器
 
 - **Decision**: 先把服务器对齐当前最新提交，确保用户能立刻看到最新页面
@@ -46,6 +94,18 @@
 - **Risk**: 服务器工作树有未跟踪 `tools/` 文件，暂不能直接切到 `main`
 - **Mission**: `missions/0506-deploy-latest/`
 
+
+### 2026-05-27 | LOF数据库+回测架构
+
+- **Decision**: 建立SQLite数据库存储IOPV计算和回测数据，消除硬编码和默认值
+- **Action**: 创建 data_fetch/lof_db/ 模块（schema/updater/nav/etf/fx/holdings/iopv_calculator）
+- **Action**: 创建 strategy/lof_iopv/backtest.py 回测脚本，从数据库读取
+- **Action**: 31只基金分为A类(27只指数法)/B类(4只T10法)
+- **Action**: 更新 specs/lof-arbitrage.md 为完整规格文档
+- **Verification**: 根目录清洁检查通过，AI-SUMMARY覆盖检查通过
+- **Backtest**: 13只可回测，1只OK(164701)，2只WARN，10只BAD
+- **Risk**: 东方财富美股API当前不可用，ETF数据只有8个标的
+- **Mission**: missions/0527-lof-database/
 ### 2026-05-06 | 全局移动端化（手机优先，所有设备统一）
 
 - **Decision**: 用户主要用手机看网页，要求所有设备（手机/电脑/平板）统一显示移动端界面，废弃桌面端大表格
@@ -61,6 +121,18 @@
 - **Remaining**: AB溢价、打新/申购、自定义监控、分红提醒、抢权配售、事件套利仍为表格（未卡片化）
 - **Mission**: `missions/0506-mobile-adaptation/`
 
+
+### 2026-05-27 | LOF数据库+回测架构
+
+- **Decision**: 建立SQLite数据库存储IOPV计算和回测数据，消除硬编码和默认值
+- **Action**: 创建 data_fetch/lof_db/ 模块（schema/updater/nav/etf/fx/holdings/iopv_calculator）
+- **Action**: 创建 strategy/lof_iopv/backtest.py 回测脚本，从数据库读取
+- **Action**: 31只基金分为A类(27只指数法)/B类(4只T10法)
+- **Action**: 更新 specs/lof-arbitrage.md 为完整规格文档
+- **Verification**: 根目录清洁检查通过，AI-SUMMARY覆盖检查通过
+- **Backtest**: 13只可回测，1只OK(164701)，2只WARN，10只BAD
+- **Risk**: 东方财富美股API当前不可用，ETF数据只有8个标的
+- **Mission**: missions/0527-lof-database/
 ### 2026-05-05 | Server Profile 恢复与 CLI 配置
 
 - **Decision**: 用户要求恢复 SSH 服务器配置文件，并统一放到 config/ 目录
@@ -72,6 +144,18 @@
 - **Verification**: 文件位置正确，代码引用已更新，gitignore 正确
 - **Mission**: `missions/0505-server-profile-config/`
 
+
+### 2026-05-27 | LOF数据库+回测架构
+
+- **Decision**: 建立SQLite数据库存储IOPV计算和回测数据，消除硬编码和默认值
+- **Action**: 创建 data_fetch/lof_db/ 模块（schema/updater/nav/etf/fx/holdings/iopv_calculator）
+- **Action**: 创建 strategy/lof_iopv/backtest.py 回测脚本，从数据库读取
+- **Action**: 31只基金分为A类(27只指数法)/B类(4只T10法)
+- **Action**: 更新 specs/lof-arbitrage.md 为完整规格文档
+- **Verification**: 根目录清洁检查通过，AI-SUMMARY覆盖检查通过
+- **Backtest**: 13只可回测，1只OK(164701)，2只WARN，10只BAD
+- **Risk**: 东方财富美股API当前不可用，ETF数据只有8个标的
+- **Mission**: missions/0527-lof-database/
 ### 2026-04-30 | ES Module修复 + dashboard_page.js拆分
 
 - **Decision**: 服务器启动失败，view_models和routes使用CommonJS但被当作ES Module加载

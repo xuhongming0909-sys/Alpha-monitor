@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """QDII LOF IOPV 数据获取层 - 31只基金双引擎版。
 
 东财净值+持仓+基金档案 | 腾讯行情+汇率。
@@ -26,45 +26,33 @@ SESSION.headers.update({
 
 # QDII LOF 基金列表: estimation = "A"(指数跟踪) / "B"(T10持仓)
 QDII_FUNDS = [
-    # === A类: 指数跟踪法 (ETF标的) ===
-    # 美股指数型
+def _load_funds_from_config() -> list[dict]:
+    """从 config.yaml 读取基金列表，fallback 到内置列表。"""
+    try:
+        from shared.config.script_config import load_config
+        cfg = load_config()
+        plugins = cfg.get("data_fetch", {}).get("plugins", {})
+        lof_cfg = plugins.get("lof_arbitrage", plugins.get("lof_iopv", {}))
+        funds = lof_cfg.get("funds")
+        if funds and isinstance(funds, list) and len(funds) > 0:
+            return funds
+    except Exception:
+        pass
+    # Fallback 内置列表
+    return _FALLBACK_FUNDS
+
+# 内置 fallback 列表（config.yaml 不可用时使用）
+_FALLBACK_FUNDS = [
     {"code": "161128", "name": "标普信息科技LOF", "currency": "USD", "estimation": "A", "etf": "XLK"},
     {"code": "501225", "name": "全球芯片LOF", "currency": "USD", "estimation": "A", "etf": "SMH"},
     {"code": "161130", "name": "纳指LOF", "currency": "USD", "estimation": "A", "etf": "QQQ"},
     {"code": "161125", "name": "标普500LOF", "currency": "USD", "estimation": "A", "etf": "SPY"},
-    {"code": "161126", "name": "标普医疗LOF", "currency": "USD", "estimation": "A", "etf": "RSPH"},
-    {"code": "161127", "name": "标普生物LOF", "currency": "USD", "estimation": "A", "etf": "XBI"},
-    {"code": "162415", "name": "标普可选消费LOF", "currency": "USD", "estimation": "A", "etf": "XLY"},
-    {"code": "160140", "name": "标普地产LOF", "currency": "USD", "estimation": "A", "etf": "VNQ"},
-    {"code": "501300", "name": "美国国债LOF", "currency": "USD", "estimation": "A", "etf": "AGG"},
-    {"code": "164824", "name": "工银印度LOF", "currency": "USD", "estimation": "A", "etf": "INDA"},
-    {"code": "159202", "name": "恒生科技联接", "currency": "HKD", "estimation": "A", "etf": "HSTECH"},
-    {"code": "513660", "name": "恒生科技ETF", "currency": "HKD", "estimation": "A", "etf": "HSTECH"},
-    {"code": "513690", "name": "恒生高股息ETF", "currency": "HKD", "estimation": "A", "etf": "HSHKLI"},
-    {"code": "520600", "name": "沪港深科技ETF", "currency": "HKD", "estimation": "A"},
-    # 石油商品型
-    {"code": "160416", "name": "华安石油LOF", "currency": "USD", "estimation": "A", "etf": "XLE"},
-    {"code": "162719", "name": "广发石油LOF", "currency": "USD", "estimation": "A", "etf": "XOP"},
-    {"code": "162411", "name": "华宝油气LOF", "currency": "USD", "estimation": "A", "etf": "XOP"},
-    {"code": "160723", "name": "嘉实原油LOF", "currency": "USD", "estimation": "A", "etf": "USO"},
-    {"code": "161129", "name": "易方达原油LOF", "currency": "USD", "estimation": "A", "etf": "USO"},
-    {"code": "501018", "name": "南方原油LOF", "currency": "USD", "estimation": "A", "etf": "USO"},
-    {"code": "163208", "name": "诺安油气LOF", "currency": "HKD", "estimation": "A", "etf": "XLE"},
-    {"code": "160216", "name": "国泰商品LOF", "currency": "USD", "estimation": "A", "etf": "GSG"},
-    # 黄金商品型
-    {"code": "160719", "name": "嘉实黄金LOF", "currency": "USD", "estimation": "A", "etf": "GLD"},
-    {"code": "164701", "name": "汇添富黄金LOF", "currency": "USD", "estimation": "A", "etf": "GLD"},
-    {"code": "161116", "name": "易方达黄金LOF", "currency": "USD", "estimation": "A", "etf": "GLD"},
-    {"code": "161815", "name": "银华抗通胀LOF", "currency": "USD", "estimation": "A", "etf": "GLD"},
-    {"code": "165513", "name": "中信保诚商品LOF", "currency": "USD", "estimation": "A", "etf": "GSG"},
-
-    # === B类: T10持仓加权法 (持仓数据) ===
-    {"code": "160644", "name": "港美互联LOF", "currency": "HKD", "estimation": "B"},
-    {"code": "164906", "name": "中美互联LOF", "currency": "USD", "estimation": "B"},
+    {"code": "164701", "name": "黄金LOF", "currency": "USD", "estimation": "A", "etf": "GLD"},
     {"code": "160125", "name": "南方香港LOF", "currency": "HKD", "estimation": "B"},
-    {"code": "501312", "name": "全球互联LOF", "currency": "USD", "estimation": "B"},
+    {"code": "164906", "name": "中概互联网LOF", "currency": "USD", "estimation": "B"},
 ]
 
+QDII_FUNDS = _load_funds_from_config()
 
 def _to_float(value: Any) -> Optional[float]:
     try:

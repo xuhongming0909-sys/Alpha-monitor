@@ -1,4 +1,4 @@
-// LOF IOPV 估值卡片 - 用户定义字段
+﻿// LOF IOPV 估值卡片 - 用户定义字段
 import React from 'react';
 import SimpleDataTable from './SimpleDataTable.jsx';
 import { formatDate, formatNumber, formatPercent, pickText, rowMatchesQuery, signedClass, toNumber } from './cardHelpers.jsx';
@@ -22,7 +22,7 @@ function formatStockPosition(row) {
 
 export default function LofCardList({ rows = [], searchQuery = '' }) {
   const filtered = rows.filter((row) =>
-    rowMatchesQuery(row, searchQuery, ['name', 'code', 'fundCompany', 'calcCore'])
+    rowMatchesQuery(row, searchQuery, ['name', 'code', 'fundCompany', 'calcTarget'])
   );
   const sorted = [...filtered].sort(
     (a, b) => Math.abs(toNumber(b.premiumRate) ?? 0) - Math.abs(toNumber(a.premiumRate) ?? 0)
@@ -43,7 +43,7 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
     { key: 'redeemFee', label: '赎回费', numeric: true, render: (row) => formatFee(row.redeemFee) },
     { key: 'custodianFee', label: '托管费', numeric: true, render: (row) => formatFee(row.custodianFee) },
     { key: 'fundCompany', label: '基金公司', render: (row) => pickText(row.fundCompany) },
-    { key: 'calcCore', label: '估值核心', render: (row) => <span className="muted" style={{fontSize: '0.85em'}}>{pickText(row.calcCore)}</span> },
+    { key: 'calcTarget', label: '估值标的', render: (row) => <span className="muted" style={{fontSize: '0.85em'}}>{pickText(row.calcTarget)}</span> },
     { key: 'stockPosition', label: '动态仓位', numeric: true, render: (row) => formatStockPosition(row) },
     { key: 'r2', label: 'R²', numeric: true, render: (row) => row.r2 != null ? row.r2.toFixed(3) : '--' },
     { key: 'mae', label: '平均误差', numeric: true, render: (row) => row.mae != null ? `${row.mae.toFixed(2)}%` : '--' },
