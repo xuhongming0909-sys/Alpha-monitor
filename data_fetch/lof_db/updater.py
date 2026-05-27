@@ -1,5 +1,5 @@
-﻿# -*- coding: utf-8 -*-
-# AI-SUMMARY: LOF数据更新调度器，统一管理净值/ETF/汇率/持仓更新
+# -*- coding: utf-8 -*-
+# AI-SUMMARY: LOF数据更新调度器，统一管理净值/ETF/汇率/持仓更新+清理
 # 对应 INDEX.md §9.3 文件摘要索引
 """LOF数据更新调度器"""
 
@@ -7,38 +7,17 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from data_fetch.lof_db.schema import get_db, init_db
+from data_fetch.lof_db.schema import get_db, init_db, cleanup_old_data, drop_unused_tables
 from data_fetch.lof_db.nav_updater import update_nav
 from data_fetch.lof_db.etf_updater import update_etf
 from data_fetch.lof_db.fx_updater import update_fx
 from data_fetch.lof_db.holdings_updater import update_holdings
-from data_fetch.lof_db.schema import cleanup_old_data
-
-
-
-def sync_funds():
-    from shared.config.script_config import load_config
-    conn = get_db()
-    cfg = load_config()
-    plugins = cfg.get('data_fetch', {}).get('plugins', {})
-    lof_cfg = plugins.get('lof_arbitrage', plugins.get('lof_iopv', {}))
-    funds = lof_cfg.get('funds', [])
-    count = 0
-    for f in funds:
-        code = f.get('code')
-        if not code:
-            continue
-        conn.execute('INSERT OR REPLACE INTO funds (code, name, currency, estimation, etf, updated_at) VALUES (?, ?, ?, ?, ?, datetime("now"))',
-            (code, f.get('name', ''), f.get('currency', 'USD'), f.get('estimation', 'A'), f.get('etf', '')))
-        count += 1
-    conn.commit()
-    conn.close()
-    return count
 
 
 def update_all():
-    """更新所有数据"""
+    """更新所有数据 + 清理过期数据"""
     init_db()
+    drop_unused_tables()
     results = {}
 
     print("Updating fund NAV...")
@@ -53,10 +32,7 @@ def update_all():
     print("Updating holdings...")
     results['holdings'] = update_holdings()
 
-    print("Syncing fund list...")
-    results['funds'] = sync_funds()
-
-    print("Cleaning up old data...")
+    print("Cleaning up old data (>90 days)...")
     results['cleanup'] = cleanup_old_data()
 
     return results

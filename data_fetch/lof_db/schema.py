@@ -1,5 +1,5 @@
-﻿# -*- coding: utf-8 -*-
-# AI-SUMMARY: LOF数据库Schema定义和初始化
+# -*- coding: utf-8 -*-
+# AI-SUMMARY: LOF数据库Schema定义和初始化（5表，90天保留）
 # 对应 INDEX.md §9.3 文件摘要索引
 """LOF数据库Schema定义和初始化"""
 
@@ -19,22 +19,9 @@ def get_db():
 
 
 def init_db():
-    """初始化数据库表"""
+    """初始化数据库表（5张核心表）"""
     conn = get_db()
     conn.executescript("""
-        CREATE TABLE IF NOT EXISTS funds (
-            code TEXT PRIMARY KEY,
-            name TEXT,
-            currency TEXT,
-            estimation TEXT,
-            etf TEXT,
-            fund_company TEXT,
-            apply_fee REAL,
-            redeem_fee REAL,
-            custodian_fee REAL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
         CREATE TABLE IF NOT EXISTS fund_nav (
             code TEXT,
             date TEXT,
@@ -68,56 +55,34 @@ def init_db():
             market TEXT,
             PRIMARY KEY (code, report_date, ticker)
         );
-        CREATE TABLE IF NOT EXISTS iopv_results (
-            code TEXT,
-            date TEXT,
-            nav REAL,
-            iopv REAL,
-            premium_rate REAL,
-            calc_mode TEXT,
-            calc_status TEXT,
-            PRIMARY KEY (code, date)
-        );
-        CREATE TABLE IF NOT EXISTS update_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            table_name TEXT,
-            update_type TEXT,
-            rows_affected INTEGER,
-            status TEXT,
-            error_msg TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
     """)
     conn.commit()
     conn.close()
 
 
+def drop_unused_tables(conn=None):
+    """删除无用表（funds/iopv_results/update_log）"""
+    own_conn = conn is None
+    if own_conn:
+        conn = get_db()
+    for table in ('funds', 'iopv_results', 'update_log'):
+        conn.execute(f'DROP TABLE IF EXISTS {table}')
+    conn.commit()
+    if own_conn:
+        conn.close()
+
 
 def cleanup_old_data(conn=None):
+    """清理超过90天的历史数据（holdings不清理）"""
     own_conn = conn is None
     if own_conn:
         conn = get_db()
     today = datetime.now()
     stats = {}
-    # NAV: 120天
-    cutoff = (today - timedelta(days=120)).strftime('%Y-%m-%d')
-    cur = conn.execute('DELETE FROM fund_nav WHERE date < ?', (cutoff,))
-    stats['fund_nav'] = cur.rowcount
-    # ETF: 250天
-    cutoff = (today - timedelta(days=250)).strftime('%Y-%m-%d')
-    cur = conn.execute('DELETE FROM etf_prices WHERE date < ?', (cutoff,))
-    stats['etf_prices'] = cur.rowcount
-    # Stock: 250天
-    cur = conn.execute('DELETE FROM stock_prices WHERE date < ?', (cutoff,))
-    stats['stock_prices'] = cur.rowcount
-    # FX: 当年之前
-    year_start = f'{today.year}-01-01'
-    cur = conn.execute('DELETE FROM fx_rates WHERE date < ?', (year_start,))
-    stats['fx_rates'] = cur.rowcount
-    # IOPV: 30天
-    cutoff = (today - timedelta(days=30)).strftime('%Y-%m-%d')
-    cur = conn.execute('DELETE FROM iopv_results WHERE date < ?', (cutoff,))
-    stats['iopv_results'] = cur.rowcount
+    cutoff = (today - timedelta(days=90)).strftime('%Y-%m-%d')
+    for table in ('fund_nav', 'etf_prices', 'stock_prices', 'fx_rates'):
+        cur = conn.execute(f'DELETE FROM {table} WHERE date < ?', (cutoff,))
+        stats[table] = cur.rowcount
     conn.commit()
     if own_conn:
         conn.close()
@@ -126,4 +91,5 @@ def cleanup_old_data(conn=None):
 
 if __name__ == '__main__':
     init_db()
+    drop_unused_tables()
     print(f"Database initialized at {DB_PATH}")
