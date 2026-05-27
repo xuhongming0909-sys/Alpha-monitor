@@ -90,6 +90,8 @@ def build_lof_iopv_response(fetch_payload, records):
                 etf_change_pct=to_float(row.get("etfChange")),
                 fx_now=fx_now,
                 fx_base=fx_base,
+                stock_position=to_float(row.get("stockPosition")),
+                etf_nav_date_price=to_float(row.get("etfNavDatePrice")),
             )
 
         price = to_float(row.get("price"))
