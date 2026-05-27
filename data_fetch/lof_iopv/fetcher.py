@@ -257,6 +257,27 @@ def _fetch_purchase_status() -> dict:
         pass
     return result
 
+# A类ETF净值日价格（用于期间涨跌幅）
+def _get_etf_nav_date_prices(etf_codes, nav_date):
+    """获取ETF在净值日的价格"""
+    if not nav_date:
+        return {}
+    result = {}
+    try:
+        from data_fetch.lof_db.schema import get_db as _get_db
+        _conn = _get_db()
+        for ticker in set(etf_codes):
+            row = _conn.execute(
+                "SELECT close FROM etf_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
+                (ticker, nav_date)
+            ).fetchone()
+            if row:
+                result[ticker] = row[0]
+        _conn.close()
+    except Exception:
+        pass
+    return result
+
 def _fetch_jisilu_qdii() -> dict:
     """从集思录获取QDII限额数据。返回 {code: {min_amt, apply_status, ...}}。"""
     result = {}
@@ -367,6 +388,8 @@ def fetch_lof_iopv_snapshot() -> dict:
         nav_data = _fetch_nav(code)
         nav, nav_date = nav_data["nav"], nav_data["navDate"]
         holdings = _fetch_holdings(code)
+        # 更新该基金ETF的净值日价格
+        etf_nav_date_prices[fund.get("etf", "")] = _get_etf_nav_date_prices([fund.get("etf", "")], nav_date).get(fund.get("etf", ""))
         fund_info = _fetch_fund_info(code)
 
         # LOF场内价格
@@ -467,6 +490,7 @@ def fetch_lof_iopv_snapshot() -> dict:
             "custodianFee": fund_info.get("custodianFee"),
             "fundCompany": fund_info.get("fundCompany"),
             "etfChange": etf_changes.get(fund.get("etf")),
+            "etfNavDatePrice": etf_nav_date_prices.get(fund.get("etf")),
         })
 
     return {
