@@ -161,7 +161,8 @@ def backtest_b(code, end_date_str):
     holdings = _get_holdings(code)
     if not holdings:
         return None
-    stock_ratio = sum(h["weight"] for h in holdings)
+    # 用雪球实际股票仓位，fallback到T10权重总和
+    stock_ratio = _fetch_stock_position(code) or sum(h["weight"] for h in holdings)
     if stock_ratio <= 0:
         return None
 
@@ -248,3 +249,4 @@ if __name__ == "__main__":
     results = run_all()
     for code, r in sorted(results.items()):
         print(f"{code} ({r['type']}): r2={r['r2']}, maxErr={r['maxErr']}, aligned={r['alignedDays']}")
+
