@@ -6,6 +6,16 @@
 **Do not**: dump full conversations.
 
 ## Entries
+### 2026-05-28 | LOF文档同步
+
+- **Decision**: 代码领先于文档，全面同步specs/INDEX/calc与实际代码
+- **Action**: 修复specs/lof-arbitrage.md（维护脚本路径、文件结构、数据源表）
+- **Action**: INDEX.md补充backtest_v2/classifier/source/normalizer条目，更新etf_updater描述
+- **Action**: calc.py docstring从iopv_calculator改为实际backtest文件引用
+- **Action**: MEMORY.md清理7处重复的LOF数据库条目为1处
+- **Result**: 6文件修改，74行增95行删，提交3726bb5
+
+
 
 ### 2026-05-27 | 40交易日回测+汇率修正
 
