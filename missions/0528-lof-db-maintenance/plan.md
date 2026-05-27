@@ -2,33 +2,29 @@
 
 ## 步骤
 
-1. [x] 给 schema.py 增加 cleanup_old_data() 按表保留策略删除旧数据
-2. [x] 修改 updater.py，update_all 后自动 cleanup + sync_funds
-3. [x] 创建 scripts/lof_maintenance.py 独立维护入口
-4. [x] 本地测试维护脚本（通过）
-5. [x] 创建 deploy/lof_maintenance.service + deploy/lof_maintenance.timer
-6. [x] Git push
-7. [x] 服务器部署：SCP推送文件 + systemd timer 配置
-8. [x] 服务器手动执行验证通过
+1. [x] 审核每张表的实际读取方，确认有用/无用
+2. [x] 删除无用表: funds, iopv_results, update_log
+3. [x] 统一保留策略为 90 天（回测需要3个月）
+4. [x] 删除 sync_funds()（config.yaml 是唯一真相）
+5. [x] 本地测试通过
+6. [x] 服务器部署验证通过（4907 行，全部 ≤90 天）
+7. [x] systemd timer 已激活（每天 06:30）
 
-## 验证结果
+## 审核结论
 
-- [x] 本地 run scripts/lof_maintenance.py 成功
-- [x] 服务器 run 成功: NAV 2400条, ETF 63239条, FX 254条, Holdings 55条
-- [x] 清理生效: NAV删601, ETF删74832, stock删94408
-- [x] systemd timer 已激活, 每天06:30触发
+无用表（只写不读）：
+- funds: 从未被读取，config.yaml 是真相
+- iopv_results: 从未写入，IOPV 实时计算不存储
+- update_log: 从未被读取
 
-## 保留策略
+有用表（被 source.py 或 backtest_v2.py 读取）：
+- etf_prices: source.py 查 nav-date 价格 + 回测
+- stock_prices: source.py 查 nav-date 价格 + 回测
+- fund_nav: 回测 3 个月净值
+- fx_rates: 回测 3 个月汇率
+- holdings: 回测 + B 类 IOPV 备用
 
-| 表 | 保留天数 | 说明 |
-|----|----------|------|
-| fund_nav | 120天 | 足够回测40交易日 |
-| etf_prices | 250天 | 约1年交易日 |
-| stock_prices | 250天 | 同上 |
-| fx_rates | 当年 | 只保留当前年份 |
-| iopv_results | 30天 | 临时计算结果 |
+## 数据量变化
 
-## 风险
-
-- GLD ETF 新浪拉取失败（assignment destination is read-only），不影响其他ETF
-- 东方财富 NAV API 在服务器可正常访问
+改造前: ~23 万行（ETF 从 2001 年至今）
+改造后: ~4907 行（全部 ≤90 天）
