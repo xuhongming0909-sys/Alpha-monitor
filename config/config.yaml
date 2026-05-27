@@ -276,7 +276,24 @@ data_fetch:
       intraday: true
       refresh_interval_ms: 60000
       daily_incremental_sync: true
+      default_group: index
+      source_page_urls:
+        index: https://www.jisilu.cn/data/lof/#index
+        asia: https://www.jisilu.cn/data/qdii/#qdiia
+      source_api_urls:
+        index: https://www.jisilu.cn/data/lof/index_lof_list/
+        asia: https://www.jisilu.cn/data/qdii/qdii_list/A
+      source_referer: https://www.jisilu.cn/
       request_timeout_ms: 20000
+      jisilu_cookie: ${JISILU_COOKIE}
+      firecrawl_enabled: false
+      firecrawl_api_url: ${FIRECRAWL_API_URL}
+      firecrawl_api_key: ${FIRECRAWL_API_KEY}
+      firecrawl_timeout_ms: 20000
+      limited_apply_cap_amount: 100000
+      limited_premium_rate_threshold: 1
+      unlimited_abs_premium_rate_threshold: 5
+      min_turnover_wan: 100
       funds:
       - code: '161128'
         name: 标普信息科技LOF
@@ -492,7 +509,12 @@ strategy:
     - 鑲′笢澶т細閫氳繃
     - 鍙戝濮旈€氳繃
   lof_iopv:
+    default_group: index
     ranking_metric: premium_rate
+    limited_apply_cap_amount: 100000
+    limited_premium_rate_threshold: 1
+    unlimited_abs_premium_rate_threshold: 5
+    min_turnover_wan: 100
 presentation:
   api_prefix: /api
   dashboard_entry: ./ui/templates/dashboard_template.html
