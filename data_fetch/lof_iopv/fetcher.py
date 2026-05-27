@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """QDII LOF IOPV 数据获取层 - 31只基金双引擎版。
 
 东财净值+持仓+基金档案 | 腾讯行情+汇率。
@@ -191,6 +191,42 @@ def _fetch_holdings(code: str) -> List[dict]:
         return []
 
 
+def _fetch_purchase_status() -> dict:
+    """从天天基金获取所有基金申购状态和日累计限额。
+
+    返回: {code: {"applyStatus": str, "dailyLimit": float}}
+    - applyStatus: "开放申购" / "暂停申购" / "限大额"
+    - dailyLimit: 日累计限定金额（元），无限额时为 1e11
+    """
+    result = {}
+    try:
+        url = "https://fund.eastmoney.com/Data/Fund_JJJZ_Data.aspx"
+        params = {"t": "8", "page": "1,50000", "js": "reData", "sort": "fcode,asc"}
+        r = SESSION.get(url, params=params, timeout=_REQUEST_TIMEOUT)
+        text = r.text.strip().replace("var reData=", "")
+        # 正则提取datas数组，避免依赖demjson
+        m = re.search(r'datas:\s*(\[.*?\])\s*,\s*\w+:', text, re.DOTALL)
+        if not m:
+            return result
+        import json as _json_parse
+        arr = _json_parse.loads(m.group(1))
+        for item in arr:
+            if len(item) >= 11:
+                code = item[0]
+                status_raw = item[5]
+                daily_limit_raw = item[9]
+                try:
+                    daily_limit = float(daily_limit_raw)
+                except (TypeError, ValueError):
+                    daily_limit = None
+                result[code] = {
+                    "applyStatus": status_raw,
+                    "dailyLimit": daily_limit,
+                }
+    except Exception:
+        pass
+    return result
+
 def _fetch_jisilu_qdii() -> dict:
     """从集思录获取QDII限额数据。返回 {code: {min_amt, apply_status, ...}}。"""
     result = {}
@@ -271,8 +307,9 @@ def fetch_lof_iopv_snapshot() -> dict:
     except Exception:
         fx_rates = {}
 
-    # 从集思录获取限额数据
-    jisilu_data = _fetch_jisilu_qdii()
+
+    # 从天天基金获取申购状态和限额
+    purchase_status_data = _fetch_purchase_status()
 
     # A类ETF实时涨跌幅
     etf_codes = list({f.get("etf") for f in QDII_FUNDS if f.get("etf") and f.get("estimation") == "A"})
@@ -328,8 +365,8 @@ def fetch_lof_iopv_snapshot() -> dict:
             "holdingsPrevClose": current_prices.pop("_prev_close", None),
             "currentFxRate": fx_rates.get(fund["currency"], 1.0),
             "applyFee": fund_info.get("applyFee"),
-            "applyStatus": fund_info.get("applyStatus"),
-            "minAmt": jisilu_data.get(code, {}).get("min_amt"),
+            "applyStatus": purchase_status_data.get(code, {}).get("applyStatus") or fund_info.get("applyStatus"),
+            "dailyLimit": purchase_status_data.get(code, {}).get("dailyLimit"),
             "redeemFee": fund_info.get("redeemFee"),
             "redeemStatus": fund_info.get("redeemStatus"),
             "custodianFee": fund_info.get("custodianFee"),

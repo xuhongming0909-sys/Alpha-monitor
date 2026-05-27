@@ -184,11 +184,17 @@ def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
         # 基准指数
         benchmark = row.get("etf") or f"Top10({len(row.get('holdings', []) or [])})"
 
-        # 申购状态+限额
+        # 申购状态：暂停申购 / 开放申购 / 限额XXXX
         apply_status = row.get("applyStatus") or ""
-        min_amt = row.get("minAmt")
-        if min_amt:
-            apply_status = f"{apply_status}(限额{min_amt}万)"
+        daily_limit = row.get("dailyLimit")
+        if apply_status == "限大额" and daily_limit is not None and daily_limit < 1e10:
+            apply_status = f"限额{int(daily_limit)}"
+        elif apply_status == "暂停申购":
+            apply_status = "暂停申购"
+        elif apply_status == "开放申购":
+            apply_status = "开放申购"
+        elif not apply_status:
+            apply_status = "--"
 
         # 估值标的: A类=ETF标的代码, B类="前十大"
         if est == "A":
