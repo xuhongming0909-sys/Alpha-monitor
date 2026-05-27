@@ -33,6 +33,27 @@ _ETF_SESSION.trust_env = False
 _ETF_SESSION.proxies = {"http": None, "https": None}
 
 
+def _get_etf_nav_date_prices(etf_codes, nav_date):
+    """获取ETF在净值日的价格（用于期间涨跌幅）"""
+    if not nav_date or not etf_codes:
+        return {}
+    result = {}
+    try:
+        from data_fetch.lof_db.schema import get_db as _get_db
+        _conn = _get_db()
+        for ticker in set(etf_codes):
+            row = _conn.execute(
+                "SELECT close FROM etf_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
+                (ticker, nav_date)
+            ).fetchone()
+            if row:
+                result[ticker] = row[0]
+        _conn.close()
+    except Exception:
+        pass
+    return result
+
+
 def _load_fund_list():
     """Load fund list from config.yaml. Raises on failure."""
     cfg = load_config()
@@ -298,6 +319,9 @@ def build_lof_snapshot():
         nav, nav_date = nav_data["nav"], nav_data["navDate"]
         holdings = _fetch_holdings(code)
         fund_info = _fetch_fund_info(code)
+        # A类ETF净值日价格
+        if fund.get("etf") and fund.get("estimation") == "A":
+            etf_nav_date_prices[fund["etf"]] = _get_etf_nav_date_prices([fund["etf"]], nav_date).get(fund["etf"])
 
         market = "sh" if code.startswith(("5", "6")) else "sz"
         try:
@@ -393,6 +417,7 @@ def build_lof_snapshot():
             "custodianFee": fund_info.get("custodianFee"),
             "fundCompany": fund_info.get("fundCompany"),
             "etfChange": etf_changes.get(fund.get("etf")),
+            "etfNavDatePrice": etf_nav_date_prices.get(fund.get("etf")) if fund.get("estimation") == "A" else None,
         })
 
     return {

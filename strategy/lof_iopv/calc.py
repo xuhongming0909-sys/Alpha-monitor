@@ -42,16 +42,36 @@ def get_base_fx(currency, date_str):
     return None
 
 
-def calc_a_iopv(nav, etf_change_pct, fx_now, fx_base):
+def calc_a_iopv(nav, etf_change_pct, fx_now, fx_base, stock_position=None, etf_nav_date_price=None):
+    """A类: IOPV = NAV × (1 + stock_position × etf_period_ret) × fx_ratio
+    
+    etf_period_ret: 优先用etf_current/etf_navDate - 1（期间涨跌），fallback到etf_change_pct/100（日内涨跌）
+    stock_position: 从雪球获取的仓位占比，默认90%
+    """
     if nav is None or nav <= 0:
         return None, "NAV缺失", {}
     fx_ratio = 1.0
     if fx_now and fx_base and fx_base > 0:
         fx_ratio = fx_now / fx_base
-    etf_ret = (etf_change_pct or 0) / 100
-    iopv = nav * (1 + etf_ret) * fx_ratio
-    status = "A类-指数跟踪" if etf_change_pct is not None else "A类-指数跟踪(无ETF数据)"
-    return round(iopv, 6), status, {"fxRatio": fx_ratio, "etfRet": etf_ret}
+    # 仓位
+    if stock_position is None:
+        stock_position = 90.0
+    # ETF期间涨跌
+    etf_period_ret = None
+    meta = {"fxRatio": fx_ratio, "stockPosition": stock_position}
+    if etf_nav_date_price and etf_nav_date_price > 0:
+        etf_change = (etf_change_pct or 0) / 100
+        etf_current = etf_nav_date_price * (1 + etf_change)
+        etf_period_ret = etf_current / etf_nav_date_price - 1
+        meta["etfPeriodRet"] = etf_period_ret
+    elif etf_change_pct is not None:
+        etf_period_ret = etf_change_pct / 100
+        meta["etfDailyRet"] = etf_period_ret
+    else:
+        return round(nav * fx_ratio, 6), "A类-无ETF数据", meta
+    iopv = nav * (1 + stock_position / 100 * etf_period_ret) * fx_ratio
+    status = "A类-指数跟踪"
+    return round(iopv, 6), status, meta
 
 
 def calc_b_iopv(nav, holdings, stock_ratio, current_prices, nav_date_prices, prev_closes, fx_now, fx_base):
