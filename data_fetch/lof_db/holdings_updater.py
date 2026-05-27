@@ -6,9 +6,6 @@ import os
 import datetime
 import time
 
-for k in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY']:
-    os.environ[k] = ''
-
 from data_fetch.lof_db.schema import get_db
 
 
