@@ -313,6 +313,7 @@ def build_lof_snapshot():
     etf_changes = _fetch_etf_changes(etf_codes)
 
     all_rows = []
+    etf_nav_date_prices = {}
     for fund in funds:
         code = fund["code"]
         nav_data = _fetch_nav(code)
