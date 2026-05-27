@@ -1,4 +1,4 @@
-﻿# Alpha Monitor — 项目索引
+# Alpha Monitor — 项目索引
 
 **定位**：金融套利机会监控终端，从真实市场数据中发现套利机会，通过网页展示和企业微信推送完成闭环。
 **阶段**：React 金融终端 UI 并行重做中，旧 HTML 看板保留 `/legacy` 回滚入口；当前 React 顶层导航收敛为 7 个标签。
@@ -169,7 +169,8 @@
 | `Caddyfile`, `nginx-*.conf` | Web 服务器配置 |
 | `install_*.sh` | 安装脚本（Caddy/Nginx/systemd） |
 | `update_*.sh` | 自动更新脚本 |
-| `server_doctor.sh` | 服务器健康检查 |
+| server_doctor.sh | 服务器健康检查 |
+| sync_server.sh | 服务器 git 同步（协议修复/stash/冲突/重启） |
 | `sync_remote_env_from_profile.py` | 同步远程环境变量（读取 `config/server_profile.local.yaml`） |
 
 ### 2.6a config/ — 配置文件
