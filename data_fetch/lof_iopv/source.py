@@ -235,20 +235,24 @@ def _fetch_purchase_status():
 
 
 def _fetch_stock_position(code):
-    """Fetch stock position ratio from xueqiu."""
+    """stockPosition = 100 - 现金比例（雪球资产大类占比）"""
     try:
         import akshare as ak
         from datetime import datetime
-        date = datetime.now().strftime("%Y%m%d")
+        date = datetime.now().strftime('%Y%m%d')
         df = ak.fund_individual_detail_hold_xq(symbol=code, date=date)
         if df is not None and not df.empty:
-            for _, row in df.iterrows():
-                if "\u80a1\u7968" in str(row.get("\u8d44\u4ea7\u7c7b\u578b", "")):
-                    val = row.get("\\u4ed3\\u4f4d\\u5360\\u6bd4"); return float(val) if val else None
+            vals = []
+            for i in range(len(df)):
+                try:
+                    vals.append(float(df.iloc[i, 1]))
+                except (TypeError, ValueError):
+                    continue
+            if vals:
+                return round(100 - min(vals), 2)
     except Exception:
         pass
     return None
-
 
 def _fetch_fund_info(code):
     """Fetch fund info from eastmoney fund page."""
