@@ -1,14 +1,18 @@
-# -*- coding: utf-8 -*-
-# AI-SUMMARY: ETF价格增量更新，通过akshare反查secid后从东财拉取美股ETF日线
+﻿# -*- coding: utf-8 -*-
+# AI-SUMMARY: ETF和个股价格增量更新，统一使用新浪akshare替代东财secid反查
 # 对应 INDEX.md §9.3 文件摘要索引
-"""ETF价格增量更新 - 两步走：stock_us_spot_em反查secid + stock_us_hist拉历史"""
+"""ETF/个股价格增量更新 - 新浪akshare stock_us_daily + stock_hk_daily"""
 
+import os
 import time
+
+for k in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY']:
+    os.environ[k] = ''
+
 from data_fetch.lof_db.schema import get_db
 
 
 def _load_etf_list() -> list[str]:
-    """从 config.yaml 提取去重的 ETF 代码列表。"""
     try:
         from shared.config.script_config import load_config
         cfg = load_config()
@@ -23,111 +27,91 @@ def _load_etf_list() -> list[str]:
     return ['QQQ', 'SPY', 'GLD', 'XLK']
 
 
-def _resolve_secids(tickers: list[str]) -> dict[str, str]:
-    """通过 stock_us_spot_em 反查每个ETF的东财secid（105/106/107）。
+def _load_stock_list() -> list[str]:
+    conn = get_db()
+    rows = conn.execute('SELECT DISTINCT ticker FROM holdings').fetchall()
+    conn.close()
+    return sorted([r[0] for r in rows if r[0]])
 
-    返回 {ticker: "105.QQQ", ...} 映射。
-    """
+
+def _is_hk(ticker: str) -> bool:
+    """判断是否港股：5位数字开头或HK前缀"""
+    return ticker.isdigit() and len(ticker) == 5
+
+
+def _fetch_sina(ticker: str) -> dict[str, float]:
+    """通过新浪akshare拉取美股/港股历史日线收盘价"""
     import akshare as ak
     try:
-        df = ak.stock_us_spot_em()
-    except Exception as e:
-        print(f'  stock_us_spot_em 失败: {e}')
-        return {}
-
-    # df 里有 代码 列，格式如 "105.QQQ" 或 "106.SPY"
-    result = {}
-    code_to_ticker = {}
-    for _, row in df.iterrows():
-        code = str(row.get('代码', ''))
-        if '.' in code:
-            parts = code.split('.', 1)
-            secid = parts[0]
-            sym = parts[1].upper()
-            code_to_ticker[sym] = f'{secid}.{sym}'
-
-    for t in tickers:
-        t_upper = t.upper()
-        if t_upper in code_to_ticker:
-            result[t] = code_to_ticker[t_upper]
+        if _is_hk(ticker):
+            df = ak.stock_hk_daily(symbol=ticker, adjust='qfq')
         else:
-            print(f'  {t}: 未在stock_us_spot_em中找到')
-
-    return result
-
-
-def fetch_etf_hist(secid: str, start: str = '20250101', end: str = '20261231') -> dict:
-    """通过 akshare stock_us_hist 拉取ETF历史日线收盘价。
-
-    secid: 东财内部编码，如 "105.QQQ"
-    返回 {date_str: close_price}
-    """
-    import akshare as ak
-    try:
-        df = ak.stock_us_hist(
-            symbol=secid,
-            period="daily",
-            start_date=start,
-            end_date=end,
-            adjust=""
-        )
+            df = ak.stock_us_daily(symbol=ticker, adjust='qfq')
+        prices = {}
+        for _, row in df.iterrows():
+            date_str = str(row['date'])[:10]
+            close = float(row['close'])
+            if close > 0:
+                prices[date_str] = close
+        return prices
     except Exception as e:
-        print(f'  {secid}: stock_us_hist 失败 - {e}')
+        print(f'  {ticker}: 新浪拉取失败 - {e}')
         return {}
-
-    if df is None or df.empty:
-        return {}
-
-    prices = {}
-    for _, row in df.iterrows():
-        date_str = str(row['日期']).replace('-', '')
-        close = float(row['收盘'])
-        if close > 0:
-            prices[date_str] = close
-    return prices
 
 
 def update_etf():
-    """增量更新所有ETF价格。"""
     conn = get_db()
     total_inserted = 0
-
     etf_list = _load_etf_list()
     print(f'ETF列表 ({len(etf_list)}): {", ".join(etf_list)}')
-
-    # 步骤1: 反查secid
-    secid_map = _resolve_secids(etf_list)
-    if not secid_map:
-        print('secid反查失败，跳过更新')
-        conn.close()
-        return 0
-
-    print(f'secid映射: {secid_map}')
-
-    # 步骤2: 逐个拉取历史数据
     for ticker in etf_list:
-        secid = secid_map.get(ticker)
-        if not secid:
-            continue
-
-        prices = fetch_etf_hist(secid)
+        prices = _fetch_sina(ticker)
         if not prices:
             continue
-
-        for date, close in prices.items():
+        for date_str, close in prices.items():
             conn.execute(
                 'INSERT OR REPLACE INTO etf_prices (ticker, date, close) VALUES (?, ?, ?)',
-                (ticker, date, close)
+                (ticker, date_str, close)
             )
         conn.commit()
         total_inserted += len(prices)
-        print(f'  {ticker} ({secid}): {len(prices)} days')
-        time.sleep(0.5)
-
+        print(f'  {ticker}: {len(prices)}天')
+        time.sleep(0.3)
     conn.close()
     return total_inserted
 
 
+def update_stocks(tickers: list[str] = None):
+    if tickers is None:
+        tickers = _load_stock_list()
+    conn = get_db()
+    total_inserted = 0
+    print(f'股票列表 ({len(tickers)}): {", ".join(tickers[:10])}{"..." if len(tickers) > 10 else ""}')
+    for ticker in tickers:
+        prices = _fetch_sina(ticker)
+        if not prices:
+            continue
+        for date_str, close in prices.items():
+            conn.execute(
+                'INSERT OR REPLACE INTO stock_prices (ticker, date, close) VALUES (?, ?, ?)',
+                (ticker, date_str, close)
+            )
+        conn.commit()
+        total_inserted += len(prices)
+        print(f'  {ticker}: {len(prices)}天')
+        time.sleep(0.3)
+    conn.close()
+    return total_inserted
+
+
+def update_all():
+    print('=== 更新ETF价格 ===')
+    etf_count = update_etf()
+    print(f'\n=== 更新持仓股票价格 ===')
+    stock_count = update_stocks()
+    print(f'\n完成: ETF {etf_count}条, 股票 {stock_count}条')
+    return etf_count + stock_count
+
+
 if __name__ == '__main__':
-    total = update_etf()
-    print(f'\n更新完成: 共 {total} 条记录')
+    update_all()

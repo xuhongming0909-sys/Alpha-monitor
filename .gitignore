@@ -33,3 +33,10 @@ runtime_data/*.tsv
 # ui/dist/
 scripts/debug_scripts/
 scripts/screenshots/
+
+codex.pem
+
+runtime_data/check_*
+runtime_data/gen_*
+runtime_data/patch_*
+.claude/

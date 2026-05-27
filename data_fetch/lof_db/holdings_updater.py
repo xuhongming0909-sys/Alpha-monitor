@@ -1,84 +1,95 @@
 ﻿# -*- coding: utf-8 -*-
-# AI-SUMMARY: 持仓数据增量更新，从东方财富F10 API获取
-# 对应 INDEX.md §9.3 文件摘要索引
-"""持仓数据增量更新"""
+# AI-SUMMARY: 基金持仓更新，使用akshare fund_portfolio_hold_em API
+"""基金持仓增量更新 - akshare fund_portfolio_hold_em API"""
 
-import re
-import requests
+import os
+import datetime
+import time
+
+for k in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY']:
+    os.environ[k] = ''
+
 from data_fetch.lof_db.schema import get_db
 
-SESSION = requests.Session()
-SESSION.headers.update({
-    'User-Agent': 'Mozilla/5.0',
-    'Referer': 'https://fundf10.eastmoney.com/',
-})
 
-# B类基金（需要持仓数据）
-def _load_b_fund_codes() -> list[str]:
-    """从 config 读取B类基金代码。"""
+def _load_b_funds():
     try:
         from shared.config.script_config import load_config
         cfg = load_config()
         plugins = cfg.get("data_fetch", {}).get("plugins", {})
         lof_cfg = plugins.get("lof_arbitrage", plugins.get("lof_iopv", {}))
         funds = lof_cfg.get("funds", [])
-        return [f["code"] for f in funds if f.get("estimation") == "B" and f.get("code")]
+        return [f for f in funds if f.get("estimation") == "B" and f.get("code")]
     except Exception:
-        pass
-    return ['160644', '164906', '160125', '501312']
-
-B_FUNDS = _load_b_fund_codes()
+        return []
 
 
-def fetch_holdings(code, year=2025, month=12):
-    """获取基金持仓"""
-    url = f'https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code={code}&topline=10&year={year}&month={month}'
+def _fetch_holdings_api(code, year=None):
+    import akshare as ak
+    if year is None:
+        year = str(datetime.datetime.now().year)
     try:
-        r = SESSION.get(url, timeout=15)
-        m = re.search(r'content:"(.*?)",arryear', r.text, re.DOTALL)
-        if not m:
+        df = ak.fund_portfolio_hold_em(symbol=code, date=year)
+        if df is None or df.empty:
             return []
-        html = m.group(1)
-        rows = re.findall(
-            r'<tr><td>(\d+)</td>.*?<a href=[^>]+>([A-Z0-9]+)</a>.*?<a href=[^>]+>([^<]+)</a>.*?<td[^>]*>([\d.]+)%</td>',
-            html, re.DOTALL
-        )
-        result = []
-        for seq, stk_code, stk_name, pct in rows:
-            if int(seq) > 10:
-                continue
-            mkt = 'HK' if stk_code.isdigit() else 'US'
-            result.append({
-                'code': stk_code,
-                'name': stk_name,
-                'weight': float(pct),
-                'market': mkt,
-            })
-        return result
+        holdings = []
+        for _, row in df.iterrows():
+            code_stock = str(row.get("股票代码", ""))
+            name_stock = str(row.get("股票名称", ""))
+            weight = float(row.get("占净值比例", 0) or 0)
+            quarter = str(row.get("季度", ""))
+            if code_stock and weight > 0:
+                holdings.append({"ticker": code_stock, "name": name_stock, "weight": weight, "quarter": quarter})
+        return holdings
     except Exception as e:
-        print(f'  {code}: {e}')
-    return []
+        print(f"  {code}: API失败 - {e}")
+        return []
+
+
+def _fetch_holdings_html(code):
+    import re, requests
+    s = requests.Session()
+    s.headers.update({"User-Agent": "Mozilla/5.0", "Referer": "https://fundf10.eastmoney.com/"})
+    url = f"http://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code={code}&topline=10"
+    try:
+        r = s.get(url, timeout=15)
+        m = re.search(r'content:"(.*?)",arryear', r.text, re.DOTALL)
+        if not m: return []
+        rows = re.findall(r'<tr><td>(\d+)</td>.*?<a href=[^>]+>([A-Z0-9]+)</a>.*?<a href=[^>]+>([^<]+)</a>.*?<td[^>]*>([\d.]+)%</td>', m.group(1), re.DOTALL)
+        return [{"ticker": c, "name": n.strip(), "weight": float(w), "quarter": ""} for _, c, n, w in rows]
+    except Exception:
+        return []
 
 
 def update_holdings():
-    """增量更新持仓数据"""
     conn = get_db()
+    b_funds = _load_b_funds()
     total = 0
-
-    for code in B_FUNDS:
-        for year, month in [(2025, 12), (2024, 12), (2024, 9)]:
-            holdings = fetch_holdings(code, year=year, month=month)
-            if holdings:
-                report_date = f'{year}-{month:02d}-31'
-                for h in holdings:
-                    conn.execute(
-                        'INSERT OR REPLACE INTO holdings (code, report_date, ticker, name, weight, market) VALUES (?, ?, ?, ?, ?, ?)',
-                        (code, report_date, h['code'], h['name'], h['weight'], h['market'])
-                    )
-                conn.commit()
-                total += len(holdings)
-                print(f'  {code}: {len(holdings)} holdings from {year}Q{month//3+1}')
-                break
-
+    print(f"B类基金 ({len(b_funds)}):")
+    for fund in b_funds:
+        code = fund["code"]
+        name = fund.get("name", "")
+        print(f"\n--- {code} {name} ---")
+        holdings = _fetch_holdings_api(code)
+        if not holdings:
+            print("  API无数据，尝试HTML...")
+            holdings = _fetch_holdings_html(code)
+        if not holdings:
+            print("  无持仓"); continue
+        quarter = holdings[0].get("quarter", "latest")
+        for h in holdings:
+            t = h["ticker"]
+            market = "HK" if (t.isdigit() and len(t) == 5) else "US"
+            conn.execute("INSERT OR REPLACE INTO holdings (code, report_date, ticker, name, weight, market) VALUES (?,?,?,?,?,?)",
+                (code, quarter, t, h["name"], h["weight"], market))
+        conn.commit()
+        total += len(holdings)
+        print(f"  {len(holdings)}条 ({quarter})")
+        time.sleep(0.5)
     conn.close()
+    print(f"\n完成: {total}条")
     return total
+
+
+if __name__ == "__main__":
+    update_holdings()

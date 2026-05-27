@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """QDII LOF IOPV 双引擎估值。A类指数跟踪法 + B类T10持仓加权法。"""
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from strategy.lof_iopv.classifier import get_calc_mode
 _BACKTEST_DIR = _os.path.join(_os.path.dirname(__file__), "..", "..", "runtime_data", "backtest")
 _BACKTEST_RESULTS = {}
 # 加载回测结果：优先加载合并文件，再加载各子文件
-for _fname in ("a_results.json", "b_results.json"):
+for _fname in ("results.json",):
     _fpath = _os.path.join(_BACKTEST_DIR, _fname)
     if _os.path.exists(_fpath):
         try:
