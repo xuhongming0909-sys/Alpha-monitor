@@ -97,8 +97,6 @@ def build_lof_iopv_response(fetch_payload, records):
 
         calc_method = "\u6307\u6570\u8ddf\u8e2a\u6cd5" if est == "A" else "T10\u6301\u4ed3\u6cd5"
         stock_pos = row.get("stockPosition")
-        if est == "A" and iopv and row.get("nav") and row["nav"] > 0:
-            stock_pos = round((iopv / row["nav"] - 1) * 100, 3) if iopv != row["nav"] else None
 
         if premium is not None:
             premium_status = "\u6ea2\u4ef7" if premium > 0.5 else ("\u6298\u4ef7" if premium < -0.5 else "\u5e73\u4ef7")
