@@ -10,7 +10,7 @@ def fetch_fx():
     """获取汇率历史"""
     import akshare as ak
     fx = {}
-    for sym, key in [("美元", 'usd'), ("港币", 'hkd')]:
+    for sym, key in [("美元", "USD"), ("港币", "HKD")]:
         try:
             df = ak.currency_boc_sina(symbol=sym, start_date="20260101", end_date="20261231")
             for _, row in df.iterrows():

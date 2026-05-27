@@ -54,7 +54,7 @@ def _get_base_fx(currency: str, date_str: str) -> Optional[float]:
         return None
     try:
         import akshare as ak
-        sym = {"USD": "美元", "HKD": "港币"}.get(currency)
+        sym = {"USD": "美元", "HKD": "美元"}.get(currency)  # HKD与USD强挂钩
         if not sym:
             return None
         from datetime import datetime, timedelta
@@ -108,8 +108,9 @@ def _calc_b(row: dict, fx_now: Optional[float]) -> tuple:
     total_w = sum(h.get("weight", 0) or 0 for h in holdings)
     if total_w <= 0:
         return round(nav * fx_ratio, 6), "B类-T10(权重为零)", {"fxRatio": fx_ratio}
-    # 持仓加权收益率
+    # 持仓加权收益率：currentPrice/navDatePrice算期间涨跌幅
     current_prices = row.get("currentPrices") or {}
+    nav_date_prices = row.get("navDatePrices") or {}
     prev_closes = row.get("holdingsPrevClose") or {}
     weighted_ret = 0.0
     has_price = False
@@ -117,10 +118,17 @@ def _calc_b(row: dict, fx_now: Optional[float]) -> tuple:
         ticker = h.get("ticker", "")
         w = (h.get("weight", 0) or 0) / total_w
         cur_p = _to_float(current_prices.get(ticker))
-        prev_p = _to_float(prev_closes.get(ticker))
-        if cur_p and prev_p and prev_p > 0:
-            weighted_ret += w * (cur_p / prev_p - 1)
+        # 优先用净值日价格作基准
+        base_p = _to_float(nav_date_prices.get(ticker))
+        if cur_p and base_p and base_p > 0:
+            weighted_ret += w * (cur_p / base_p - 1)
             has_price = True
+        elif cur_p:
+            # fallback: 日内涨跌
+            prev_p = _to_float(prev_closes.get(ticker))
+            if prev_p and prev_p > 0:
+                weighted_ret += w * (cur_p / prev_p - 1)
+                has_price = True
     if not has_price:
         return round(nav * fx_ratio, 6), "B类-T10(无股价)", {"fxRatio": fx_ratio, "stockRatio": stock_ratio}
     est = nav * (1 + stock_ratio / 100 * weighted_ret) * fx_ratio

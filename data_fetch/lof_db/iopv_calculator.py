@@ -36,8 +36,8 @@ def get_fx_rate(currency, date):
         return 1.0
     conn = get_db()
     row = conn.execute(
-        'SELECT rate FROM fx_rates WHERE currency = ? AND date <= ? ORDER BY date DESC LIMIT 1',
-        (currency.lower(), date)
+        'SELECT rate FROM fx_rates WHERE UPPER(currency) = UPPER(?) AND date <= ? ORDER BY date DESC LIMIT 1',
+        (currency, date)
     ).fetchone()
     conn.close()
     return row[0] if row else None

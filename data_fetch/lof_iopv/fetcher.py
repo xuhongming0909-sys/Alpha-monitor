@@ -12,6 +12,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 import requests
+import urllib.request
 
 from shared.market_service import get_fx_rates, get_quotes
 from shared.time.shanghai_time import now_iso
@@ -28,6 +29,35 @@ _ETF_SESSION = requests.Session()
 _ETF_SESSION.trust_env = False
 _ETF_SESSION.proxies = {'http': None, 'https': None}
 
+
+
+def _fetch_us_realtime(codes):
+    """批量获取美股实时行情（urllib直连，绕过代理）"""
+    if not codes:
+        return {}
+    query = ','.join('us' + c for c in codes)
+    url = 'https://qt.gtimg.cn/q=' + query
+    req = urllib.request.Request(url)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            text = resp.read().decode('gbk')
+    except Exception:
+        return {}
+    result = {}
+    for line in text.strip().split(';'):
+        line = line.strip()
+        if len(line) < 20:
+            continue
+        key = line.split('=')[0].replace('v_', '')
+        code = key.replace('us', '')
+        data = line.split('"')[1].split('~')
+        if len(data) < 5:
+            continue
+        price = float(data[3]) if data[3] else 0
+        prev = float(data[4]) if data[4] else 0
+        if price > 0:
+            result[code] = {'price': price, 'prev_close': prev}
+    return result
 
 def _fetch_etf_changes(etf_codes: list) -> dict:
     """获取ETF实时涨跌幅（百分比）。东财K线优先，腾讯fallback。"""
@@ -249,6 +279,22 @@ def _fetch_jisilu_qdii() -> dict:
         pass
     return result
 
+
+def _fetch_stock_position(code):
+    """从雪球获取最新股票仓位占比（用当天日期）"""
+    try:
+        import akshare as ak
+        from datetime import datetime
+        date = datetime.now().strftime('%Y%m%d')
+        df = ak.fund_individual_detail_hold_xq(symbol=code, date=date)
+        if df is not None and not df.empty:
+            for _, row in df.iterrows():
+                if '股票' in str(row.get('资产类型', '')):
+                    return float(row.get('仓位占比', 0) or 0)
+    except Exception:
+        pass
+    return None
+
 def _fetch_fund_info(code: str) -> dict:
     """东财基金档案页：费用/公司/状态。"""
     url = f"https://fundf10.eastmoney.com/jbgk_{code}.html"
@@ -334,26 +380,73 @@ def fetch_lof_iopv_snapshot() -> dict:
         # 持仓股票价格
         current_prices = {}
         if holdings:
+            # HK via get_quotes
             try:
-                codes = [_build_tc_code(h["ticker"], h["market"]) for h in holdings]
-                quotes = get_quotes(codes)
-                for h in holdings:
-                    tc = _build_tc_code(h["ticker"], h["market"])
-                    if tc in quotes:
-                        current_prices[h["ticker"]] = quotes[tc].get("price")
-                        if quotes[tc].get("prev_close"):
-                            current_prices.setdefault("_prev_close", {})[h["ticker"]] = quotes[tc]["prev_close"]
+                hk_codes = [_build_tc_code(h["ticker"], h["market"]) for h in holdings if h["market"] == "hk"]
+                if hk_codes:
+                    hk_q = get_quotes(hk_codes)
+                    for h in holdings:
+                        if h["market"] != "hk": continue
+                        tc = _build_tc_code(h["ticker"], h["market"])
+                        if tc in hk_q:
+                            cur = hk_q[tc].get("price") or hk_q[tc].get("prev_close")
+                            current_prices[h["ticker"]] = cur
+                            if hk_q[tc].get("prev_close"):
+                                current_prices.setdefault("_prev_close", {})[h["ticker"]] = hk_q[tc]["prev_close"]
             except Exception:
                 pass
+            # US via urllib (bypass proxy)
+            try:
+                us_tickers = [h["ticker"] for h in holdings if h["market"] == "us"]
+                if us_tickers:
+                    us_q = _fetch_us_realtime(us_tickers)
+                    for h in holdings:
+                        if h["market"] != "us": continue
+                        tc = h["ticker"].upper()
+                        if tc in us_q:
+                            current_prices[h["ticker"]] = us_q[tc].get("price")
+                            if us_q[tc].get("prev_close"):
+                                current_prices.setdefault("_prev_close", {})[h["ticker"]] = us_q[tc]["prev_close"]
+            except Exception:
+                pass
+            # DB fallback
+            missing = [h for h in holdings if not current_prices.get(h["ticker"])]
+            if missing:
+                try:
+                    from data_fetch.lof_db.schema import get_db as _get_db
+                    _conn = _get_db()
+                    for h in missing:
+                        row = _conn.execute("SELECT close FROM stock_prices WHERE ticker=? ORDER BY date DESC LIMIT 1", (h["ticker"],)).fetchone()
+                        if row:
+                            current_prices[h["ticker"]] = row[0]
+                    _conn.close()
+                except Exception:
+                    pass
 
-        stock_position = sum(h.get("weight", 0) or 0 for h in holdings)
+        stock_position = _fetch_stock_position(code) or sum(h.get("weight", 0) or 0 for h in holdings)
+
+        # 净值日各持仓价格（用于期间涨跌幅）
+        nav_date_prices = {}
+        if holdings and nav_date:
+            try:
+                from data_fetch.lof_db.schema import get_db as _get_db
+                _conn = _get_db()
+                for h in holdings:
+                    row = _conn.execute(
+                        "SELECT close FROM stock_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
+                        (h["ticker"], nav_date)
+                    ).fetchone()
+                    if row:
+                        nav_date_prices[h["ticker"]] = row[0]
+                _conn.close()
+            except Exception:
+                pass
 
         all_rows.append({
             "code": code,
             "name": fund["name"],
             "currency": fund["currency"],
             "nav": nav,
-            "navDate": nav_date,
             "shareIncrease": nav_data.get("shareIncrease"),
             "shareTotal": nav_data.get("shareTotal"),
             "price": price,
@@ -363,6 +456,8 @@ def fetch_lof_iopv_snapshot() -> dict:
             "currentPrices": current_prices,
             "stockPosition": stock_position,
             "holdingsPrevClose": current_prices.pop("_prev_close", None),
+            "navDatePrices": nav_date_prices,
+            "navDate": nav_date,
             "currentFxRate": fx_rates.get(fund["currency"], 1.0),
             "applyFee": fund_info.get("applyFee"),
             "applyStatus": purchase_status_data.get(code, {}).get("applyStatus") or fund_info.get("applyStatus"),
