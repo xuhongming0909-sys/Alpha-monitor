@@ -109,10 +109,11 @@ def _fetch_us_realtime(codes):
 
 
 def _fetch_etf_changes(etf_codes):
-    """Fetch ETF realtime change%. Eastmoney kline first, tencent fallback."""
+    """Fetch ETF realtime change% and current price. Returns (changes, current_prices)."""
     if not etf_codes:
-        return {}
+        return {}, {}
     changes = {}
+    current_prices = {}
     for ticker in etf_codes:
         try:
             url = (
@@ -128,6 +129,7 @@ def _fetch_etf_changes(etf_codes):
                 cur_close = float(klines[-1].split(",")[2])
                 if prev_close > 0:
                     changes[ticker] = (cur_close / prev_close - 1) * 100
+                    current_prices[ticker] = cur_close
                     continue
         except Exception:
             pass
@@ -143,9 +145,10 @@ def _fetch_etf_changes(etf_codes):
                     c = _to_float(parts[3])
                     if p and p > 0 and c:
                         changes[ticker] = (c / p - 1) * 100
+                        current_prices[ticker] = c
         except Exception:
             pass
-    return changes
+    return changes, current_prices
 
 
 def _fetch_nav(code):
@@ -314,7 +317,7 @@ def build_lof_snapshot():
     purchase_status_data = _fetch_purchase_status()
 
     etf_codes = list({f.get("etf") for f in funds if f.get("etf") and f.get("estimation") == "A"})
-    etf_changes = _fetch_etf_changes(etf_codes)
+    etf_changes, etf_current_prices = _fetch_etf_changes(etf_codes)
 
     all_rows = []
     etf_nav_date_prices = {}
@@ -423,6 +426,7 @@ def build_lof_snapshot():
             "fundCompany": fund_info.get("fundCompany"),
             "etfChange": etf_changes.get(fund.get("etf")),
             "etfNavDatePrice": etf_nav_date_prices.get(fund.get("etf")) if fund.get("estimation") == "A" else None,
+            "etfCurrentPrice": etf_current_prices.get(fund.get("etf")) if fund.get("estimation") == "A" else None,
         })
 
     return {

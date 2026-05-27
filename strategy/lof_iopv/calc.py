@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 # AI-SUMMARY: 共享IOPV计算公式：A类指数跟踪法 + B类T10持仓加权法
 # 对应 INDEX.md §9.3 文件摘要索引
 """Shared IOPV calculation formulas.
@@ -42,37 +42,36 @@ def get_base_fx(currency, date_str):
     return None
 
 
-def calc_a_iopv(nav, etf_change_pct, fx_now, fx_base, stock_position=None, etf_nav_date_price=None):
-    """A类: IOPV = NAV × (1 + stock_position × etf_period_ret) × fx_ratio
+def calc_a_iopv(nav, etf_change_pct, fx_now, fx_base, stock_position=None, etf_nav_date_price=None, etf_current_price=None):
+    """A?: IOPV = NAV ? (1 + stock_position ? etf_period_ret) ? fx_ratio
     
-    etf_period_ret: 优先用etf_current/etf_navDate - 1（期间涨跌），fallback到etf_change_pct/100（日内涨跌）
-    stock_position: 从雪球获取的仓位占比，默认90%
+    etf_period_ret: ???etf_current_price/etf_navDatePrice-1???????fallback?etf_change_pct/100??????
+    stock_position: ?????????????????????
     """
     if nav is None or nav <= 0:
-        return None, "NAV缺失", {}
+        return None, "NAV??", {}
     fx_ratio = 1.0
     if fx_now and fx_base and fx_base > 0:
         fx_ratio = fx_now / fx_base
-    # 仓位
+    # ???????????
     if stock_position is None:
-        stock_position = 90.0
-    # ETF期间涨跌
+        return round(nav * fx_ratio, 6), "A?-????", {"fxRatio": fx_ratio}
+    # ETF???????????/NAV???fallback?????
     etf_period_ret = None
     meta = {"fxRatio": fx_ratio, "stockPosition": stock_position}
-    if etf_nav_date_price and etf_nav_date_price > 0:
-        etf_change = (etf_change_pct or 0) / 100
-        etf_current = etf_nav_date_price * (1 + etf_change)
-        etf_period_ret = etf_current / etf_nav_date_price - 1
+    if etf_current_price and etf_nav_date_price and etf_nav_date_price > 0:
+        etf_period_ret = etf_current_price / etf_nav_date_price - 1
         meta["etfPeriodRet"] = etf_period_ret
+        meta["etfCurrentPrice"] = etf_current_price
+        meta["etfNavDatePrice"] = etf_nav_date_price
     elif etf_change_pct is not None:
         etf_period_ret = etf_change_pct / 100
         meta["etfDailyRet"] = etf_period_ret
     else:
-        return round(nav * fx_ratio, 6), "A类-无ETF数据", meta
+        return round(nav * fx_ratio, 6), "A?-?ETF??", meta
     iopv = nav * (1 + stock_position / 100 * etf_period_ret) * fx_ratio
-    status = "A类-指数跟踪"
+    status = "A?-????"
     return round(iopv, 6), status, meta
-
 
 def calc_b_iopv(nav, holdings, stock_ratio, current_prices, nav_date_prices, prev_closes, fx_now, fx_base):
     if nav is None or nav <= 0:
@@ -104,6 +103,6 @@ def calc_b_iopv(nav, holdings, stock_ratio, current_prices, nav_date_prices, pre
                 has_price = True
     if not has_price:
         return round(nav * fx_ratio, 6), "B类-T10(无股价)", {"fxRatio": fx_ratio, "stockRatio": stock_ratio}
-    norm_ret = weighted_ret / (total_w / 100) if total_w > 0 else 0
-    est = nav * (1 + stock_ratio / 100 * norm_ret) * fx_ratio
-    return round(est, 6), "B类-T10(%d持仓,%.0f%%)" % (len(holdings), stock_ratio), {"fxRatio": fx_ratio, "stockRatio": stock_ratio, "weightedRet": weighted_ret, "normRet": norm_ret}
+    portfolio_ret = stock_ratio / 100 * weighted_ret
+    est = nav * (1 + portfolio_ret) * fx_ratio
+    return round(est, 6), "B类-T10(%d持仓,%.0f%%)" % (len(holdings), stock_ratio), {"fxRatio": fx_ratio, "stockRatio": stock_ratio, "weightedRet": weighted_ret, "portfolioRet": portfolio_ret}

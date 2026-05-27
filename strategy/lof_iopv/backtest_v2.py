@@ -91,9 +91,12 @@ def _calc_metrics(actual_series, predicted_series, error_ratios):
     n = len(y)
     if n < MIN_SAMPLES:
         return None
-    y_mean = np.mean(y)
-    ss_tot = float(np.sum((y - y_mean) ** 2))
-    ss_res = float(np.sum((y - x) ** 2))
+    # R2 on daily returns (measures correlation, not trend)
+    actual_ret = np.diff(y) / y[:-1]
+    predicted_ret = np.diff(x) / y[:-1]
+    r_mean = np.mean(actual_ret)
+    ss_tot = float(np.sum((actual_ret - r_mean) ** 2))
+    ss_res = float(np.sum((actual_ret - predicted_ret) ** 2))
     r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0
     mae = float(np.mean(error_ratios)) * 100
     max_err = float(np.max(error_ratios)) * 100
@@ -133,7 +136,8 @@ def backtest_a(code, etf, end_date_str):
         predicted, _, _ = calc_a_iopv(
             nav=nav_prev, etf_change_pct=etf_change_pct,
             fx_now=fx_rates[d_curr], fx_base=fx_rates[d_prev],
-            stock_position=stock_position, etf_nav_date_price=etf_prices[d_prev]
+            stock_position=stock_position, etf_nav_date_price=etf_prices[d_prev],
+            etf_current_price=etf_prices[d_curr],
         )
         if predicted is None or predicted <= 0:
             continue
