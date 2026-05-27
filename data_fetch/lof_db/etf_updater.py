@@ -16,8 +16,10 @@ def _load_etf_list() -> list[str]:
         lof_cfg = plugins.get("lof_arbitrage", plugins.get("lof_iopv", {}))
         funds = lof_cfg.get("funds", [])
         etfs = {f["etf"] for f in funds if f.get("etf") and f.get("estimation") == "A"}
-        if etfs:
-            return sorted(etfs)
+        extra = {'SOXX', 'GSG', 'DBC', 'TIP'}
+        etfs |= extra
+        return sorted(etfs)
+
     except Exception:
         pass
     return ['QQQ', 'SPY', 'GLD', 'XLK']
