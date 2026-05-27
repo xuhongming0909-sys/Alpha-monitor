@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # AI-SUMMARY: 基金持仓更新，使用akshare fund_portfolio_hold_em API
 """基金持仓增量更新 - akshare fund_portfolio_hold_em API"""
 

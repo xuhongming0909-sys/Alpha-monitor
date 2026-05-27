@@ -1,13 +1,9 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # AI-SUMMARY: ETF和个股价格增量更新，统一使用新浪akshare替代东财secid反查
 # 对应 INDEX.md §9.3 文件摘要索引
 """ETF/个股价格增量更新 - 新浪akshare stock_us_daily + stock_hk_daily"""
 
-import os
 import time
-
-for k in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY']:
-    os.environ[k] = ''
 
 from data_fetch.lof_db.schema import get_db
 

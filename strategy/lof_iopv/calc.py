@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 # AI-SUMMARY: 共享IOPV计算公式：A类指数跟踪法 + B类T10持仓加权法
 # 对应 INDEX.md §9.3 文件摘要索引
-"""共享IOPV计算公式。
+"""Shared IOPV calculation formulas.
 
-被 strategy/lof_iopv/service.py (实时) 和 data_fetch/lof_db/iopv_calculator.py (历史) 共用。
-消除两套公式漂移风险。
+Used by strategy/lof_iopv/service.py (realtime) and data_fetch/lof_db/iopv_calculator.py (historical).
 """
 
 from __future__ import annotations
@@ -13,8 +12,7 @@ import math
 from typing import Any, Optional
 
 
-def to_float(v: Any) -> Optional[float]:
-    ""安全转 float，NaN/Inf 返回 None。"""
+def to_float(v):
     try:
         r = float(v)
         return r if math.isfinite(r) else None
@@ -22,8 +20,7 @@ def to_float(v: Any) -> Optional[float]:
         return None
 
 
-def get_base_fx(currency: str, date_str: str) -> Optional[float]:
-    """获取净值日汇率基准（通过 akshare 央行中间价）。"""
+def get_base_fx(currency, date_str):
     if currency == "CNY":
         return 1.0
     if not date_str or len(date_str) < 10:
@@ -45,8 +42,7 @@ def get_base_fx(currency: str, date_str: str) -> Optional[float]:
     return None
 
 
-def calc_a_iopv(nav: float, etf_change_pct: Optional[float], fx_now: Optional[float], fx_base: Optional[float]) -> tuple:
-    """A类: IOPV = NAV * (1 + etf_ret) * fx_ratio。"""
+def calc_a_iopv(nav, etf_change_pct, fx_now, fx_base):
     if nav is None or nav <= 0:
         return None, "NAV缺失", {}
     fx_ratio = 1.0
@@ -58,8 +54,7 @@ def calc_a_iopv(nav: float, etf_change_pct: Optional[float], fx_now: Optional[fl
     return round(iopv, 6), status, {"fxRatio": fx_ratio, "etfRet": etf_ret}
 
 
-def calc_b_iopv(nav: float, holdings: list, stock_ratio: float, current_prices: dict, nav_date_prices: dict, prev_closes: dict, fx_now: Optional[float], fx_base: Optional[float]) -> tuple:
-    """B类: T10持仓加权。IOPV = NAV * (1 + stock_ratio/100 * weighted_ret) * fx_ratio。"""
+def calc_b_iopv(nav, holdings, stock_ratio, current_prices, nav_date_prices, prev_closes, fx_now, fx_base):
     if nav is None or nav <= 0:
         return None, "NAV缺失", {}
     if not holdings:
@@ -90,4 +85,4 @@ def calc_b_iopv(nav: float, holdings: list, stock_ratio: float, current_prices: 
     if not has_price:
         return round(nav * fx_ratio, 6), "B类-T10(无股价)", {"fxRatio": fx_ratio, "stockRatio": stock_ratio}
     est = nav * (1 + stock_ratio / 100 * weighted_ret) * fx_ratio
-    return round(est, 6), f"B类-T10({len(holdings)}持仓,{stock_ratio:.0f}%)", {"fxRatio": fx_ratio, "stockRatio": stock_ratio, "weightedRet": weighted_ret}
+    return round(est, 6), "B类-T10(%d持仓,%.0f%%)" % (len(holdings), stock_ratio), {"fxRatio": fx_ratio, "stockRatio": stock_ratio, "weightedRet": weighted_ret}

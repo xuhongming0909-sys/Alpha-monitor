@@ -1,4 +1,4 @@
-# Alpha Monitor — 项目索引
+﻿# Alpha Monitor — 项目索引
 
 **定位**：金融套利机会监控终端，从真实市场数据中发现套利机会，通过网页展示和企业微信推送完成闭环。
 **阶段**：React 金融终端 UI 并行重做中，旧 HTML 看板保留 `/legacy` 回滚入口；当前 React 顶层导航收敛为 7 个标签。
@@ -73,7 +73,7 @@
 | `exchange_rate/` | 腾讯 | `fetcher.py`, `normalizer.py` | 港币/美元人民币汇率 |
 | `convertible_bond/` | 集思录 + 东财 | `fetcher.py`, `source.py`, `normalizer.py`, `history_sync.py`, `history_source.py` | 转债套利数据（含理论定价） |
 | `cb_rights_issue/` | 集思录 | `fetcher.py`, `source.py`, `normalizer.py`, `history_source.py` | 转债抢权配售数据 |
-| `lof_iopv/` | 集思录 | `fetcher.py`, `source.py`, `normalizer.py` | QDII LOF IOPV 估值（A类指数法/B类T10法）数据 |
+| `lof_iopv/` | 东财+腾讯+雪球 | `fetcher.py`, `source.py`, `normalizer.py` | QDII LOF IOPV 估值（A类指数法/B类T10法）数据 |
 | `merger/` | 公告 API | `fetcher.py`, `source.py`, `normalizer.py` | 并购重组公告 |
 | `event_arbitrage/` | 集思录 | `fetcher.py`, `normalizer.py` | 事件驱动套利 |
 | `subscription/` | 多源 | `fetcher.py`, `ipo_source.py`, `bond_source.py`, `normalizer.py` | 新股/转债申购日历 |
@@ -235,7 +235,8 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | 抢权配售计算 | `strategy/cb_rights_issue/service.py` |
 | 抢权配售数据抓取 | `data_fetch/cb_rights_issue/fetcher.py` |
 | 抢权配售推送 | `notification/cb_rights_issue/service.js` |
-| QDII LOF IOPV 数据抓取 | `data_fetch/lof_iopv/fetcher.py` |
+| QDII LOF IOPV 数据抓取 | `data_fetch/lof_iopv/fetcher.py` | LOF IOPV fetcher（薄包装，调用source.py） |
+| data_fetch/lof_iopv/source.py | LOF IOPV数据获取层（东财净值+腾讯行情+雪球仓位） |
 | QDII LOF IOPV 推送 | `notification/lof_iopv/service.js` |
 | AH 溢价计算 | `strategy/ah_premium/service.py` |
 | AB 溢价计算 | `strategy/ab_premium/service.py` |
@@ -337,8 +338,7 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `data_fetch/convertible_bond/cb_metrics.py` | 转债套利指标计算：波动率/ATR/理论定价/纯债价值/期权价值 |
 | `data_fetch/convertible_bond/source.py` | 转债套利上游 API：集思录实时行情 + 东方财富财务数据 |
 | `data_fetch/convertible_bond/normalizer.py` | 转债套利数据标准化：含理论定价的 Bus 记录生成 |
-| `data_fetch/lof_iopv/fetcher.py` | QDII LOF IOPV 抓取调度：东方财富+腾讯 |
-| `data_fetch/lof_iopv/source.py` | QDII LOF IOPV 上游：东方财富净值+持仓+腾讯K线 |
+| `data_fetch/lof_iopv/fetcher.py` | LOF IOPV fetcher（薄包装，调用source.py） |
 | `data_fetch/merger/fetcher.py` | 并购数据抓取调度：调用巨潮公告 API |
 | `data_fetch/merger/source.py` | 并购公告 API：巨潮资讯公告搜索与解析 |
 | `data_fetch/dividend/fetcher.py` | 股息抓取调度：调用 AkShare/巨潮 API |
@@ -375,7 +375,8 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `strategy/convertible_bond/service.js` | 转债套利 Node 适配器：计算结果格式化、折价策略状态 |
 | `strategy/merger/service.py` | 并购套利业务计算：Deal 分析、AI 报告生成 |
 | `strategy/merger/service.js` | 并购套利 Node 适配器：报告生成调度 |
-| `strategy/lof_iopv/service.py` | QDII LOF IOPV 业务计算：双引擎估值+溢价率 |
+| `strategy/lof_iopv/calc.py` | 共享IOPV计算公式（A类指数法+B类T10法） |
+| `strategy/lof_iopv/service.py` | QDII LOF IOPV 业务计算：响应构建+监控池筛选 |
 | `strategy/custom_monitor/service.py` | 自定义监控业务计算：组合收益率、对价计算 |
 | `strategy/dividend/service.py` | 股息业务计算：登记日跟踪、股息率计算 |
 | `strategy/subscription/service.py` | 申购业务计算：申购事件跟踪与状态管理 |
