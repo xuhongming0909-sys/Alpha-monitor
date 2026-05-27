@@ -13,6 +13,44 @@ from shared.models.service_result import build_success
 from shared.time.shanghai_time import now_iso
 from strategy.lof_iopv.calc import to_float, get_base_fx, calc_a_iopv, calc_b_iopv
 
+
+def _get_fx_base_from_db(currency, nav_date):
+    """?DB?NAV????fallback?get_base_fx"""
+    if not nav_date or currency == "CNY":
+        return 1.0 if currency == "CNY" else None
+    try:
+        from data_fetch.lof_db.schema import get_db
+        conn = get_db()
+        row = conn.execute(
+            "SELECT rate FROM fx_rates WHERE currency=? AND date<=? AND rate IS NOT NULL ORDER BY date DESC LIMIT 1",
+            (currency, nav_date[:10])
+        ).fetchone()
+        conn.close()
+        if row and row[0]:
+            return row[0]
+    except Exception:
+        pass
+    return get_base_fx(currency, nav_date[:10])
+
+
+def _get_fx_now_from_db(currency):
+    """?DB?????"""
+    if currency == "CNY":
+        return 1.0
+    try:
+        from data_fetch.lof_db.schema import get_db
+        conn = get_db()
+        row = conn.execute(
+            "SELECT rate FROM fx_rates WHERE currency=? AND rate IS NOT NULL ORDER BY date DESC LIMIT 1",
+            (currency,)
+        ).fetchone()
+        conn.close()
+        if row and row[0]:
+            return row[0]
+    except Exception:
+        pass
+    return None
+
 # Load backtest results
 _BACKTEST_DIR = _os.path.join(_os.path.dirname(__file__), "..", "..", "runtime_data", "backtest")
 _BACKTEST_RESULTS = {}
@@ -55,10 +93,17 @@ def build_lof_iopv_response(fetch_payload, records):
     if not fetch_payload or fetch_payload.get("success") is False:
         return build_success({"groups": [], "rows": [], "sourceSummary": {}}, updateTime=now_iso(), source="lof_iopv", error=(fetch_payload or {}).get("error", "fetch_failed"))
 
-    try:
-        fx_rates = get_fx_rates(["USD", "HKD"])
-    except Exception:
-        fx_rates = {}
+    # DB???????????????fallback???API
+    fx_rates = {}
+    for cur in ["USD", "HKD"]:
+        db_rate = _get_fx_now_from_db(cur)
+        if db_rate:
+            fx_rates[cur] = db_rate
+    if not fx_rates:
+        try:
+            fx_rates = get_fx_rates(["USD", "HKD"])
+        except Exception:
+            fx_rates = {}
 
     rows = fetch_payload.get("data") or []
     result = []
@@ -68,10 +113,10 @@ def build_lof_iopv_response(fetch_payload, records):
         currency = row.get("currency", "CNY").upper()
         fx_now = fx_rates.get(currency)
 
-        # Get FX base for the nav date
+        # Get FX base for the nav date (DB???fallback?akshare)
         fx_base = None
         if currency != "CNY":
-            fx_base = get_base_fx(currency, row.get("navDate", "")[:10])
+            fx_base = _get_fx_base_from_db(currency, row.get("navDate", ""))
 
         if est == "B":
             iopv, status, details = calc_b_iopv(
