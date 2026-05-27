@@ -3,6 +3,8 @@
 Owner: user. AI must not modify this file.
 本项目基于服务器 不要本地跑网页 会卡死 每次任务后上传git 同步服务器
 
+永远保持诚实，数据要准确无误
+
 ## Purpose
 
 This file defines the stable operating rules for AI inside this repository.

@@ -1,0 +1,73 @@
+{
+  "160216": {
+    "name": "国泰商品",
+    "status": "NO_DATA"
+  },
+  "160416": {
+    "name": "华安石油",
+    "status": "INSUFFICIENT",
+    "holdings": 3
+  },
+  "160723": {
+    "name": "嘉实原油",
+    "n": 55,
+    "r2": 0.266,
+    "mae": 2.2499,
+    "maxErr": 7.0461,
+    "over05": 47,
+    "tag": "BAD",
+    "stockRatio": 90.0,
+    "holdings_count": 2,
+    "top5": [
+      "00883(3.43%)",
+      "00857(2.99%)"
+    ]
+  },
+  "161126": {
+    "name": "标普医疗",
+    "status": "INSUFFICIENT",
+    "holdings": 10
+  },
+  "161129": {
+    "name": "原油LOF",
+    "status": "NO_DATA"
+  },
+  "161815": {
+    "name": "抗通胀",
+    "status": "NO_DATA"
+  },
+  "163208": {
+    "name": "全球油气",
+    "n": 55,
+    "r2": -0.172,
+    "mae": 1.4354,
+    "maxErr": 5.631,
+    "over05": 40,
+    "tag": "BAD",
+    "stockRatio": 90.0,
+    "holdings_count": 31,
+    "top5": [
+      "00916(3.21%)",
+      "00836(2.46%)",
+      "00135(1.97%)",
+      "01798(1.87%)",
+      "06865(1.43%)"
+    ]
+  },
+  "165513": {
+    "name": "中信商品",
+    "status": "NO_DATA"
+  },
+  "501018": {
+    "name": "南方原油",
+    "status": "NO_DATA"
+  },
+  "501225": {
+    "name": "全球芯片",
+    "status": "NO_DATA"
+  },
+  "501300": {
+    "name": "美元债",
+    "status": "NO_DATA"
+  }
+}

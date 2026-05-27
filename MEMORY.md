@@ -6,6 +6,26 @@
 **Do not**: dump full conversations.
 
 ## Entries
+
+### 2026-05-27 | 40交易日回测+汇率修正
+
+- **Decision**: 更新回测规范：40交易日、必须含汇率、R²<0.8=不合格
+- **Action**: 写入specs/lof-arbitrage.md section 9，回测脚本使用akshare stock_us_daily+currency_boc_safe
+- **Result**: OK 12只(52.2%), WARN 4只, BAD 7只
+- **Key Finding**: 汇率修正后效果显著，美国消费/华宝油气/纳指100达到OK标准
+- **Remaining**: 原油USO/GSG商品/FOF仍不可拟合
+- **File**: missions/0527-fund-backtest/report.md
+
+
+### 2026-05-27 | LOF回测完成-新浪API
+
+- **Decision**: 使用akshare stock_us_daily(新浪API)替代东方财富push2his，解决限流问题
+- **Action**: 运行A类回测，23只基金，95个交易日(2025-12-22~2026-05-22)
+- **Result**: OK 1只(501300美元债AGG)，WARN 4只，BAD 18只
+- **Key Finding**: 误差主要来源：汇率偏差、原油USO不可拟合、FOF持仓不透明
+- **Recommendation**: 1)禁用6只BAD原油/商品基金 2)IOPV计算加入汇率修正
+- **File**: missions/0527-fund-backtest/report.md
+
 ### 2026-05-27 | LOF回测链+估值链清理
 
 - **Decision**: A类IOPV加入ETF涨幅因子，B类加入持仓加权收益率
