@@ -1,4 +1,4 @@
-﻿# Alpha Monitor — 项目索引
+# Alpha Monitor — 项目索引
 
 **定位**：金融套利机会监控终端，从真实市场数据中发现套利机会，通过网页展示和企业微信推送完成闭环。
 **阶段**：React 金融终端 UI 并行重做中，旧 HTML 看板保留 `/legacy` 回滚入口；当前 React 顶层导航收敛为 7 个标签。
@@ -354,7 +354,7 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 
 | 文件 | 职责摘要 |
 |------|----------|
-| `data_fetch/lof_db/schema.py` | SQLite数据库Schema定义和初始化 |
+| `data_fetch/lof_db/schema.py` | SQLite数据库Schema定义和初始化 |（含cleanup_old_data过期清理）|
 | `data_fetch/lof_db/updater.py` | 数据更新调度器 |
 | `data_fetch/lof_db/nav_updater.py` | 基金净值增量更新 |
 | `data_fetch/lof_db/etf_updater.py` | ETF价格增量更新 |
@@ -465,6 +465,7 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `scripts/rebuild_premium_db.py` | 溢价历史数据库重建：AH/AB 溢价历史维护 |
 | `scripts/stock_price_history_db.py` | 股价历史数据库：正股 K 线数据管理 |
 | `scripts/premium_history_db.py` | 溢价历史数据库：溢价率历史数据管理 |
+| `scripts/lof_maintenance.py` | LOF数据库每日维护：更新+清理+日志 |
 | `scripts/export_pair_pool.py` | 配对池导出：AH/AB 配对表生成 |
 
 ### 9.8 tests/ — 测试

@@ -1,0 +1,15 @@
+[Unit]
+Description=Alpha Monitor LOF Database Maintenance
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Alpha monitor
+ExecStart=/usr/bin/python3 scripts/lof_maintenance.py
+StandardOutput=append:/var/log/lof_maintenance.log
+StandardError=append:/var/log/lof_maintenance.log
+
+[Install]
+WantedBy=multi-user.target

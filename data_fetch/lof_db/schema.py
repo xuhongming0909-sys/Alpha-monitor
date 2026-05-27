@@ -3,6 +3,7 @@
 # 对应 INDEX.md §9.3 文件摘要索引
 """LOF数据库Schema定义和初始化"""
 
+from datetime import datetime, timedelta
 import sqlite3
 import os
 
@@ -89,6 +90,38 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+
+
+
+def cleanup_old_data(conn=None):
+    own_conn = conn is None
+    if own_conn:
+        conn = get_db()
+    today = datetime.now()
+    stats = {}
+    # NAV: 120天
+    cutoff = (today - timedelta(days=120)).strftime('%Y-%m-%d')
+    cur = conn.execute('DELETE FROM fund_nav WHERE date < ?', (cutoff,))
+    stats['fund_nav'] = cur.rowcount
+    # ETF: 250天
+    cutoff = (today - timedelta(days=250)).strftime('%Y-%m-%d')
+    cur = conn.execute('DELETE FROM etf_prices WHERE date < ?', (cutoff,))
+    stats['etf_prices'] = cur.rowcount
+    # Stock: 250天
+    cur = conn.execute('DELETE FROM stock_prices WHERE date < ?', (cutoff,))
+    stats['stock_prices'] = cur.rowcount
+    # FX: 当年之前
+    year_start = f'{today.year}-01-01'
+    cur = conn.execute('DELETE FROM fx_rates WHERE date < ?', (year_start,))
+    stats['fx_rates'] = cur.rowcount
+    # IOPV: 30天
+    cutoff = (today - timedelta(days=30)).strftime('%Y-%m-%d')
+    cur = conn.execute('DELETE FROM iopv_results WHERE date < ?', (cutoff,))
+    stats['iopv_results'] = cur.rowcount
+    conn.commit()
+    if own_conn:
+        conn.close()
+    return stats
 
 
 if __name__ == '__main__':

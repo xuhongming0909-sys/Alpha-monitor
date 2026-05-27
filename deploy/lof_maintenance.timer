@@ -1,0 +1,10 @@
+[Unit]
+Description=Alpha Monitor LOF DB Daily Maintenance Timer
+
+[Timer]
+OnCalendar=*-*-* 06:30:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
