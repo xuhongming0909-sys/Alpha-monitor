@@ -704,6 +704,10 @@ const DATASETS = {
     refreshIntervalMs: toIntConfig(pluginFetchConfig('lof_iopv').refresh_interval_ms, 5 * 60 * 1000),
     dbDailySync: Boolean(pluginFetchConfig('lof_iopv').daily_incremental_sync),
     fetch: () => callDataCore(['lof-arbitrage'], { timeout: 300000, maxBuffer: 1024 * 1024 * 50 }),
+    dailySync: async () => {
+      await callDataCore(['lof-db-sync'], { timeout: 120000 });
+      return callDataCore(['lof-arbitrage'], { timeout: 300000, maxBuffer: 1024 * 1024 * 50 });
+    },
   },
   merger: {
     intraday: Boolean(pluginFetchConfig('merger').intraday),

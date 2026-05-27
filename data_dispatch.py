@@ -116,6 +116,20 @@ def action_lof_iopv() -> dict:
     return build_lof_iopv_response(payload, records)
 
 
+def action_lof_db_sync() -> dict:
+    """LOF数据库增量同步：净值/ETF/汇率/持仓。"""
+    from data_fetch.lof_db.updater import update_all
+    try:
+        results = update_all()
+        return {
+            "success": True,
+            "action": "lof-db-sync",
+            "results": {k: {"rows": v} for k, v in results.items()},
+        }
+    except Exception as exc:
+        return {"success": False, "action": "lof-db-sync", "error": str(exc)}
+
+
 def action_sync_cb_rights_issue_stock_history(force_full: bool = False) -> dict:
     return sync_cb_rights_issue_stock_history_snapshot(force_full=force_full)
 
@@ -179,6 +193,8 @@ def main() -> None:
             dump(action_cb_rights_issue())
         elif action in ("lof-arbitrage", "lof-iopv"):
             dump(action_lof_iopv())
+        elif action == "lof-db-sync":
+            dump(action_lof_db_sync())
         elif action == "sync-cb-rights-issue-stock-history":
             dump(action_sync_cb_rights_issue_stock_history(force_full="--force-full" in args[1:]))
         elif action == "merger":

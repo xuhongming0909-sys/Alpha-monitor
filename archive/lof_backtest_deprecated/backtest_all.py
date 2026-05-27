@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-# AI-SUMMARY: LOF 27只基金统一回测，计算R²并分级标记
+# AI-SUMMARY: LOF 27只基金统一回测（修正版），R²用OLS回归，严格日期对齐
 # 对应 INDEX.md §9.3 文件摘要索引
-"""LOF回测 - A类(ETF跟踪) + B类(T10持仓)"""
+"""LOF回测（修正版）- 修复：OLS回归R²、prev-date对齐、数据源确定性"""
 
 import os, sys, json, requests, re, time
 import numpy as np
@@ -82,6 +82,7 @@ def get_fx_from_db():
 
 
 def daily_ret(prices):
+    """日收益率，返回 {date: (ret, prev_date)}"""
     ret = {}
     dates = sorted(prices.keys())
     for i in range(1, len(dates)):
@@ -114,8 +115,8 @@ def tencent_kline_raw(tc_code, start='2026-03-01'):
         return {}
 
 
-def akshare_us_stock(ticker, start='2026-03-01'):
-    """akshare获取美股个股K线"""
+def akshare_us_prices(ticker, start='2026-03-01'):
+    """akshare获取美股价格（个股和ETF通用）"""
     try:
         import akshare as ak
         df = ak.stock_us_daily(symbol=ticker, adjust='')
@@ -127,44 +128,28 @@ def akshare_us_stock(ticker, start='2026-03-01'):
         return prices
     except:
         return {}
-
-
-def akshare_etf(ticker, start='2026-03-01'):
-    try:
-        import akshare as ak
-        df = ak.stock_us_daily(symbol=ticker, adjust='')
-        prices = {}
-        for _, row in df.iterrows():
-            d = str(row['date'])[:10]
-            if d >= start:
-                prices[d] = float(row['close'])
-        return prices
-    except:
-        return {}
-
-
-def tencent_etf(ticker, start='2026-03-01'):
-    for suffix in ['.OQ', '.N', '']:
-        r = tencent_kline_raw(f'us{ticker}{suffix}', start)
-        if len(r) >= 5:
-            return r
-    return tencent_kline_raw(f'hk{ticker}', start)
 
 
 def get_etf_series(ticker):
+    """获取ETF价格序列 - 确定性数据源：优先DB，其次akshare，最后腾讯"""
     conn = get_db()
     rows = conn.execute('SELECT date, close FROM etf_prices WHERE ticker=? ORDER BY date', (ticker,)).fetchall()
     conn.close()
-    db_data = {r['date']: r['close'] for r in rows}
-    if len(db_data) >= 20:
-        return db_data
-    online = tencent_etf(ticker)
-    if len(online) >= 10:
-        return online
-    ak_data = akshare_etf(ticker)
-    if len(ak_data) >= 10:
-        return ak_data
-    return db_data if db_data else online
+    if len(rows) >= 20:
+        return {r['date']: r['close'] for r in rows}
+    # akshare（美股ETF数据完整稳定）
+    ak = akshare_us_prices(ticker)
+    if len(ak) >= 10:
+        return ak
+    # 腾讯（港股指数）
+    for suffix in ['.OQ', '.N', '']:
+        r = tencent_kline_raw(f'us{ticker}{suffix}')
+        if len(r) >= 10:
+            return r
+    r = tencent_kline_raw(f'hk{ticker}')
+    if len(r) >= 5:
+        return r
+    return {r['date']: r['close'] for r in rows} if rows else {}
 
 
 def get_stock_ratio(code):
@@ -221,25 +206,45 @@ def get_holdings_from_db(code):
     return result
 
 
+def get_stock_prices(holding):
+    """获取持仓股票K线：港股走腾讯，美股走akshare"""
+    if holding['mkt'] == 'HK':
+        return tencent_kline_raw(holding['tc_ticker'])
+    return akshare_us_prices(holding['code'])
+
+
 # ============================================================
 # 回测核心
 # ============================================================
 
 def calc_metrics(y, x):
+    """OLS回归R² + beta + 误差指标"""
     n = len(y)
-    if n < 5:
+    if n < 10:
         return None
-    ss_tot = np.sum((y - np.mean(y)) ** 2)
-    ss_res = np.sum((y - x) ** 2)
+
+    # OLS: y = beta * x + alpha
+    x_mean = np.mean(x)
+    y_mean = np.mean(y)
+    ss_xy = np.sum((x - x_mean) * (y - y_mean))
+    ss_xx = np.sum((x - x_mean) ** 2)
+    beta = ss_xy / ss_xx if ss_xx > 0 else 0
+    alpha = y_mean - beta * x_mean
+    y_hat = beta * x + alpha
+
+    ss_tot = np.sum((y - y_mean) ** 2)
+    ss_res = np.sum((y - y_hat) ** 2)
     r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0
-    abs_err = np.abs(y - x)
+
+    abs_err = np.abs(y - y_hat)
     mae = float(np.mean(abs_err)) * 100
     max_err = float(np.max(abs_err)) * 100
     over05 = int(np.sum(abs_err > 0.005))
     dir_ok = int(np.sum(((y > 0) & (x > 0)) | ((y < 0) & (x < 0))))
     dir_pct = dir_ok / n * 100
+
     return {
-        'n': n, 'r2': round(float(r2), 4),
+        'n': n, 'r2': round(float(r2), 4), 'beta': round(float(beta), 4),
         'mae': round(mae, 4), 'max_err': round(max_err, 4),
         'over05': over05, 'dir': round(dir_pct, 1),
     }
@@ -255,6 +260,7 @@ def classify_r2(r2):
 
 
 def backtest_a_fund(code, name, etf_ticker, currency, fx_ret):
+    """A类回测：ETF跟踪法 + 严格日期对齐"""
     nav = get_nav_series(code)
     if len(nav) < 10:
         return None
@@ -265,38 +271,37 @@ def backtest_a_fund(code, name, etf_ticker, currency, fx_ret):
         return None
     etf_ret = daily_ret(etf_prices)
 
+    # 日期交集
     common = set(fund_ret.keys()) & set(etf_ret.keys()) & set(fx_ret.keys())
-    aligned = sorted(common)
-    if len(aligned) < 5:
+
+    # [修复] 严格对齐：prev-date必须一致（基金、ETF、FX三方）
+    aligned = []
+    for d in sorted(common):
+        fp = fund_ret[d][1]
+        ep = etf_ret[d][1]
+        # 基金prev == ETF prev
+        if fp != ep:
+            continue
+        # FX prev == 基金prev
+        if fx_ret[d][1] != fp:
+            continue
+        aligned.append(d)
+
+    if len(aligned) < 10:
         return None
 
-    y_list, x_list = [], []
-    for d in aligned:
-        actual = fund_ret[d][0]
-        er = etf_ret[d][0]
-        fr = fx_ret[d][0]
-        fx_key = currency.lower()
-        if fx_key not in fr:
-            fx_key = 'usd'
-        fx_v = fr.get(fx_key, 0)
-        est = er * (1 + fx_v)
-        y_list.append(actual)
-        x_list.append(est)
+    y = np.array([fund_ret[d][0] for d in aligned])
+    x = np.array([etf_ret[d][0] * (1 + fx_ret[d][0].get(currency.lower(), fx_ret[d][0].get('usd', 0))) for d in aligned])
 
-    y = np.array(y_list)
-    x = np.array(x_list)
     m = calc_metrics(y, x)
     if m:
-        m['code'] = code
-        m['name'] = name
-        m['etf'] = etf_ticker
-        m['type'] = 'A'
-        m['sample'] = f"{aligned[0]}~{aligned[-1]}"
-        m['tag'] = classify_r2(m['r2'])
+        m.update({'code': code, 'name': name, 'etf': etf_ticker, 'type': 'A',
+                  'sample': f"{aligned[0]}~{aligned[-1]}", 'tag': classify_r2(m['r2'])})
     return m
 
 
 def backtest_b_fund(code, name, currency, fx_ret):
+    """B类回测：T10持仓加权法 + 严格日期对齐"""
     holdings = get_holdings_from_db(code)
     if len(holdings) < 5:
         holdings = fetch_holdings_online(code)
@@ -313,21 +318,17 @@ def backtest_b_fund(code, name, currency, fx_ret):
 
     ticker_prices = {}
     for h in holdings:
-        # 港股走腾讯，美股走akshare
-        if h['mkt'] == 'HK':
-            tp = tencent_kline_raw(h['tc_ticker'])
-        else:
-            tp = akshare_us_stock(h['code'])
-            if len(tp) < 10:
-                tp = tencent_kline_raw(h['tc_ticker'])
+        tp = get_stock_prices(h)
         if tp:
             ticker_prices[h['tc_ticker']] = tp
 
+    # 日期交集
     common = set(fund_ret.keys()) & set(fx_ret.keys())
     for h in holdings:
         tp = ticker_prices.get(h['tc_ticker'], {})
         common &= set(tp.keys())
 
+    # [修复] 严格对齐：每只股票必须有d和fp，且fp一致
     aligned = []
     for d in sorted(common):
         fp = fund_ret[d][1]
@@ -339,11 +340,12 @@ def backtest_b_fund(code, name, currency, fx_ret):
                 break
         if not ok:
             continue
+        # FX prev对齐
         if fx_ret[d][1] != fp:
             continue
         aligned.append(d)
 
-    if len(aligned) < 5:
+    if len(aligned) < 10:
         return None
 
     y_list, x_list = [], []
@@ -357,8 +359,6 @@ def backtest_b_fund(code, name, currency, fx_ret):
         weighted_cny_ret = 0
         for h in holdings:
             tp = ticker_prices.get(h['tc_ticker'], {})
-            if d not in tp or fp not in tp:
-                continue
             local_ret = tp[d] / tp[fp] - 1
             w_norm = h['ratio'] / total_w
             if h['mkt'] == 'US':
@@ -379,12 +379,8 @@ def backtest_b_fund(code, name, currency, fx_ret):
     x = np.array(x_list)
     m = calc_metrics(y, x)
     if m:
-        m['code'] = code
-        m['name'] = name
-        m['etf'] = f'T10({len(holdings)})'
-        m['type'] = 'B'
-        m['sample'] = f"{aligned[0]}~{aligned[-1]}"
-        m['tag'] = classify_r2(m['r2'])
+        m.update({'code': code, 'name': name, 'etf': f'T10({len(holdings)})', 'type': 'B',
+                  'sample': f"{aligned[0]}~{aligned[-1]}", 'tag': classify_r2(m['r2'])})
     return m
 
 
@@ -411,7 +407,6 @@ def main():
             fx_ret[d] = (r, dp)
     print(f'汇率: {len(fx_ret)} 天')
 
-    # 从DB读取基金元数据
     conn = get_db()
     funds = conn.execute('SELECT code, name, estimation, etf, currency FROM funds').fetchall()
     conn.close()
@@ -442,7 +437,7 @@ def main():
 
             if r:
                 results.append(r)
-                print(f'  R²={r["r2"]:.4f} MAE={r["mae"]:.4f}% MaxErr={r["max_err"]:.4f}% N={r["n"]} tag={r["tag"]}')
+                print(f'  R²={r["r2"]:.4f} beta={r["beta"]:.4f} MAE={r["mae"]:.4f}% N={r["n"]} tag={r["tag"]}')
             else:
                 errors.append(f'{code} {name}: 数据不足')
                 print(f'  数据不足')
@@ -454,20 +449,17 @@ def main():
 
     results.sort(key=lambda x: -x['r2'])
 
-    # ============================================================
-    # 标准输出
-    # ============================================================
     ok_list = [r for r in results if r['tag'] == 'OK']
     warn_list = [r for r in results if r['tag'] == 'WARN']
     bad_list = [r for r in results if r['tag'] == 'BAD']
 
-    print(f'\n{"="*105}')
-    print(f'LOF回测结果 (27只, R²≥0.9=OK | 0.8~0.9=WARN | <0.8=BAD)')
-    print(f'{"="*105}')
-    print(f'{"#":>3} {"code":<8} {"name":<20} {"type":<5} {"etf":<10} {"N":>3} {"R2":>8} {"MAE%":>8} {"MaxErr%":>9} {">0.5%":>6} {"dir%":>7} {"tag":>5}')
-    print('-' * 105)
+    print(f'\n{"="*115}')
+    print(f'LOF回测结果 (27只, R²≥0.9=OK | 0.8~0.9=WARN | <0.8=BAD) — OLS回归R²')
+    print(f'{"="*115}')
+    print(f'{"#":>3} {"code":<8} {"name":<20} {"type":<5} {"etf":<10} {"N":>3} {"R2":>8} {"beta":>7} {"MAE%":>8} {"MaxErr%":>9} {">0.5%":>6} {"dir%":>7} {"tag":>5}')
+    print('-' * 115)
     for idx, r in enumerate(results, 1):
-        print(f'{idx:>3} {r["code"]:<8} {r["name"]:<20} {r["type"]:<5} {r["etf"]:<10} {r["n"]:>3} {r["r2"]:>8.4f} {r["mae"]:>8.4f} {r["max_err"]:>9.4f} {r["over05"]:>6} {r["dir"]:>6.1f}% {r["tag"]:>5}')
+        print(f'{idx:>3} {r["code"]:<8} {r["name"]:<20} {r["type"]:<5} {r["etf"]:<10} {r["n"]:>3} {r["r2"]:>8.4f} {r["beta"]:>7.4f} {r["mae"]:>8.4f} {r["max_err"]:>9.4f} {r["over05"]:>6} {r["dir"]:>6.1f}% {r["tag"]:>5}')
 
     print(f'\nOK: {len(ok_list)} | WARN: {len(warn_list)} | BAD: {len(bad_list)} | 失败: {len(errors)}')
 
@@ -476,7 +468,6 @@ def main():
         for e in errors:
             print(f'  - {e}')
 
-    # 保存JSON
     out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'runtime_data', 'backtest')
     os.makedirs(out_dir, exist_ok=True)
     json_path = os.path.join(out_dir, 'lof27_r2_results.json')

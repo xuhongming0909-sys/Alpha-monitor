@@ -14,17 +14,23 @@ SESSION.headers.update({
 })
 
 # 所有A类基金代码
-A_FUNDS = [
-    '161128', '501225', '161130', '161125', '161126', '161127', '162415', '160140',
-    '501300', '164824', '159202', '513660', '513690', '520600',
-    '160416', '162719', '162411', '160723', '161129', '501018', '163208', '160216',
-    '160719', '164701', '161116', '161815', '165513',
-]
+def _load_all_fund_codes() -> list[str]:
+    """从 config.yaml 读取全部基金代码。"""
+    try:
+        from shared.config.script_config import load_config
+        cfg = load_config()
+        plugins = cfg.get('data_fetch', {}).get('plugins', {})
+        lof_cfg = plugins.get('lof_arbitrage', plugins.get('lof_iopv', {}))
+        funds = lof_cfg.get('funds', [])
+        if funds:
+            return [f['code'] for f in funds if f.get('code')]
+    except Exception:
+        pass
+    return ['164701', '161128', '161130']  # 最小 fallback
 
-# 所有B类基金代码
-B_FUNDS = ['160644', '164906', '160125', '501312']
-
-ALL_FUNDS = A_FUNDS + B_FUNDS
+ALL_FUNDS = _load_all_fund_codes()
+A_FUNDS = ALL_FUNDS
+B_FUNDS = ALL_FUNDS
 
 
 def fetch_nav(code, pages=5):

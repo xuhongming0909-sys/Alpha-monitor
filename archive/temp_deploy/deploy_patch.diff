@@ -1,0 +1,94 @@
+﻿git : warning: in the working copy of 'data_fetch/lof_iopv/fetcher.py', LF will be replaced by CRLF the next time Git t
+ouches it
+所在位置 行:4 字符: 1
++ git diff data_fetch/lof_iopv/fetcher.py strategy/lof_iopv/service.py  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: in the... Git touches it:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+warning: in the working copy of 'strategy/lof_iopv/service.py', LF will be replaced by CRLF the next time Git touches i
+t
+diff --git a/data_fetch/lof_iopv/fetcher.py b/data_fetch/lof_iopv/fetcher.py
+index 4f27d48..f7bc048 100644
+--- a/data_fetch/lof_iopv/fetcher.py
++++ b/data_fetch/lof_iopv/fetcher.py
+@@ -1,4 +1,4 @@
+-﻿# -*- coding: utf-8 -*-
++# -*- coding: utf-8 -*-
+ """QDII LOF IOPV 数据获取层 - 31只基金双引擎版。
+ 
+ 东财净值+持仓+基金档案 | 腾讯行情+汇率。
+@@ -24,8 +24,6 @@ SESSION.headers.update({
+     "Referer": "https://fundf10.eastmoney.com/",
+ })
+ 
+-# QDII LOF 基金列表: estimation = "A"(指数跟踪) / "B"(T10持仓)
+-QDII_FUNDS = [
+ def _load_funds_from_config() -> list[dict]:
+     """从 config.yaml 读取基金列表，fallback 到内置列表。"""
+     try:
+@@ -43,13 +41,37 @@ def _load_funds_from_config() -> list[dict]:
+ 
+ # 内置 fallback 列表（config.yaml 不可用时使用）
+ _FALLBACK_FUNDS = [
++    # A类: 美股宽基指数
+     {"code": "161128", "name": "标普信息科技LOF", "currency": "USD", "estimation": "A", "etf": "XLK"},
+     {"code": "501225", "name": "全球芯片LOF", "currency": "USD", "estimation": "A", "etf": "SMH"},
+     {"code": "161130", "name": "纳指LOF", "currency": "USD", "estimation": "A", "etf": "QQQ"},
+     {"code": "161125", "name": "标普500LOF", "currency": "USD", "estimation": "A", "etf": "SPY"},
++    {"code": "161126", "name": "标普医疗保健LOF", "currency": "USD", "estimation": "A", "etf": "XLV"},
++    {"code": "161127", "name": "标普生物科技LOF", "currency": "USD", "estimation": "A", "etf": "XBI"},
++    {"code": "162415", "name": "美国消费LOF", "currency": "USD", "estimation": "A", "etf": "XLY"},
++    {"code": "160140", "name": "美国REIT精选LOF", "currency": "USD", "estimation": "A", "etf": "VNQ"},
++    {"code": "501300", "name": "美元债LOF", "currency": "USD", "estimation": "A", "etf": "AGG"},
++    {"code": "164824", "name": "印度基金LOF", "currency": "USD", "estimation": "A", "etf": "INDA"},
++    # A类: 石油商品
++    {"code": "160416", "name": "石油基金LOF", "currency": "USD", "estimation": "A", "etf": "XLE"},
++    {"code": "162719", "name": "石油LOF", "currency": "USD", "estimation": "A", "etf": "XOP"},
++    {"code": "162411", "name": "华宝油气LOF", "currency": "USD", "estimation": "A", "etf": "XOP"},
++    {"code": "160723", "name": "嘉实原油LOF", "currency": "USD", "estimation": "A", "etf": "USO"},
++    {"code": "161129", "name": "原油LOF", "currency": "USD", "estimation": "A", "etf": "USO"},
++    {"code": "501018", "name": "南方原油LOF", "currency": "USD", "estimation": "A", "etf": "USO"},
++    {"code": "163208", "name": "全球油气能源LOF", "currency": "USD", "estimation": "A", "etf": "XLE"},
++    {"code": "160216", "name": "国泰商品LOF", "currency": "USD", "estimation": "A", "etf": "GSG"},
++    {"code": "161815", "name": "抗通胀LOF", "currency": "USD", "estimation": "A", "etf": "GLD"},
++    {"code": "165513", "name": "中信保诚商品LOF", "currency": "USD", "estimation": "A", "etf": "GSG"},
++    # A类: 黄金
++    {"code": "160719", "name": "嘉实黄金LOF", "currency": "USD", "estimation": "A", "etf": "GLD"},
+     {"code": "164701", "name": "黄金LOF", "currency": "USD", "estimation": "A", "etf": "GLD"},
++    {"code": "161116", "name": "黄金主题LOF", "currency": "USD", "estimation": "A", "etf": "GLD"},
++    # B类: T10持仓
+     {"code": "160125", "name": "南方香港LOF", "currency": "HKD", "estimation": "B"},
++    {"code": "160644", "name": "港美互联网LOF", "currency": "HKD", "estimation": "B"},
+     {"code": "164906", "name": "中概互联网LOF", "currency": "USD", "estimation": "B"},
++    {"code": "501312", "name": "海外科技LOF", "currency": "USD", "estimation": "B"},
+ ]
+ 
+ QDII_FUNDS = _load_funds_from_config()
+diff --git a/strategy/lof_iopv/service.py b/strategy/lof_iopv/service.py
+index 8ff9201..59a7346 100644
+--- a/strategy/lof_iopv/service.py
++++ b/strategy/lof_iopv/service.py
+@@ -70,7 +70,7 @@ def _get_base_fx(currency: str, date_str: str) -> Optional[float]:
+ 
+ 
+ def _calc_a(row: dict, fx_now: Optional[float]) -> tuple:
+-    """A类: IOPV = NAV * (1 + etf_ret) * fx_ratio。当前简化为 NAV * fx_ratio。"""
++    """A类: IOPV = NAV * (1 + etf_ret/100) * fx_ratio。"""
+     nav = _to_float(row.get("nav"))
+     if nav is None or nav <= 0:
+         return None, "NAV缺失", {}
+@@ -80,7 +80,12 @@ def _calc_a(row: dict, fx_now: Optional[float]) -> tuple:
+         base = _get_base_fx(currency, row.get("navDate", "")[:10])
+         if base and base > 0:
+             fx_ratio = fx_now / base
+-    return round(nav * fx_ratio, 6), "A类-指数跟踪", {"fxRatio": fx_ratio}
++    # ETF涨跌幅（百分比 → 小数）
++    etf_change_pct = _to_float(row.get("etfChange"))
++    etf_ret = etf_change_pct / 100 if etf_change_pct is not None else 0.0
++    iopv = nav * (1 + etf_ret) * fx_ratio
++    status = "A类-指数跟踪" if etf_change_pct is not None else "A类-指数跟踪(无ETF数据)"
++    return round(iopv, 6), status, {"fxRatio": fx_ratio, "etfRet": etf_ret}
+ 
+ 
+ def _calc_b(row: dict, fx_now: Optional[float]) -> tuple:

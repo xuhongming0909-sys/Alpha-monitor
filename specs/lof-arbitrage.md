@@ -1,4 +1,4 @@
-﻿---
+---
 name: lof-iopv
 description: QDII LOF IOPV 估值策略 - 20字段（27只基金）
 type: spec
@@ -75,7 +75,7 @@ type: spec
 ### A类回测
 - 脚本：`tools/backtest/qdii_backtest_A.py` / `tools/backtest/lof13_backtest_A.py`
 - 方法：基金净值日收益率 vs ETF日收益率，对齐日期后计算R2/MAE/MaxErr
-- 数据：NAV=东财, ETF=Yahoo Finance(需VPN)
+- 数据：NAV=东财lsjz, ETF=东财k.stock_us_hist（全部国内API）
 - 结果：`runtime_data/backtest/a_results.json`
 
 ### B类回测

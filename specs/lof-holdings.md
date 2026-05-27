@@ -1,4 +1,4 @@
-﻿---
+---
 name: lof-holdings
 description: QDII LOF 基金标的清单 - 27只基金估值标的与数据源
 type: spec

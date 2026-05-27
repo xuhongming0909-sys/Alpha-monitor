@@ -1,4 +1,4 @@
-# AI-SUMMARY: 跨市场工具：价格查询、配对匹配、股票搜索
+﻿# AI-SUMMARY: 跨市场工具：价格查询、配对匹配、股票搜索
 # 对应 INDEX.md §9 文件摘要索引
 
 """市场基础服务。
@@ -109,9 +109,15 @@ def get_quotes(codes: Iterable[str], timeout: int = 15) -> Dict[str, Dict[str, A
                     price = 0.0
                 if price <= 0:
                     continue
+                prev_close = 0.0
+                try:
+                    prev_close = float(parts[4]) if len(parts) > 4 and parts[4] else 0.0
+                except Exception:
+                    prev_close = 0.0
                 result[code] = {
                     "name": clean_name(parts[1] if len(parts) > 1 else ""),
                     "price": price,
+                    "prev_close": prev_close if prev_close > 0 else None,
                 }
 
     return result

@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """QDII LOF IOPV 数据获取层 - 31只基金双引擎版。
 
 东财净值+持仓+基金档案 | 腾讯行情+汇率。
@@ -23,9 +23,49 @@ SESSION.headers.update({
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Referer": "https://fundf10.eastmoney.com/",
 })
+# ETF实时涨跌幅获取（东财美股K线 → 腾讯行情 fallback）
+_ETF_SESSION = requests.Session()
+_ETF_SESSION.trust_env = False
+_ETF_SESSION.proxies = {'http': None, 'https': None}
 
-# QDII LOF 基金列表: estimation = "A"(指数跟踪) / "B"(T10持仓)
-QDII_FUNDS = [
+
+def _fetch_etf_changes(etf_codes: list) -> dict:
+    """获取ETF实时涨跌幅（百分比）。东财K线优先，腾讯fallback。"""
+    if not etf_codes:
+        return {}
+    changes = {}
+    for ticker in etf_codes:
+        try:
+            url = (f'https://push2his.eastmoney.com/api/qt/stock/kline/get'
+                   f'?secid=107.{ticker}&fields1=f1,f2,f3&fields2=f51,f52,f53,f54'
+                   f'&klt=101&fqt=1&beg=0&end=20500101&lmt=2')
+            r = _ETF_SESSION.get(url, timeout=10)
+            klines = r.json().get('data', {}).get('klines', [])
+            if len(klines) >= 2:
+                prev = float(klines[-2].split(',')[2])
+                cur = float(klines[-1].split(',')[2])
+                if prev > 0:
+                    changes[ticker] = (cur / prev - 1) * 100
+        except Exception:
+            pass
+    missing = [t for t in etf_codes if t not in changes]
+    if missing:
+        try:
+            qt_codes = [f"us{t}.us" for t in missing]
+            resp = _ETF_SESSION.get(f"https://qt.gtimg.cn/q={','.join(qt_codes)}", timeout=10)
+            for i, line in enumerate(resp.content.decode("gbk", errors="ignore").splitlines()):
+                if i >= len(missing):
+                    break
+                parts = line.split("~")
+                if len(parts) > 4:
+                    p, c = _to_float(parts[4]), _to_float(parts[3])
+                    if p and p > 0 and c:
+                        changes[missing[i]] = (c / p - 1) * 100
+        except Exception:
+            pass
+    return changes
+
+
 def _load_funds_from_config() -> list[dict]:
     """从 config.yaml 读取基金列表，fallback 到内置列表。"""
     try:
@@ -43,13 +83,37 @@ def _load_funds_from_config() -> list[dict]:
 
 # 内置 fallback 列表（config.yaml 不可用时使用）
 _FALLBACK_FUNDS = [
+    # A类: 美股宽基指数
     {"code": "161128", "name": "标普信息科技LOF", "currency": "USD", "estimation": "A", "etf": "XLK"},
     {"code": "501225", "name": "全球芯片LOF", "currency": "USD", "estimation": "A", "etf": "SMH"},
     {"code": "161130", "name": "纳指LOF", "currency": "USD", "estimation": "A", "etf": "QQQ"},
     {"code": "161125", "name": "标普500LOF", "currency": "USD", "estimation": "A", "etf": "SPY"},
+    {"code": "161126", "name": "标普医疗保健LOF", "currency": "USD", "estimation": "A", "etf": "XLV"},
+    {"code": "161127", "name": "标普生物科技LOF", "currency": "USD", "estimation": "A", "etf": "XBI"},
+    {"code": "162415", "name": "美国消费LOF", "currency": "USD", "estimation": "A", "etf": "XLY"},
+    {"code": "160140", "name": "美国REIT精选LOF", "currency": "USD", "estimation": "A", "etf": "VNQ"},
+    {"code": "501300", "name": "美元债LOF", "currency": "USD", "estimation": "A", "etf": "AGG"},
+    {"code": "164824", "name": "印度基金LOF", "currency": "USD", "estimation": "A", "etf": "INDA"},
+    # A类: 石油商品
+    {"code": "160416", "name": "石油基金LOF", "currency": "USD", "estimation": "A", "etf": "XLE"},
+    {"code": "162719", "name": "石油LOF", "currency": "USD", "estimation": "A", "etf": "XOP"},
+    {"code": "162411", "name": "华宝油气LOF", "currency": "USD", "estimation": "A", "etf": "XOP"},
+    {"code": "160723", "name": "嘉实原油LOF", "currency": "USD", "estimation": "A", "etf": "USO"},
+    {"code": "161129", "name": "原油LOF", "currency": "USD", "estimation": "A", "etf": "USO"},
+    {"code": "501018", "name": "南方原油LOF", "currency": "USD", "estimation": "A", "etf": "USO"},
+    {"code": "163208", "name": "全球油气能源LOF", "currency": "USD", "estimation": "A", "etf": "XLE"},
+    {"code": "160216", "name": "国泰商品LOF", "currency": "USD", "estimation": "A", "etf": "GSG"},
+    {"code": "161815", "name": "抗通胀LOF", "currency": "USD", "estimation": "A", "etf": "GLD"},
+    {"code": "165513", "name": "中信保诚商品LOF", "currency": "USD", "estimation": "A", "etf": "GSG"},
+    # A类: 黄金
+    {"code": "160719", "name": "嘉实黄金LOF", "currency": "USD", "estimation": "A", "etf": "GLD"},
     {"code": "164701", "name": "黄金LOF", "currency": "USD", "estimation": "A", "etf": "GLD"},
+    {"code": "161116", "name": "黄金主题LOF", "currency": "USD", "estimation": "A", "etf": "GLD"},
+    # B类: T10持仓
     {"code": "160125", "name": "南方香港LOF", "currency": "HKD", "estimation": "B"},
+    {"code": "160644", "name": "港美互联网LOF", "currency": "HKD", "estimation": "B"},
     {"code": "164906", "name": "中概互联网LOF", "currency": "USD", "estimation": "B"},
+    {"code": "501312", "name": "海外科技LOF", "currency": "USD", "estimation": "B"},
 ]
 
 QDII_FUNDS = _load_funds_from_config()
@@ -210,6 +274,10 @@ def fetch_lof_iopv_snapshot() -> dict:
     # 从集思录获取限额数据
     jisilu_data = _fetch_jisilu_qdii()
 
+    # A类ETF实时涨跌幅
+    etf_codes = list({f.get("etf") for f in QDII_FUNDS if f.get("etf") and f.get("estimation") == "A"})
+    etf_changes = _fetch_etf_changes(etf_codes)
+
     all_rows = []
     for fund in QDII_FUNDS:
         code = fund["code"]
@@ -236,6 +304,8 @@ def fetch_lof_iopv_snapshot() -> dict:
                     tc = _build_tc_code(h["ticker"], h["market"])
                     if tc in quotes:
                         current_prices[h["ticker"]] = quotes[tc].get("price")
+                        if quotes[tc].get("prev_close"):
+                            current_prices.setdefault("_prev_close", {})[h["ticker"]] = quotes[tc]["prev_close"]
             except Exception:
                 pass
 
@@ -255,6 +325,7 @@ def fetch_lof_iopv_snapshot() -> dict:
             "holdings": holdings,
             "currentPrices": current_prices,
             "stockPosition": stock_position,
+            "holdingsPrevClose": current_prices.pop("_prev_close", None),
             "currentFxRate": fx_rates.get(fund["currency"], 1.0),
             "applyFee": fund_info.get("applyFee"),
             "applyStatus": fund_info.get("applyStatus"),
@@ -263,6 +334,7 @@ def fetch_lof_iopv_snapshot() -> dict:
             "redeemStatus": fund_info.get("redeemStatus"),
             "custodianFee": fund_info.get("custodianFee"),
             "fundCompany": fund_info.get("fundCompany"),
+            "etfChange": etf_changes.get(fund.get("etf")),
         })
 
     return {

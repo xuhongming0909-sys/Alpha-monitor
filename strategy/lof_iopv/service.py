@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """QDII LOF IOPV 双引擎估值。A类指数跟踪法 + B类T10持仓加权法。"""
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from strategy.lof_iopv.classifier import get_calc_mode
 _BACKTEST_DIR = _os.path.join(_os.path.dirname(__file__), "..", "..", "runtime_data", "backtest")
 _BACKTEST_RESULTS = {}
 # 加载回测结果：优先加载合并文件，再加载各子文件
-for _fname in ("lof_all_r2_results.json", "lof27_r2_results.json", "a_results.json", "b_results.json"):
+for _fname in ("a_results.json", "b_results.json"):
     _fpath = _os.path.join(_BACKTEST_DIR, _fname)
     if _os.path.exists(_fpath):
         try:
@@ -70,7 +70,7 @@ def _get_base_fx(currency: str, date_str: str) -> Optional[float]:
 
 
 def _calc_a(row: dict, fx_now: Optional[float]) -> tuple:
-    """A类: IOPV = NAV * (1 + etf_ret) * fx_ratio。当前简化为 NAV * fx_ratio。"""
+    """A类: IOPV = NAV * (1 + etf_ret/100) * fx_ratio。"""
     nav = _to_float(row.get("nav"))
     if nav is None or nav <= 0:
         return None, "NAV缺失", {}
@@ -80,11 +80,16 @@ def _calc_a(row: dict, fx_now: Optional[float]) -> tuple:
         base = _get_base_fx(currency, row.get("navDate", "")[:10])
         if base and base > 0:
             fx_ratio = fx_now / base
-    return round(nav * fx_ratio, 6), "A类-指数跟踪", {"fxRatio": fx_ratio}
+    # ETF涨跌幅（百分比 → 小数）
+    etf_change_pct = _to_float(row.get("etfChange"))
+    etf_ret = etf_change_pct / 100 if etf_change_pct is not None else 0.0
+    iopv = nav * (1 + etf_ret) * fx_ratio
+    status = "A类-指数跟踪" if etf_change_pct is not None else "A类-指数跟踪(无ETF数据)"
+    return round(iopv, 6), status, {"fxRatio": fx_ratio, "etfRet": etf_ret}
 
 
 def _calc_b(row: dict, fx_now: Optional[float]) -> tuple:
-    """B类: T10持仓加权。est = stock_ratio * Σ(w_i * ret_i * fx_i)。"""
+    """B类: T10持仓加权。IOPV = NAV * (1 + stock_ratio * Σ(w_i * ret_i)) * fx_ratio"""
     nav = _to_float(row.get("nav"))
     if nav is None or nav <= 0:
         return None, "NAV缺失", {}
@@ -97,13 +102,29 @@ def _calc_b(row: dict, fx_now: Optional[float]) -> tuple:
         base = _get_base_fx(currency, row.get("navDate", "")[:10])
         if base and base > 0:
             fx_ratio = fx_now / base
-    stock_ratio = _to_float(row.get("stockPosition")) or 90.0
+    stock_ratio = _to_float(row.get("stockPosition"))
+    if stock_ratio is None:
+        return None, "仓位缺失", {}
     total_w = sum(h.get("weight", 0) or 0 for h in holdings)
     if total_w <= 0:
-        return nav * fx_ratio, "B类-T10(权重为零)", {"fxRatio": fx_ratio, "stockRatio": stock_ratio}
-    # 当前简化: 返回 NAV * fx_ratio（需要K线历史价格才能算真实收益率）
-    est = nav * fx_ratio
-    return round(est, 6), f"B类-T10({len(holdings)}持仓,仓位{stock_ratio:.0f}%)", {"fxRatio": fx_ratio, "stockRatio": stock_ratio}
+        return round(nav * fx_ratio, 6), "B类-T10(权重为零)", {"fxRatio": fx_ratio}
+    # 持仓加权收益率
+    current_prices = row.get("currentPrices") or {}
+    prev_closes = row.get("holdingsPrevClose") or {}
+    weighted_ret = 0.0
+    has_price = False
+    for h in holdings:
+        ticker = h.get("ticker", "")
+        w = (h.get("weight", 0) or 0) / total_w
+        cur_p = _to_float(current_prices.get(ticker))
+        prev_p = _to_float(prev_closes.get(ticker))
+        if cur_p and prev_p and prev_p > 0:
+            weighted_ret += w * (cur_p / prev_p - 1)
+            has_price = True
+    if not has_price:
+        return round(nav * fx_ratio, 6), "B类-T10(无股价)", {"fxRatio": fx_ratio, "stockRatio": stock_ratio}
+    est = nav * (1 + stock_ratio / 100 * weighted_ret) * fx_ratio
+    return round(est, 6), f"B类-T10({len(holdings)}持仓,{stock_ratio:.0f}%)", {"fxRatio": fx_ratio, "stockRatio": stock_ratio, "weightedRet": weighted_ret}
 
 
 def _is_paused(status: Any) -> bool:
@@ -146,7 +167,7 @@ def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
             iopv, status, details = _calc_a(row, fx_now)
 
         price = _to_float(row.get("price"))
-        premium = round((price / iopv - 1) * 100, 2) if (iopv and price and price > 0 and iopv > 0) else None
+        premium = round((price / iopv - 1) * 100, 3) if (iopv and price and price > 0 and iopv > 0) else None
 
         # 估值方法
         calc_method = "指数跟踪法" if est == "A" else "T10持仓法"
@@ -154,7 +175,7 @@ def build_lof_iopv_response(fetch_payload: dict, records: list) -> dict:
         stock_pos = row.get("stockPosition")
         if est == "A" and iopv and row.get("nav") and row["nav"] > 0:
             # A类反推仓位: (IOPV/NAV - 1) / etf_ret
-            stock_pos = round((iopv / row["nav"] - 1) * 100, 2) if iopv != row["nav"] else None
+            stock_pos = round((iopv / row["nav"] - 1) * 100, 3) if iopv != row["nav"] else None
         # 溢价状态
         if premium is not None:
             premium_status = "溢价" if premium > 0.5 else ("折价" if premium < -0.5 else "平价")

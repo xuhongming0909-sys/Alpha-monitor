@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # AI-SUMMARY: IOPV计算引擎，从数据库读取数据计算估值
 # 对应 INDEX.md §9.3 文件摘要索引
 """IOPV计算引擎"""
@@ -64,7 +64,7 @@ def calc_iopv_a(code, nav, nav_date, etf, fx_now):
         fx_ratio = fx_now / fx_base
 
     iopv = nav * (1 + etf_ret) * fx_ratio
-    return round(iopv, 4), f"A类({etf},ret={etf_ret:.4f},fx={fx_ratio:.4f})"
+    return round(iopv, 3), f"A类({etf},ret={etf_ret:.4f},fx={fx_ratio:.4f})"
 
 
 def calc_iopv_b(code, nav, nav_date, holdings, stock_ratio, fx_now):
@@ -108,7 +108,7 @@ def calc_iopv_b(code, nav, nav_date, holdings, stock_ratio, fx_now):
 
     est_ret = (stock_ratio / 100) * weighted_ret
     iopv = nav * (1 + est_ret)
-    return round(iopv, 4), f"B类({valid_count}/{len(holdings)}持仓,仓位{stock_ratio:.0f}%)"
+    return round(iopv, 3), f"B类({valid_count}/{len(holdings)}持仓,仓位{stock_ratio:.0f}%)"
 
 
 def calculate_all_iopv():

@@ -6,6 +6,30 @@
 **Do not**: dump full conversations.
 
 ## Entries
+### 2026-05-27 | LOF回测链+估值链清理
+
+- **Decision**: A类IOPV加入ETF涨幅因子，B类加入持仓加权收益率
+- **Fix**: fetcher.py 新增 _fetch_etf_changes() 东财+腾讯双源，输出 etfChange + holdingsPrevClose
+- **Fix**: service.py _calc_b 从简化版(NAV*汇率)恢复为完整持仓加权公式
+- **Fix**: service.py _calc_b stockPosition 兜底从 90.0 改为 None(仓位缺失)
+- **Fix**: market_service.py get_quotes 增加 prev_close 字段(parts[4])
+- **Fix**: 回测加载只读 a_results.json + b_results.json(字段名匹配: maxErr, samplePeriod)
+- **Action**: 删除 backtest.py，新建 backtest_a.py + backtest_b.py，字段对齐 service.py
+- **Action**: 清理 runtime_data/backtest/ 10个无用文件，只保留 a/b_results.json
+- **Action**: nav_updater.py 从 config 读取基金列表
+- **Risk**: 东财美股API(107)不稳定，腾讯fallback格式需服务器验证
+- **Mission**: missions/0527-lof-backtest-cleanup/
+### 2026-05-27 | LOF全链修复
+
+- **Decision**: 统一LOF管道，config.yaml为基金列表唯一来源，修复A类估值缺少ETF涨幅因子
+- **Action**: 9个文件修改，5个冗余脚本归档
+- **Fix**: service.py回测加载路径错误→修正为lof_all_r2_results.json
+- **Fix**: A类IOPV从简化版(NAV*汇率)恢复为完整公式(NAV*(1+etf_ret)*汇率)
+- **Fix**: fetcher.py新增_fetch_etf_changes()东财+腾讯双源
+- **Action**: config.yaml daily_incremental_sync=true，start_server.js dailySync接入lof-db-sync
+- **Action**: 冗余回测脚本归档至archive/lof_backtest_deprecated/
+- **Risk**: ETF腾讯行情格式需服务器验证
+- **Mission**: missions/0527-lof-pipeline-fix/
 
 
 ### 2026-05-27 | LOF数据库+回测架构
