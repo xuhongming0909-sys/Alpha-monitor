@@ -3,7 +3,7 @@
 # 对应 INDEX.md §9.3 文件摘要索引
 """Shared IOPV calculation formulas.
 
-Used by strategy/lof_iopv/service.py (realtime) and data_fetch/lof_db/iopv_calculator.py (historical).
+Used by strategy/lof_iopv/service.py (realtime) and strategy/lof_iopv/backtest.py and backtest_v2.py (historical).
 """
 
 from __future__ import annotations

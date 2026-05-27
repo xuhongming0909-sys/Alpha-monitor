@@ -339,6 +339,8 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `data_fetch/convertible_bond/source.py` | 转债套利上游 API：集思录实时行情 + 东方财富财务数据 |
 | `data_fetch/convertible_bond/normalizer.py` | 转债套利数据标准化：含理论定价的 Bus 记录生成 |
 | `data_fetch/lof_iopv/fetcher.py` | LOF IOPV fetcher（薄包装，调用source.py） |
+| `data_fetch/lof_iopv/source.py` | LOF IOPV上游API：东财净值+腾讯行情+雪球仓位+集思录申购状态 |
+| `data_fetch/lof_iopv/normalizer.py` | LOF IOPV数据标准化：快照转Bus记录 |
 | `data_fetch/merger/fetcher.py` | 并购数据抓取调度：调用巨潮公告 API |
 | `data_fetch/merger/source.py` | 并购公告 API：巨潮资讯公告搜索与解析 |
 | `data_fetch/dividend/fetcher.py` | 股息抓取调度：调用 AkShare/巨潮 API |
@@ -357,10 +359,12 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `data_fetch/lof_db/schema.py` | SQLite数据库Schema定义和初始化 |（含cleanup_old_data过期清理）|
 | `data_fetch/lof_db/updater.py` | 数据更新调度器 |
 | `data_fetch/lof_db/nav_updater.py` | 基金净值增量更新 |
-| `data_fetch/lof_db/etf_updater.py` | ETF价格增量更新 |
+| `data_fetch/lof_db/etf_updater.py` | ETF/个股价格增量更新（新浪akshare stock_us_daily + stock_hk_daily） |
 | `data_fetch/lof_db/fx_updater.py` | 汇率增量更新 |
 | `data_fetch/lof_db/holdings_updater.py` | 持仓数据增量更新 |
-| `strategy/lof_iopv/backtest.py` | LOF回测脚本（从数据库读取） |
+| `strategy/lof_iopv/backtest.py` | LOF回测v1（日收益率回归，共同日期对齐） |
+| `strategy/lof_iopv/backtest_v2.py` | LOF回测v2（NAV绝对值对比，3个月窗口，复用calc公式） |
+| `strategy/lof_iopv/classifier.py` | LOF分类器：A(指数跟踪)/B(T10持仓)模式判断 |
 
 ### 9.3 strategy/ — 业务计算层
 
