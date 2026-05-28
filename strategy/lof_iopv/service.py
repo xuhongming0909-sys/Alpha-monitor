@@ -15,7 +15,7 @@ from strategy.lof_iopv.calc import to_float, get_base_fx, calc_a_iopv, calc_b_io
 
 
 def _get_fx_base_from_db(currency, nav_date):
-    """?DB?NAV????fallback?get_base_fx"""
+    """从 DB 获取 NAV 基准日汇率，fallback 到 get_base_fx"""
     if not nav_date or currency == "CNY":
         return 1.0 if currency == "CNY" else None
     try:
@@ -180,6 +180,7 @@ def build_lof_iopv_response(fetch_payload, records):
             "redeemFee": row.get("redeemFee"),
             "custodianFee": row.get("custodianFee"),
             "fundCompany": row.get("fundCompany"),
+            "dailyLimit": row.get("dailyLimit"),
             "calcTarget": calc_core,
             "stockPosition": stock_pos,
             "r2": _BACKTEST_RESULTS.get(row.get("code"), {}).get("r2"),

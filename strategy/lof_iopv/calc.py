@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # AI-SUMMARY: 共享IOPV计算公式：A类指数跟踪法 + B类T10持仓加权法
 # 对应 INDEX.md §9.3 文件摘要索引
 """Shared IOPV calculation formulas.
@@ -27,7 +27,7 @@ def get_base_fx(currency, date_str):
         return None
     try:
         import akshare as ak
-        sym = {"USD": "美元", "HKD": "美元"}.get(currency)
+        sym = {"USD": "美元", "HKD": "港币"}.get(currency)
         if not sym:
             return None
         from datetime import datetime, timedelta

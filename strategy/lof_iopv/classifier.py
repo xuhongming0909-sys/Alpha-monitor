@@ -3,6 +3,3 @@
 
 def get_calc_mode(estimation: str) -> str:
     return {"A": "指数跟踪法", "B": "T10持仓加权法"}.get(estimation, "未知")
-
-def get_calc_method(estimation: str) -> str:
-    return {"A": "指数跟踪法", "B": "T10持仓法"}.get(estimation, "未知")

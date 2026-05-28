@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 // LOF IOPV 推送服务 - 重写版
 // 推送条件：限购金额存在 AND 溢价率 > 2%
 // 推送内容：代码 名称 溢价率 限购金额
@@ -21,7 +21,7 @@ function createLofIopvPushService(options = {}) {
     if (!rows || !Array.isArray(rows)) return [];
     return rows.filter(r => {
       const premium = r.premiumRate;
-      const minAmt = r.minAmt;
+      const minAmt = r.dailyLimit;
       if (premium === null || premium === undefined) return false;
       if (minAmt === null || minAmt === undefined || minAmt === "" || minAmt === 0) return false;
       return premium > 2.0;
@@ -38,7 +38,7 @@ function createLofIopvPushService(options = {}) {
       const code = r.code || "";
       const name = r.name || "";
       const premium = r.premiumRate !== null ? r.premiumRate.toFixed(2) + "%" : "-";
-      const amt = r.minAmt ? r.minAmt + "万" : "-";
+      const amt = r.dailyLimit != null ? r.dailyLimit + "万" : "-";
       md += `| ${code} | ${name} | ${premium} | ${amt} |\n`;
     }
     md += `\n共${rows.length}只 | ${new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}`;

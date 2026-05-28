@@ -15,8 +15,16 @@ def _load_etf_list() -> list[str]:
         plugins = cfg.get("data_fetch", {}).get("plugins", {})
         lof_cfg = plugins.get("lof_arbitrage", plugins.get("lof_iopv", {}))
         funds = lof_cfg.get("funds", [])
-        etfs = {f["etf"] for f in funds if f.get("etf") and f.get("estimation") == "A"}
-        extra = {'SOXX', 'GSG', 'DBC', 'TIP'}
+        etfs = set()
+        for f in funds:
+            if f.get("estimation") != "A":
+                continue
+            if f.get("etf"):
+                etfs.add(f["etf"])
+            for b in (f.get("etf_blend") or []):
+                if b.get("ticker"):
+                    etfs.add(b["ticker"])
+        extra = {'SOXX', 'DBC', 'TIP', 'OIH'}  # GSG已移除(新浪数据有误)
         etfs |= extra
         return sorted(etfs)
 

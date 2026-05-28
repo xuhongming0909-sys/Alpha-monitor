@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # AI-SUMMARY: 基金净值增量更新，从东方财富API获取
 # 对应 INDEX.md §9.3 文件摘要索引
 """基金净值增量更新"""
@@ -26,7 +26,8 @@ def _load_all_fund_codes() -> list[str]:
             return [f['code'] for f in funds if f.get('code')]
     except Exception:
         pass
-    return ['164701', '161128', '161130']  # 最小 fallback
+    print('WARNING: config load failed, using 3-fund fallback')
+    return ['164701', '161128', '161130']
 
 ALL_FUNDS = _load_all_fund_codes()
 A_FUNDS = ALL_FUNDS
@@ -68,7 +69,7 @@ def update_nav():
                     'INSERT OR IGNORE INTO fund_nav (code, date, nav) VALUES (?, ?, ?)',
                     (code, date, nav_val)
                 )
-                inserted += conn.total_changes
+                pass  # count via len(nav)
             except Exception:
                 pass
 
