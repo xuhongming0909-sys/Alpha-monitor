@@ -27,7 +27,7 @@ def get_base_fx(currency, date_str):
         return None
     try:
         import akshare as ak
-        sym = {"USD": "美元", "HKD": "港币"}.get(currency)
+        sym = {"USD": "美元", "HKD": "美元"}.get(currency)
         if not sym:
             return None
         from datetime import datetime, timedelta
