@@ -62,10 +62,6 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
       if (ex === 'SH') return <span style={{ color: '#3498db', fontWeight: 600 }}>沪</span>;
       return <span className="muted">--</span>;
     } },
-    { key: 'nav', label: 'T-2净值', numeric: true, render: (row) => formatNumber(row.nav) },
-    { key: 'navDate', label: '净值日期', render: (row) => formatDate(row.navDate) },
-    { key: 'price', label: '现价', numeric: true, render: (row) => formatNumber(row.price) },
-    { key: 'iopv', label: '实时估值', numeric: true, render: (row) => formatNumber(row.iopv) },
     { key: 'premiumRate', label: '溢价率', numeric: true, className: (row) => signedClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate) },
     { key: 'applyStatus', label: '申购状态', render: (row) => {
       const s = (row.applyStatus || '').toString();
@@ -75,6 +71,10 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
       return <span className="muted">{s || '--'}</span>;
     } },
     { key: 'supports1to6', label: '1拖六', render: (row) => row.supports1to6 ? <span style={{ color: '#27ae60', fontWeight: 600 }}>✓</span> : <span style={{ color: '#bdc3c7' }}>✗</span> },
+    { key: 'nav', label: 'T-2净值', numeric: true, render: (row) => formatNumber(row.nav) },
+    { key: 'navDate', label: '净值日期', render: (row) => formatDate(row.navDate) },
+    { key: 'price', label: '现价', numeric: true, render: (row) => formatNumber(row.price) },
+    { key: 'iopv', label: '实时估值', numeric: true, render: (row) => formatNumber(row.iopv) },
     { key: 'shareIncrease', label: '新增份额', numeric: true, render: (row) => formatShare(row.shareIncrease) },
     { key: 'shareTotal', label: '原有份额', numeric: true, render: (row) => formatShare(row.shareTotal) },
     { key: 'applyFee', label: '申购费', numeric: true, render: (row) => formatFee(row.applyFee) },
