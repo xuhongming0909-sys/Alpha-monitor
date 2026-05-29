@@ -371,8 +371,7 @@ data_fetch:
       - code: '501018'
         name: 南方原油LOF
         currency: USD
-        fund_class: index
-        etf_ticker: USO
+        fund_class: active_pdf
       - code: '163208'
         name: 全球油气能源LOF
         currency: USD
