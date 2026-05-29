@@ -809,3 +809,75 @@ h2 {
     display: none;
   }
 }
+
+/* ========== LOF 展开持仓样式 ========== */
+.lof-expandable-table .lof-data-row {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.lof-expandable-table .lof-data-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.lof-expandable-table .lof-data-row.expanded {
+  background: rgba(64, 196, 255, 0.06);
+}
+.lof-expand-col {
+  width: 28px;
+  text-align: center;
+  padding: 6px 4px !important;
+}
+.lof-expand-icon {
+  display: inline-block;
+  font-size: 10px;
+  color: #6b7f99;
+  transition: transform 0.2s;
+}
+.lof-expand-icon.open {
+  transform: rotate(90deg);
+}
+.lof-holdings-row td {
+  padding: 0 !important;
+  border-top: none !important;
+}
+.lof-holdings-panel {
+  background: rgba(0, 0, 0, 0.25);
+  border-left: 3px solid #40c4ff;
+  margin: 0 16px 8px 28px;
+  padding: 10px 14px;
+  border-radius: 0 6px 6px 0;
+}
+.lof-holdings-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #40c4ff;
+  margin-bottom: 8px;
+}
+.lof-holdings-empty {
+  color: #6b7f99;
+  font-size: 12px;
+}
+.lof-holdings-inner {
+  width: auto;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.lof-holdings-inner th {
+  padding: 4px 10px;
+  color: #8899aa;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  white-space: nowrap;
+}
+.lof-holdings-inner th.num,
+.lof-holdings-inner td.num {
+  text-align: right;
+}
+.lof-holdings-inner td {
+  padding: 3px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+.lof-holdings-inner tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
