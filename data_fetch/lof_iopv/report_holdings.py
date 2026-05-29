@@ -33,34 +33,26 @@ _SECTION_KW = [
     "股票及存托凭证投资明细", "债券投资明细", "占基金资产净值比例",
 ]
 
-_LLM_PROMPT = """你是基金持仓数据提取专家。
-从基金季报中提取所有持仓（股票、ETF、基金、债券）。
+_LLM_PROMPT = """你是基金持仓数据提取专家。从基金季报PDF文本中提取所有持仓。
 
-严格按以下JSON数组格式返回，不要任何其他文字、解释或markdown：
+输出格式（纯JSON数组，不要任何其他文字）：
 [{"ticker":"代码","name":"名称","weight":数字,"market":"US/HK/A"}]
 
-代码规则（必须遵守）：
-- 港股5位数代码：00883(中海油), 00857(中石油), 01818(招金矿业), 02899(紫金矿业)等
-- A股6位数代码：600489(中金黄金), 002155(湖南黄金), 600988(赤峰黄金)等
-- 美股ETF用标准简称（非常重要，必须精确）：
-  原油类：CRUD(WisdomTree WTI), USO(United States Oil), BNO(United States Brent), BRNT(WisdomTree Brent), DBO(Invesco DB Oil), OILK, XLE, XOP, IXC, IEO
-  黄金类：GLD(SPDR Gold), IAU(iShares Gold), SGOL(abrdn Physical Gold), GLDM(SPDR Gold MiniShares), GDX(VanEck Gold Miners), GDXJ, BAR, AAU, UBS(UBS Gold ETF)
-  科技类：QQQ, SOXX, SMH, BOTZ, AIQ, XLK, FINX, SOXQ, PSI, ARKK, ARKG, ARKQ
-  其他：SPY, IYR, INDA, XBI, XHE, RYH, XLY, AGG, ARKW, ARKF
-  日本ETF：SimpleXWTI, NOMURA_CRUDE, UBS_CMCI
-- 无法确定的代码填空字符串""
+字段说明：
+- ticker: 证券代码
+  - 港股/美股ETF名：5位数字如00883, 02899
+  - A股：6位数字如600489, 002155
+  - 海外ETF/ETC：用其标准交易代码，如USO,GLD,IAU,QQQ,SPY,CRUD,BNO等
+  - 如果文本中没有明确给出代码且你不确定，填空字符串""
+- name: 原始名称（保留完整，合并跨行显示的名称）
+- weight: 占基金资产净值比例%，纯数字
+- market: 美股/海外=US, 港股=HK, A股=A
 
-name: 原始完整名称
-weight: 占基金资产净值比例，纯数字不带%
-market: US=美股/海外ETF, HK=港股, A=A股
-
-FOF基金特别注意：
-- 如果季报显示"本基金本报告期末未持有权益投资"但有"基金投资明细"，说明是FOF
-- FOF的持仓在"前十名基金投资明细"中，每行是一个ETF/基金
-- 基金名称可能跨多行显示，需要合并理解，如"abrdn Physical\nGold Shares"实际是"abrdn Physical Gold Shares"
-- ticker必须用ETF的真实代码，不要猜测
-
-排除项：银行存款、结算备付金、货币市场工具、应收类、待摊费用、其他资产、合计、买入返售。"""
+重要规则：
+1. 只提取季报中实际列出的持仓，不要推测或编造
+2. 如果某只ETF名称你不知道其交易代码，ticker填""，不要猜
+3. 股票、ETF、基金、债券都算持仓，分别在不同章节
+4. 排除：银行存款、结算备付金、货币基金、应收类、其他资产"""
 
 
 # ============================================================
