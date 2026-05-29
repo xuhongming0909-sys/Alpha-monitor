@@ -268,6 +268,7 @@ def build_lof_snapshot():
         else:
             holdings = _fetch_holdings(code)
 
+        fund_info = _fetch_fund_info(code)
         market = "sh" if code.startswith(("5", "6")) else "sz"
         current_prices = {}
         price = None
