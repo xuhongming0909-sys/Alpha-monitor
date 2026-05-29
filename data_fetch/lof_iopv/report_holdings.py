@@ -40,18 +40,27 @@ _LLM_PROMPT = """你是基金持仓数据提取专家。
 [{"ticker":"代码","name":"名称","weight":数字,"market":"US/HK/A"}]
 
 代码规则（必须遵守）：
-- 美股ETF用标准简称：CRUD,USO,BNO,BRNT,OILK,DBO,ARKK,ARKG,ARKQ,ARKW,ARKF,QQQ,SOXX,SMH,BOTZ,AIQ,XLK,FINX,SOXQ,PSI,XOP,XLE,VDE,IYE,IXC,GLD,IAU
-- 港股5位数：00883,00857
-- A股6位数：159995,159881,512760,512480
-- 日本ETF：SimpleXWTI,NOMURA_CRUDE,UBS_CMCI
+- 港股5位数代码：00883(中海油), 00857(中石油), 01818(招金矿业), 02899(紫金矿业)等
+- A股6位数代码：600489(中金黄金), 002155(湖南黄金), 600988(赤峰黄金)等
+- 美股ETF用标准简称（非常重要，必须精确）：
+  原油类：CRUD(WisdomTree WTI), USO(United States Oil), BNO(United States Brent), BRNT(WisdomTree Brent), DBO(Invesco DB Oil), OILK, XLE, XOP, IXC, IEO
+  黄金类：GLD(SPDR Gold), IAU(iShares Gold), SGOL(abrdn Physical Gold), GLDM(SPDR Gold MiniShares), GDX(VanEck Gold Miners), GDXJ, IAU, BAR, AAU
+  科技类：QQQ, SOXX, SMH, BOTZ, AIQ, XLK, FINX, SOXQ, PSI, ARKK, ARKG, ARKQ
+  其他：SPY, IYR, INDA, XBI, XHE, RYH, XLY, AGG, ARKW, ARKF
+  日本ETF：SimpleXWTI, NOMURA_CRUDE, UBS_CMCI
 - 无法确定的代码填空字符串""
-- 正确示例："WisdomTree WTI Crude Oil"→CRUD, "United States Oil Fund"→USO, "CNOOC Ltd(883)"→00883
 
 name: 原始完整名称
 weight: 占基金资产净值比例，纯数字不带%
-market: US=美股, HK=港股, A=A股
+market: US=美股/海外ETF, HK=港股, A=A股
 
-排除项（不要提取）：银行存款、结算备付金、货币市场工具、应收类、待摊费用、其他资产、合计、买入返售。"""
+FOF基金特别注意：
+- 如果季报显示"本基金本报告期末未持有权益投资"但有"基金投资明细"，说明是FOF
+- FOF的持仓在"前十名基金投资明细"中，每行是一个ETF/基金
+- 基金名称可能跨多行显示，需要合并理解，如"abrdn Physical\nGold Shares"实际是"abrdn Physical Gold Shares"
+- ticker必须用ETF的真实代码，不要猜测
+
+排除项：银行存款、结算备付金、货币市场工具、应收类、待摊费用、其他资产、合计、买入返售。"""
 
 
 # ============================================================
