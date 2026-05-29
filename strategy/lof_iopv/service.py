@@ -64,7 +64,7 @@ def _get_holdings_from_db(code):
         return []
 
 def _monitor_pools(row, limited_threshold=0.5, unlimited_threshold=1.0):
-    """根据溢价率决定监控池资格。阈值可以被config覆盖。"""
+    """Decide monitor pool eligibility based on premium rate."""
     premium = row.get("premiumRate")
     if premium is None:
         return False, False
