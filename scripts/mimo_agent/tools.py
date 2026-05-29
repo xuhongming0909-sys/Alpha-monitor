@@ -135,7 +135,7 @@ _HEADERS = {
 
 
 def web_search(query: str, max_results: int = 5) -> str:
-    """百度搜索，返回摘要结果列表。
+    """Bing搜索，返回摘要结果列表。
 
     返回 JSON 字符串: {"status":"success","results":[{"title":"...","url":"...","snippet":"..."},...]}
     """
@@ -144,15 +144,15 @@ def web_search(query: str, max_results: int = 5) -> str:
         return json.dumps({"status": "error", "message": "query 不能为空"}, ensure_ascii=False)
 
     try:
-        url = f"https://www.baidu.com/s?wd={quote_plus(query)}&rn={max_results}"
+        url = f"https://cn.bing.com/search?q={quote_plus(query)}&mkt=zh-CN"
         resp = requests.get(url, headers=_HEADERS, timeout=10)
         resp.encoding = "utf-8"
         soup = BeautifulSoup(resp.text, "lxml")
 
         results = []
-        for item in soup.select("div.result, div.c-container"):
-            title_tag = item.select_one("h3 a, .c-title a, .t a")
-            snippet_tag = item.select_one(".c-abstract, .c-span-last, .content-right_8Zs40")
+        for item in soup.select("li.b_algo"):
+            title_tag = item.select_one("h2 a")
+            snippet_tag = item.select_one(".b_caption p, .b_algoSlug")
             if not title_tag:
                 continue
             title = title_tag.get_text(strip=True)
