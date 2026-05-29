@@ -5,8 +5,9 @@ import SimpleDataTable from './SimpleDataTable.jsx';
 import { formatDate, formatNumber, formatPercent, pickText, rowMatchesQuery, signedClass, toNumber } from './cardHelpers.jsx';
 
 function formatFee(value) {
-  const n = toNumber(value);
-  return n === null ? '--' : `${n}%`;
+  if (value == null) return '--';
+  const s = String(value).replace('%', '');
+  return toNumber(s) === null ? '--' : s + '%';
 }
 
 function formatShare(value) {
