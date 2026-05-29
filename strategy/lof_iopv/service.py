@@ -30,7 +30,7 @@ def _load_backtest_results():
 
 
 def _get_fx_base_from_db(currency, nav_date):
-    """浠?DB 鑾峰彇 NAV 鍩哄噯鏃ユ眹鐜囷紝fallback 鍒?get_base_fx"""
+    """Get NAV base-date exchange rate from DB, fallback to get_base_fx."""
     if not nav_date or currency == "CNY":
         return 1.0 if currency == "CNY" else None
     try:
@@ -50,7 +50,7 @@ def _get_fx_base_from_db(currency, nav_date):
 
 
 def _get_holdings_from_db(code):
-    """浠?DB 鍏滃簳鑾峰彇鏈€鏂版寔浠撴暟鎹?""
+    """Get latest holdings data from DB bottom-up."""
     try:
         from data_fetch.lof_db.schema import get_db
         conn = get_db()
@@ -101,7 +101,7 @@ def _resolve_fx_rates(currencies):
     return fx
 
 def build_lof_response(fetch_payload):
-    """浠?source 灞?fetch 缁撴灉鏋勫缓 UI 灞曠ず鏁版嵁"""
+    """Build UI display data from source layer fetch results."""
     _load_backtest_results()
 
     fx_rates = _resolve_fx_rates(["USD", "HKD"])
@@ -150,7 +150,7 @@ def build_lof_response(fetch_payload):
 
         apply_status = row.get("applyStatus") or ""
         daily_limit = row.get("dailyLimit")
-        if apply_status == "闄愬ぇ棰? and daily_limit is not None and daily_limit < 1e10:
+        if apply_status == "limit_big" and daily_limit is not None and daily_limit < 1e10:
             apply_status = "闄愰%d" % int(daily_limit)
         elif not apply_status:
             apply_status = "鏈煡"
