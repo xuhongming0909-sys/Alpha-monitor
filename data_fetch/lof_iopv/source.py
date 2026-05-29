@@ -168,7 +168,7 @@ def _fetch_holdings(code):
 
 
 def _fetch_stock_position(code):
-    """Fetch stock position % from akshare (雪球持仓资产比例)."""
+    """Fetch total non-cash position % from akshare (total position = 100% - cash)."""
     try:
         import akshare as ak
         from datetime import datetime
@@ -183,14 +183,12 @@ def _fetch_stock_position(code):
         date_str = f"{q_year}{q_month:02d}31"
         df = ak.fund_individual_detail_hold_xq(symbol=code, date=date_str)
         if df is not None and not df.empty:
+            cash_pct = 0.0
             for _, row in df.iterrows():
                 asset_type = str(row.iloc[0])
-                if "股票" in asset_type:
-                    return round(float(row.iloc[1]), 2)
-            for _, row in df.iterrows():
-                asset_type = str(row.iloc[0])
-                if "其他" in asset_type:
-                    return round(float(row.iloc[1]), 2)
+                if "现金" in asset_type:
+                    cash_pct += float(row.iloc[1])
+            return round(100.0 - cash_pct, 2)
     except Exception:
         pass
     return None
