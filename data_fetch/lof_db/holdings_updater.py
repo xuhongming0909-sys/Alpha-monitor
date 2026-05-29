@@ -111,7 +111,7 @@ def _download_latest_pdf(code: str) -> str | None:
             return pdf_path
         
         # 下载PDF
-        pdf_url = f"https://docf10.eastmoney.com/report/{report_id}.pdf"
+        pdf_url = f"https://pdf.dfcfw.com/pdf/H2_{report_id}_1.pdf"
         print(f"  {code}: 下载 {title} ({date})")
         r = req.get(pdf_url, timeout=60, stream=True, headers={"User-Agent": "Mozilla/5.0"})
         if r.status_code == 200:
