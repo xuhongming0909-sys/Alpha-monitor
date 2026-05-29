@@ -202,7 +202,7 @@ def _fetch_fund_info(code):
     try:
         url = f"https://fundf10.eastmoney.com/jbgk_{code}.html"
         text = SESSION.get(url, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
-        m = re.search(r"管理费率.*?(\d+\.\d+%)", text)
+        m = re.search(r"托管费率.*?(\d+\.\d+%)", text)
         if m:
             info["custodianFee"] = m.group(1)
         m = re.search(r"申购费率.*?(\d+\.\d+%)", text)
