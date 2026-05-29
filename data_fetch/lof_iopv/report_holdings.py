@@ -1,422 +1,431 @@
-﻿# -*- coding: utf-8 -*-
-"""从季报PDF提取前20大持仓，映射到ticker+market，存入DB。
-数据拉取后存入SQLite，回测/实时计算从DB读取。"""
+# -*- coding: utf-8 -*-
+# AI-SUMMARY: 持仓提取 - PDF渲染→Vision LLM提取→文本LLM兜底→直接覆盖DB
+# 对应 INDEX.md §9.3 文件摘要索引
+"""持仓提取器：PDF渲染→Vision LLM→文本LLM兜底→直接覆盖DB。"""
 from __future__ import annotations
 
+import base64
+import io
+import json
 import os
 import re
 import sqlite3
+import sys
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
+import fitz  # PyMuPDF
+import httpx
 import requests
 
-# ============================================================
-# 已知 US ETF 映射字典 (name关键词 -> ticker)
-# ============================================================
-_KNOWN_US_ETFS: Dict[str, str] = {
-    # ARK系列
-    "ARK Innovation": "ARKK",
-    "ARK Genomic": "ARKG",
-    "ARK Autonomous": "ARKQ",
-    "ARK Next Generation": "ARKW",
-    "ARK Fintech": "ARKF",
-    # 科技/半导体
-    "Invesco QQQ": "QQQ",
-    "Invesco Dynamic Semiconductor": "PSI",
-    "Invesco PHLX Semiconductor": "SOXQ",
-    "iShares Semiconductor": "SOXX",
-    "iShares PHLX Semiconductor": "SOXX",
-    "VanEck Semiconductor": "SMH",
-    "Global X Robotics": "BOTZ",
-    "Global X Artificial Intelligence": "AIQ",
-    "Global X Autonomous": "AIQ",
-    "Technology Select Sector": "XLK",
-    "State Street Technology": "XLK",
-    "SPDR Technology": "XLK",
-    "SPDR S&P Technology": "XLK",
-    # 能源/原油
-    "United States Oil Fund": "USO",
-    "United States Brent Oil": "BNO",
-    "WisdomTree WTI Crude": "CRUD",
-    "WisdomTree Brent Crude": "BRNT",
-    "ProShares K-1 Free Crude": "OILK",
-    "Invesco DB Oil": "DBO",
-    "iShares US Energy": "IYE",
-    "iShares Global Energy": "IXC",
-    "Vanguard Energy": "VDE",
-    "SPDR S&P Oil": "XOP",
-    "SPDR Energy Select": "XLE",
-    "Oil & Gas Exploration": "XOP",
-    "Energy Select Sector": "XLE",
-    # 医疗/生物科技
-    "Health Care Select": "XLV",
-    "SPDR Health Care": "XLV",
-    "iShares Biotechnology": "IBB",
-    "SPDR S&P Biotech": "XBI",
-    # 消费/REIT
-    "Consumer Discretionary Select": "XLY",
-    "SPDR Consumer": "XLY",
-    "Vanguard Real Estate": "VNQ",
-    "iShares Cohen & Steers REIT": "ICF",
-    # 债券
-    "iShares Core U.S. Aggregate": "AGG",
-    "iShares TIPS Bond": "TIP",
-    "iShares iBoxx Investment Grade": "LQD",
-    "iShares iBoxx High Yield": "HYG",
-    # 宽基
-    "SPDR S&P 500": "SPY",
-    "iShares Core S&P 500": "IVV",
-    "iShares MSCI India": "INDA",
-    "iShares MSCI Emerging": "EEM",
-    "Vanguard FTSE Emerging": "VWO",
-    "SPDR Dow Jones": "DIA",
-    # 黄金
-    "SPDR Gold": "GLD",
-    "iShares Gold Trust": "IAU",
-    "VanEck Gold Miners": "GDX",
-    # 其他
-    "iShares Core S&P Mid-Cap": "IJH",
-    "iShares Core S&P Small-Cap": "IJR",
-    "iShares Edge MSCI USA Value": "VLUE",
-    "iShares Edge MSCI USA Momentum": "MTUM",
-    "iShares Edge MSCI USA Quality": "QUAL",
-    "iShares Edge MSCI Min Vol": "USMV",
-    "WisdomTree India Earnings": "EPI",
-    "iShares MSCI Brazil": "EWZ",
-    "iShares MSCI Japan": "EWJ",
-    "iShares MSCI South Korea": "EWY",
-    "iShares MSCI Taiwan": "EWT",
-    "Samsung S&P GSCI": "USO",
-    "NEXT FUNDS NOMURA Crude": "USO",
-    "UBS CMCI Oil": "BNO",
-    "Simplex WTI": "USO",
-    "Simplex Brent": "BNO",
-}
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-_A_SHARE_PREFIXES = {"51": "sh", "15": "sz", "60": "sh", "00": "sz", "30": "sz", "68": "sh"}
+SESSION = requests.Session()
+SESSION.headers.update({"User-Agent": "Mozilla/5.0"})
 
-HK_SESSION = requests.Session()
-HK_SESSION.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Referer": "https://fundf10.eastmoney.com/",
-})
+_DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'runtime_data', 'lof_db', 'lof.db')
+_PDF_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'runtime_data', 'qreport')
+_CONCURRENCY = 5
+
+_SECTION_KW = [
+    "前十名股票", "前十名基金投资", "前十名权益投资",
+    "前十名资产支持证券", "基金投资明细", "权益投资明细",
+    "股票及存托凭证投资明细", "债券投资明细", "占基金资产净值比例",
+]
+
+_LLM_PROMPT = """你是基金持仓数据提取专家。
+从基金季报中提取所有持仓（股票、ETF、基金、债券）。
+
+严格按以下JSON数组格式返回，不要任何其他文字、解释或markdown：
+[{"ticker":"代码","name":"名称","weight":数字,"market":"US/HK/A"}]
+
+代码规则（必须遵守）：
+- 美股ETF用标准简称：CRUD,USO,BNO,BRNT,OILK,DBO,ARKK,ARKG,ARKQ,ARKW,ARKF,QQQ,SOXX,SMH,BOTZ,AIQ,XLK,FINX,SOXQ,PSI,XOP,XLE,VDE,IYE,IXC,GLD,IAU
+- 港股5位数：00883,00857
+- A股6位数：159995,159881,512760,512480
+- 日本ETF：SimpleXWTI,NOMURA_CRUDE,UBS_CMCI
+- 无法确定的代码填空字符串""
+- 正确示例："WisdomTree WTI Crude Oil"→CRUD, "United States Oil Fund"→USO, "CNOOC Ltd(883)"→00883
+
+name: 原始完整名称
+weight: 占基金资产净值比例，纯数字不带%
+market: US=美股, HK=港股, A=A股
+
+排除项（不要提取）：银行存款、结算备付金、货币市场工具、应收类、待摊费用、其他资产、合计、买入返售。"""
 
 
 # ============================================================
-# 1. 季报获取 + PDF下载
+# 配置加载
 # ============================================================
-def fetch_latest_report_id(code: str) -> Optional[str]:
-    import akshare as ak
+
+def _load_secrets() -> dict:
+    import yaml
+    p = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'secrets.yaml')
+    if not os.path.exists(p):
+        return {}
+    with open(p, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f) or {}
+
+
+def _vision_config() -> dict:
+    return _load_secrets().get('vision', {})
+
+
+def _text_config() -> dict:
+    return _load_secrets().get('deepseek', {})
+
+
+# ============================================================
+# PDF处理
+# ============================================================
+
+def _find_holdings_pages(pdf_path: str) -> List[int]:
+    """找到包含持仓关键词的页码（含下一页）。"""
+    doc = fitz.open(pdf_path)
+    pages = set()
+    for i, page in enumerate(doc):
+        if any(kw in page.get_text() for kw in _SECTION_KW):
+            pages.add(i)
+            if i + 1 < len(doc):
+                pages.add(i + 1)
+    doc.close()
+    return sorted(pages)[:6]
+
+
+def _extract_text(pdf_path: str) -> str:
+    """提取持仓相关页的文本。"""
+    doc = fitz.open(pdf_path)
+    pages = _find_holdings_pages(pdf_path)
+    texts = []
+    for pi in pages:
+        t = doc[pi].get_text().strip()
+        if t:
+            texts.append(t)
+    doc.close()
+    return "\n\n".join(texts)
+
+
+def _render_pages(pdf_path: str) -> Optional[str]:
+    """渲染持仓页为base64 JPEG。"""
     try:
-        df = ak.fund_announcement_report_em(symbol=code)
-        if df is None or df.empty:
-            return None
-        for _, row in df.iloc[::-1].iterrows():
-            title = str(row.get("公告标题", ""))
-            if "季度报告" in title and "摘要" not in title and "年度" not in title:
-                return str(row.get("报告ID", ""))
-        return str(df.iloc[-1].get("报告ID", ""))
-    except Exception:
+        from PIL import Image as PILImage
+    except ImportError:
         return None
+    doc = fitz.open(pdf_path)
+    pages = _find_holdings_pages(pdf_path)
+    if not pages:
+        doc.close()
+        return None
+    imgs = []
+    for pi in pages:
+        if pi < len(doc):
+            pix = doc[pi].get_pixmap(dpi=150)
+            imgs.append(PILImage.frombytes('RGB', [pix.width, pix.height], pix.samples))
+    doc.close()
+    if not imgs:
+        return None
+    gap = 10
+    total_h = sum(im.height for im in imgs) + gap * (len(imgs) - 1)
+    max_w = max(im.width for im in imgs)
+    combined = PILImage.new('RGB', (max_w, total_h), 'white')
+    y = 0
+    for im in imgs:
+        combined.paste(im, (0, y))
+        y += im.height + gap
+    buf = io.BytesIO()
+    combined.save(buf, format='JPEG', quality=75)
+    return base64.b64encode(buf.getvalue()).decode()
 
 
-def download_report_pdf(report_id: str, save_dir: str) -> Optional[str]:
-    os.makedirs(save_dir, exist_ok=True)
-    pdf_path = os.path.join(save_dir, f"{report_id}.pdf")
-    if os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 10000:
-        return pdf_path
-    # HTTP优先(HTTPS被拦截)
-    for url in [
-        f"http://pdf.dfcfw.com/pdf/H2_{report_id}_1.pdf",
-        f"https://pdf.dfcfw.com/pdf/H2_{report_id}_1.pdf",
-    ]:
+# ============================================================
+# LLM调用
+# ============================================================
+
+def _parse_json(content: str) -> List[Dict]:
+    """从LLM返回中解析JSON数组。"""
+    content = content.strip()
+    content = re.sub(r'^```json\s*', '', content)
+    content = re.sub(r'\s*```$', '', content)
+    jm = re.search(r'\[.*\]', content, re.DOTALL)
+    if not jm:
+        return []
+    try:
+        items = json.loads(jm.group())
+    except json.JSONDecodeError:
+        return []
+    valid = []
+    for item in items:
+        ticker = str(item.get("ticker", "")).strip().upper()
+        name = str(item.get("name", "")).strip()
         try:
-            r = HK_SESSION.get(url, timeout=60, verify=(not url.startswith("http://")))
-            if r.content[:4] == b"%PDF" and len(r.content) > 10000:
-                with open(pdf_path, "wb") as f:
-                    f.write(r.content)
-                return pdf_path
-        except Exception:
+            weight = float(item.get("weight", 0))
+        except (ValueError, TypeError):
             continue
+        market = str(item.get("market", "")).strip().upper()
+        if not name or weight <= 0:
+            continue
+        if market not in ("US", "HK", "A", ""):
+            market = ""
+        if not ticker:
+            ticker = _guess_ticker(name)
+        if ticker:
+            valid.append({"ticker": ticker, "name": name, "weight": weight, "market": market})
+    return valid
+
+
+def _guess_ticker(name: str) -> str:
+    """从名称推断ticker。"""
+    nu = name.upper()
+    _MAP = {
+        "WISDOMTREE WTI CRUDE": "CRUD", "WISDOMTREE BRENT": "BRNT",
+        "PROSHARES K-1 FREE CRUDE": "FREE", "UNITED STATES OIL": "USO",
+        "UNITED STATES BRENT OIL": "BNO", "SIMPLEX WTI": "SimpleXWTI",
+        "SAMSUNG": "GSCI", "COLLATERIZED ETC": "BRNT",
+        "STATE STREET ENERGY": "XLE",
+    }
+    for k, v in _MAP.items():
+        if k in nu:
+            return v
+    m = re.search(r'\b(\d{5})\b', name)
+    if m:
+        return m.group(1)
+    m = re.search(r'\b(\d{6})\b', name)
+    if m:
+        return m.group(1)
+    return ""
+
+
+def _call_vision_llm(b64_image: str, fund_code: str) -> List[Dict]:
+    """Vision LLM（mimo-v2.5）提取持仓。"""
+    cfg = _vision_config()
+    if not cfg.get('api_key'):
+        return []
+    url = cfg.get('base_url', '')
+    r = httpx.post(
+        url,
+        headers={"Authorization": f"Bearer {cfg['api_key']}"},
+        json={
+            "model": cfg.get('model', 'mimo-v2.5'),
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": _LLM_PROMPT + f"\n\n基金代码: {fund_code}"},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}},
+            ]}],
+            "max_tokens": 8000,
+            "temperature": 0.0,
+        },
+        timeout=120,
+    )
+    r.raise_for_status()
+    content = r.json()['choices'][0]['message']['content']
+    return _parse_json(content)
+
+
+def _call_text_llm(text: str, fund_code: str) -> List[Dict]:
+    """文本LLM（deepseek-chat）提取持仓。"""
+    cfg = _text_config()
+    if not cfg.get('api_key'):
+        return []
+    url = cfg.get('base_url', '').rstrip('/') + '/chat/completions'
+    r = httpx.post(
+        url,
+        headers={"Authorization": f"Bearer {cfg['api_key']}"},
+        json={
+            "model": "deepseek-chat",
+            "messages": [{"role": "user",
+                          "content": f"{_LLM_PROMPT}\n\n基金代码: {fund_code}\n\n季报文本:\n{text}"}],
+            "max_tokens": 2000,
+            "temperature": 0.0,
+        },
+        timeout=90,
+    )
+    r.raise_for_status()
+    content = r.json()['choices'][0]['message']['content']
+    return _parse_json(content)
+
+
+# ============================================================
+# 去重
+# ============================================================
+
+def _dedup(items: List[Dict]) -> List[Dict]:
+    """同一ticker取最大weight。"""
+    best = {}
+    for item in items:
+        t = item["ticker"]
+        if t not in best or item["weight"] > best[t]["weight"]:
+            best[t] = item
+    return list(best.values())
+
+
+# ============================================================
+# DB覆盖写入
+# ============================================================
+
+def _report_date_from_path(pdf_path: str) -> str:
+    """从PDF文件名推导报告期。如 160723_2026Q1.pdf → 2026-03-31"""
+    basename = os.path.basename(pdf_path)
+    m = re.search(r'(\d{4})Q(\d)', basename)
+    if not m:
+        return datetime.now().strftime('%Y-%m-%d')
+    year, q = int(m.group(1)), int(m.group(2))
+    q_end = {1: "03-31", 2: "06-30", 3: "09-30", 4: "12-31"}
+    return f"{year}-{q_end.get(q, '03-31')}"
+
+
+def save_to_db(code: str, holdings: List[Dict], pdf_path: str) -> int:
+    """覆盖写入DB。DELETE旧数据+INSERT新数据。返回写入条数。"""
+    if not holdings:
+        return 0
+    report_date = _report_date_from_path(pdf_path)
+    db = sqlite3.connect(_DB_PATH)
+    try:
+        db.execute("DELETE FROM holdings WHERE code = ? AND report_date = ?", (code, report_date))
+        for h in holdings:
+            db.execute(
+                "INSERT INTO holdings (code, report_date, ticker, name, weight, market) VALUES (?, ?, ?, ?, ?, ?)",
+                (code, report_date, h["ticker"], h["name"], h["weight"], h["market"]),
+            )
+        db.commit()
+        return len(holdings)
+    finally:
+        db.close()
+
+
+# ============================================================
+# 主流程
+# ============================================================
+
+def get_fund_holdings(code: str) -> Tuple[List[Dict], Optional[str]]:
+    """
+    提取单只基金持仓。
+    返回: (holdings列表, 错误信息)
+    """
+    import glob
+    pdf_path = None
+    for q in ["Q1", "Q2", "Q3", "Q4"]:
+        matches = glob.glob(os.path.join(_PDF_DIR, f"{code}_*{q}*.pdf"))
+        if matches:
+            pdf_path = max(matches, key=os.path.getmtime)
+            break
+
+    if not pdf_path:
+        return [], f"无PDF文件: {code}"
+
+    # 1. Vision LLM（优先）
+    b64 = _render_pages(pdf_path)
+    if b64:
+        try:
+            items = _call_vision_llm(b64, code)
+            if items:
+                items = _dedup(items)
+                total = sum(h["weight"] for h in items)
+                print(f"  {code}: vision {len(items)}条 占比{total:.1f}%")
+                return items, None
+        except Exception as e:
+            print(f"  {code}: vision失败: {e}")
+
+    # 2. 文本LLM（兜底）
+    text = _extract_text(pdf_path)
+    if text and len(text) > 100:
+        try:
+            items = _call_text_llm(text, code)
+            if items:
+                items = _dedup(items)
+                total = sum(h["weight"] for h in items)
+                print(f"  {code}: text {len(items)}条 占比{total:.1f}%")
+                return items, None
+        except Exception as e:
+            print(f"  {code}: text失败: {e}")
+
+    return [], f"提取失败: {code}"
+
+
+def _process_one(code: str) -> Tuple[str, Dict]:
+    """处理单只基金：提取+覆盖写入DB。"""
+    try:
+        holdings, error = get_fund_holdings(code)
+        if error:
+            return code, {"ok": False, "error": error}
+        if not holdings:
+            return code, {"ok": False, "error": f"{code}: 0条持仓"}
+        import glob
+        pdf_path = None
+        for q in ["Q1", "Q2", "Q3", "Q4"]:
+            matches = glob.glob(os.path.join(_PDF_DIR, f"{code}_*{q}*.pdf"))
+            if matches:
+                pdf_path = max(matches, key=os.path.getmtime)
+                break
+        if pdf_path:
+            n = save_to_db(code, holdings, pdf_path)
+            return code, {"ok": True, "holdings": n}
+        return code, {"ok": False, "error": f"{code}: 无PDF路径"}
+    except Exception as e:
+        return code, {"ok": False, "error": str(e)}
+
+
+def update_all_holdings(fund_codes: List[str], concurrency: int = _CONCURRENCY):
+    """并发更新所有基金持仓。"""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from data_fetch.lof_db.schema import init_db
+    init_db()
+    results = {}
+    with ThreadPoolExecutor(max_workers=concurrency) as pool:
+        futures = {pool.submit(_process_one, code): code for code in fund_codes}
+        for future in as_completed(futures):
+            code, result = future.result()
+            results[code] = result
+            if result["ok"]:
+                print(f"  {code} OK: {result['holdings']}条持仓已写入DB")
+            else:
+                print(f"  {code} FAIL: {result.get('error', '')}")
+    return results
+
+
+# ============================================================
+# PDF下载工具
+# ============================================================
+
+def fetch_latest_report_id(code: str) -> Optional[str]:
+    try:
+        r = SESSION.get("https://reportapi.eastmoney.com/report/list", params={
+            "cb": "datatable", "industryCode": "*", "pageSize": 5,
+            "industry": "*", "rating": "*", "ratingChange": "*",
+            "beginTime": "", "endTime": "", "pageNo": 1, "fields": "",
+            "qType": 0, "orgCode": "", "code": code,
+            "rcode": "", "p": 1, "pageNum": 1, "pageNumber": 1,
+        }, timeout=15)
+        m = re.search(r'"attachPath":"([^"]+)"', r.text)
+        if m:
+            return os.path.splitext(os.path.basename(m.group(1)))[0]
+    except Exception:
+        pass
     return None
 
 
-# ============================================================
-# 2. PDF解析 - 提取持仓
-# ============================================================
-def extract_holdings_from_pdf(pdf_path: str) -> List[Dict]:
-    import pdfplumber
-    all_holdings = []
-    with pdfplumber.open(pdf_path) as pdf:
-        all_holdings.extend(_extract_fund_holdings(pdf))
-        all_holdings.extend(_extract_stock_holdings(pdf))
-        all_holdings.extend(_extract_bond_holdings(pdf))
-    seen = set()
-    unique = []
-    for h in all_holdings:
-        key = h.get("ticker") or h.get("name", "")
-        if key and key not in seen:
-            seen.add(key)
-            unique.append(h)
-    unique.sort(key=lambda x: x.get("weight", 0), reverse=True)
-    return unique[:20]
-
-
-def _extract_fund_holdings(pdf) -> List[Dict]:
-    holdings = []
-    for page in pdf.pages:
-        for table in page.extract_tables():
-            if not table or len(table) < 2:
-                continue
-            header = " ".join([str(c) for c in table[0] if c])
-            if ("基金名称" not in header and "基金简称" not in header):
-                continue
-            if "占净值" not in header and "比例" not in header and "净值比" not in header:
-                continue
-            name_col = weight_col = None
-            for ci, cell in enumerate(table[0]):
-                c = str(cell) if cell else ""
-                if "名称" in c or "基金" in c:
-                    name_col = ci
-                if "比例" in c or "净值" in c:
-                    weight_col = ci
-            if name_col is None or weight_col is None:
-                continue
-            for row in table[1:]:
-                if len(row) <= max(name_col, weight_col):
-                    continue
-                name = _clean(row[name_col])
-                weight = _parse_weight(row[weight_col])
-                if name and weight is not None and weight > 0:
-                    ticker, market = map_to_ticker_and_market(name, "")
-                    holdings.append({"name": name, "ticker": ticker, "weight": weight, "market": market, "type": "fund"})
-    return holdings
-
-
-def _extract_stock_holdings(pdf) -> List[Dict]:
-    holdings = []
-    for page in pdf.pages:
-        for table in page.extract_tables():
-            if not table or len(table) < 2:
-                continue
-            header = " ".join([str(c) for c in table[0] if c])
-            if "股票代码" not in header and "股票名称" not in header:
-                continue
-            if "占净值" not in header and "比例" not in header:
-                continue
-            name_col = code_col = weight_col = None
-            for ci, cell in enumerate(table[0]):
-                c = str(cell) if cell else ""
-                if "名称" in c:
-                    name_col = ci
-                if "代码" in c:
-                    code_col = ci
-                if "比例" in c or "净值" in c:
-                    weight_col = ci
-            if name_col is None or weight_col is None:
-                continue
-            for row in table[1:]:
-                if len(row) <= max(name_col, weight_col):
-                    continue
-                name = _clean(row[name_col])
-                code_str = _clean(row[code_col]) if code_col is not None and len(row) > code_col else ""
-                weight = _parse_weight(row[weight_col])
-                if name and weight is not None and weight > 0:
-                    ticker, market = map_to_ticker_and_market(name, code_str)
-                    holdings.append({"name": name, "ticker": ticker, "weight": weight, "market": market, "type": "stock"})
-    return holdings
-
-
-def _extract_bond_holdings(pdf) -> List[Dict]:
-    holdings = []
-    for page in pdf.pages:
-        for table in page.extract_tables():
-            if not table or len(table) < 2:
-                continue
-            header = " ".join([str(c) for c in table[0] if c])
-            if "债券" not in header:
-                continue
-            if "占净值" not in header and "比例" not in header:
-                continue
-            name_col = weight_col = None
-            for ci, cell in enumerate(table[0]):
-                c = str(cell) if cell else ""
-                if "名称" in c:
-                    name_col = ci
-                if "比例" in c or "净值" in c:
-                    weight_col = ci
-            if name_col is None or weight_col is None:
-                continue
-            for row in table[1:]:
-                if len(row) <= max(name_col, weight_col):
-                    continue
-                name = _clean(row[name_col])
-                weight = _parse_weight(row[weight_col])
-                if name and weight is not None and weight > 0:
-                    holdings.append({"name": name, "ticker": "", "weight": weight, "market": "bond", "type": "bond"})
-    return holdings
-
-
-# ============================================================
-# 3. Ticker映射 + 市场识别
-# ============================================================
-def map_to_ticker_and_market(name: str, code_str: str) -> Tuple[str, str]:
-    if not name:
-        return ("", "other")
-    name_upper = name.upper().strip()
-
-    # 1) 已知US ETF字典
-    for keyword, ticker in _KNOWN_US_ETFS.items():
-        if keyword.upper() in name_upper:
-            return (ticker, "US")
-
-    # 2) 名称含US关键词
-    us_kws = ["ETF", "FUND", "TRUST", "SPDR", "ISHARES", "VANGUARD",
-               "INVESCO", "PROSHARES", "GLOBAL X", "WISDOMTREE",
-               "VANECK", "DIREXION", "ARK ", "ETC"]
-    for kw in us_kws:
-        if kw in name_upper:
-            m = re.search(r'\b([A-Z]{2,5})\b', name_upper)
-            if m:
-                return (m.group(1), "US")
-            return ("", "US")
-
-    # 3) 代码识别
-    if code_str:
-        code_clean = re.sub(r'[^0-9]', '', code_str)
-        if len(code_clean) == 5:
-            return (code_clean.zfill(5), "HK")
-        elif len(code_clean) == 6 and code_clean[:2] in _A_SHARE_PREFIXES:
-            return (code_clean, "A")
-
-    # 4) 名称中嵌入的代码
-    hk_m = re.search(r'\b(\d{5})\b', name)
-    if hk_m:
-        return (hk_m.group(1).zfill(5), "HK")
-    a_m = re.search(r'\b(\d{6})\b', name)
-    if a_m and a_m.group(1)[:2] in _A_SHARE_PREFIXES:
-        return (a_m.group(1), "A")
-
-    return ("", "other")
-
-
-def filter_and_normalize(holdings: List[Dict]) -> Tuple[List[Tuple[str, float, str]], List[Dict]]:
-    valid, excluded = [], []
-    for h in holdings:
-        ticker = h.get("ticker", "")
-        market = h.get("market", "other")
-        weight = h.get("weight", 0)
-        name = h.get("name", "")
-        if market in ("US", "HK", "A") and ticker:
-            valid.append((ticker, weight, market))
-        else:
-            excluded.append({"name": name, "market": market, "weight": weight,
-                             "reason": f"market={market}" if not ticker else "no_ticker"})
-    total_w = sum(w for _, w, _ in valid)
-    if total_w <= 0:
-        return [], excluded
-    normalized = [(t, w / total_w * 100, m) for t, w, m in valid]
-    return normalized, excluded
-
-
-def _clean(val) -> str:
-    if val is None:
-        return ""
-    return re.sub(r'\s+', ' ', str(val)).strip()
-
-
-def _parse_weight(val) -> Optional[float]:
-    if val is None:
-        return None
-    s = str(val).strip().replace("%", "").replace("％", "")
-    if not s or s in ("-", "--", ""):
-        return None
+def download_report_pdf(report_id: str, save_dir: str = None) -> Optional[str]:
+    if save_dir is None:
+        save_dir = _PDF_DIR
+    os.makedirs(save_dir, exist_ok=True)
+    path = os.path.join(save_dir, f"{report_id}.pdf")
+    if os.path.exists(path):
+        return path
     try:
-        v = float(s)
-        return v if v > 0 else None
-    except (ValueError, TypeError):
-        return None
+        r = SESSION.get(f"https://docf10.eastmoney.com/report/{report_id}.pdf", timeout=30, stream=True)
+        if r.status_code == 200:
+            with open(path, 'wb') as f:
+                for chunk in r.iter_content(8192):
+                    f.write(chunk)
+            return path
+    except Exception:
+        pass
+    return None
 
 
-# ============================================================
-# 4. 便捷入口：获取持仓
-# ============================================================
-def get_fund_holdings(code: str, pdf_cache_dir: str = None) -> Tuple[List[Tuple[str, float, str]], List[Dict], Optional[str]]:
-    """获取基金前20大持仓（归一化后）。
-
-    Returns:
-        (valid_holdings, excluded, error_msg)
-        valid_holdings: [(ticker, weight_pct, market), ...]
-        excluded: [{"name", "reason", ...}, ...]
-        error_msg: None on success
-    """
-    if pdf_cache_dir is None:
-        pdf_cache_dir = os.path.join(os.path.dirname(__file__), "..", "..", "runtime_data", "qreport")
-
-    report_id = fetch_latest_report_id(code)
-    if not report_id:
-        return [], [], f"{code}: 无法获取季报ID"
-
-    pdf_path = download_report_pdf(report_id, pdf_cache_dir)
-    if not pdf_path:
-        return [], [], f"{code}: PDF下载失败 (report_id={report_id})"
-
-    raw = extract_holdings_from_pdf(pdf_path)
-    if not raw:
-        return [], [], f"{code}: PDF解析无持仓数据"
-
-    valid, excluded = filter_and_normalize(raw)
-    return valid, excluded, None
-
-
-# ============================================================
-# 5. DB写入
-# ============================================================
-def store_holdings_to_db(code: str, holdings: List[Tuple[str, float, str]],
-                         report_date: str = None, db_path: str = None):
-    """将持仓写入DB holdings表。
-
-    Args:
-        code: 基金代码
-        holdings: [(ticker, weight, market), ...]
-        report_date: 报告日期，默认今天
-        db_path: DB路径，默认 runtime_data/lof_db/lof.db
-    """
-    if db_path is None:
-        db_path = os.path.join(os.path.dirname(__file__), "..", "..", "runtime_data", "lof_db", "lof.db")
-    if report_date is None:
-        report_date = datetime.now().strftime("%Y-%m-%d")
-
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    conn = sqlite3.connect(db_path)
-    # 先删除该基金旧持仓
-    conn.execute("DELETE FROM holdings WHERE code = ?", (code,))
-    # 写入新持仓
-    for ticker, weight, market in holdings:
-        conn.execute(
-            "INSERT OR REPLACE INTO holdings (code, report_date, ticker, name, weight, market) VALUES (?, ?, ?, ?, ?, ?)",
-            (code, report_date, ticker, "", weight, market)
-        )
-    conn.commit()
-    conn.close()
-
-
-def update_all_holdings(fund_codes: List[str], pdf_cache_dir: str = None, db_path: str = None):
-    """批量更新所有基金持仓到DB。
-
-    Returns:
-        results: {code: {"ok": bool, "holdings": int, "excluded": int, "error": str|None}}
-    """
-    results = {}
-    for code in fund_codes:
-        valid, excluded, err = get_fund_holdings(code, pdf_cache_dir)
-        if err:
-            results[code] = {"ok": False, "holdings": 0, "excluded": 0, "error": err}
-            print(f"  {code} FAIL: {err}")
-            continue
-        store_holdings_to_db(code, valid, db_path=db_path)
-        results[code] = {"ok": True, "holdings": len(valid), "excluded": len(excluded), "error": None}
-        excl_names = [e["name"] for e in excluded]
-        print(f"  {code} OK: {len(valid)} holdings, {len(excluded)} excluded {excl_names}")
-    return results
+if __name__ == "__main__":
+    from shared.config.script_config import load_config
+    cfg = load_config()
+    plugins = cfg.get("data_fetch", {}).get("plugins", {})
+    lof_cfg = plugins.get("lof_arbitrage", plugins.get("lof_iopv", {}))
+    codes = [f["code"] for f in lof_cfg.get("funds", [])]
+    print(f"更新 {len(codes)} 只基金持仓...")
+    update_all_holdings(codes)
