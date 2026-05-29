@@ -161,34 +161,70 @@ def _parse_json(content: str) -> List[Dict]:
             continue
         if not name or weight <= 0:
             continue
-        # ticker/market 由 _guess_ticker 兜底 + Yahoo resolve 补全
-        ticker = _guess_ticker(name)
-        market = ""
+        # ticker/market 由 _guess_ticker 兜底（返回 "TICKER|MARKET" 或空）
+        guessed = _guess_ticker(name)
+        if "|" in guessed:
+            ticker, market = guessed.split("|", 1)
+        else:
+            ticker, market = guessed, ""
         valid.append({"ticker": ticker, "name": name, "weight": weight, "market": market})
-    return valid
 
 def _guess_ticker(name: str) -> str:
-    """从名称推断ticker。"""
+    """从名称推断ticker+market。本地映射表覆盖已知ETF/ETC，其余返回空。"""
     nu = name.upper()
-    _MAP = {
-        "WISDOMTREE WTI CRUDE": "CRUD", "WISDOMTREE BRENT": "BRNT",
-        "PROSHARES K-1 FREE CRUDE": "FREE", "UNITED STATES OIL": "USO",
-        "UNITED STATES BRENT OIL": "BNO", "SIMPLEX WTI": "SimpleXWTI",
-        "SAMSUNG": "GSCI", "COLLATERIZED ETC": "BRNT",
-        "STATE STREET ENERGY": "XLE",
-    }
-    for k, v in _MAP.items():
-        if k in nu:
-            return v
+    # 精确+模糊映射: (关键词, ticker, market)
+    _MAP = [
+        # 原油ETC/ETF
+        ("WISDOMTREE WTI CRUDE", "CRUD", "UK"),
+        ("WISDOMTREE BRENT", "BRNT", "UK"),
+        ("PROSHARES K-1 FREE CRUDE", "FREE", "US"),
+        ("UNITED STATES OIL", "USO", "US"),
+        ("UNITED STATES BRENT OIL", "BNO", "US"),
+        ("SIMPLEX WTI", "SimpleXWTI", "UK"),
+        ("OILK", "OILK", "US"),
+        # 大宗商品
+        ("SAMSUNG S&P GSCI", "GSCI", "UK"),
+        ("COLLATERIZED ETC", "BRNT", "UK"),
+        # 板块ETF
+        ("STATE STREET ENERGY", "XLE", "US"),
+        ("SPDR S&P OIL", "XOP", "US"),
+        ("VAN ECK OIL", "OIH", "US"),
+        ("ISHARES GLOBAL ENERGY", "IXC", "US"),
+        # 股票
+        ("APPLE", "AAPL", "US"),
+        ("MICROSOFT", "MSFT", "US"),
+        ("NVIDIA", "NVDA", "US"),
+        ("TSMC", "2330", "HK"),
+        ("SAMSUNG ELECTRONICS", "005930", "HK"),
+        ("SAP SE", "SAP", "US"),
+        ("AIRBUS", "AIR", "US"),
+        ("HSBC", "HSBA", "UK"),
+        ("TOYOTA", "7203", "HK"),
+        ("TENCENT", "0700", "HK"),
+        ("ALIBABA", "BABA", "US"),
+        ("SAMSUNG SDS", "018260", "HK"),
+        ("SK HYNIX", "000660", "HK"),
+        # 指数ETF
+        ("SPDR S&P 500", "SPY", "US"),
+        ("INVESCO QQQ", "QQQ", "US"),
+        ("ISHARES RUSSELL", "IWM", "US"),
+        # 宽基
+        ("INDA", "INDA", "US"),
+        ("ISHARES US REAL ESTATE", "IYR", "US"),
+    ]
+    for keyword, ticker, market in _MAP:
+        if keyword in nu:
+            return f"{ticker}|{market}"
+    # 5位数字=港股代码
+    import re
     m = re.search(r'\b(\d{5})\b', name)
     if m:
-        return m.group(1)
+        return f"{m.group(1)}|HK"
+    # 6位数字=A股代码
     m = re.search(r'\b(\d{6})\b', name)
     if m:
-        return m.group(1)
+        return f"{m.group(1)}|A"
     return ""
-
-
 def _call_vision_llm(b64_image: str, fund_code: str) -> List[Dict]:
     """Vision LLM（mimo-v2.5）提取持仓。"""
     cfg = _vision_config()
