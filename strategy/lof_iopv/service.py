@@ -146,12 +146,13 @@ def build_lof_response(fetch_payload):
             benchmark = "ETF:%s" % get_index_etf_ticker(code)
         else:
             source = get_holdings_source(code)
+            total_w = sum(h.get("weight", 0) for h in effective_holdings)
             if source == "api":
-                benchmark = "API(%d)" % len(effective_holdings)
+                benchmark = "API(%.0f%%)" % total_w
             elif source == "pdf":
-                benchmark = "PDF(%d)" % len(effective_holdings)
+                benchmark = "PDF(%.0f%%)" % total_w
             else:
-                benchmark = "active(%d)" % len(effective_holdings)
+                benchmark = "active(%.0f%%)" % total_w
 
         apply_status = row.get("applyStatus") or ""
         daily_limit = row.get("dailyLimit")
