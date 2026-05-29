@@ -59,6 +59,24 @@ def _get_stock_prices(ticker, start_date=None):
     return {r[0]: r[1] for r in rows}
 
 
+
+def _get_etf_prices(ticker, start_date=None):
+    """从DB读取ETF K线数据"""
+    conn = get_db()
+    if start_date:
+        rows = conn.execute(
+            "SELECT date, close FROM etf_prices WHERE ticker=? AND date>? ORDER BY date",
+            (ticker, start_date)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT date, close FROM etf_prices WHERE ticker=? ORDER BY date",
+            (ticker,)
+        ).fetchall()
+    conn.close()
+    return {r[0]: r[1] for r in rows}
+
+
 def _save_json(filepath, data):
     """保存JSON文件"""
     filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -171,9 +189,64 @@ def update_single_fund(code, name, force_full=False):
     fund_dir = FUND_DATA_DIR / code
     
     # 指数型基金：只更新ETF的K线，不需要拉持仓
+    # 指数型基金：从INDEX_ETF映射获取持仓，从etf_prices获取K线
     if cls == "index":
-        print(f"  指数型基金，跳过持仓更新")
-        # 只更新NAV
+        etf_mapping = INDEX_ETF.get(code, [])
+        if not etf_mapping:
+            print(f"  指数型基金，无ETF映射，跳过")
+            return
+        
+        # 构建持仓数据
+        holdings_data = [{"ticker": t, "weight": w, "market": "US"} for t, w in etf_mapping]
+        holdings_path = fund_dir / "holdings.json"
+        old_holdings = _load_json(holdings_path)
+        old_tickers = set(h["ticker"] for h in (old_holdings.get("holdings", []) if old_holdings else []))
+        new_tickers = set(h["ticker"] for h in holdings_data)
+        
+        _save_json(holdings_path, {
+            "code": code,
+            "updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "holdings": holdings_data
+        })
+        
+        # 检查持仓变化
+        changed = False
+        removed = old_tickers - new_tickers
+        if old_holdings and removed:
+            print(f"  持仓变化: -{removed}")
+            _delete_stock_klines(fund_dir, list(removed))
+            changed = True
+        
+        # 更新ETF K线
+        print(f"  更新ETF K线 ({len(holdings_data)}只)...")
+        stocks_dir = fund_dir / "stocks"
+        stocks_dir.mkdir(parents=True, exist_ok=True)
+        
+        for h in holdings_data:
+            ticker = h["ticker"]
+            kline_path = stocks_dir / f"{ticker}.json"
+            
+            if changed or force_full:
+                existing = {}
+            else:
+                existing = _load_json(kline_path) or {}
+            
+            if existing:
+                last_date = max(existing.keys()) if existing else None
+                new_data = _get_etf_prices(ticker, last_date)
+            else:
+                new_data = _get_etf_prices(ticker)
+            
+            if new_data:
+                existing.update(new_data)
+                _save_json(kline_path, existing)
+                print(f"    {ticker}: +{len(new_data)}条 (总计{len(existing)}条)")
+            elif len(existing) > 0:
+                print(f"    {ticker}: 已最新")
+            else:
+                print(f"    {ticker}: 无数据")
+        
+        # 更新NAV
         _update_nav(fund_dir, code)
         return
     
