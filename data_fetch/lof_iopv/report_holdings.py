@@ -148,10 +148,12 @@ def _parse_json(content: str) -> List[Dict]:
     content = re.sub(r'\s*```$', '', content)
     jm = re.search(r'\[.*\]', content, re.DOTALL)
     if not jm:
+            print(f"  [debug] LLM返回无JSON数组: {content[:200]}")
         return []
     try:
         items = json.loads(jm.group())
     except json.JSONDecodeError:
+            print(f"  [debug] JSON解析失败: {jm.group()[:200]}")
         return []
     valid = []
     for item in items:
@@ -210,7 +212,7 @@ def _call_vision_llm(b64_image: str, fund_code: str) -> List[Dict]:
                 {"type": "text", "text": _LLM_PROMPT + f"\n\n基金代码: {fund_code}"},
                 {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}},
             ]}],
-            "max_tokens": 8000,
+            "max_tokens": 20000,
             "temperature": 0.0,
         },
         timeout=120,
@@ -222,18 +224,18 @@ def _call_vision_llm(b64_image: str, fund_code: str) -> List[Dict]:
 
 def _call_text_llm(text: str, fund_code: str) -> List[Dict]:
     """文本LLM（deepseek-chat）提取持仓。"""
-    cfg = _text_config()
+    cfg = _vision_config()
     if not cfg.get('api_key'):
         return []
-    url = cfg.get('base_url', '').rstrip('/') + '/chat/completions'
+    url = cfg.get('base_url', '')
     r = httpx.post(
         url,
         headers={"Authorization": f"Bearer {cfg['api_key']}"},
         json={
-            "model": "deepseek-chat",
+            "model": cfg.get("model", "mimo-v2.5"),
             "messages": [{"role": "user",
                           "content": f"{_LLM_PROMPT}\n\n基金代码: {fund_code}\n\n季报文本:\n{text}"}],
-            "max_tokens": 2000,
+            "max_tokens": 20000,
             "temperature": 0.0,
         },
         timeout=90,
