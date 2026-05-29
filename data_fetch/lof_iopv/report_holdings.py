@@ -44,7 +44,7 @@ _LLM_PROMPT = """你是基金持仓数据提取专家。
 - A股6位数代码：600489(中金黄金), 002155(湖南黄金), 600988(赤峰黄金)等
 - 美股ETF用标准简称（非常重要，必须精确）：
   原油类：CRUD(WisdomTree WTI), USO(United States Oil), BNO(United States Brent), BRNT(WisdomTree Brent), DBO(Invesco DB Oil), OILK, XLE, XOP, IXC, IEO
-  黄金类：GLD(SPDR Gold), IAU(iShares Gold), SGOL(abrdn Physical Gold), GLDM(SPDR Gold MiniShares), GDX(VanEck Gold Miners), GDXJ, IAU, BAR, AAU
+  黄金类：GLD(SPDR Gold), IAU(iShares Gold), SGOL(abrdn Physical Gold), GLDM(SPDR Gold MiniShares), GDX(VanEck Gold Miners), GDXJ, BAR, AAU, UBS(UBS Gold ETF)
   科技类：QQQ, SOXX, SMH, BOTZ, AIQ, XLK, FINX, SOXQ, PSI, ARKK, ARKG, ARKQ
   其他：SPY, IYR, INDA, XBI, XHE, RYH, XLY, AGG, ARKW, ARKF
   日本ETF：SimpleXWTI, NOMURA_CRUDE, UBS_CMCI
