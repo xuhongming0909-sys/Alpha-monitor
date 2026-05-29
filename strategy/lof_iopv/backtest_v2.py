@@ -58,6 +58,11 @@ def _get_stock_prices_batch(tickers, start_date, end_date):
             'SELECT date, close FROM stock_prices WHERE ticker = ? AND date >= ? AND date <= ? ORDER BY date',
             (ticker, start_date, end_date)
         ).fetchall()
+        if not rows:
+            rows = conn.execute(
+                'SELECT date, close FROM etf_prices WHERE ticker = ? AND date >= ? AND date <= ? ORDER BY date',
+                (ticker, start_date, end_date)
+            ).fetchall()
         result[ticker] = {r[0]: r[1] for r in rows}
     conn.close()
     return result
