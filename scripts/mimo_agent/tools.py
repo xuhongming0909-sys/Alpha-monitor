@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 """MiMo Agent 工具集：本地ticker查询 + 百度联网搜索"""
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+
 import json
 import os
 import re

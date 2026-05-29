@@ -2,15 +2,19 @@
 """MiMo Agent: 调用小米MiMo API，支持本地工具调用（联网搜索 + ticker查询）。
 
 用法:
-    python scripts/mimo_agent/agent.py "帮我查一下原油LOF的代码"
-    python scripts/mimo_agent/agent.py --search "标普500最新行情"
-    python scripts/mimo_agent/agent.py --lookup "原油"
+    python3 scripts/mimo_agent/agent.py "帮我查一下原油LOF的代码"
+    python3 scripts/mimo_agent/agent.py --search "标普500最新行情"
+    python3 scripts/mimo_agent/agent.py --lookup "原油"
 """
 
 import argparse
 import json
 import os
 import sys
+
+# 确保项目根目录在 sys.path
+_PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
+sys.path.insert(0, _PROJECT_ROOT)
 
 import requests
 
@@ -24,7 +28,7 @@ def _load_config():
     """从 config/secrets.yaml 加载 MiMo API 配置。"""
     try:
         import yaml
-        secrets_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'secrets.yaml')
+        secrets_path = os.path.join(_PROJECT_ROOT, 'config', 'secrets.yaml')
         with open(secrets_path, 'r', encoding='utf-8') as f:
             secrets = yaml.safe_load(f) or {}
         mimo = secrets.get("mimo", {})
@@ -92,11 +96,9 @@ def chat(user_message: str, system_prompt: str = None, max_tool_rounds: int = 5,
         message = choice["message"]
         finish_reason = choice.get("finish_reason", "")
 
-        # 如果MiMo直接回复文本（没有工具调用），返回
         if finish_reason == "stop" or not message.get("tool_calls"):
             return message.get("content", "")
 
-        # MiMo 决定调用工具
         messages.append(message)
 
         for tool_call in message["tool_calls"]:
@@ -137,19 +139,16 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="打印工具调用详情")
     args = parser.parse_args()
 
-    # 快捷模式：直接搜索
     if args.search:
         from scripts.mimo_agent.tools import web_search
         print(web_search(args.search))
         return
 
-    # 快捷模式：直接查询
     if args.lookup:
         from scripts.mimo_agent.tools import lookup_ticker_locally
         print(lookup_ticker_locally(args.lookup))
         return
 
-    # 交互模式
     if args.message:
         reply = chat(args.message, system_prompt=args.system, verbose=args.verbose)
         print(reply)
@@ -168,5 +167,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
     main()
