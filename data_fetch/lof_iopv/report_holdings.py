@@ -49,10 +49,12 @@ _LLM_PROMPT = """你是基金持仓数据提取专家。从基金季报PDF文本
 - market: 美股/海外=US, 港股=HK, A股=A
 
 重要规则：
-1. 只提取季报中实际列出的持仓，不要推测或编造
-2. 如果某只ETF名称你不知道其交易代码，ticker填""，不要猜
+1. 必须提取文本中列出的**每一条**持仓，不能遗漏任何一条
+2. 如果某只ETF/基金名称你不确定其交易代码，ticker填""，但仍然必须把它列入结果
 3. 股票、ETF、基金、债券都算持仓，分别在不同章节
-4. 排除：银行存款、结算备付金、货币基金、应收类、其他资产"""
+4. 排除：银行存款、结算备付金、货币基金、应收类、其他资产
+5. 基金名称可能跨多行，需要合并理解，如 abrdn Physical+换行+Gold Shares 实际是 abrdn Physical Gold Shares
+6. 海外ETF/ETC的ticker必须返回美股市场代码（因为我们只能拿到美股行情）。例如 abrdn Physical Gold Shares 的美股代码是 SGOL，不是 PHAU；如果不确定美股代码，找同品种的美股替代品（如黄金ETF用GLD/IAU/SGOL，原油ETF用USO/BNO/CRUD）"""
 
 
 # ============================================================
@@ -120,7 +122,7 @@ def _render_pages(pdf_path: str) -> Optional[str]:
     imgs = []
     for pi in pages:
         if pi < len(doc):
-            pix = doc[pi].get_pixmap(dpi=150)
+            pix = doc[pi].get_pixmap(dpi=200)
             imgs.append(PILImage.frombytes('RGB', [pix.width, pix.height], pix.samples))
     doc.close()
     if not imgs:
