@@ -144,8 +144,20 @@ def web_search(query: str, max_results: int = 5) -> str:
         return json.dumps({"status": "error", "message": "query 不能为空"}, ensure_ascii=False)
 
     try:
-        url = f"https://cn.bing.com/search?q={quote_plus(query)}&mkt=zh-CN"
-        resp = requests.get(url, headers=_HEADERS, timeout=10)
+        # 判断是否包含中文，决定搜索策略
+        has_chinese = any('\u4e00' <= c <= '\u9fff' for c in query)
+        if has_chinese:
+            url = f"https://cn.bing.com/search?q={quote_plus(query)}&mkt=zh-CN"
+            lang = "zh-CN,zh;q=0.9"
+        else:
+            url = f"https://cn.bing.com/search?q={quote_plus(query)}&ensearch=1&mkt=en-US"
+            lang = "en-US,en;q=0.9"
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": lang,
+        }
+        resp = requests.get(url, headers=headers, timeout=10)
         resp.encoding = "utf-8"
         soup = BeautifulSoup(resp.text, "lxml")
 
