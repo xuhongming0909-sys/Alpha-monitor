@@ -28,7 +28,10 @@ INDEX_ETF: Dict[str, List[Tuple[str, float]]] = {
     "160719": [("GLD", 100.0)],
     "164824": [("INDA", 100.0)],
     "160140": [("IYR", 100.0)],
+    "160723": [("USO", 100.0)],
+    "161129": [("USO", 100.0)],
     "164701": [("GLD", 100.0)],
+    "161116": [("GLD", 50.0), ("GDX", 50.0)],
     "501018": [("USO", 60.0), ("BNO", 40.0)],
     # 原油类(高偏差,保留但标注)
 }
@@ -41,10 +44,6 @@ def get_fund_class(code: str) -> str:
     """返回基金分类: 'index' / 'active_api' / 'active_pdf'"""
     if code in INDEX_ETF:
         return "index"
-    # MAE>0.5%的原指数型降级为报表型
-    mae_fail = {"161116", "160723", "161129"}
-    if code in mae_fail:
-        return "active_pdf"
     # 主动1类: 天天基金API持仓合计>30%
     active_api = {"160644", "164906", "163208", "160125"}
     if code in active_api:

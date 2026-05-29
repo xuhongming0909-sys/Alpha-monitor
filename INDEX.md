@@ -1,486 +1,487 @@
-# Alpha Monitor — 项目索引
+# Alpha Monitor 鈥?椤圭洰绱㈠紩
 
-**定位**：金融套利机会监控终端，从真实市场数据中发现套利机会，通过网页展示和企业微信推送完成闭环。
-**阶段**：React 金融终端 UI 并行重做中，旧 HTML 看板保留 `/legacy` 回滚入口；当前 React 顶层导航收敛为 7 个标签。
-**技术栈**：Node.js 18+ + Express（API/服务层），Python 3（数据抓取/计算层），React + Vite（新前端），SQLite + JSON（运行时状态）。
-
----
-
-## 1. 架构概览
-
-```
-浏览器/客户端
-    │
-    ▼
-┌──────────────────────────────────────────────────────────┐
-│  ui/              API 路由与页面渲染                      │
-│  ├─ routes/       /api/market/* /api/dashboard/*        │
-│  ├─ view_models/  数据整形                               │
-│  └─ templates/    HTML 模板                             │
-└──────────────────────────────────────────────────────────┘
-    │
-    ▼
-┌──────────────────────────────────────────────────────────┐
-│  strategy/          业务计算层                            │
-│  ├─ ah_premium/     AH 溢价排名                          │
-│  ├─ convertible_bond/ 转债套利（双低/折价/回售）        │
-│  ├─ lof_iopv/  QDII LOF IOPV 估值（T10持仓加权法）                       │
-│  └─ ... (共 10 个插件)                                   │
-└──────────────────────────────────────────────────────────┘
-    │
-    ▼
-┌──────────────────────────────────────────────────────────┐
-│  "The Bus" — 标准化记录格式                              │
-│  shared/bus/market_record.{py,js}                       │
-└──────────────────────────────────────────────────────────┘
-    │
-    ▼
-┌──────────────────────────────────────────────────────────┐
-│  data_fetch/          数据抓取层                          │
-│  ├─ ah_premium/       腾讯行情（实时股价+汇率）           │
-│  ├─ convertible_bond/ 集思录+东财（转债行情+财务）       │
-│  ├─ lof_iopv/    集思录（QDII LOF IOPV 溢价率）         │
-│  └─ ... (共 11 个插件)                                   │
-└──────────────────────────────────────────────────────────┘
-    │
-    ▼
-┌──────────────────────────────────────────────────────────┐
-│  上游数据源                                                │
-│  腾讯行情 / 集思录 / AkShare / 巨潮资讯 / 东方财富       │
-└──────────────────────────────────────────────────────────┘
-```
-
-**分层规则**：
-- `data_fetch/` 只做抓取+标准化，不写业务逻辑
-- `strategy/` 只做计算+规则判断，不直接调上游 API
-- `ui/` 只做 API 整形+展示，不做计算
-- `notification/` 只做推送+调度，不碰数据抓取
-- 跨层通信只能通过 The Bus 标准化记录
-- 跨插件禁止直接 import（由 `tools/check_plugin_boundaries.py` 强制检查）
+**瀹氫綅**锛氶噾铻嶅鍒╂満浼氱洃鎺х粓绔紝浠庣湡瀹炲競鍦烘暟鎹腑鍙戠幇濂楀埄鏈轰細锛岄€氳繃缃戦〉灞曠ず鍜屼紒涓氬井淇℃帹閫佸畬鎴愰棴鐜€?
+**闃舵**锛歊eact 閲戣瀺缁堢 UI 骞惰閲嶅仛涓紝鏃?HTML 鐪嬫澘淇濈暀 `/legacy` 鍥炴粴鍏ュ彛锛涘綋鍓?React 椤跺眰瀵艰埅鏀舵暃涓?7 涓爣绛俱€?
+**鎶€鏈爤**锛歂ode.js 18+ + Express锛圓PI/鏈嶅姟灞傦級锛孭ython 3锛堟暟鎹姄鍙?璁＄畻灞傦級锛孯eact + Vite锛堟柊鍓嶇锛夛紝SQLite + JSON锛堣繍琛屾椂鐘舵€侊級銆?
 
 ---
 
-## 2. 目录索引
+## 1. 鏋舵瀯姒傝
 
-### 2.1 data_fetch/ — 数据抓取层（11 个插件，从上游 API 拉数据并标准化为 Bus 记录）
+```
+娴忚鍣?瀹㈡埛绔?
+    鈹?
+    鈻?
+鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+鈹? ui/              API 璺敱涓庨〉闈㈡覆鏌?                     鈹?
+鈹? 鈹溾攢 routes/       /api/market/* /api/dashboard/*        鈹?
+鈹? 鈹溾攢 view_models/  鏁版嵁鏁村舰                               鈹?
+鈹? 鈹斺攢 templates/    HTML 妯℃澘                             鈹?
+鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+    鈹?
+    鈻?
+鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+鈹? strategy/          涓氬姟璁＄畻灞?                           鈹?
+鈹? 鈹溾攢 ah_premium/     AH 婧环鎺掑悕                          鈹?
+鈹? 鈹溾攢 convertible_bond/ 杞€哄鍒╋紙鍙屼綆/鎶樹环/鍥炲敭锛?       鈹?
+鈹? 鈹溾攢 lof_iopv/  QDII LOF IOPV 浼板€硷紙T10鎸佷粨鍔犳潈娉曪級                       鈹?
+鈹? 鈹斺攢 ... (鍏?10 涓彃浠?                                   鈹?
+鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+    鈹?
+    鈻?
+鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+鈹? "The Bus" 鈥?鏍囧噯鍖栬褰曟牸寮?                             鈹?
+鈹? shared/bus/market_record.{py,js}                       鈹?
+鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+    鈹?
+    鈻?
+鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+鈹? data_fetch/          鏁版嵁鎶撳彇灞?                         鈹?
+鈹? 鈹溾攢 ah_premium/       鑵捐琛屾儏锛堝疄鏃惰偂浠?姹囩巼锛?          鈹?
+鈹? 鈹溾攢 convertible_bond/ 闆嗘€濆綍+涓滆储锛堣浆鍊鸿鎯?璐㈠姟锛?      鈹?
+鈹? 鈹溾攢 lof_iopv/    闆嗘€濆綍锛圦DII LOF IOPV 婧环鐜囷級         鈹?
+鈹? 鈹斺攢 ... (鍏?11 涓彃浠?                                   鈹?
+鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+    鈹?
+    鈻?
+鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+鈹? 涓婃父鏁版嵁婧?                                               鈹?
+鈹? 鑵捐琛屾儏 / 闆嗘€濆綍 / AkShare / 宸ㄦ疆璧勮 / 涓滄柟璐㈠瘜       鈹?
+鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+```
 
-每个插件标准结构：`fetcher.py`（调度）+ `source.py`（上游 API）+ `normalizer.py`（标准化为 Bus 记录）。部分插件有 `history_source.py`/`history_sync.py`（历史数据同步）。
+**鍒嗗眰瑙勫垯**锛?
+- `data_fetch/` 鍙仛鎶撳彇+鏍囧噯鍖栵紝涓嶅啓涓氬姟閫昏緫
+- `strategy/` 鍙仛璁＄畻+瑙勫垯鍒ゆ柇锛屼笉鐩存帴璋冧笂娓?API
+- `ui/` 鍙仛 API 鏁村舰+灞曠ず锛屼笉鍋氳绠?
+- `notification/` 鍙仛鎺ㄩ€?璋冨害锛屼笉纰版暟鎹姄鍙?
+- 璺ㄥ眰閫氫俊鍙兘閫氳繃 The Bus 鏍囧噯鍖栬褰?
+- 璺ㄦ彃浠剁姝㈢洿鎺?import锛堢敱 `tools/check_plugin_boundaries.py` 寮哄埗妫€鏌ワ級
 
-| 插件 | 数据源 | 关键文件 | 输出 |
+---
+
+## 2. 鐩綍绱㈠紩
+
+### 2.1 data_fetch/ 鈥?鏁版嵁鎶撳彇灞傦紙11 涓彃浠讹紝浠庝笂娓?API 鎷夋暟鎹苟鏍囧噯鍖栦负 Bus 璁板綍锛?
+
+姣忎釜鎻掍欢鏍囧噯缁撴瀯锛歚fetcher.py`锛堣皟搴︼級+ `source.py`锛堜笂娓?API锛? `normalizer.py`锛堟爣鍑嗗寲涓?Bus 璁板綍锛夈€傞儴鍒嗘彃浠舵湁 `history_source.py`/`history_sync.py`锛堝巻鍙叉暟鎹悓姝ワ級銆?
+
+| 鎻掍欢 | 鏁版嵁婧?| 鍏抽敭鏂囦欢 | 杈撳嚭 |
 |------|--------|----------|------|
-| `ah_premium/` | 腾讯行情 | `fetcher.py`, `source.py`, `normalizer.py` | AH 股溢价快照 |
-| `ab_premium/` | 腾讯行情 | `fetcher.py`, `source.py`, `normalizer.py` | AB 股溢价快照 |
-| `exchange_rate/` | 腾讯 | `fetcher.py`, `normalizer.py` | 港币/美元人民币汇率 |
-| `convertible_bond/` | 集思录 + 东财 | `fetcher.py`, `source.py`, `normalizer.py`, `history_sync.py`, `history_source.py` | 转债套利数据（含理论定价） |
-| `cb_rights_issue/` | 集思录 | `fetcher.py`, `source.py`, `normalizer.py`, `history_source.py` | 转债抢权配售数据 |
-| `lof_iopv/` | 东财+腾讯+雪球 | `fetcher.py`, `source.py`, `fund_classifier.py`, `normalizer.py` | QDII LOF IOPV三分类(指数/持仓/报表)数据 |
-| `merger/` | 公告 API | `fetcher.py`, `source.py`, `normalizer.py` | 并购重组公告 |
-| `event_arbitrage/` | 集思录 | `fetcher.py`, `normalizer.py` | 事件驱动套利 |
-| `subscription/` | 多源 | `fetcher.py`, `ipo_source.py`, `bond_source.py`, `normalizer.py` | 新股/转债申购日历 |
-| `dividend/` | AkShare / 巨潮 | `fetcher.py`, `source.py`, `normalizer.py` | 股息公告 |
-| `custom_monitor/` | 运行态 | `input_reader.py` | 用户自定义监控组合 |
+| `ah_premium/` | 鑵捐琛屾儏 | `fetcher.py`, `source.py`, `normalizer.py` | AH 鑲℃孩浠峰揩鐓?|
+| `ab_premium/` | 鑵捐琛屾儏 | `fetcher.py`, `source.py`, `normalizer.py` | AB 鑲℃孩浠峰揩鐓?|
+| `exchange_rate/` | 鑵捐 | `fetcher.py`, `normalizer.py` | 娓竵/缇庡厓浜烘皯甯佹眹鐜?|
+| `convertible_bond/` | 闆嗘€濆綍 + 涓滆储 | `fetcher.py`, `source.py`, `normalizer.py`, `history_sync.py`, `history_source.py` | 杞€哄鍒╂暟鎹紙鍚悊璁哄畾浠凤級 |
+| `cb_rights_issue/` | 闆嗘€濆綍 | `fetcher.py`, `source.py`, `normalizer.py`, `history_source.py` | 杞€烘姠鏉冮厤鍞暟鎹?|
+| `lof_iopv/` | 涓滆储+鑵捐+闆悆 | `fetcher.py`, `source.py`, `fund_classifier.py`, `normalizer.py` | QDII LOF IOPV涓夊垎绫?鎸囨暟/鎸佷粨/鎶ヨ〃)鏁版嵁 |
+| `merger/` | 鍏憡 API | `fetcher.py`, `source.py`, `normalizer.py` | 骞惰喘閲嶇粍鍏憡 |
+| `event_arbitrage/` | 闆嗘€濆綍 | `fetcher.py`, `normalizer.py` | 浜嬩欢椹卞姩濂楀埄 |
+| `subscription/` | 澶氭簮 | `fetcher.py`, `ipo_source.py`, `bond_source.py`, `normalizer.py` | 鏂拌偂/杞€虹敵璐棩鍘?|
+| `dividend/` | AkShare / 宸ㄦ疆 | `fetcher.py`, `source.py`, `normalizer.py` | 鑲℃伅鍏憡 |
+| `custom_monitor/` | 杩愯鎬?| `input_reader.py` | 鐢ㄦ埛鑷畾涔夌洃鎺х粍鍚?|
 
-**统一入口**：`data_dispatch.py <action>` — 命令行调度器，根据 action 调用对应插件的 fetcher。
+**缁熶竴鍏ュ彛**锛歚data_dispatch.py <action>` 鈥?鍛戒护琛岃皟搴﹀櫒锛屾牴鎹?action 璋冪敤瀵瑰簲鎻掍欢鐨?fetcher銆?
 
-### 2.2 strategy/ — 业务计算层（10 个插件，执行计算规则、排名、筛选、策略判定）
+### 2.2 strategy/ 鈥?涓氬姟璁＄畻灞傦紙10 涓彃浠讹紝鎵ц璁＄畻瑙勫垯銆佹帓鍚嶃€佺瓫閫夈€佺瓥鐣ュ垽瀹氾級
 
-每个插件标准结构：`service.py`（Python 计算逻辑）+ `service.js`（Node.js 适配器）。部分有 `runtime_service.js`（运行时状态管理）或 `discount_runtime_store.js`（策略状态持久化）。
+姣忎釜鎻掍欢鏍囧噯缁撴瀯锛歚service.py`锛圥ython 璁＄畻閫昏緫锛? `service.js`锛圢ode.js 閫傞厤鍣級銆傞儴鍒嗘湁 `runtime_service.js`锛堣繍琛屾椂鐘舵€佺鐞嗭級鎴?`discount_runtime_store.js`锛堢瓥鐣ョ姸鎬佹寔涔呭寲锛夈€?
 
-| 插件 | 关键文件 | 业务规则 |
+| 鎻掍欢 | 鍏抽敭鏂囦欢 | 涓氬姟瑙勫垯 |
 |------|----------|----------|
-| `ah_premium/` | `service.py`, `service.js` | 溢价率排名、历史百分位 |
-| `ab_premium/` | `service.py`, `service.js` | AB 溢价排名 |
-| `convertible_bond/` | `service.py`, `service.js`, `discount_runtime_store.js` | 双低策略、理论收益率、回售套利、折价策略（买入/卖出/监控） |
-| `cb_rights_issue/` | `service.py` | 抢权配售预期收益计算、阶段判定、入池判断 |
-| `lof_iopv/` | `service.py` | QDII LOF IOPV 溢价率排名 |
-| `merger/` | `service.py`, `service.js` | 并购重组 deal 分析、AI 报告生成（DeepSeek） |
-| `event_arbitrage/` | `service.py` | 事件匹配与过滤 |
-| `subscription/` | `service.py`, `service.js` | 申购事件跟踪 |
-| `dividend/` | `service.py`, `service.js`, `runtime_service.js` | 股权登记日跟踪、收益率计算 |
-| `custom_monitor/` | `service.py`, `service.js`, `runtime_service.js` | 自定义组合收益率计算 |
+| `ah_premium/` | `service.py`, `service.js` | 婧环鐜囨帓鍚嶃€佸巻鍙茬櫨鍒嗕綅 |
+| `ab_premium/` | `service.py`, `service.js` | AB 婧环鎺掑悕 |
+| `convertible_bond/` | `service.py`, `service.js`, `discount_runtime_store.js` | 鍙屼綆绛栫暐銆佺悊璁烘敹鐩婄巼銆佸洖鍞鍒┿€佹姌浠风瓥鐣ワ紙涔板叆/鍗栧嚭/鐩戞帶锛?|
+| `cb_rights_issue/` | `service.py` | 鎶㈡潈閰嶅敭棰勬湡鏀剁泭璁＄畻銆侀樁娈靛垽瀹氥€佸叆姹犲垽鏂?|
+| `lof_iopv/` | `service.py` | QDII LOF IOPV 婧环鐜囨帓鍚?|
+| `merger/` | `service.py`, `service.js` | 骞惰喘閲嶇粍 deal 鍒嗘瀽銆丄I 鎶ュ憡鐢熸垚锛圖eepSeek锛?|
+| `event_arbitrage/` | `service.py` | 浜嬩欢鍖归厤涓庤繃婊?|
+| `subscription/` | `service.py`, `service.js` | 鐢宠喘浜嬩欢璺熻釜 |
+| `dividend/` | `service.py`, `service.js`, `runtime_service.js` | 鑲℃潈鐧昏鏃ヨ窡韪€佹敹鐩婄巼璁＄畻 |
+| `custom_monitor/` | `service.py`, `service.js`, `runtime_service.js` | 鑷畾涔夌粍鍚堟敹鐩婄巼璁＄畻 |
 
-### 2.3 ui/ — API 与展示层（Express 路由、视图模型、看板模板）
+### 2.3 ui/ 鈥?API 涓庡睍绀哄眰锛圗xpress 璺敱銆佽鍥炬ā鍨嬨€佺湅鏉挎ā鏉匡級
 
-| 文件 | 职责 | 服务端点 |
+| 鏂囦欢 | 鑱岃矗 | 鏈嶅姟绔偣 |
 |------|------|----------|
-| `routes/market_routes.js` | 市场行情路由 | `/api/market/ah`, `/api/market/ab`, `/api/market/convertible-bond-arbitrage`, `/api/market/lof-arbitrage`, `/api/market/merger`, `/api/market/event-arbitrage`, `/api/market/cb-rights-issue`, `/api/market/ipo`, `/api/market/convertible-bonds`, `/api/market/exchange-rate` |
-| `routes/dashboard_routes.js` | 看板路由 | `/api/dashboard/ui-config`, `/api/dashboard/resource-status`, `/api/dashboard/overview`, `/api/monitors`, `/api/dividend?action=*` |
-| `routes/push_routes.js` | 推送配置路由 | `/api/push/config`, `/api/push/cb-rights-issue-config`, `/api/push/lof-arbitrage-config`, `/api/push/wecom` |
-| `view_models/overview.js` | 看板概览数据组装 | 被 dashboard_routes 调用 |
-| `view_models/push_payload.js` | 推送配置响应格式 | 被 push_routes 调用 |
-| `dashboard/dashboard_page.js` | 旧看板页面逻辑 | legacy 页面渲染 |
-| `templates/dashboard_template.html` | 旧看板 HTML 模板 | 含内联 CSS/JS，暗色金融终端主题 |
+| `routes/market_routes.js` | 甯傚満琛屾儏璺敱 | `/api/market/ah`, `/api/market/ab`, `/api/market/convertible-bond-arbitrage`, `/api/market/lof-arbitrage`, `/api/market/merger`, `/api/market/event-arbitrage`, `/api/market/cb-rights-issue`, `/api/market/ipo`, `/api/market/convertible-bonds`, `/api/market/exchange-rate` |
+| `routes/dashboard_routes.js` | 鐪嬫澘璺敱 | `/api/dashboard/ui-config`, `/api/dashboard/resource-status`, `/api/dashboard/overview`, `/api/monitors`, `/api/dividend?action=*` |
+| `routes/push_routes.js` | 鎺ㄩ€侀厤缃矾鐢?| `/api/push/config`, `/api/push/cb-rights-issue-config`, `/api/push/lof-arbitrage-config`, `/api/push/wecom` |
+| `view_models/overview.js` | 鐪嬫澘姒傝鏁版嵁缁勮 | 琚?dashboard_routes 璋冪敤 |
+| `view_models/push_payload.js` | 鎺ㄩ€侀厤缃搷搴旀牸寮?| 琚?push_routes 璋冪敤 |
+| `dashboard/dashboard_page.js` | 鏃х湅鏉块〉闈㈤€昏緫 | legacy 椤甸潰娓叉煋 |
+| `templates/dashboard_template.html` | 鏃х湅鏉?HTML 妯℃澘 | 鍚唴鑱?CSS/JS锛屾殫鑹查噾铻嶇粓绔富棰?|
 
-### 2.4 notification/ — 推送与调度层（企业微信、摘要组装、告警推送）
+### 2.4 notification/ 鈥?鎺ㄩ€佷笌璋冨害灞傦紙浼佷笟寰俊銆佹憳瑕佺粍瑁呫€佸憡璀︽帹閫侊級
 
-| 组件 | 关键文件 | 职责 |
+| 缁勪欢 | 鍏抽敭鏂囦欢 | 鑱岃矗 |
 |------|----------|------|
-| **WeCom 客户端** | `wecom/client.js` | 发送 Markdown 到企业微信 Webhook |
-| **调度器** | `scheduler/wecom_scheduler.js` | 定时推送调度（60s tick） |
-| **推送配置** | `scheduler/push_config_store.js`, `push_runtime_store.js` | 运行时推送配置与状态 |
-| **模块配置** | `scheduler/module_push_config_store.js`, `module_push_runtime_store.js` | 各模块（CB/LOF/抢权配售）独立推送配置 |
-| **摘要服务** | `summary/main_summary.js` | 聚合所有模块生成每日摘要 Markdown |
-| **折价策略提醒** | `alerts/event_alert_service.js` | 实时折价买入/卖出/监控名单推送 |
-| **CB 套利推送** | `cb_arbitrage/service.js` | 转债套利独立推送逻辑 |
-| **抢权配售推送** | `cb_rights_issue/service.js` | 抢权配售独立推送逻辑 |
-| **LOF 套利推送** | `lof_iopv/service.js` | QDII LOF IOPV 推送逻辑（定时+即时） |
-| **并购报告** | `merger_report/service.js` | 并购 deal 报告推送 |
-| **Markdown 样式** | `styles/*.js` | 各推送类型的格式化模板 |
+| **WeCom 瀹㈡埛绔?* | `wecom/client.js` | 鍙戦€?Markdown 鍒颁紒涓氬井淇?Webhook |
+| **璋冨害鍣?* | `scheduler/wecom_scheduler.js` | 瀹氭椂鎺ㄩ€佽皟搴︼紙60s tick锛?|
+| **鎺ㄩ€侀厤缃?* | `scheduler/push_config_store.js`, `push_runtime_store.js` | 杩愯鏃舵帹閫侀厤缃笌鐘舵€?|
+| **妯″潡閰嶇疆** | `scheduler/module_push_config_store.js`, `module_push_runtime_store.js` | 鍚勬ā鍧楋紙CB/LOF/鎶㈡潈閰嶅敭锛夌嫭绔嬫帹閫侀厤缃?|
+| **鎽樿鏈嶅姟** | `summary/main_summary.js` | 鑱氬悎鎵€鏈夋ā鍧楃敓鎴愭瘡鏃ユ憳瑕?Markdown |
+| **鎶樹环绛栫暐鎻愰啋** | `alerts/event_alert_service.js` | 瀹炴椂鎶樹环涔板叆/鍗栧嚭/鐩戞帶鍚嶅崟鎺ㄩ€?|
+| **CB 濂楀埄鎺ㄩ€?* | `cb_arbitrage/service.js` | 杞€哄鍒╃嫭绔嬫帹閫侀€昏緫 |
+| **鎶㈡潈閰嶅敭鎺ㄩ€?* | `cb_rights_issue/service.js` | 鎶㈡潈閰嶅敭鐙珛鎺ㄩ€侀€昏緫 |
+| **LOF 濂楀埄鎺ㄩ€?* | `lof_iopv/service.js` | QDII LOF IOPV 鎺ㄩ€侀€昏緫锛堝畾鏃?鍗虫椂锛?|
+| **骞惰喘鎶ュ憡** | `merger_report/service.js` | 骞惰喘 deal 鎶ュ憡鎺ㄩ€?|
+| **Markdown 鏍峰紡** | `styles/*.js` | 鍚勬帹閫佺被鍨嬬殑鏍煎紡鍖栨ā鏉?|
 
-### 2.5 shared/ — 跨层通用能力（配置、路径、时区、日志、Bus 记录格式、运行时状态）
+### 2.5 shared/ 鈥?璺ㄥ眰閫氱敤鑳藉姏锛堥厤缃€佽矾寰勩€佹椂鍖恒€佹棩蹇椼€丅us 璁板綍鏍煎紡銆佽繍琛屾椂鐘舵€侊級
 
-| 目录 | 关键文件 | 职责 |
+| 鐩綍 | 鍏抽敭鏂囦欢 | 鑱岃矗 |
 |------|----------|------|
-| `bus/` | `market_record.py`, `market_record.js`, `bus_contract.md` | **The Bus** — 标准化记录格式，定义跨层通信契约 |
-| `config/` | `node_config.js`, `script_config.py` | 统一配置读取（YAML + 环境变量注入） |
-| `paths/` | `node_paths.js`, `script_paths.py`, `tool_paths.py` | 路径解析（运行时文件、数据库、配置） |
-| `runtime/` | `json_store.js`, `json_store.py`, `state_registry.js`, `state_registry.py` | JSON 文件持久化、运行时状态管理 |
-| `time/` | `shanghai_time.js`, `shanghai_time.py` | 上海时区、交易时段检测、市场时间 |
-| `logging/` | `logger.js`, `logger.py` | 统一日志 |
-| `models/` | `service_result.js`, `service_result.py` | 标准成功/错误响应包装 |
-| 根目录 | `market_service.py` | 跨市场工具（价格查询、配对匹配、搜索） |
+| `bus/` | `market_record.py`, `market_record.js`, `bus_contract.md` | **The Bus** 鈥?鏍囧噯鍖栬褰曟牸寮忥紝瀹氫箟璺ㄥ眰閫氫俊濂戠害 |
+| `config/` | `node_config.js`, `script_config.py` | 缁熶竴閰嶇疆璇诲彇锛圷AML + 鐜鍙橀噺娉ㄥ叆锛?|
+| `paths/` | `node_paths.js`, `script_paths.py`, `tool_paths.py` | 璺緞瑙ｆ瀽锛堣繍琛屾椂鏂囦欢銆佹暟鎹簱銆侀厤缃級 |
+| `runtime/` | `json_store.js`, `json_store.py`, `state_registry.js`, `state_registry.py` | JSON 鏂囦欢鎸佷箙鍖栥€佽繍琛屾椂鐘舵€佺鐞?|
+| `time/` | `shanghai_time.js`, `shanghai_time.py` | 涓婃捣鏃跺尯銆佷氦鏄撴椂娈垫娴嬨€佸競鍦烘椂闂?|
+| `logging/` | `logger.js`, `logger.py` | 缁熶竴鏃ュ織 |
+| `models/` | `service_result.js`, `service_result.py` | 鏍囧噯鎴愬姛/閿欒鍝嶅簲鍖呰 |
+| 鏍圭洰褰?| `market_service.py` | 璺ㄥ競鍦哄伐鍏凤紙浠锋牸鏌ヨ銆侀厤瀵瑰尮閰嶃€佹悳绱級 |
 
-### 2.6 scripts/ — 运维与数据管理脚本（历史库重建、配对导出、健康检查等）
+### 2.6 scripts/ 鈥?杩愮淮涓庢暟鎹鐞嗚剼鏈紙鍘嗗彶搴撻噸寤恒€侀厤瀵瑰鍑恒€佸仴搴锋鏌ョ瓑锛?
 
-| 文件 | 职责 |
+| 鏂囦欢 | 鑱岃矗 |
 |------|------|
-| `add_ai_summary.py` | 批量添加 AI-SUMMARY 注释 |
-| `audit_ah_history_coverage.py` | AH 历史覆盖审计 |
-| `cb_rights_issue_stock_history_db.py` | 抢权配售正股历史数据库 |
-| `check_plugin_boundaries.py` | **架构 enforcement** — 检查跨插件非法依赖 |
-| `check_root_cleanliness.py` | 根目录清洁检查 |
-| `check_health.ps1` | 健康检查（PowerShell） |
-| `export_pair_pool.py` | 配对池导出 |
-| `fetch_historical_premium.py` | 历史溢价抓取 |
-| `fetch_merger_arbitrage.py` | 并购套利抓取 |
-| `market_pairs.py` | 市场配对工具 |
-| `premium_history_db.py` | 溢价历史数据库管理 |
-| `rebuild_premium_db.py` | 溢价历史数据库重建 |
-| `render_mini_swe_task.py` | mini-SWE-agent 任务渲染 |
-| `stock_price_history_db.py` | 股价历史数据库管理 |
-| `subscription_history_db.py` | 申购历史数据库管理 |
-| `sync_convertible_bond_stock_history.py` | 转债正股历史同步 |
+| `add_ai_summary.py` | 鎵归噺娣诲姞 AI-SUMMARY 娉ㄩ噴 |
+| `audit_ah_history_coverage.py` | AH 鍘嗗彶瑕嗙洊瀹¤ |
+| `cb_rights_issue_stock_history_db.py` | 鎶㈡潈閰嶅敭姝ｈ偂鍘嗗彶鏁版嵁搴?|
+| `check_plugin_boundaries.py` | **鏋舵瀯 enforcement** 鈥?妫€鏌ヨ法鎻掍欢闈炴硶渚濊禆 |
+| `check_root_cleanliness.py` | 鏍圭洰褰曟竻娲佹鏌?|
+| `check_health.ps1` | 鍋ュ悍妫€鏌ワ紙PowerShell锛?|
+| `export_pair_pool.py` | 閰嶅姹犲鍑?|
+| `fetch_historical_premium.py` | 鍘嗗彶婧环鎶撳彇 |
+| `fetch_merger_arbitrage.py` | 骞惰喘濂楀埄鎶撳彇 |
+| `market_pairs.py` | 甯傚満閰嶅宸ュ叿 |
+| `premium_history_db.py` | 婧环鍘嗗彶鏁版嵁搴撶鐞?|
+| `rebuild_premium_db.py` | 婧环鍘嗗彶鏁版嵁搴撻噸寤?|
+| `render_mini_swe_task.py` | mini-SWE-agent 浠诲姟娓叉煋 |
+| `stock_price_history_db.py` | 鑲′环鍘嗗彶鏁版嵁搴撶鐞?|
+| `subscription_history_db.py` | 鐢宠喘鍘嗗彶鏁版嵁搴撶鐞?|
+| `sync_convertible_bond_stock_history.py` | 杞€烘鑲″巻鍙插悓姝?|
 
-### 2.7 deploy/ — 部署配置
+### 2.7 deploy/ 鈥?閮ㄧ讲閰嶇疆
 
-| 文件 | 职责 |
+| 鏂囦欢 | 鑱岃矗 |
 |------|------|
-| `alpha-monitor.service` | systemd 服务文件 |
-| `Caddyfile`, `nginx-*.conf` | Web 服务器配置 |
-| `install_*.sh` | 安装脚本（Caddy/Nginx/systemd） |
-| `update_*.sh` | 自动更新脚本 |
-| server_doctor.sh | 服务器健康检查 |
-| sync_server.sh | 服务器 git 同步（协议修复/stash/冲突/重启） |
-| `sync_remote_env_from_profile.py` | 同步远程环境变量（读取 `config/server_profile.local.yaml`） |
+| `alpha-monitor.service` | systemd 鏈嶅姟鏂囦欢 |
+| `Caddyfile`, `nginx-*.conf` | Web 鏈嶅姟鍣ㄩ厤缃?|
+| `install_*.sh` | 瀹夎鑴氭湰锛圕addy/Nginx/systemd锛?|
+| `update_*.sh` | 鑷姩鏇存柊鑴氭湰 |
+| server_doctor.sh | 鏈嶅姟鍣ㄥ仴搴锋鏌?|
+| sync_server.sh | 鏈嶅姟鍣?git 鍚屾锛堝崗璁慨澶?stash/鍐茬獊/閲嶅惎锛?|
+| `sync_remote_env_from_profile.py` | 鍚屾杩滅▼鐜鍙橀噺锛堣鍙?`config/server_profile.local.yaml`锛?|
 
-### 2.6a config/ — 配置文件
+### 2.6a config/ 鈥?閰嶇疆鏂囦欢
 
-| 文件 | 职责 |
+| 鏂囦欢 | 鑱岃矗 |
 |------|------|
-| `config/config.yaml` | 非敏感业务配置：参数、阈值、URL、开关 |
-| `config/secrets.yaml` | 敏感配置：API Key、Webhook、密码（gitignored） |
-| `config/server_profile.local.yaml` | 服务器连接配置：SSH host/user/port/password（gitignored） |
+| `config/config.yaml` | 闈炴晱鎰熶笟鍔￠厤缃細鍙傛暟銆侀槇鍊笺€乁RL銆佸紑鍏?|
+| `config/secrets.yaml` | 鏁忔劅閰嶇疆锛欰PI Key銆乄ebhook銆佸瘑鐮侊紙gitignored锛?|
+| `config/server_profile.local.yaml` | 鏈嶅姟鍣ㄨ繛鎺ラ厤缃細SSH host/user/port/password锛坓itignored锛?|
 
-### 2.7 docs/ — 项目文档（UI 设计规范、运维手册、mini-SWE-agent 使用指南）
+### 2.7 docs/ 鈥?椤圭洰鏂囨。锛圲I 璁捐瑙勮寖銆佽繍缁存墜鍐屻€乵ini-SWE-agent 浣跨敤鎸囧崡锛?
 
-### 2.8 ui/ — React 前端（进行中，Vite + React 重写 UI）
+### 2.8 ui/ 鈥?React 鍓嶇锛堣繘琛屼腑锛孷ite + React 閲嶅啓 UI锛?
 
-当前 React 顶层标签固定为：概览、转债套利、AH 溢价、AB 溢价、LOF 套利、打新申购、自定义。
-React 导航与概览已排除：分红提醒、事件套利、推送设置。
+褰撳墠 React 椤跺眰鏍囩鍥哄畾涓猴細姒傝銆佽浆鍊哄鍒┿€丄H 婧环銆丄B 婧环銆丩OF 濂楀埄銆佹墦鏂扮敵璐€佽嚜瀹氫箟銆?
+React 瀵艰埅涓庢瑙堝凡鎺掗櫎锛氬垎绾㈡彁閱掋€佷簨浠跺鍒┿€佹帹閫佽缃€?
 
-| 文件 | 职责 |
+| 鏂囦欢 | 鑱岃矗 |
 |------|------|
-| `src/App.jsx` | React 应用主组件 |
-| `src/main.jsx` | 入口文件 |
-| `src/styles.css` | 样式 |
-| `src/components/BottomNav.jsx` | 手机端底部导航，负责 7 个顶级标签切换 |
-| `src/components/ConvertibleCardList.jsx` | 转债套利简洁模块表格 |
-| `src/components/AhCardList.jsx` | AH 溢价简洁模块表格 |
-| `src/components/AbCardList.jsx` | AB 溢价简洁模块表格 |
-| `src/components/LofCardList.jsx` | LOF IOPV估值表格：三分类展示(指数型蓝/持仓型绿/报表型橙)+MAE列 |
-| `src/components/SubscriptionCardList.jsx` | 打新申购简洁模块表格 |
-| `src/components/RightsIssueCardList.jsx` | 抢权配售简洁模块表格 |
-| `src/components/MonitorCardList.jsx` | 自定义监控简洁模块表格 |
-| `src/components/cardHelpers.jsx` | React 公共格式化与轻量展示积木 |
-| `src/components/cardListHelpers.jsx` | React 历史行壳帮助函数 |
-| `src/components/SimpleDataTable.jsx` | React 简洁模块表格公共组件 |
-| `index.html` | HTML 模板 |
-| `package.json` | Vite + React 依赖 |
+| `src/App.jsx` | React 搴旂敤涓荤粍浠?|
+| `src/main.jsx` | 鍏ュ彛鏂囦欢 |
+| `src/styles.css` | 鏍峰紡 |
+| `src/components/BottomNav.jsx` | 鎵嬫満绔簳閮ㄥ鑸紝璐熻矗 7 涓《绾ф爣绛惧垏鎹?|
+| `src/components/ConvertibleCardList.jsx` | 杞€哄鍒╃畝娲佹ā鍧楄〃鏍?|
+| `src/components/AhCardList.jsx` | AH 婧环绠€娲佹ā鍧楄〃鏍?|
+| `src/components/AbCardList.jsx` | AB 婧环绠€娲佹ā鍧楄〃鏍?|
+| `src/components/LofCardList.jsx` | LOF IOPV浼板€艰〃鏍硷細涓夊垎绫诲睍绀?鎸囨暟鍨嬭摑/鎸佷粨鍨嬬豢/鎶ヨ〃鍨嬫)+MAE鍒?|
+| `src/components/SubscriptionCardList.jsx` | 鎵撴柊鐢宠喘绠€娲佹ā鍧楄〃鏍?|
+| `src/components/RightsIssueCardList.jsx` | 鎶㈡潈閰嶅敭绠€娲佹ā鍧楄〃鏍?|
+| `src/components/MonitorCardList.jsx` | 鑷畾涔夌洃鎺х畝娲佹ā鍧楄〃鏍?|
+| `src/components/cardHelpers.jsx` | React 鍏叡鏍煎紡鍖栦笌杞婚噺灞曠ず绉湪 |
+| `src/components/cardListHelpers.jsx` | React 鍘嗗彶琛屽３甯姪鍑芥暟 |
+| `src/components/SimpleDataTable.jsx` | React 绠€娲佹ā鍧楄〃鏍煎叕鍏辩粍浠?|
+| `index.html` | HTML 妯℃澘 |
+| `package.json` | Vite + React 渚濊禆 |
 
-### 2.9 根目录关键文件（入口脚本、配置合同、冒烟测试）
+### 2.9 鏍圭洰褰曞叧閿枃浠讹紙鍏ュ彛鑴氭湰銆侀厤缃悎鍚屻€佸啋鐑熸祴璇曪級
 
-| 文件 | 职责 |
+| 鏂囦欢 | 鑱岃矗 |
 |------|------|
-| `start_server.js` | **主入口**（3224 行）— Express 启动、服务注册、路由挂载、调度器启动 |
-| `data_dispatch.py` | **数据调度 CLI** — 根据 action 调用对应 data_fetch + strategy 插件 |
-| `config.yaml` | **唯一正式配置合同** — 所有业务参数、阈值、URL、开关 |
-| `package.json` | Node 依赖与脚本 |
-| `requirements.txt` | Python 依赖 |
-| `tests/smoke_check.js` | 冒烟测试 |
-| `shared/paths/db_paths.py` | 数据库路径配置 |
+| `start_server.js` | **涓诲叆鍙?*锛?224 琛岋級鈥?Express 鍚姩銆佹湇鍔℃敞鍐屻€佽矾鐢辨寕杞姐€佽皟搴﹀櫒鍚姩 |
+| `data_dispatch.py` | **鏁版嵁璋冨害 CLI** 鈥?鏍规嵁 action 璋冪敤瀵瑰簲 data_fetch + strategy 鎻掍欢 |
+| `config.yaml` | **鍞竴姝ｅ紡閰嶇疆鍚堝悓** 鈥?鎵€鏈変笟鍔″弬鏁般€侀槇鍊笺€乁RL銆佸紑鍏?|
+| `package.json` | Node 渚濊禆涓庤剼鏈?|
+| `requirements.txt` | Python 渚濊禆 |
+| `tests/smoke_check.js` | 鍐掔儫娴嬭瘯 |
+| `shared/paths/db_paths.py` | 鏁版嵁搴撹矾寰勯厤缃?|
 
 ---
 
-## 3. 文件速查表（按功能搜索源码位置）
+## 3. 鏂囦欢閫熸煡琛紙鎸夊姛鑳芥悳绱㈡簮鐮佷綅缃級
 
-按功能查询：
+鎸夊姛鑳芥煡璇細
 
-| 想找什么 | 文件位置 |
+| 鎯虫壘浠€涔?| 鏂囦欢浣嶇疆 |
 |----------|----------|
-| 折价策略买入/卖出/监控推送逻辑 | `notification/alerts/event_alert_service.js` |
-| 折价策略状态持久化 | `strategy/convertible_bond/discount_runtime_store.js` |
-| 折价策略业务计算 | `strategy/convertible_bond/service.py` |
-| 转债套利数据抓取 | `data_fetch/convertible_bond/fetcher.py` |
-| 转债套利上游 API | `data_fetch/convertible_bond/source.py` |
-| 抢权配售计算 | `strategy/cb_rights_issue/service.py` |
-| 抢权配售数据抓取 | `data_fetch/cb_rights_issue/fetcher.py` |
-| 抢权配售推送 | `notification/cb_rights_issue/service.js` |
-| QDII LOF IOPV 数据抓取 | `data_fetch/lof_iopv/fetcher.py` | LOF IOPV fetcher（薄包装，调用source.py） |
-| data_fetch/lof_iopv/source.py | LOF IOPV数据获取层（东财净值+腾讯行情+雪球仓位） |
-| QDII LOF IOPV 推送 | `notification/lof_iopv/service.js` |
-| AH 溢价计算 | `strategy/ah_premium/service.py` |
-| AB 溢价计算 | `strategy/ab_premium/service.py` |
-| 并购套利计算+AI 报告 | `strategy/merger/service.py` |
-| 每日摘要推送组装 | `notification/summary/main_summary.js` |
-| 推送调度器 | `notification/scheduler/wecom_scheduler.js` |
-| 推送配置存储 | `notification/scheduler/push_config_store.js` |
-| 模块推送配置 | `notification/scheduler/module_push_config_store.js` |
-| WeCom 发送客户端 | `notification/wecom/client.js` |
-| 市场行情路由 | `ui/routes/market_routes.js` |
-| 看板路由 | `ui/routes/dashboard_routes.js` |
-| 推送配置路由 | `ui/routes/push_routes.js` |
-| 看板概览数据 | `ui/view_models/overview.js` |
-| 统一配置读取 | `shared/config/node_config.js` / `script_config.py` |
-| JSON 状态持久化 | `shared/runtime/json_store.js` / `json_store.py` |
-| 上海时区/交易时段 | `shared/time/shanghai_time.js` / `shanghai_time.py` |
-| The Bus 记录格式 | `shared/bus/market_record.js` / `market_record.py` |
-| 架构边界检查 | `scripts/check_plugin_boundaries.py` |
-| 自动部署脚本 | `deploy/update_from_github.sh` |
-| 服务器启动 | `start_server.js` |
-| 数据调度 CLI | `data_dispatch.py` |
+| 鎶樹环绛栫暐涔板叆/鍗栧嚭/鐩戞帶鎺ㄩ€侀€昏緫 | `notification/alerts/event_alert_service.js` |
+| 鎶樹环绛栫暐鐘舵€佹寔涔呭寲 | `strategy/convertible_bond/discount_runtime_store.js` |
+| 鎶樹环绛栫暐涓氬姟璁＄畻 | `strategy/convertible_bond/service.py` |
+| 杞€哄鍒╂暟鎹姄鍙?| `data_fetch/convertible_bond/fetcher.py` |
+| 杞€哄鍒╀笂娓?API | `data_fetch/convertible_bond/source.py` |
+| 鎶㈡潈閰嶅敭璁＄畻 | `strategy/cb_rights_issue/service.py` |
+| 鎶㈡潈閰嶅敭鏁版嵁鎶撳彇 | `data_fetch/cb_rights_issue/fetcher.py` |
+| 鎶㈡潈閰嶅敭鎺ㄩ€?| `notification/cb_rights_issue/service.js` |
+| QDII LOF IOPV 鏁版嵁鎶撳彇 | `data_fetch/lof_iopv/fetcher.py` | LOF IOPV fetcher锛堣杽鍖呰锛岃皟鐢╯ource.py锛?|
+| data_fetch/lof_iopv/source.py | LOF IOPV鏁版嵁鑾峰彇灞傦紙涓滆储鍑€鍊?鑵捐琛屾儏+闆悆浠撲綅锛?|
+| QDII LOF IOPV 鎺ㄩ€?| `notification/lof_iopv/service.js` |
+| AH 婧环璁＄畻 | `strategy/ah_premium/service.py` |
+| AB 婧环璁＄畻 | `strategy/ab_premium/service.py` |
+| 骞惰喘濂楀埄璁＄畻+AI 鎶ュ憡 | `strategy/merger/service.py` |
+| 姣忔棩鎽樿鎺ㄩ€佺粍瑁?| `notification/summary/main_summary.js` |
+| 鎺ㄩ€佽皟搴﹀櫒 | `notification/scheduler/wecom_scheduler.js` |
+| 鎺ㄩ€侀厤缃瓨鍌?| `notification/scheduler/push_config_store.js` |
+| 妯″潡鎺ㄩ€侀厤缃?| `notification/scheduler/module_push_config_store.js` |
+| WeCom 鍙戦€佸鎴风 | `notification/wecom/client.js` |
+| 甯傚満琛屾儏璺敱 | `ui/routes/market_routes.js` |
+| 鐪嬫澘璺敱 | `ui/routes/dashboard_routes.js` |
+| 鎺ㄩ€侀厤缃矾鐢?| `ui/routes/push_routes.js` |
+| 鐪嬫澘姒傝鏁版嵁 | `ui/view_models/overview.js` |
+| 缁熶竴閰嶇疆璇诲彇 | `shared/config/node_config.js` / `script_config.py` |
+| JSON 鐘舵€佹寔涔呭寲 | `shared/runtime/json_store.js` / `json_store.py` |
+| 涓婃捣鏃跺尯/浜ゆ槗鏃舵 | `shared/time/shanghai_time.js` / `shanghai_time.py` |
+| The Bus 璁板綍鏍煎紡 | `shared/bus/market_record.js` / `market_record.py` |
+| 鏋舵瀯杈圭晫妫€鏌?| `scripts/check_plugin_boundaries.py` |
+| 鑷姩閮ㄧ讲鑴氭湰 | `deploy/update_from_github.sh` |
+| 鏈嶅姟鍣ㄥ惎鍔?| `start_server.js` |
+| 鏁版嵁璋冨害 CLI | `data_dispatch.py` |
 
 ---
 
-## 4. 运行与验证速查
+## 4. 杩愯涓庨獙璇侀€熸煡
 
-- 数据流：`ui/routes/*` → `data_dispatch.py` → `data_fetch/*` → Bus → `strategy/*` → API JSON。
-- 运行态：关键 JSON/DB 位于 `runtime_data/shared/`，部署时保留，不提交 Git。
-- 主要验证：`npm run ui:build`、`npm run check:boundaries`、`ALPHA_MONITOR_BASE_URL=http://43.139.35.190 node tests/smoke_check.js`、`node tests/ui_*.test.js`。
-- 工作流：新任务写入 `missions/MMDD-name/{spec.md,plan.md}`，交接写入 `MEMORY.md`，正式需求写入 `specs/`。
+- 鏁版嵁娴侊細`ui/routes/*` 鈫?`data_dispatch.py` 鈫?`data_fetch/*` 鈫?Bus 鈫?`strategy/*` 鈫?API JSON銆?
+- 杩愯鎬侊細鍏抽敭 JSON/DB 浣嶄簬 `runtime_data/shared/`锛岄儴缃叉椂淇濈暀锛屼笉鎻愪氦 Git銆?
+- 涓昏楠岃瘉锛歚npm run ui:build`銆乣npm run check:boundaries`銆乣ALPHA_MONITOR_BASE_URL=http://43.139.35.190 node tests/smoke_check.js`銆乣node tests/ui_*.test.js`銆?
+- 宸ヤ綔娴侊細鏂颁换鍔″啓鍏?`missions/MMDD-name/{spec.md,plan.md}`锛屼氦鎺ュ啓鍏?`MEMORY.md`锛屾寮忛渶姹傚啓鍏?`specs/`銆?
 
 ---
 
-## 5. 代码文件规范（文件大小限制、AI-SUMMARY 注释规范）
+## 5. 浠ｇ爜鏂囦欢瑙勮寖锛堟枃浠跺ぇ灏忛檺鍒躲€丄I-SUMMARY 娉ㄩ噴瑙勮寖锛?
 
-### 9.1 文件大小限制
+### 9.1 鏂囦欢澶у皬闄愬埗
 
-> **硬规则**：任何代码文件（`.py`、`.js`、`.jsx`）不得超过 **1000 行**。
+> **纭鍒?*锛氫换浣曚唬鐮佹枃浠讹紙`.py`銆乣.js`銆乣.jsx`锛変笉寰楄秴杩?**1000 琛?*銆?
 >
-> **为什么**：超过 1000 行的文件难以在 AI 上下文窗口中完整加载，导致检索困难、修改易出错、Review 成本指数级上升。
+> **涓轰粈涔?*锛氳秴杩?1000 琛岀殑鏂囦欢闅句互鍦?AI 涓婁笅鏂囩獥鍙ｄ腑瀹屾暣鍔犺浇锛屽鑷存绱㈠洶闅俱€佷慨鏀规槗鍑洪敊銆丷eview 鎴愭湰鎸囨暟绾т笂鍗囥€?
 >
-> **拆分原则**：
-> - 按功能职责拆分（如 `source.py` → `source.py` + `parser.py` + `cache.py`）
-> - 按 API 端点拆分（如 `market_routes.js` → `ah_routes.js` + `cb_routes.js` + `...`）
-> - 按数据层拆分（如 `service.py` → `calculator.py` + `formatter.py` + `validator.py`）
-> - 拆分后每份新文件必须有独立的 `AI-SUMMARY` 和 INDEX.md 登记
+> **鎷嗗垎鍘熷垯**锛?
+> - 鎸夊姛鑳借亴璐ｆ媶鍒嗭紙濡?`source.py` 鈫?`source.py` + `parser.py` + `cache.py`锛?
+> - 鎸?API 绔偣鎷嗗垎锛堝 `market_routes.js` 鈫?`ah_routes.js` + `cb_routes.js` + `...`锛?
+> - 鎸夋暟鎹眰鎷嗗垎锛堝 `service.py` 鈫?`calculator.py` + `formatter.py` + `validator.py`锛?
+> - 鎷嗗垎鍚庢瘡浠芥柊鏂囦欢蹇呴』鏈夌嫭绔嬬殑 `AI-SUMMARY` 鍜?INDEX.md 鐧昏
 >
-> **例外**：自动生成的模板/常量文件（如大型 HTML 模板、JSON 数据文件）可豁免，但应在文件名中标注（如 `.template.html`、`.data.json`）。
+> **渚嬪**锛氳嚜鍔ㄧ敓鎴愮殑妯℃澘/甯搁噺鏂囦欢锛堝澶у瀷 HTML 妯℃澘銆丣SON 鏁版嵁鏂囦欢锛夊彲璞佸厤锛屼絾搴斿湪鏂囦欢鍚嶄腑鏍囨敞锛堝 `.template.html`銆乣.data.json`锛夈€?
 
-### 9.2 AI-SUMMARY 注释规范
+### 9.2 AI-SUMMARY 娉ㄩ噴瑙勮寖
 
-> **硬规则**：每份核心代码文件顶部必须有 `AI-SUMMARY:` 注释。
+> **纭鍒?*锛氭瘡浠芥牳蹇冧唬鐮佹枃浠堕《閮ㄥ繀椤绘湁 `AI-SUMMARY:` 娉ㄩ噴銆?
 >
-> **格式**：
+> **鏍煎紡**锛?
 > ```python
-> # AI-SUMMARY: [一句话职责描述]
-> # 对应 INDEX.md §9.3 文件摘要索引
+> # AI-SUMMARY: [涓€鍙ヨ瘽鑱岃矗鎻忚堪]
+> # 瀵瑰簲 INDEX.md 搂9.3 鏂囦欢鎽樿绱㈠紩
 > ```
 > ```javascript
-> // AI-SUMMARY: [一句话职责描述]
-> // 对应 INDEX.md §9.3 文件摘要索引
+> // AI-SUMMARY: [涓€鍙ヨ瘽鑱岃矗鎻忚堪]
+> // 瀵瑰簲 INDEX.md 搂9.3 鏂囦欢鎽樿绱㈠紩
 > ```
 >
-> **要求**：
-> - 一句话，不超过 30 字
-> - 说明"这个文件做什么"，不是"这个文件有什么函数"
-> - 必须与 INDEX.md 表格中的描述完全一致
+> **瑕佹眰**锛?
+> - 涓€鍙ヨ瘽锛屼笉瓒呰繃 30 瀛?
+> - 璇存槑"杩欎釜鏂囦欢鍋氫粈涔?锛屼笉鏄?杩欎釜鏂囦欢鏈変粈涔堝嚱鏁?
+> - 蹇呴』涓?INDEX.md 琛ㄦ牸涓殑鎻忚堪瀹屽叏涓€鑷?
 >
-> **维护规则**：
-> 1. 修改文件职责或结构后，必须同步更新文件顶部 `AI-SUMMARY` 和 INDEX.md 表格。
-> 2. 新增核心文件时，必须写入 `AI-SUMMARY` 并在 INDEX.md 登记。
-> 3. 删除核心文件时，必须同步删除 INDEX.md 对应行和文件中的注释。
-> 4. 拆分文件时，旧文件的 `AI-SUMMARY` 和 INDEX.md 条目需更新或删除，新文件必须登记。
+> **缁存姢瑙勫垯**锛?
+> 1. 淇敼鏂囦欢鑱岃矗鎴栫粨鏋勫悗锛屽繀椤诲悓姝ユ洿鏂版枃浠堕《閮?`AI-SUMMARY` 鍜?INDEX.md 琛ㄦ牸銆?
+> 2. 鏂板鏍稿績鏂囦欢鏃讹紝蹇呴』鍐欏叆 `AI-SUMMARY` 骞跺湪 INDEX.md 鐧昏銆?
+> 3. 鍒犻櫎鏍稿績鏂囦欢鏃讹紝蹇呴』鍚屾鍒犻櫎 INDEX.md 瀵瑰簲琛屽拰鏂囦欢涓殑娉ㄩ噴銆?
+> 4. 鎷嗗垎鏂囦欢鏃讹紝鏃ф枃浠剁殑 `AI-SUMMARY` 鍜?INDEX.md 鏉＄洰闇€鏇存柊鎴栧垹闄わ紝鏂版枃浠跺繀椤荤櫥璁般€?
 
 ---
 
-## 9.3 文件摘要索引
+## 9.3 鏂囦欢鎽樿绱㈠紩
 
-### 9.1 根目录与入口
+### 9.1 鏍圭洰褰曚笌鍏ュ彛
 
-| 文件 | 职责摘要 |
+| 鏂囦欢 | 鑱岃矗鎽樿 |
 |------|----------|
-| `server_config_loader.js` | 服务器配置加载：端口/路径/策略/超时等配置读取 |
-| `start_server.js` | Express 主入口：启动服务、挂载路由、注册调度器、管理运行时状态 |
-| `data_dispatch.py` | CLI 数据调度器：根据 action 调用对应 data_fetch 抓取和 strategy 计算 |
-| `config.yaml` | 业务配置合同：所有参数、阈值、URL、开关的单一来源 |
+| `server_config_loader.js` | 鏈嶅姟鍣ㄩ厤缃姞杞斤細绔彛/璺緞/绛栫暐/瓒呮椂绛夐厤缃鍙?|
+| `start_server.js` | Express 涓诲叆鍙ｏ細鍚姩鏈嶅姟銆佹寕杞借矾鐢便€佹敞鍐岃皟搴﹀櫒銆佺鐞嗚繍琛屾椂鐘舵€?|
+| `data_dispatch.py` | CLI 鏁版嵁璋冨害鍣細鏍规嵁 action 璋冪敤瀵瑰簲 data_fetch 鎶撳彇鍜?strategy 璁＄畻 |
+| `config.yaml` | 涓氬姟閰嶇疆鍚堝悓锛氭墍鏈夊弬鏁般€侀槇鍊笺€乁RL銆佸紑鍏崇殑鍗曚竴鏉ユ簮 |
 
-### 9.2 data_fetch/ — 数据抓取层
+### 9.2 data_fetch/ 鈥?鏁版嵁鎶撳彇灞?
 
-| 文件 | 职责摘要 |
+| 鏂囦欢 | 鑱岃矗鎽樿 |
 |------|----------|
-| `data_fetch/ah_premium/fetcher.py` | AH 溢价抓取调度：调用腾讯行情 API 并标准化为 Bus 记录 |
-| `data_fetch/ah_premium/source.py` | AH 溢价上游 API：腾讯行情 + 配对库 + 历史数据库 |
-| `data_fetch/ah_premium/normalizer.py` | AH 溢价数据标准化：原始行情转为 Bus 标准化记录 |
-| `data_fetch/ab_premium/fetcher.py` | AB 溢价抓取调度：调用腾讯行情 API 并标准化为 Bus 记录 |
-| `data_fetch/ab_premium/source.py` | AB 溢价上游 API：腾讯行情 + 配对库 + 历史数据库 |
-| `data_fetch/ab_premium/normalizer.py` | AB 溢价数据标准化：原始行情转为 Bus 标准化记录 |
-| `data_fetch/convertible_bond/fetcher.py` | 转债套利抓取调度：调用集思录/东方财富 API |
-| `data_fetch/convertible_bond/cb_metrics.py` | 转债套利指标计算：波动率/ATR/理论定价/纯债价值/期权价值 |
-| `data_fetch/convertible_bond/source.py` | 转债套利上游 API：集思录实时行情 + 东方财富财务数据 |
-| `data_fetch/convertible_bond/normalizer.py` | 转债套利数据标准化：含理论定价的 Bus 记录生成 |
-| `data_fetch/lof_iopv/fetcher.py` | LOF IOPV fetcher（薄包装，调用source.py） |
-| `data_fetch/lof_iopv/source.py` | LOF IOPV上游API：东财净值+腾讯行情+雪球仓位+集思录申购状态 |
-| `data_fetch/lof_iopv/normalizer.py` | LOF IOPV数据标准化：快照转Bus记录 |
-| `data_fetch/merger/fetcher.py` | 并购数据抓取调度：调用巨潮公告 API |
-| `data_fetch/merger/source.py` | 并购公告 API：巨潮资讯公告搜索与解析 |
-| `data_fetch/dividend/fetcher.py` | 股息抓取调度：调用 AkShare/巨潮 API |
-| `data_fetch/dividend/source.py` | 股息上游 API：AkShare CNINFO + 腾讯行情 |
-| `data_fetch/subscription/fetcher.py` | 申购抓取调度：IPO + 转债申购日历 |
-| `data_fetch/exchange_rate/fetcher.py` | 汇率抓取调度：调用腾讯汇率 API |
-| `data_fetch/custom_monitor/input_reader.py` | 自定义监控输入读取：从运行态 JSON 读取用户组合 |
-| `data_fetch/event_arbitrage/fetcher.py` | 事件套利抓取调度：调用集思录事件 API |
-| `data_fetch/cb_rights_issue/fetcher.py` | 抢权配售抓取调度：调用集思录预案 API |
+| `data_fetch/ah_premium/fetcher.py` | AH 婧环鎶撳彇璋冨害锛氳皟鐢ㄨ吘璁鎯?API 骞舵爣鍑嗗寲涓?Bus 璁板綍 |
+| `data_fetch/ah_premium/source.py` | AH 婧环涓婃父 API锛氳吘璁鎯?+ 閰嶅搴?+ 鍘嗗彶鏁版嵁搴?|
+| `data_fetch/ah_premium/normalizer.py` | AH 婧环鏁版嵁鏍囧噯鍖栵細鍘熷琛屾儏杞负 Bus 鏍囧噯鍖栬褰?|
+| `data_fetch/ab_premium/fetcher.py` | AB 婧环鎶撳彇璋冨害锛氳皟鐢ㄨ吘璁鎯?API 骞舵爣鍑嗗寲涓?Bus 璁板綍 |
+| `data_fetch/ab_premium/source.py` | AB 婧环涓婃父 API锛氳吘璁鎯?+ 閰嶅搴?+ 鍘嗗彶鏁版嵁搴?|
+| `data_fetch/ab_premium/normalizer.py` | AB 婧环鏁版嵁鏍囧噯鍖栵細鍘熷琛屾儏杞负 Bus 鏍囧噯鍖栬褰?|
+| `data_fetch/convertible_bond/fetcher.py` | 杞€哄鍒╂姄鍙栬皟搴︼細璋冪敤闆嗘€濆綍/涓滄柟璐㈠瘜 API |
+| `data_fetch/convertible_bond/cb_metrics.py` | 杞€哄鍒╂寚鏍囪绠楋細娉㈠姩鐜?ATR/鐞嗚瀹氫环/绾€轰环鍊?鏈熸潈浠峰€?|
+| `data_fetch/convertible_bond/source.py` | 杞€哄鍒╀笂娓?API锛氶泦鎬濆綍瀹炴椂琛屾儏 + 涓滄柟璐㈠瘜璐㈠姟鏁版嵁 |
+| `data_fetch/convertible_bond/normalizer.py` | 杞€哄鍒╂暟鎹爣鍑嗗寲锛氬惈鐞嗚瀹氫环鐨?Bus 璁板綍鐢熸垚 |
+| `data_fetch/lof_iopv/fetcher.py` | LOF IOPV fetcher锛堣杽鍖呰锛岃皟鐢╯ource.py锛?|
+| `data_fetch/lof_iopv/source.py` | LOF IOPV涓婃父API锛氫笢璐㈠噣鍊?鑵捐琛屾儏+闆悆浠撲綅+闆嗘€濆綍鐢宠喘鐘舵€?|
+| `data_fetch/lof_iopv/normalizer.py` | LOF IOPV鏁版嵁鏍囧噯鍖栵細蹇収杞珺us璁板綍 |
+| `data_fetch/merger/fetcher.py` | 骞惰喘鏁版嵁鎶撳彇璋冨害锛氳皟鐢ㄥ法娼叕鍛?API |
+| `data_fetch/merger/source.py` | 骞惰喘鍏憡 API锛氬法娼祫璁叕鍛婃悳绱笌瑙ｆ瀽 |
+| `data_fetch/dividend/fetcher.py` | 鑲℃伅鎶撳彇璋冨害锛氳皟鐢?AkShare/宸ㄦ疆 API |
+| `data_fetch/dividend/source.py` | 鑲℃伅涓婃父 API锛欰kShare CNINFO + 鑵捐琛屾儏 |
+| `data_fetch/subscription/fetcher.py` | 鐢宠喘鎶撳彇璋冨害锛欼PO + 杞€虹敵璐棩鍘?|
+| `data_fetch/exchange_rate/fetcher.py` | 姹囩巼鎶撳彇璋冨害锛氳皟鐢ㄨ吘璁眹鐜?API |
+| `data_fetch/custom_monitor/input_reader.py` | 鑷畾涔夌洃鎺ц緭鍏ヨ鍙栵細浠庤繍琛屾€?JSON 璇诲彇鐢ㄦ埛缁勫悎 |
+| `data_fetch/event_arbitrage/fetcher.py` | 浜嬩欢濂楀埄鎶撳彇璋冨害锛氳皟鐢ㄩ泦鎬濆綍浜嬩欢 API |
+| `data_fetch/cb_rights_issue/fetcher.py` | 鎶㈡潈閰嶅敭鎶撳彇璋冨害锛氳皟鐢ㄩ泦鎬濆綍棰勬 API |
 
 
-### 9.3.1 data_fetch/lof_db/ -- LOF数据库模块
+### 9.3.1 data_fetch/lof_db/ -- LOF鏁版嵁搴撴ā鍧?
 
-| 文件 | 职责摘要 |
+| 鏂囦欢 | 鑱岃矗鎽樿 |
 |------|----------|
-| `data_fetch/lof_db/schema.py` | SQLite数据库Schema定义和初始化 |（含cleanup_old_data过期清理）|
-| `data_fetch/lof_db/updater.py` | 数据更新调度器 |
-| `data_fetch/lof_db/nav_updater.py` | 基金净值增量更新 |
-| `data_fetch/lof_db/etf_updater.py` | ETF/个股价格增量更新（新浪akshare stock_us_daily + stock_hk_daily） |
-| `data_fetch/lof_db/fx_updater.py` | 汇率增量更新 |
-| `data_fetch/lof_db/holdings_updater.py` | 持仓数据增量更新 |
-| `data_fetch/lof_iopv/fund_classifier.py` | LOF三分类(指数型/持仓型/报表型)基金分类器+持仓获取 |
-| `strategy/lof_iopv/backtest_v2.py` | LOF回测（指数型ETF+主动型持仓，统一calc_iopv公式，3个月窗口） |
+| `data_fetch/lof_db/schema.py` | SQLite鏁版嵁搴揝chema瀹氫箟鍜屽垵濮嬪寲 |锛堝惈cleanup_old_data杩囨湡娓呯悊锛墊
+| `data_fetch/lof_db/updater.py` | 鏁版嵁鏇存柊璋冨害鍣?|
+| `data_fetch/lof_db/nav_updater.py` | 鍩洪噾鍑€鍊煎閲忔洿鏂?|
+| `data_fetch/lof_db/etf_updater.py` | ETF/涓偂浠锋牸澧為噺鏇存柊锛堟柊娴猘kshare stock_us_daily + stock_hk_daily锛?|
+| `data_fetch/lof_db/fx_updater.py` | 姹囩巼澧為噺鏇存柊 |
+| `data_fetch/lof_db/holdings_updater.py` | 鎸佷粨鏁版嵁澧為噺鏇存柊 |
+| `data_fetch/lof_iopv/fund_classifier.py` | LOF涓夊垎绫?鎸囨暟鍨?鎸佷粨鍨?鎶ヨ〃鍨?鍩洪噾鍒嗙被鍣?鎸佷粨鑾峰彇 |
+| `strategy/lof_iopv/backtest_v2.py` | LOF鍥炴祴锛堟寚鏁板瀷ETF+涓诲姩鍨嬫寔浠擄紝缁熶竴calc_iopv鍏紡锛?涓湀绐楀彛锛?|
 
-### 9.3 strategy/ — 业务计算层
+### 9.3 strategy/ 鈥?涓氬姟璁＄畻灞?
 
-| 文件 | 职责摘要 |
+| 鏂囦欢 | 鑱岃矗鎽樿 |
 |------|----------|
-| `strategy/ah_premium/service.py` | AH 溢价业务计算：溢价率排名、历史百分位 |
-| `strategy/ah_premium/service.js` | AH 溢价 Node 适配器：Python 计算结果转为 API 响应 |
-| `strategy/ab_premium/service.py` | AB 溢价业务计算：AB 股溢价率排名 |
-| `strategy/ab_premium/service.js` | AB 溢价 Node 适配器：Python 计算结果转为 API 响应 |
-| `strategy/convertible_bond/service.py` | 转债套利业务计算：双低策略、理论收益率、回售套利 |
-| `strategy/convertible_bond/service.js` | 转债套利 Node 适配器：计算结果格式化、折价策略状态 |
-| `strategy/merger/service.py` | 并购套利业务计算：Deal 分析、AI 报告生成 |
-| `strategy/merger/service.js` | 并购套利 Node 适配器：报告生成调度 |
-| `strategy/lof_iopv/calc.py` | 共享IOPV计算公式：T10持仓加权法（从净值披露日按持仓推算） |
-| `strategy/lof_iopv/service.py` | QDII LOF IOPV业务计算：三分类持仓来源+响应构建+监控池筛选 |
-| `strategy/custom_monitor/service.py` | 自定义监控业务计算：组合收益率、对价计算 |
-| `strategy/dividend/service.py` | 股息业务计算：登记日跟踪、股息率计算 |
-| `strategy/subscription/service.py` | 申购业务计算：申购事件跟踪与状态管理 |
-| `strategy/event_arbitrage/service.py` | 事件套利业务计算：事件匹配与过滤规则 |
-| `strategy/cb_rights_issue/service.py` | 抢权配售业务计算：预期收益、阶段判定、入池判断 |
+| `strategy/ah_premium/service.py` | AH 婧环涓氬姟璁＄畻锛氭孩浠风巼鎺掑悕銆佸巻鍙茬櫨鍒嗕綅 |
+| `strategy/ah_premium/service.js` | AH 婧环 Node 閫傞厤鍣細Python 璁＄畻缁撴灉杞负 API 鍝嶅簲 |
+| `strategy/ab_premium/service.py` | AB 婧环涓氬姟璁＄畻锛欰B 鑲℃孩浠风巼鎺掑悕 |
+| `strategy/ab_premium/service.js` | AB 婧环 Node 閫傞厤鍣細Python 璁＄畻缁撴灉杞负 API 鍝嶅簲 |
+| `strategy/convertible_bond/service.py` | 杞€哄鍒╀笟鍔¤绠楋細鍙屼綆绛栫暐銆佺悊璁烘敹鐩婄巼銆佸洖鍞鍒?|
+| `strategy/convertible_bond/service.js` | 杞€哄鍒?Node 閫傞厤鍣細璁＄畻缁撴灉鏍煎紡鍖栥€佹姌浠风瓥鐣ョ姸鎬?|
+| `strategy/merger/service.py` | 骞惰喘濂楀埄涓氬姟璁＄畻锛欴eal 鍒嗘瀽銆丄I 鎶ュ憡鐢熸垚 |
+| `strategy/merger/service.js` | 骞惰喘濂楀埄 Node 閫傞厤鍣細鎶ュ憡鐢熸垚璋冨害 |
+| `strategy/lof_iopv/calc.py` | 鍏变韩IOPV璁＄畻鍏紡锛歍10鎸佷粨鍔犳潈娉曪紙浠庡噣鍊兼姭闇叉棩鎸夋寔浠撴帹绠楋級 |
+| `strategy/lof_iopv/service.py` | QDII LOF IOPV涓氬姟璁＄畻锛氫笁鍒嗙被鎸佷粨鏉ユ簮+鍝嶅簲鏋勫缓+鐩戞帶姹犵瓫閫?|
+| `strategy/custom_monitor/service.py` | 鑷畾涔夌洃鎺т笟鍔¤绠楋細缁勫悎鏀剁泭鐜囥€佸浠疯绠?|
+| `strategy/dividend/service.py` | 鑲℃伅涓氬姟璁＄畻锛氱櫥璁版棩璺熻釜銆佽偂鎭巼璁＄畻 |
+| `strategy/subscription/service.py` | 鐢宠喘涓氬姟璁＄畻锛氱敵璐簨浠惰窡韪笌鐘舵€佺鐞?|
+| `strategy/event_arbitrage/service.py` | 浜嬩欢濂楀埄涓氬姟璁＄畻锛氫簨浠跺尮閰嶄笌杩囨护瑙勫垯 |
+| `strategy/cb_rights_issue/service.py` | 鎶㈡潈閰嶅敭涓氬姟璁＄畻锛氶鏈熸敹鐩娿€侀樁娈靛垽瀹氥€佸叆姹犲垽鏂?|
 
-### 9.4 ui/ — API 与展示层
+### 9.4 ui/ 鈥?API 涓庡睍绀哄眰
 
-| 文件 | 职责摘要 |
+| 鏂囦欢 | 鑱岃矗鎽樿 |
 |------|----------|
-| `ui/routes/market_routes.js` | 市场行情 API 路由：/api/market/* 端点定义 |
-| `ui/routes/dashboard_routes.js` | 看板 API 路由：/api/dashboard/* 端点定义 |
-| `ui/routes/push_routes.js` | 推送配置 API 路由：/api/push/* 端点定义 |
-| `ui/view_models/overview.js` | 看板概览数据组装：聚合各模块数据为统一视图 |
-| `ui/view_models/push_payload.js` | 推送配置响应格式：推送配置数据结构整形 |
-| `ui/dashboard/constants.js` | 看板 UI 常量：端点、Tab 序列、表格配置、样式默认值 |
-| `ui/dashboard/dashboard_page.js` | 旧看板页面逻辑：HTML 看板渲染与交互 |
-| `ui/templates/dashboard_template.html` | 旧看板 HTML 模板：含内联 CSS/JS |
-| `ui/src/components/ConvertibleCardList.jsx` | 转债套利简洁模块表格：尽量还原旧网页端表格风格 |
-| `ui/src/components/AhCardList.jsx` | AH 溢价简洁模块表格：尽量还原旧网页端表格风格 |
-| `ui/src/components/AbCardList.jsx` | AB 溢价简洁模块表格：尽量还原旧网页端表格风格 |
-| `ui/src/components/LofCardList.jsx` | LOF 套利简洁模块表格：尽量还原旧网页端表格风格 |
-| `ui/src/components/SubscriptionCardList.jsx` | 打新申购简洁模块表格：尽量还原旧网页端表格风格 |
-| `ui/src/components/RightsIssueCardList.jsx` | 抢权配售简洁模块表格：沪深市场与三阶段切换 |
-| `ui/src/components/MonitorCardList.jsx` | 自定义监控简洁模块表格：保留编辑删除操作 |
-| `ui/src/components/cardHelpers.jsx` | React 公共格式化与轻量展示积木 |
-| `ui/src/components/cardListHelpers.jsx` | React 历史密集行壳帮助函数 |
-| `ui/src/components/SimpleDataTable.jsx` | React 简洁模块表格公共组件 |
-| `ui/src/components/BottomNav.jsx` | 手机端底部导航栏：固定底部切换 7 个 React 顶级标签 |
+| `ui/routes/market_routes.js` | 甯傚満琛屾儏 API 璺敱锛?api/market/* 绔偣瀹氫箟 |
+| `ui/routes/dashboard_routes.js` | 鐪嬫澘 API 璺敱锛?api/dashboard/* 绔偣瀹氫箟 |
+| `ui/routes/push_routes.js` | 鎺ㄩ€侀厤缃?API 璺敱锛?api/push/* 绔偣瀹氫箟 |
+| `ui/view_models/overview.js` | 鐪嬫澘姒傝鏁版嵁缁勮锛氳仛鍚堝悇妯″潡鏁版嵁涓虹粺涓€瑙嗗浘 |
+| `ui/view_models/push_payload.js` | 鎺ㄩ€侀厤缃搷搴旀牸寮忥細鎺ㄩ€侀厤缃暟鎹粨鏋勬暣褰?|
+| `ui/dashboard/constants.js` | 鐪嬫澘 UI 甯搁噺锛氱鐐广€乀ab 搴忓垪銆佽〃鏍奸厤缃€佹牱寮忛粯璁ゅ€?|
+| `ui/dashboard/dashboard_page.js` | 鏃х湅鏉块〉闈㈤€昏緫锛欻TML 鐪嬫澘娓叉煋涓庝氦浜?|
+| `ui/templates/dashboard_template.html` | 鏃х湅鏉?HTML 妯℃澘锛氬惈鍐呰仈 CSS/JS |
+| `ui/src/components/ConvertibleCardList.jsx` | 杞€哄鍒╃畝娲佹ā鍧楄〃鏍硷細灏介噺杩樺師鏃х綉椤电琛ㄦ牸椋庢牸 |
+| `ui/src/components/AhCardList.jsx` | AH 婧环绠€娲佹ā鍧楄〃鏍硷細灏介噺杩樺師鏃х綉椤电琛ㄦ牸椋庢牸 |
+| `ui/src/components/AbCardList.jsx` | AB 婧环绠€娲佹ā鍧楄〃鏍硷細灏介噺杩樺師鏃х綉椤电琛ㄦ牸椋庢牸 |
+| `ui/src/components/LofCardList.jsx` | LOF 濂楀埄绠€娲佹ā鍧楄〃鏍硷細灏介噺杩樺師鏃х綉椤电琛ㄦ牸椋庢牸 |
+| `ui/src/components/SubscriptionCardList.jsx` | 鎵撴柊鐢宠喘绠€娲佹ā鍧楄〃鏍硷細灏介噺杩樺師鏃х綉椤电琛ㄦ牸椋庢牸 |
+| `ui/src/components/RightsIssueCardList.jsx` | 鎶㈡潈閰嶅敭绠€娲佹ā鍧楄〃鏍硷細娌繁甯傚満涓庝笁闃舵鍒囨崲 |
+| `ui/src/components/MonitorCardList.jsx` | 鑷畾涔夌洃鎺х畝娲佹ā鍧楄〃鏍硷細淇濈暀缂栬緫鍒犻櫎鎿嶄綔 |
+| `ui/src/components/cardHelpers.jsx` | React 鍏叡鏍煎紡鍖栦笌杞婚噺灞曠ず绉湪 |
+| `ui/src/components/cardListHelpers.jsx` | React 鍘嗗彶瀵嗛泦琛屽３甯姪鍑芥暟 |
+| `ui/src/components/SimpleDataTable.jsx` | React 绠€娲佹ā鍧楄〃鏍煎叕鍏辩粍浠?|
+| `ui/src/components/BottomNav.jsx` | 鎵嬫満绔簳閮ㄥ鑸爮锛氬浐瀹氬簳閮ㄥ垏鎹?7 涓?React 椤剁骇鏍囩 |
 
-### 9.5 notification/ — 推送与调度层
+### 9.5 notification/ 鈥?鎺ㄩ€佷笌璋冨害灞?
 
-| 文件 | 职责摘要 |
+| 鏂囦欢 | 鑱岃矗鎽樿 |
 |------|----------|
-| `notification/wecom/client.js` | 企业微信客户端：发送 Markdown 到 Webhook |
-| `notification/scheduler/wecom_scheduler.js` | 推送调度器：定时 tick 触发各模块推送 |
-| `notification/scheduler/push_config_store.js` | 推送配置存储：主推送配置读写 |
-| `notification/scheduler/push_runtime_store.js` | 推送运行时存储：推送状态与历史 |
-| `notification/summary/main_summary.js` | 每日摘要组装：聚合所有模块生成推送 Markdown |
-| `notification/alerts/event_alert_service.js` | 事件告警服务：折价策略买入/卖出/监控实时推送 |
-| `notification/cb_arbitrage/service.js` | 转债套利推送：独立推送逻辑与格式化 |
-| `notification/cb_rights_issue/service.js` | 抢权配售推送：独立推送逻辑与格式化 |
-| `notification/lof_iopv/service.js` | QDII LOF IOPV 推送：独立推送逻辑与格式化 |
-| `notification/merger_report/service.js` | 并购报告推送：DeepSeek AI 报告生成与推送 |
-| `notification/styles/markdown_style.js` | 推送 Markdown 样式：通用格式化模板 |
+| `notification/wecom/client.js` | 浼佷笟寰俊瀹㈡埛绔細鍙戦€?Markdown 鍒?Webhook |
+| `notification/scheduler/wecom_scheduler.js` | 鎺ㄩ€佽皟搴﹀櫒锛氬畾鏃?tick 瑙﹀彂鍚勬ā鍧楁帹閫?|
+| `notification/scheduler/push_config_store.js` | 鎺ㄩ€侀厤缃瓨鍌細涓绘帹閫侀厤缃鍐?|
+| `notification/scheduler/push_runtime_store.js` | 鎺ㄩ€佽繍琛屾椂瀛樺偍锛氭帹閫佺姸鎬佷笌鍘嗗彶 |
+| `notification/summary/main_summary.js` | 姣忔棩鎽樿缁勮锛氳仛鍚堟墍鏈夋ā鍧楃敓鎴愭帹閫?Markdown |
+| `notification/alerts/event_alert_service.js` | 浜嬩欢鍛婅鏈嶅姟锛氭姌浠风瓥鐣ヤ拱鍏?鍗栧嚭/鐩戞帶瀹炴椂鎺ㄩ€?|
+| `notification/cb_arbitrage/service.js` | 杞€哄鍒╂帹閫侊細鐙珛鎺ㄩ€侀€昏緫涓庢牸寮忓寲 |
+| `notification/cb_rights_issue/service.js` | 鎶㈡潈閰嶅敭鎺ㄩ€侊細鐙珛鎺ㄩ€侀€昏緫涓庢牸寮忓寲 |
+| `notification/lof_iopv/service.js` | QDII LOF IOPV 鎺ㄩ€侊細鐙珛鎺ㄩ€侀€昏緫涓庢牸寮忓寲 |
+| `notification/merger_report/service.js` | 骞惰喘鎶ュ憡鎺ㄩ€侊細DeepSeek AI 鎶ュ憡鐢熸垚涓庢帹閫?|
+| `notification/styles/markdown_style.js` | 鎺ㄩ€?Markdown 鏍峰紡锛氶€氱敤鏍煎紡鍖栨ā鏉?|
 
-### 9.6 shared/ — 跨层通用能力
+### 9.6 shared/ 鈥?璺ㄥ眰閫氱敤鑳藉姏
 
-| 文件 | 职责摘要 |
+| 鏂囦欢 | 鑱岃矗鎽樿 |
 |------|----------|
-| `shared/config/node_config.js` | Node 配置读取器：YAML 解析 + 环境变量/Secrets 注入 |
-| `shared/config/script_config.py` | Python 配置读取器：YAML 解析 + 环境变量/Secrets 注入 |
-| `shared/bus/market_record.js` | Bus 标准化记录（JS）：跨层通信数据结构 |
-| `shared/bus/market_record.py` | Bus 标准化记录（Python）：跨层通信数据结构 |
-| `shared/runtime/json_store.js` | JSON 持久化（JS）：运行时状态读写 |
-| `shared/runtime/json_store.py` | JSON 持久化（Python）：运行时状态读写 |
-| `shared/runtime/state_registry.js` | 状态注册表（JS）：运行时文件统一管理 |
-| `shared/runtime/state_registry.py` | 状态注册表（Python）：运行时文件统一管理 |
-| `shared/time/shanghai_time.js` | 上海时区（JS）：交易时段检测、市场时间 |
-| `shared/time/shanghai_time.py` | 上海时区（Python）：交易时段检测、市场时间 |
-| `shared/paths/node_paths.js` | 路径解析（JS）：运行时目录、数据库路径 |
-| `shared/paths/script_paths.py` | 路径解析（Python）：运行时目录、数据库路径 |
-| `shared/models/service_result.js` | 标准响应包装（JS）：成功/错误响应格式 |
-| `shared/models/service_result.py` | 标准响应包装（Python）：成功/错误响应格式 |
-| `shared/market_service.py` | 跨市场工具：价格查询、配对匹配、股票搜索 |
-| `shared/utils/ranking.js` | 通用排序工具：按字段升降序取 Top N |
+| `shared/config/node_config.js` | Node 閰嶇疆璇诲彇鍣細YAML 瑙ｆ瀽 + 鐜鍙橀噺/Secrets 娉ㄥ叆 |
+| `shared/config/script_config.py` | Python 閰嶇疆璇诲彇鍣細YAML 瑙ｆ瀽 + 鐜鍙橀噺/Secrets 娉ㄥ叆 |
+| `shared/bus/market_record.js` | Bus 鏍囧噯鍖栬褰曪紙JS锛夛細璺ㄥ眰閫氫俊鏁版嵁缁撴瀯 |
+| `shared/bus/market_record.py` | Bus 鏍囧噯鍖栬褰曪紙Python锛夛細璺ㄥ眰閫氫俊鏁版嵁缁撴瀯 |
+| `shared/runtime/json_store.js` | JSON 鎸佷箙鍖栵紙JS锛夛細杩愯鏃剁姸鎬佽鍐?|
+| `shared/runtime/json_store.py` | JSON 鎸佷箙鍖栵紙Python锛夛細杩愯鏃剁姸鎬佽鍐?|
+| `shared/runtime/state_registry.js` | 鐘舵€佹敞鍐岃〃锛圝S锛夛細杩愯鏃舵枃浠剁粺涓€绠＄悊 |
+| `shared/runtime/state_registry.py` | 鐘舵€佹敞鍐岃〃锛圥ython锛夛細杩愯鏃舵枃浠剁粺涓€绠＄悊 |
+| `shared/time/shanghai_time.js` | 涓婃捣鏃跺尯锛圝S锛夛細浜ゆ槗鏃舵妫€娴嬨€佸競鍦烘椂闂?|
+| `shared/time/shanghai_time.py` | 涓婃捣鏃跺尯锛圥ython锛夛細浜ゆ槗鏃舵妫€娴嬨€佸競鍦烘椂闂?|
+| `shared/paths/node_paths.js` | 璺緞瑙ｆ瀽锛圝S锛夛細杩愯鏃剁洰褰曘€佹暟鎹簱璺緞 |
+| `shared/paths/script_paths.py` | 璺緞瑙ｆ瀽锛圥ython锛夛細杩愯鏃剁洰褰曘€佹暟鎹簱璺緞 |
+| `shared/models/service_result.js` | 鏍囧噯鍝嶅簲鍖呰锛圝S锛夛細鎴愬姛/閿欒鍝嶅簲鏍煎紡 |
+| `shared/models/service_result.py` | 鏍囧噯鍝嶅簲鍖呰锛圥ython锛夛細鎴愬姛/閿欒鍝嶅簲鏍煎紡 |
+| `shared/market_service.py` | 璺ㄥ競鍦哄伐鍏凤細浠锋牸鏌ヨ銆侀厤瀵瑰尮閰嶃€佽偂绁ㄦ悳绱?|
+| `shared/utils/ranking.js` | 閫氱敤鎺掑簭宸ュ叿锛氭寜瀛楁鍗囬檷搴忓彇 Top N |
 
 
-### 9.7.1 tools/backtest/ -- LOF/QDII 回测脚本
+### 9.7.1 tools/backtest/ -- LOF/QDII 鍥炴祴鑴氭湰
 
-| 文件 | 职责摘要 |
+| 鏂囦欢 | 鑱岃矗鎽樿 |
 |------|----------|
-| `ools/backtest/lof13_backtest_A.py` | ~~已废弃：A类指数法回测~~ |
-| `ools/backtest/lof13_backtest_B.py` | LOF T10持仓法回测：前十大持仓加权估值 |
-| 	ools/backtest/lof13_backtest_report.md | 13只LOF估值方法回测报告 |
-| `ools/backtest/qdii_backtest_A.py` | ~~已废弃：A类指数法回测~~ |
-| `ools/backtest/qdii_backtest_B.py` | QDII T10持仓法回测（港股/美股混合基金） |
-| 	ools/backtest/qdii_v6_backtest.py | QDII v6回测脚本（日期对齐版） |
-### 9.7 scripts/ — 脚本
+| `ools/backtest/lof13_backtest_A.py` | ~~宸插簾寮冿細A绫绘寚鏁版硶鍥炴祴~~ |
+| `ools/backtest/lof13_backtest_B.py` | LOF T10鎸佷粨娉曞洖娴嬶細鍓嶅崄澶ф寔浠撳姞鏉冧及鍊?|
+| 	ools/backtest/lof13_backtest_report.md | 13鍙狶OF浼板€兼柟娉曞洖娴嬫姤鍛?|
+| `ools/backtest/qdii_backtest_A.py` | ~~宸插簾寮冿細A绫绘寚鏁版硶鍥炴祴~~ |
+| `ools/backtest/qdii_backtest_B.py` | QDII T10鎸佷粨娉曞洖娴嬶紙娓偂/缇庤偂娣峰悎鍩洪噾锛?|
+| 	ools/backtest/qdii_v6_backtest.py | QDII v6鍥炴祴鑴氭湰锛堟棩鏈熷榻愮増锛?|
+### 9.7 scripts/ 鈥?鑴氭湰
 
-| 文件 | 职责摘要 |
+| 鏂囦欢 | 鑱岃矗鎽樿 |
 |------|----------|
-| `scripts/add_ai_summary.py` | 批量添加 AI-SUMMARY 注释 |
-| `scripts/audit_ah_history_coverage.py` | AH 历史覆盖审计 |
-| `scripts/check_plugin_boundaries.py` | 架构边界检查：验证插件间无非法依赖 |
-| `scripts/check_root_cleanliness.py` | 根目录清洁检查 |
-| `scripts/rebuild_premium_db.py` | 溢价历史数据库重建：AH/AB 溢价历史维护 |
-| `scripts/stock_price_history_db.py` | 股价历史数据库：正股 K 线数据管理 |
-| `scripts/premium_history_db.py` | 溢价历史数据库：溢价率历史数据管理 |
-| `scripts/lof_maintenance.py` | LOF数据库每日维护：更新+清理+日志 |
-| `scripts/export_pair_pool.py` | 配对池导出：AH/AB 配对表生成 |
+| `scripts/add_ai_summary.py` | 鎵归噺娣诲姞 AI-SUMMARY 娉ㄩ噴 |
+| `scripts/audit_ah_history_coverage.py` | AH 鍘嗗彶瑕嗙洊瀹¤ |
+| `scripts/check_plugin_boundaries.py` | 鏋舵瀯杈圭晫妫€鏌ワ細楠岃瘉鎻掍欢闂存棤闈炴硶渚濊禆 |
+| `scripts/check_root_cleanliness.py` | 鏍圭洰褰曟竻娲佹鏌?|
+| `scripts/rebuild_premium_db.py` | 婧环鍘嗗彶鏁版嵁搴撻噸寤猴細AH/AB 婧环鍘嗗彶缁存姢 |
+| `scripts/stock_price_history_db.py` | 鑲′环鍘嗗彶鏁版嵁搴擄細姝ｈ偂 K 绾挎暟鎹鐞?|
+| `scripts/premium_history_db.py` | 婧环鍘嗗彶鏁版嵁搴擄細婧环鐜囧巻鍙叉暟鎹鐞?|
+| `scripts/lof_maintenance.py` | LOF鏁版嵁搴撴瘡鏃ョ淮鎶わ細鏇存柊+娓呯悊+鏃ュ織 |
+| `scripts/export_pair_pool.py` | 閰嶅姹犲鍑猴細AH/AB 閰嶅琛ㄧ敓鎴?|
 
-### 9.8 tests/ — 测试
+### 9.8 tests/ 鈥?娴嬭瘯
 
-| 文件 | 职责摘要 |
+| 鏂囦欢 | 鑱岃矗鎽樿 |
 |------|----------|
-| `tests/smoke_check.js` | 冒烟测试：验证服务首页和 health 端点可达 |
+| `tests/smoke_check.js` | 鍐掔儫娴嬭瘯锛氶獙璇佹湇鍔￠椤靛拰 health 绔偣鍙揪 |
 
-### 9.9 config/ — 配置文件
+### 9.9 config/ 鈥?閰嶇疆鏂囦欢
 
-| 文件 | 职责摘要 |
+| 鏂囦欢 | 鑱岃矗鎽樿 |
 |------|----------|
-| `config/config.yaml` | 业务配置合同：所有参数、阈值、URL、开关的单一来源 |
-| `config/secrets.yaml` | 敏感配置：API Key、Webhook、密码（gitignored） |
-| `config/server_profile.local.yaml` | 服务器连接配置：SSH host/user/port/password（gitignored） |
+| `config/config.yaml` | 涓氬姟閰嶇疆鍚堝悓锛氭墍鏈夊弬鏁般€侀槇鍊笺€乁RL銆佸紑鍏崇殑鍗曚竴鏉ユ簮 |
+| `config/secrets.yaml` | 鏁忔劅閰嶇疆锛欰PI Key銆乄ebhook銆佸瘑鐮侊紙gitignored锛?|
+| `config/server_profile.local.yaml` | 鏈嶅姟鍣ㄨ繛鎺ラ厤缃細SSH host/user/port/password锛坓itignored锛?|
+

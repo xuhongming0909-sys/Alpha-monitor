@@ -1,93 +1,93 @@
 ---
 name: lof-iopv
-description: QDII LOF IOPV 估值策略 - 24只基金
+description: QDII LOF IOPV 浼板€肩瓥鐣?- 24鍙熀閲?
 type: spec
 ---
 
-# QDII LOF IOPV 估值策略
+# QDII LOF IOPV 浼板€肩瓥鐣?
 
-## 1. 范围
+## 1. 鑼冨洿
 
-24只QDII LOF基金，三类估值：
-- **指数型（14只）**：ETF映射追踪业绩基准，回测MAE<0.5%，IOPV = NAV * (1 + etf_ret) * fx_ratio
-- **持仓型（4只）**：天天基金API实时持仓（合计>30%），自动适应季度变更
-- **报表型（6只）**：PDF季报解析持仓，每季度手动更新
+24鍙猀DII LOF鍩洪噾锛屼笁绫讳及鍊硷細
+- **鎸囨暟鍨嬶紙14鍙級**锛欵TF鏄犲皠杩借釜涓氱哗鍩哄噯锛屽洖娴婱AE<0.5%锛孖OPV = NAV * (1 + etf_ret) * fx_ratio
+- **鎸佷粨鍨嬶紙4鍙級**锛氬ぉ澶╁熀閲慉PI瀹炴椂鎸佷粨锛堝悎璁?30%锛夛紝鑷姩閫傚簲瀛ｅ害鍙樻洿
+- **鎶ヨ〃鍨嬶紙6鍙級**锛歅DF瀛ｆ姤瑙ｆ瀽鎸佷粨锛屾瘡瀛ｅ害鎵嬪姩鏇存柊
 
-分类规则：
-1. 回测MAE<0.5% → 指数型（ETF映射）
-2. 不通过→ API持仓合计>30% → 持仓型（天天基金API）
-3. 其他 → 报表型（PDF季报）
+鍒嗙被瑙勫垯锛?
+1. 鍥炴祴MAE<0.5% 鈫?鎸囨暟鍨嬶紙ETF鏄犲皠锛?
+2. 涓嶉€氳繃鈫?API鎸佷粨鍚堣>30% 鈫?鎸佷粨鍨嬶紙澶╁ぉ鍩洪噾API锛?
+3. 鍏朵粬 鈫?鎶ヨ〃鍨嬶紙PDF瀛ｆ姤锛?
 
-已移除：161815抗通胀、160216国泰商品、165513中信商品（FOF持仓不透明，无法拟合）
+宸茬Щ闄わ細161815鎶楅€氳儉銆?60216鍥芥嘲鍟嗗搧銆?65513涓俊鍟嗗搧锛團OF鎸佷粨涓嶉€忔槑锛屾棤娉曟嫙鍚堬級
 
-## 2. 数据源
+## 2. 鏁版嵁婧?
 
-| 数据 | API | 刷新间隔 |
+| 鏁版嵁 | API | 鍒锋柊闂撮殧 |
 |---|---|---|
-| 净值NAV | 东财 lsjz API | 每日 |
-| 持仓Top10 | 天天基金API（持仓型）/ PDF季报（报表型）/ ETF映射（指数型） | 实时/季度/静态 |
-| LOF场内价 | shared.market_service（腾讯行情） | 实时 |
-| ETF价格 | 新浪 stock_us_daily（etf_updater） | 每日 |
-| 个股价格 | 新浪 stock_us_daily / stock_hk_daily（etf_updater） | 每日 |
-| 汇率 | akshare currency_boc_sina | 每日 |
-| 申购限额 | 东财 fund数据页 | 每日 |
+| 鍑€鍊糔AV | 涓滆储 lsjz API | 姣忔棩 |
+| 鎸佷粨Top10 | 澶╁ぉ鍩洪噾API锛堟寔浠撳瀷锛? PDF瀛ｆ姤锛堟姤琛ㄥ瀷锛? ETF鏄犲皠锛堟寚鏁板瀷锛?| 瀹炴椂/瀛ｅ害/闈欐€?|
+| LOF鍦哄唴浠?| shared.market_service锛堣吘璁鎯咃級 | 瀹炴椂 |
+| ETF浠锋牸 | 鏂版氮 stock_us_daily锛坋tf_updater锛?| 姣忔棩 |
+| 涓偂浠锋牸 | 鏂版氮 stock_us_daily / stock_hk_daily锛坋tf_updater锛?| 姣忔棩 |
+| 姹囩巼 | akshare currency_boc_sina | 姣忔棩 |
+| 鐢宠喘闄愰 | 涓滆储 fund鏁版嵁椤?| 姣忔棩 |
 
-## 3. 指数型估值公式
+## 3. 鎸囨暟鍨嬩及鍊煎叕寮?
 
 ```
 IOPV = NAV_T-2 * (1 + ETF_ret) * (FX_today / FX_T-2)
 ```
 
-## 4. 持仓型/报表型估值公式
+## 4. 鎸佷粨鍨?鎶ヨ〃鍨嬩及鍊煎叕寮?
 
 ```
 IOPV = NAV_T-2 * (1 + stock_ratio * sum(w_i * ret_i)) * fx_ratio
 ```
 
-## 5. 数据库
+## 5. 鏁版嵁搴?
 
-Schema定义：`data_fetch/lof_db/schema.py`
+Schema瀹氫箟锛歚data_fetch/lof_db/schema.py`
 
-| 表名 | 用途 | 清理策略 |
+| 琛ㄥ悕 | 鐢ㄩ€?| 娓呯悊绛栫暐 |
 |---|---|---|
-| `fund_nav` | 基金净值历史 | 90天过期清理 |
-| `etf_prices` | ETF价格历史 | 90天过期清理 |
-| `stock_prices` | 持仓股票价格历史（持仓型/报表型回测用） | 90天过期清理 |
-| `fx_rates` | 汇率历史 | 90天过期清理 |
-| `holdings` | 持仓数据（不清理） | 保留全部 |
+| `fund_nav` | 鍩洪噾鍑€鍊煎巻鍙?| 90澶╄繃鏈熸竻鐞?|
+| `etf_prices` | ETF浠锋牸鍘嗗彶 | 90澶╄繃鏈熸竻鐞?|
+| `stock_prices` | 鎸佷粨鑲＄エ浠锋牸鍘嗗彶锛堟寔浠撳瀷/鎶ヨ〃鍨嬪洖娴嬬敤锛?| 90澶╄繃鏈熸竻鐞?|
+| `fx_rates` | 姹囩巼鍘嗗彶 | 90澶╄繃鏈熸竻鐞?|
+| `holdings` | 鎸佷粨鏁版嵁锛堜笉娓呯悊锛?| 淇濈暀鍏ㄩ儴 |
 
-## 6. 回测方法
+## 6. 鍥炴祴鏂规硶
 
-- 脚本v1：`strategy/lof_iopv/backtest.py`（日收益率回归，共同日期对齐）
-- 脚本v2：`strategy/lof_iopv/backtest_v2.py`（NAV绝对值对比，3个月窗口，复用calc公式）
-- 指数型：基金净值日收益 vs ETF日收益+汇率日收益
-- 持仓型/报表型：基金净值日收益 vs T10持仓加权日收益+汇率日收益
-- 日期对齐：共同价格日期集合
-- 评级：R²>=0.8且MaxErr<1%=OK, R²>=0.6=WARN, 否则BAD
+- 鑴氭湰v1锛歚strategy/lof_iopv/backtest.py`锛堟棩鏀剁泭鐜囧洖褰掞紝鍏卞悓鏃ユ湡瀵归綈锛?
+- 鑴氭湰v2锛歚strategy/lof_iopv/backtest_v2.py`锛圢AV缁濆鍊煎姣旓紝3涓湀绐楀彛锛屽鐢╟alc鍏紡锛?
+- 鎸囨暟鍨嬶細鍩洪噾鍑€鍊兼棩鏀剁泭 vs ETF鏃ユ敹鐩?姹囩巼鏃ユ敹鐩?
+- 鎸佷粨鍨?鎶ヨ〃鍨嬶細鍩洪噾鍑€鍊兼棩鏀剁泭 vs T10鎸佷粨鍔犳潈鏃ユ敹鐩?姹囩巼鏃ユ敹鐩?
+- 鏃ユ湡瀵归綈锛氬叡鍚屼环鏍兼棩鏈熼泦鍚?
+- 璇勭骇锛歊虏>=0.8涓擬axErr<1%=OK, R虏>=0.6=WARN, 鍚﹀垯BAD
 
-## 7. 推送规则
+## 7. 鎺ㄩ€佽鍒?
 
-- 条件：dailyLimit存在(非空非零) + 溢价率 > 2%
-- 内容：代码、名称、溢价率、限购金额
-- 时间：交易日14:00
-- 服务：notification/lof_iopv/service.js（用dailyLimit字段判断限购）
+- 鏉′欢锛歞ailyLimit瀛樺湪(闈炵┖闈為浂) + 婧环鐜?> 2%
+- 鍐呭锛氫唬鐮併€佸悕绉般€佹孩浠风巼銆侀檺璐噾棰?
+- 鏃堕棿锛氫氦鏄撴棩14:00
+- 鏈嶅姟锛歯otification/lof_iopv/service.js锛堢敤dailyLimit瀛楁鍒ゆ柇闄愯喘锛?
 
-## 8. 每日维护
+## 8. 姣忔棩缁存姢
 
-- 脚本：`scripts/lof_maintenance.py`
-- 调度：`data_fetch/lof_db/updater.py`（update_all）
-- 流程：净值 → ETF+个股 → 汇率 → 持仓 → 清理
+- 鑴氭湰锛歚scripts/lof_maintenance.py`
+- 璋冨害锛歚data_fetch/lof_db/updater.py`锛坲pdate_all锛?
+- 娴佺▼锛氬噣鍊?鈫?ETF+涓偂 鈫?姹囩巼 鈫?鎸佷粨 鈫?娓呯悊
 
-## 9. 文件结构
+## 9. 鏂囦欢缁撴瀯
 
 ```
-data_fetch/lof_iopv/         # 实时数据获取（source/fetcher/normalizer）
-data_fetch/lof_db/           # 数据库Schema+维护（schema/updater/nav/etf/fx/holdings）
-strategy/lof_iopv/           # 估值计算(calc) + 服务(service) + 回测(backtest/v2) + 分类(classifier)
-notification/lof_iopv/       # 推送服务(service.js) + 样式(markdown.js)
-ui/src/components/          # React组件(LofCardList.jsx)
-notification/lof_iopv/       # 推送服务
-scripts/lof_maintenance.py   # 每日维护入口
-config/config.yaml           # 基金列表 + 推送配置
-specs/lof-arbitrage.md       # 本文件
+data_fetch/lof_iopv/         # 瀹炴椂鏁版嵁鑾峰彇锛坰ource/fetcher/normalizer锛?
+data_fetch/lof_db/           # 鏁版嵁搴揝chema+缁存姢锛坰chema/updater/nav/etf/fx/holdings锛?
+strategy/lof_iopv/           # 浼板€艰绠?calc) + 鏈嶅姟(service) + 鍥炴祴(backtest/v2) + 鍒嗙被(classifier)
+notification/lof_iopv/       # 鎺ㄩ€佹湇鍔?service.js) + 鏍峰紡(markdown.js)
+ui/src/components/          # React缁勪欢(LofCardList.jsx)
+notification/lof_iopv/       # 鎺ㄩ€佹湇鍔?
+scripts/lof_maintenance.py   # 姣忔棩缁存姢鍏ュ彛
+config/config.yaml           # 鍩洪噾鍒楄〃 + 鎺ㄩ€侀厤缃?
+specs/lof-arbitrage.md       # 鏈枃浠?
 ```

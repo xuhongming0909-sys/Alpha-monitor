@@ -173,7 +173,7 @@ def build_lof_response(fetch_payload):
             "fxRate": fx_now,
             "fxBase": fx_base,
             "stockPosition": stock_pos,
-            "benchmark": benchmark,
+            "calcTarget": benchmark,
             "holdingsCount": len(effective_holdings),
             "holdings": effective_holdings,
             "applyStatus": apply_status,

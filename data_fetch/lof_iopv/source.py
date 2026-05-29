@@ -116,6 +116,21 @@ def _fetch_nav(code):
                 result["shareTotal"] = _to_float(arr2[-1])
     except Exception:
         pass
+    # fallback: 从基金概况页获取份额
+    if result["shareTotal"] is None:
+        try:
+            url3 = f"https://fundf10.eastmoney.com/jbgk_{code}.html"
+            text3 = SESSION.get(url3, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
+            # 匹配 "份额规模: xxx亿份" 或 "xxx万份"
+            for unit, mult in [("亿份", 10000), ("万份", 1)]:
+                m3 = re.search(r"份额规模.*?(\d+[\d,.]*)\s*" + unit, text3)
+                if m3:
+                    val = _to_float(m3.group(1).replace(",", ""))
+                    if val:
+                        result["shareTotal"] = val * mult
+                        break
+        except Exception:
+            pass
     return result
 
 
