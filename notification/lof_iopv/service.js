@@ -23,7 +23,7 @@ function createLofIopvPushService(options = {}) {
       if (premium === null || premium === undefined || premium <= 1.0) return false;
       const limit = r.dailyLimit;
       if (limit === null || limit === undefined || limit === "" || limit === 0) return false;
-      if (limit >= 5) return false;
+      if (limit >= 50000) return false;
       return true;
     });
   }
