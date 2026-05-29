@@ -148,12 +148,12 @@ def _parse_json(content: str) -> List[Dict]:
     content = re.sub(r'\s*```$', '', content)
     jm = re.search(r'\[.*\]', content, re.DOTALL)
     if not jm:
-            print(f"  [debug] LLM返回无JSON数组: {content[:200]}")
+        print(f"  [debug] LLM返回无JSON数组: {content[:200]}")
         return []
     try:
         items = json.loads(jm.group())
     except json.JSONDecodeError:
-            print(f"  [debug] JSON解析失败: {jm.group()[:200]}")
+        print(f"  [debug] JSON解析失败: {jm.group()[:200]}")
         return []
     valid = []
     for item in items:
