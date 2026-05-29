@@ -12,6 +12,7 @@ import re
 import sqlite3
 import sys
 from datetime import datetime
+import time
 from typing import Dict, List, Optional, Tuple
 
 import fitz  # PyMuPDF
@@ -33,28 +34,21 @@ _SECTION_KW = [
     "股票及存托凭证投资明细", "债券投资明细", "占基金资产净值比例",
 ]
 
-_LLM_PROMPT = """你是基金持仓数据提取专家。从基金季报PDF文本中提取所有持仓。
+_LLM_PROMPT = """你是基金持仓数据提取专家。从基金季报PDF中提取所有持仓的名称和净值占比。
+
+你的唯一任务：从PDF中抄写持仓名称和对应比例。不要猜测任何代码。
 
 输出格式（纯JSON数组，不要任何其他文字）：
-[{"ticker":"代码","name":"名称","weight":数字,"market":"US/HK/A"}]
+[{"name":"PDF原文中的完整名称","weight":数字}]
 
-字段说明：
-- ticker: 证券代码
-  - 港股/美股ETF名：5位数字如00883, 02899
-  - A股：6位数字如600489, 002155
-  - 海外ETF/ETC：用其标准交易代码，如USO,GLD,IAU,QQQ,SPY,CRUD,BNO等
-  - 如果文本中没有明确给出代码且你不确定，填空字符串""
-- name: 原始名称（保留完整，合并跨行显示的名称）
-- weight: 占基金资产净值比例%，纯数字
-- market: 美股/海外=US, 港股=HK, A股=A
-
-重要规则：
-1. 必须提取文本中列出的**每一条**持仓，不能遗漏任何一条
-2. 如果某只ETF/基金名称你不确定其交易代码，ticker填""，但仍然必须把它列入结果
-3. 股票、ETF、基金、债券都算持仓，分别在不同章节
-4. 排除：银行存款、结算备付金、货币基金、应收类、其他资产
-5. 基金名称可能跨多行，需要合并理解，如 abrdn Physical+换行+Gold Shares 实际是 abrdn Physical Gold Shares
-6. 海外ETF/ETC的ticker必须返回美股市场代码（因为我们只能拿到美股行情）。例如 abrdn Physical Gold Shares 的美股代码是 SGOL，不是 PHAU；如果不确定美股代码，找同品种的美股替代品（如黄金ETF用GLD/IAU/SGOL，原油ETF用USO/BNO/CRUD）"""
+规则：
+1. name必须是PDF中显示的原始名称（合并跨行），一字不改
+2. weight是占基金资产净值比例%，纯数字
+3. 必须提取每一条持仓，不能遗漏
+4. 股票、ETF、ETC、基金、债券都算持仓
+5. 排除：银行存款、结算备付金、货币基金、应收类、其他资产
+6. 不要输出任何代码字段，代码会在后续步骤中查找
+"""
 
 
 # ============================================================
@@ -145,7 +139,7 @@ def _render_pages(pdf_path: str) -> Optional[str]:
 # ============================================================
 
 def _parse_json(content: str) -> List[Dict]:
-    """从LLM返回中解析JSON数组。"""
+    """从LLM返回中解析JSON数组。LLM只输出name+weight，ticker由后续步骤补全。"""
     content = content.strip()
     content = re.sub(r'^```json\s*', '', content)
     content = re.sub(r'\s*```$', '', content)
@@ -160,23 +154,18 @@ def _parse_json(content: str) -> List[Dict]:
         return []
     valid = []
     for item in items:
-        ticker = str(item.get("ticker", "")).strip().upper()
         name = str(item.get("name", "")).strip()
         try:
             weight = float(item.get("weight", 0))
         except (ValueError, TypeError):
             continue
-        market = str(item.get("market", "")).strip().upper()
         if not name or weight <= 0:
             continue
-        if market not in ("US", "HK", "A", ""):
-            market = ""
-        if not ticker:
-            ticker = _guess_ticker(name)
-        if ticker:
-            valid.append({"ticker": ticker, "name": name, "weight": weight, "market": market})
+        # ticker/market 由 _guess_ticker 兜底 + Yahoo resolve 补全
+        ticker = _guess_ticker(name)
+        market = ""
+        valid.append({"ticker": ticker, "name": name, "weight": weight, "market": market})
     return valid
-
 
 def _guess_ticker(name: str) -> str:
     """从名称推断ticker。"""
@@ -300,6 +289,7 @@ def save_to_db(code: str, holdings: List[Dict], pdf_path: str) -> int:
 # 主流程
 # ============================================================
 
+
 def get_fund_holdings(code: str) -> Tuple[List[Dict], Optional[str]]:
     """
     提取单只基金持仓。
@@ -316,6 +306,8 @@ def get_fund_holdings(code: str) -> Tuple[List[Dict], Optional[str]]:
     if not pdf_path:
         return [], f"无PDF文件: {code}"
 
+    items = None
+
     # 1. Vision LLM（优先）
     b64 = _render_pages(pdf_path)
     if b64:
@@ -323,26 +315,57 @@ def get_fund_holdings(code: str) -> Tuple[List[Dict], Optional[str]]:
             items = _call_vision_llm(b64, code)
             if items:
                 items = _dedup(items)
-                total = sum(h["weight"] for h in items)
-                print(f"  {code}: vision {len(items)}条 占比{total:.1f}%")
-                return items, None
         except Exception as e:
             print(f"  {code}: vision失败: {e}")
 
     # 2. 文本LLM（兜底）
-    text = _extract_text(pdf_path)
-    if text and len(text) > 100:
-        try:
-            items = _call_text_llm(text, code)
-            if items:
-                items = _dedup(items)
-                total = sum(h["weight"] for h in items)
-                print(f"  {code}: text {len(items)}条 占比{total:.1f}%")
-                return items, None
-        except Exception as e:
-            print(f"  {code}: text失败: {e}")
+    if not items:
+        text = _extract_text(pdf_path)
+        if text and len(text) > 100:
+            try:
+                items = _call_text_llm(text, code)
+                if items:
+                    items = _dedup(items)
+            except Exception as e:
+                print(f"  {code}: text失败: {e}")
 
-    return [], f"提取失败: {code}"
+    if not items:
+        return [], f"提取失败: {code}"
+
+    # 3. Yahoo resolve: 为无ticker的持仓补全ticker+market
+    items = _resolve_tickers(items, code)
+
+    total = sum(h["weight"] for h in items)
+    print(f"  {code}: {len(items)}条 占比{total:.1f}%")
+    return items, None
+
+
+def _resolve_tickers(items: List[Dict], code: str) -> List[Dict]:
+    """用Yahoo搜索为无ticker的持仓补全。已有ticker的保留。"""
+    try:
+        from data_fetch.lof_iopv.yahoo_finance import search_ticker, determine_market_from_ticker
+    except ImportError:
+        return items
+
+    resolved = 0
+    for h in items:
+        if h.get("ticker"):
+            continue
+        name = h.get("name", "")
+        if not name:
+            continue
+        result = search_ticker(name)
+        if result:
+            h["ticker"] = result["ticker"]
+            h["market"] = result["market"]
+            h["yahoo_symbol"] = result["yahoo_symbol"]
+            resolved += 1
+            print(f"    {code}: Yahoo resolve '{name}' -> {result['ticker']} ({result['market']})")
+        time.sleep(0.5)
+
+    if resolved:
+        print(f"  {code}: Yahoo resolve 补全 {resolved}/{len(items)} 条")
+    return items
 
 
 def _process_one(code: str) -> Tuple[str, Dict]:
@@ -366,7 +389,6 @@ def _process_one(code: str) -> Tuple[str, Dict]:
         return code, {"ok": False, "error": f"{code}: 无PDF路径"}
     except Exception as e:
         return code, {"ok": False, "error": str(e)}
-
 
 def update_all_holdings(fund_codes: List[str], concurrency: int = _CONCURRENCY):
     """并发更新所有基金持仓。"""

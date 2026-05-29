@@ -2,6 +2,7 @@
 """LOF数据库每日维护脚本，独立入口供cron/systemd调用。"""
 import sys
 import os
+import time
 import traceback
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
@@ -41,11 +42,13 @@ def run_maintenance(dry_run=False):
     errors = []
 
     # 逐步执行，记录失败但不中断
+    # 逐步执行，记录失败但不中断
     steps = [
         ("nav", "data_fetch.lof_db.nav_updater", "update_nav"),
         ("etf", "data_fetch.lof_db.etf_updater", "update_etf"),
         ("fx", "data_fetch.lof_db.fx_updater", "update_fx"),
         ("holdings", "data_fetch.lof_db.holdings_updater", "update_holdings"),
+        ("resolve_tickers", "scripts.lof_maintenance", "resolve_unresolved_tickers"),
         ("stock_prices", "data_fetch.lof_db.etf_updater", "update_stocks"),
         ("backtest", "strategy.lof_iopv.backtest_v2", "run_all"),
     ]
@@ -82,7 +85,47 @@ def run_maintenance(dry_run=False):
     return True
 
 
+
+
+def resolve_unresolved_tickers():
+    """Yahoo搜索为DB中无ticker的持仓补全ticker和market。"""
+    from data_fetch.lof_db.schema import get_db
+    from data_fetch.lof_iopv.yahoo_finance import search_ticker
+
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT DISTINCT code, name FROM holdings WHERE ticker = '' OR ticker IS NULL OR market = '' OR market IS NULL"
+    ).fetchall()
+    conn.close()
+
+    if not rows:
+        print("  No unresolved tickers")
+        return 0
+
+    print(f"  Resolving {len(rows)} unresolved holdings...")
+    resolved = 0
+    for code, name in rows:
+        if not name:
+            continue
+        result = search_ticker(name)
+        if result:
+            conn2 = get_db()
+            conn2.execute(
+                "UPDATE holdings SET ticker=?, market=? WHERE code=? AND name=? AND (ticker='' OR market='')",
+                (result["ticker"], result["market"], code, name),
+            )
+            conn2.commit()
+            conn2.close()
+            resolved += 1
+            print(f"    {code}: '{name}' -> {result['ticker']} ({result['market']})")
+        time.sleep(0.5)
+
+    print(f"  Resolved {resolved}/{len(rows)}")
+    return resolved
+
+
 if __name__ == '__main__':
+    import time
     dry = '--dry-run' in sys.argv
     ok = run_maintenance(dry_run=dry)
     sys.exit(0 if ok else 1)

@@ -1,0 +1,51 @@
+use_default_settings: true
+general:
+  instance_name: "Alpha Search"
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "zh-CN"
+  formats:
+    - html
+    - json
+server:
+  secret_key: "alpha-monitor-searxng-2026"
+  limiter: false
+  image_proxy: false
+  method: "GET"
+  bind_address: "0.0.0.0"
+ui:
+  static_use_hash: true
+outgoing:
+  request_timeout: 8
+  max_request_timeout: 12
+
+engines:
+  - name: bing
+    engine: bing
+    shortcut: bi
+    disabled: false
+  - name: baidu
+    engine: baidu
+    shortcut: bd
+    disabled: false
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    disabled: true
+  - name: google
+    engine: google
+    shortcut: go
+    disabled: true
+  - name: brave
+    engine: brave
+    shortcut: br
+    disabled: true
+  - name: startpage
+    engine: startpage
+    shortcut: sp
+    disabled: true
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    disabled: true
