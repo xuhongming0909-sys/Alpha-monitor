@@ -1,7 +1,11 @@
-﻿# -*- coding: utf-8 -*-
-# AI-SUMMARY: LOF回测v2 - 复用IOPV公式，NAV绝对值对比，3个月窗口
+# -*- coding: utf-8 -*-
+# AI-SUMMARY: LOF回测 - 指数型ETF + 主动型持仓，统一calc_iopv公式
 # 对应 INDEX.md §9.3 文件摘要索引
-"""LOF回测v2: 复用calc_a_iopv/calc_b_iopv，NAV绝对值对比，3个月窗口，日期严格对齐"""
+"""LOF回测: 指数型用ETF映射, 主动型用持仓, 统一calc_iopv公式。
+
+日期对齐规则：每个NAV披露日d，用d日的持仓和d日股价作为基准，
+用d+1日股价推算IOPV，与d+1日实际NAV对比。
+"""
 
 import json
 import os
@@ -11,10 +15,13 @@ from datetime import datetime, timedelta
 import numpy as np
 
 from data_fetch.lof_db.schema import get_db
-from strategy.lof_iopv.calc import calc_a_iopv, calc_b_iopv
+from strategy.lof_iopv.calc import calc_iopv
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from data_fetch.lof_iopv.source import _fetch_stock_position
+from data_fetch.lof_iopv.fund_classifier import (
+    is_index_fund, get_holdings_for_backtest, get_index_etf_ticker,
+)
 
 OUTPUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'runtime_data', 'backtest', 'results_v2.json')
 MIN_SAMPLES = 5
@@ -42,19 +49,10 @@ def _get_nav_dates(code, start_date, end_date):
     return {r[0]: r[1] for r in rows}
 
 
-def _get_etf_prices(ticker, start_date, end_date):
-    conn = get_db()
-    rows = conn.execute(
-        'SELECT date, close FROM etf_prices WHERE ticker = ? AND date >= ? AND date <= ? ORDER BY date',
-        (ticker, start_date, end_date)
-    ).fetchall()
-    conn.close()
-    return {r[0]: r[1] for r in rows}
-
-
 def _get_stock_prices_batch(tickers, start_date, end_date):
-    conn = get_db()
+    """批量获取股价 {ticker: {date: price}}"""
     result = {}
+    conn = get_db()
     for ticker in tickers:
         rows = conn.execute(
             'SELECT date, close FROM stock_prices WHERE ticker = ? AND date >= ? AND date <= ? ORDER BY date',
@@ -66,6 +64,7 @@ def _get_stock_prices_batch(tickers, start_date, end_date):
 
 
 def _get_fx_rates(start_date, end_date):
+    """获取USD汇率 {date: rate}"""
     conn = get_db()
     rows = conn.execute(
         'SELECT date, rate FROM fx_rates WHERE currency = ? AND date >= ? AND date <= ? ORDER BY date',
@@ -76,95 +75,53 @@ def _get_fx_rates(start_date, end_date):
 
 
 def _get_holdings(code):
-    conn = get_db()
-    rows = conn.execute(
-        'SELECT ticker, name, weight, market FROM holdings WHERE code = ? ORDER BY report_date DESC LIMIT 10',
-        (code,)
-    ).fetchall()
-    conn.close()
-    return [{"ticker": r[0], "name": r[1], "weight": r[2], "market": r[3]} for r in rows]
+    """获取持仓: A类=ETF(weight=100), B类=hardcoded实际持仓"""
+    return get_holdings_for_backtest(code)
 
 
-def _calc_metrics(actual_series, predicted_series, error_ratios):
+def _calc_metrics(actual_series, predicted_series):
+    """计算回测指标: Bias / MAE / MaxErr / ErrRate05"""
     y = np.array(actual_series)
     x = np.array(predicted_series)
     n = len(y)
     if n < MIN_SAMPLES:
         return None
-    # R2 on daily returns (measures correlation, not trend)
-    actual_ret = np.diff(y) / y[:-1]
-    predicted_ret = np.diff(x) / y[:-1]
-    r_mean = np.mean(actual_ret)
-    ss_tot = float(np.sum((actual_ret - r_mean) ** 2))
-    ss_res = float(np.sum((actual_ret - predicted_ret) ** 2))
-    r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0
-    mae = float(np.mean(error_ratios)) * 100
-    max_err = float(np.max(error_ratios)) * 100
+    nav_prev = np.concatenate([[y[0]], y[:-1]])
+    signed_err = np.where(nav_prev > 0, (x - y) / nav_prev, 0)
+    abs_err = np.abs(signed_err)
+    bias = float(np.mean(signed_err)) * 100
+    mae = float(np.mean(abs_err)) * 100
+    max_err = float(np.max(abs_err)) * 100
+    err_count = int(np.sum(abs_err > 0.005))
+    err_rate = round(err_count / n * 100, 1) if n > 0 else 0
     return {
-        "r2": round(r2, 4),
+        "bias": round(bias, 4),
         "mae": round(mae, 4),
         "maxErr": round(max_err, 4),
-        "n": n,
+        "errRate05": err_rate,
+        "errDays": err_count,
+        "totalDays": n,
     }
 
 
-def backtest_a(code, etf, end_date_str):
-    start_date = (datetime.strptime(end_date_str, '%Y-%m-%d') - timedelta(days=LOOKBACK_DAYS)).strftime('%Y-%m-%d')
-    nav_dict = _get_nav_dates(code, start_date, end_date_str)
-    etf_prices = _get_etf_prices(etf, start_date, end_date_str)
-    fx_rates = _get_fx_rates(start_date, end_date_str)
-    stock_position = _fetch_stock_position(code)
-    if stock_position is None:
-        return None
-
-    nav_dates = sorted(nav_dict.keys())
-    if len(nav_dates) < MIN_SAMPLES + 1:
-        return None
-
-    actual_series, predicted_series, error_ratios = [], [], []
-    for i in range(1, len(nav_dates)):
-        d_prev, d_curr = nav_dates[i-1], nav_dates[i]
-        if d_prev not in etf_prices or d_curr not in etf_prices:
-            continue
-        if d_prev not in fx_rates or d_curr not in fx_rates:
-            continue
-        nav_prev = nav_dict[d_prev]
-        nav_curr = nav_dict[d_curr]
-        if nav_prev <= 0:
-            continue
-        etf_change_pct = (etf_prices[d_curr] / etf_prices[d_prev] - 1) * 100
-        predicted, _, _ = calc_a_iopv(
-            nav=nav_prev, etf_change_pct=etf_change_pct,
-            fx_now=fx_rates[d_curr], fx_base=fx_rates[d_prev],
-            stock_position=stock_position, etf_nav_date_price=etf_prices[d_prev],
-            etf_current_price=etf_prices[d_curr],
-        )
-        if predicted is None or predicted <= 0:
-            continue
-        error_ratio = abs(predicted - nav_curr) / nav_prev
-        actual_series.append(nav_curr)
-        predicted_series.append(predicted)
-        error_ratios.append(error_ratio)
-
-    metrics = _calc_metrics(actual_series, predicted_series, error_ratios)
-    if metrics is None:
-        return None
-    metrics["samplePeriod"] = f"{nav_dates[1]}~{nav_dates[-1]}" if len(nav_dates) > 1 else ""
-    metrics["alignedDays"] = len(actual_series)
-    return metrics
-
-
-def backtest_b(code, end_date_str):
+def backtest_fund(code, end_date_str):
+    """回测单只基金: A类ETF追踪或B类持仓加权, 统一calc_iopv。"""
     start_date = (datetime.strptime(end_date_str, '%Y-%m-%d') - timedelta(days=LOOKBACK_DAYS)).strftime('%Y-%m-%d')
     nav_dict = _get_nav_dates(code, start_date, end_date_str)
     fx_rates = _get_fx_rates(start_date, end_date_str)
     holdings = _get_holdings(code)
     if not holdings:
         return None
-    # 用雪球实际股票仓位，fallback到T10权重总和
-    stock_ratio = _fetch_stock_position(code) or sum(h["weight"] for h in holdings)
+
+    # 总仓位: 从API获取(1-现金比例)
+    stock_ratio = _fetch_stock_position(code)
+    if not stock_ratio or stock_ratio <= 0:
+        stock_ratio = sum(h.get("weight", 0) for h in holdings)
     if stock_ratio <= 0:
         return None
+
+    cls = "A" if is_index_fund(code) else "B"
+    etf = get_index_etf_ticker(code) if cls == "A" else ""
 
     tickers = list(set(h["ticker"] for h in holdings))
     stock_prices = _get_stock_prices_batch(tickers, start_date, end_date_str)
@@ -173,9 +130,9 @@ def backtest_b(code, end_date_str):
     if len(nav_dates) < MIN_SAMPLES + 1:
         return None
 
-    actual_series, predicted_series, error_ratios = [], [], []
+    actual_series, predicted_series = [], []
     for i in range(1, len(nav_dates)):
-        d_prev, d_curr = nav_dates[i-1], nav_dates[i]
+        d_prev, d_curr = nav_dates[i - 1], nav_dates[i]
         if d_prev not in fx_rates or d_curr not in fx_rates:
             continue
         nav_prev = nav_dict[d_prev]
@@ -183,70 +140,85 @@ def backtest_b(code, end_date_str):
         if nav_prev <= 0:
             continue
 
+        # 构建价格字典
         nav_date_prices = {}
         current_prices = {}
+        all_ok = True
         for h in holdings:
             t = h["ticker"]
-            if t in stock_prices:
-                if d_prev in stock_prices[t]:
-                    nav_date_prices[t] = stock_prices[t][d_prev]
-                if d_curr in stock_prices[t]:
-                    current_prices[t] = stock_prices[t][d_curr]
-
-        if not nav_date_prices or not current_prices:
+            p_prev = stock_prices.get(t, {}).get(d_prev)
+            p_curr = stock_prices.get(t, {}).get(d_curr)
+            if p_prev and p_prev > 0:
+                nav_date_prices[t] = p_prev
+            else:
+                all_ok = False
+                break
+            if p_curr and p_curr > 0:
+                current_prices[t] = p_curr
+            else:
+                all_ok = False
+                break
+        if not all_ok:
             continue
 
-        predicted, _, details = calc_b_iopv(
-            nav=nav_prev, holdings=holdings, stock_ratio=stock_ratio,
-            current_prices=current_prices, nav_date_prices=nav_date_prices,
-            prev_closes={}, fx_now=fx_rates[d_curr], fx_base=fx_rates[d_prev]
+        predicted, _, _ = calc_iopv(
+            nav=nav_prev,
+            holdings=holdings,
+            stock_ratio=stock_ratio,
+            current_prices=current_prices,
+            nav_date_prices=nav_date_prices,
+            prev_closes={},
+            fx_now=fx_rates[d_curr],
+            fx_base=fx_rates[d_prev],
         )
         if predicted is None or predicted <= 0:
             continue
-        error_ratio = abs(predicted - nav_curr) / nav_prev
         actual_series.append(nav_curr)
         predicted_series.append(predicted)
-        error_ratios.append(error_ratio)
 
-    metrics = _calc_metrics(actual_series, predicted_series, error_ratios)
+    metrics = _calc_metrics(actual_series, predicted_series)
     if metrics is None:
         return None
     metrics["samplePeriod"] = f"{nav_dates[1]}~{nav_dates[-1]}" if len(nav_dates) > 1 else ""
     metrics["alignedDays"] = len(actual_series)
-    metrics["holdings_count"] = len(holdings)
+    metrics["class"] = cls
+    if etf:
+        metrics["etf"] = etf
     return metrics
 
 
-def run_all(end_date_str=None):
-    if end_date_str is None:
-        end_date_str = datetime.now().strftime('%Y-%m-%d')
+def run_all():
+    """回测所有配置的LOF基金"""
+    end_date_str = datetime.now().strftime('%Y-%m-%d')
     funds = _load_funds()
     results = {}
+    skipped = []
     for f in funds:
-        code = f["code"]
-        est = f.get("estimation", "A")
-        if est == "A" and f.get("etf"):
-            r = backtest_a(code, f["etf"], end_date_str)
-            if r:
-                r["type"] = "A"
-                r["etf"] = f["etf"]
-                r["code"] = code
-                results[code] = r
-        elif est == "B":
-            r = backtest_b(code, end_date_str)
-            if r:
-                r["type"] = "B"
-                r["code"] = code
-                results[code] = r
+        code = f.get("code", "")
+        cls = "A" if is_index_fund(code) else "B"
+        r = backtest_fund(code, end_date_str)
+        if r:
+            r["code"] = code
+            r["name"] = f.get("name", "")
+            results[code] = r
+        else:
+            skipped.append(f"{code}({f.get('name','')})")
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     with open(OUTPUT_PATH, "w", encoding="utf-8") as fp:
         json.dump(results, fp, ensure_ascii=False, indent=2)
-    print(f"回测v2完成: {len(results)}只 -> {OUTPUT_PATH}")
+    print(f"回测完成: {len(results)}只 -> {OUTPUT_PATH}")
+    if skipped:
+        print(f"跳过(无数据): {', '.join(skipped)}")
     return results
 
 
 if __name__ == "__main__":
     results = run_all()
     for code, r in sorted(results.items()):
-        print(f"{code} ({r['type']}): r2={r['r2']}, maxErr={r['maxErr']}, aligned={r['alignedDays']}")
-
+        bias = r.get('bias', 0)
+        mae = r.get('mae', 0)
+        maxe = r.get('maxErr', 0)
+        err_rate = r.get('errRate05', 0)
+        cls = r.get('class', '?')
+        tag = f"[{cls}]" + (f"<{r.get('etf','')}>" if r.get('etf') else "")
+        print(f"{code} {tag}: bias={bias:+.3f}% mae={mae:.3f}% maxErr={maxe:.3f}% err>0.5%={err_rate}% ({r.get('errDays',0)}/{r.get('totalDays',0)})")

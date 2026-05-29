@@ -881,3 +881,75 @@ h2 {
 .lof-holdings-inner tbody tr:hover {
   background: rgba(255, 255, 255, 0.03);
 }
+
+/* === LOF Three-Class Badges === */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-blue {
+  background: #e0f0ff;
+  color: #1565c0;
+}
+.badge-green {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.badge-orange {
+  background: #fff3e0;
+  color: #e65100;
+}
+.badge-muted {
+  background: #f5f5f5;
+  color: #999;
+}
+
+/* === LOF Table Expandable Rows === */
+tr.clickable:hover {
+  background: rgba(0,0,0,0.02);
+}
+tr.expanded {
+  background: rgba(0,0,0,0.015);
+}
+.sub-row td {
+  padding: 0 !important;
+  border-bottom: 2px solid #e0e0e0;
+}
+.sub-cell {
+  background: #fafbfc;
+}
+.holdings-panel {
+  padding: 12px 16px 12px 40px;
+  font-size: 0.88em;
+}
+.holdings-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 8px;
+  color: #666;
+}
+.holdings-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+}
+.holdings-table th {
+  text-align: left;
+  padding: 4px 8px;
+  font-weight: 600;
+  border-bottom: 1px solid #ddd;
+  font-size: 0.9em;
+  color: #888;
+}
+.holdings-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.holdings-table tbody tr:hover {
+  background: rgba(0,0,0,0.02);
+}

@@ -24,7 +24,7 @@
 │  strategy/          业务计算层                            │
 │  ├─ ah_premium/     AH 溢价排名                          │
 │  ├─ convertible_bond/ 转债套利（双低/折价/回售）        │
-│  ├─ lof_iopv/  QDII LOF IOPV 估值（A类指数法/B类T10法）                       │
+│  ├─ lof_iopv/  QDII LOF IOPV 估值（T10持仓加权法）                       │
 │  └─ ... (共 10 个插件)                                   │
 └──────────────────────────────────────────────────────────┘
     │
@@ -73,7 +73,7 @@
 | `exchange_rate/` | 腾讯 | `fetcher.py`, `normalizer.py` | 港币/美元人民币汇率 |
 | `convertible_bond/` | 集思录 + 东财 | `fetcher.py`, `source.py`, `normalizer.py`, `history_sync.py`, `history_source.py` | 转债套利数据（含理论定价） |
 | `cb_rights_issue/` | 集思录 | `fetcher.py`, `source.py`, `normalizer.py`, `history_source.py` | 转债抢权配售数据 |
-| `lof_iopv/` | 东财+腾讯+雪球 | `fetcher.py`, `source.py`, `normalizer.py` | QDII LOF IOPV 估值（A类指数法/B类T10法）数据 |
+| `lof_iopv/` | 东财+腾讯+雪球 | `fetcher.py`, `source.py`, `fund_classifier.py`, `normalizer.py` | QDII LOF IOPV三分类(指数/持仓/报表)数据 |
 | `merger/` | 公告 API | `fetcher.py`, `source.py`, `normalizer.py` | 并购重组公告 |
 | `event_arbitrage/` | 集思录 | `fetcher.py`, `normalizer.py` | 事件驱动套利 |
 | `subscription/` | 多源 | `fetcher.py`, `ipo_source.py`, `bond_source.py`, `normalizer.py` | 新股/转债申购日历 |
@@ -197,7 +197,7 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `src/components/ConvertibleCardList.jsx` | 转债套利简洁模块表格 |
 | `src/components/AhCardList.jsx` | AH 溢价简洁模块表格 |
 | `src/components/AbCardList.jsx` | AB 溢价简洁模块表格 |
-| `src/components/LofCardList.jsx` | LOF 套利简洁模块表格 |
+| `src/components/LofCardList.jsx` | LOF IOPV估值表格：三分类展示(指数型蓝/持仓型绿/报表型橙)+MAE列 |
 | `src/components/SubscriptionCardList.jsx` | 打新申购简洁模块表格 |
 | `src/components/RightsIssueCardList.jsx` | 抢权配售简洁模块表格 |
 | `src/components/MonitorCardList.jsx` | 自定义监控简洁模块表格 |
@@ -362,9 +362,8 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `data_fetch/lof_db/etf_updater.py` | ETF/个股价格增量更新（新浪akshare stock_us_daily + stock_hk_daily） |
 | `data_fetch/lof_db/fx_updater.py` | 汇率增量更新 |
 | `data_fetch/lof_db/holdings_updater.py` | 持仓数据增量更新 |
-| `strategy/lof_iopv/backtest.py` | LOF回测v1（日收益率回归，共同日期对齐） |
-| `strategy/lof_iopv/backtest_v2.py` | LOF回测v2（NAV绝对值对比，3个月窗口，复用calc公式） |
-| `strategy/lof_iopv/classifier.py` | LOF分类器：A(指数跟踪)/B(T10持仓)模式判断 |
+| `data_fetch/lof_iopv/fund_classifier.py` | LOF三分类(指数型/持仓型/报表型)基金分类器+持仓获取 |
+| `strategy/lof_iopv/backtest_v2.py` | LOF回测（指数型ETF+主动型持仓，统一calc_iopv公式，3个月窗口） |
 
 ### 9.3 strategy/ — 业务计算层
 
@@ -378,8 +377,8 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `strategy/convertible_bond/service.js` | 转债套利 Node 适配器：计算结果格式化、折价策略状态 |
 | `strategy/merger/service.py` | 并购套利业务计算：Deal 分析、AI 报告生成 |
 | `strategy/merger/service.js` | 并购套利 Node 适配器：报告生成调度 |
-| `strategy/lof_iopv/calc.py` | 共享IOPV计算公式（A类指数法+B类T10法） |
-| `strategy/lof_iopv/service.py` | QDII LOF IOPV 业务计算：响应构建+监控池筛选 |
+| `strategy/lof_iopv/calc.py` | 共享IOPV计算公式：T10持仓加权法（从净值披露日按持仓推算） |
+| `strategy/lof_iopv/service.py` | QDII LOF IOPV业务计算：三分类持仓来源+响应构建+监控池筛选 |
 | `strategy/custom_monitor/service.py` | 自定义监控业务计算：组合收益率、对价计算 |
 | `strategy/dividend/service.py` | 股息业务计算：登记日跟踪、股息率计算 |
 | `strategy/subscription/service.py` | 申购业务计算：申购事件跟踪与状态管理 |
@@ -452,11 +451,11 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 
 | 文件 | 职责摘要 |
 |------|----------|
-| 	ools/backtest/lof13_backtest_A.py | LOF 13只A类指数法回测：ETF组合跟踪基金净值 |
-| 	ools/backtest/lof13_backtest_B.py | LOF 13只B类T10持仓法回测：前十大持仓加权估值 |
+| `ools/backtest/lof13_backtest_A.py` | ~~已废弃：A类指数法回测~~ |
+| `ools/backtest/lof13_backtest_B.py` | LOF T10持仓法回测：前十大持仓加权估值 |
 | 	ools/backtest/lof13_backtest_report.md | 13只LOF估值方法回测报告 |
-| 	ools/backtest/qdii_backtest_A.py | QDII A类指数法回测（旧版，10只美股指数基金） |
-| 	ools/backtest/qdii_backtest_B.py | QDII B类T10持仓法回测（旧版，3只港股/美股混合基金） |
+| `ools/backtest/qdii_backtest_A.py` | ~~已废弃：A类指数法回测~~ |
+| `ools/backtest/qdii_backtest_B.py` | QDII T10持仓法回测（港股/美股混合基金） |
 | 	ools/backtest/qdii_v6_backtest.py | QDII v6回测脚本（日期对齐版） |
 ### 9.7 scripts/ — 脚本
 

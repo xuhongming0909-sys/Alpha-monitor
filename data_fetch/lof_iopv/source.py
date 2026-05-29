@@ -18,6 +18,9 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from shared.market_service import get_fx_rates, get_quotes
+from data_fetch.lof_iopv.fund_classifier import (
+    get_fund_class, get_holdings_for_service, get_index_etf_ticker, is_index_fund,
+)
 from shared.config.script_config import load_config
 from shared.time.shanghai_time import now_iso
 
@@ -28,30 +31,6 @@ SESSION.headers.update({
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Referer": "https://fundf10.eastmoney.com/",
 })
-_ETF_SESSION = requests.Session()
-_ETF_SESSION.trust_env = False
-_ETF_SESSION.proxies = {"http": None, "https": None}
-
-
-def _get_etf_nav_date_prices(etf_codes, nav_date):
-    """获取ETF在净值日的价格（用于期间涨跌幅）"""
-    if not nav_date or not etf_codes:
-        return {}
-    result = {}
-    try:
-        from data_fetch.lof_db.schema import get_db as _get_db
-        _conn = _get_db()
-        for ticker in set(etf_codes):
-            row = _conn.execute(
-                "SELECT close FROM etf_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
-                (ticker, nav_date)
-            ).fetchone()
-            if row:
-                result[ticker] = row[0]
-        _conn.close()
-    except Exception:
-        pass
-    return result
 
 
 def _load_fund_list():
@@ -108,49 +87,6 @@ def _fetch_us_realtime(codes):
     return result
 
 
-def _fetch_etf_changes(etf_codes):
-    """Fetch ETF realtime change% and current price. Returns (changes, current_prices)."""
-    if not etf_codes:
-        return {}, {}
-    changes = {}
-    current_prices = {}
-    for ticker in etf_codes:
-        try:
-            url = (
-                f"https://push2his.eastmoney.com/api/qt/stock/kline/get"
-                f"?secid=107.{ticker}&fields1=f1,f2,f3&fields2=f51,f52,f53,f54,f55,f56"
-                f"&klt=101&fqt=0&end=20500101&lmt=2"
-            )
-            resp = _ETF_SESSION.get(url, timeout=10)
-            data = resp.json()
-            klines = data.get("data", {}).get("klines", [])
-            if len(klines) >= 2:
-                prev_close = float(klines[-2].split(",")[2])
-                cur_close = float(klines[-1].split(",")[2])
-                if prev_close > 0:
-                    changes[ticker] = (cur_close / prev_close - 1) * 100
-                    current_prices[ticker] = cur_close
-                    continue
-        except Exception:
-            pass
-        # tencent fallback
-        try:
-            qt_codes = [f"us{ticker}"]
-            resp = _ETF_SESSION.get(f"https://qt.gtimg.cn/q={','.join(qt_codes)}", timeout=10)
-            text = resp.content.decode("gbk", errors="ignore")
-            for line in text.strip().split(";"):
-                parts = line.split("~")
-                if len(parts) > 4:
-                    p = _to_float(parts[4])
-                    c = _to_float(parts[3])
-                    if p and p > 0 and c:
-                        changes[ticker] = (c / p - 1) * 100
-                        current_prices[ticker] = c
-        except Exception:
-            pass
-    return changes, current_prices
-
-
 def _fetch_nav(code):
     """Fetch NAV from eastmoney. Returns {nav, navDate, shareIncrease, shareTotal}."""
     result = {"nav": None, "navDate": None, "shareIncrease": None, "shareTotal": None}
@@ -176,123 +112,125 @@ def _fetch_nav(code):
         m2 = re.search(r"Data_fluctuationTrend\s*=\s*(\[.*?\]);", text, re.DOTALL)
         if m2:
             arr2 = _json.loads(m2.group(1))
-            if arr2:
-                result["shareTotal"] = _to_float(arr2[-1].get("total"))
+            if arr2 and len(arr2) >= 2:
+                result["shareTotal"] = _to_float(arr2[-1])
     except Exception:
         pass
     return result
 
 
 def _fetch_holdings(code):
-    """Fetch top 10 holdings from eastmoney."""
+    """Fetch top-10 holdings from eastmoney."""
     url = f"http://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code={code}&topline=10"
     try:
-        text = SESSION.get(url, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
-        m = re.search(r'content:"(.*?)",arryear', text, re.DOTALL)
+        r = SESSION.get(url, timeout=_REQUEST_TIMEOUT)
+        text = r.content.decode("utf-8", errors="ignore")
+        m = re.search(r'var apidata=\{content:"(.*?)"\}', text, re.DOTALL)
         if not m:
             return []
-        rows = re.findall(
-            r"<tr><td>(\d+)</td>.*?<a href=[^>]+>([A-Z0-9]+)</a>.*?<a href=[^>]+>([^<]+)</a>.*?<td[^>]*>([\d.]+)%</td>",
-            m.group(1), re.DOTALL,
-        )
+        html = m.group(1)
+        rows = re.findall(r'<td class=\'tor\'>.*?</td>', html, re.DOTALL)
+        # 解析持仓表格
         holdings = []
-        for _, ticker_raw, name_raw, weight_raw in rows:
-            ticker = _clean(ticker_raw)
-            name = _clean(name_raw)
-            weight = _to_float(weight_raw)
-            market = "hk" if (ticker.isdigit() and len(ticker) == 5) else "us"
-            holdings.append({"ticker": ticker, "name": name, "weight": weight, "market": market})
+        # 每行数据：序号、股票代码、股票名称、占净值比例、持仓股数、持仓市值
+        stock_blocks = re.findall(
+            r'<td[^>]*>.*?</td>.*?<td[^>]*>.*?</td>.*?<td[^>]*>(.*?)</td>.*?<td[^>]*>(.*?)</td>.*?<td[^>]*>(.*?)</td>',
+            html, re.DOTALL
+        )
+        for code_td, name_td, weight_td in stock_blocks:
+            ticker = _clean(code_td)
+            name = _clean(name_td)
+            weight = _to_float(weight_td.replace("%", ""))
+            if ticker and weight is not None:
+                # 港股:5位数字(00700) 美股:纯字母(NVDA) A股:6位数字
+                market = "hk" if ticker.isdigit() and len(ticker) >= 4 else \
+                         "us" if ticker.isalpha() and len(ticker) <= 5 else \
+                         "sz" if ticker.startswith(("0", "3")) and ticker.isdigit() else "sh"
+                holdings.append({"ticker": ticker, "name": name, "weight": weight, "market": market})
         return holdings[:10]
     except Exception:
         return []
 
 
-def _fetch_purchase_status():
-    """Fetch purchase status and daily limit from eastmoney for all funds."""
-    result = {}
-    try:
-        url = "https://fund.eastmoney.com/Data/Fund_JJJZ_Data.aspx"
-        params = {"t": "8", "page": "1,50000", "js": "reData", "sort": "fcode,asc"}
-        r = SESSION.get(url, params=params, timeout=_REQUEST_TIMEOUT)
-        text = r.text.strip().replace("var reData=", "")
-        m = re.search(r"datas:\s*(\[.*?\])\s*,\s*\w+:", text, re.DOTALL)
-        if not m:
-            return result
-        arr = _json.loads(m.group(1))
-        for item in arr:
-            if len(item) >= 11:
-                code = item[0]
-                status_raw = item[5]
-                daily_limit_raw = item[9]
-                try:
-                    daily_limit = float(daily_limit_raw)
-                except (TypeError, ValueError):
-                    daily_limit = None
-                result[code] = {
-                    "applyStatus": status_raw,
-                    "dailyLimit": daily_limit,
-                }
-    except Exception:
-        pass
-    return result
-
-
 def _fetch_stock_position(code):
-    """stockPosition = 100 - 现金比例（雪球资产大类占比）"""
+    """Fetch actual stock position % from xueqiu."""
     try:
-        import akshare as ak
-        from datetime import datetime
-        date = datetime.now().strftime('%Y%m%d')
-        df = ak.fund_individual_detail_hold_xq(symbol=code, date=date)
-        if df is not None and not df.empty:
-            vals = []
-            for i in range(len(df)):
-                try:
-                    vals.append(float(df.iloc[i, 1]))
-                except (TypeError, ValueError):
-                    continue
-            if vals:
-                return round(100 - min(vals), 3)
+        url = f"https://stock.xueqiu.com/v5/fund/portfolio/stock.json?symbol={code}&size=10"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers, timeout=10)
+        data = r.json()
+        items = data.get("data", {}).get("list", [])
+        if items:
+            total = sum(i.get("percent", 0) or 0 for i in items)
+            return round(total, 2)
     except Exception:
         pass
     return None
 
+
 def _fetch_fund_info(code):
-    """Fetch fund info from eastmoney fund page."""
-    url = f"https://fundf10.eastmoney.com/jbgk_{code}.html"
+    """Fetch fund info: applyFee, redeemFee, custodianFee, fundCompany, applyStatus, redeemStatus."""
     info = {}
     try:
+        url = f"https://fundf10.eastmoney.com/jbgk_{code}.html"
         text = SESSION.get(url, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
-        for label, key in [
-            ("\u7ba1\u7406\u8d39\u7387", "managementFee"),
-            ("\u6258\u7ba1\u8d39\u7387", "custodianFee"),
-            ("\u7533\u8d2d\u8d39\u7387", "applyFee"),
-            ("\u8d4e\u56de\u8d39\u7387", "redeemFee"),
-        ]:
-            m = re.search(r">" + label + r"</th><td>([\d.]+)%", text)
-            if not m:
-                m = re.search(label + r".*?([\d.]+)%", text, re.DOTALL)
-            if m:
-                info[key] = m.group(1)
-        m = re.search(r"\u7ba1\u7406\u4eba.*?<a[^>]*>(.*?)</a>", text, re.DOTALL)
+        m = re.search(r"管理费率.*?(\d+\.\d+%)", text)
         if m:
-            val = _clean(m.group(1))
-            if val:
-                info["fundCompany"] = val
-        if "\u5f00\u653e\u7533\u8d2d" in text:
-            info["applyStatus"] = "\u5f00\u653e\u7533\u8d2d"
-        elif "\u6682\u505c\u7533\u8d2d" in text:
-            info["applyStatus"] = "\u6682\u505c\u7533\u8d2d"
-        if "\u5f00\u653e\u8d4e\u56de" in text:
-            info["redeemStatus"] = "\u5f00\u653e\u8d4e\u56de"
-        elif "\u6682\u505c\u8d4e\u56de" in text:
-            info["redeemStatus"] = "\u6682\u505c\u8d4e\u56de"
+            info["custodianFee"] = m.group(1)
+        m = re.search(r"申购费率.*?(\d+\.\d+%)", text)
+        if m:
+            info["applyFee"] = m.group(1)
+        m = re.search(r"赎回费率.*?(\d+\.\d+%)", text)
+        if m:
+            info["redeemFee"] = m.group(1)
+        # 基金公司
+        for key in ["基金公司", "基金管理人"]:
+            m = re.search(key + r".*?<a[^>]*>(.*?)</a>", text, re.DOTALL)
+            if m:
+                val = _clean(m.group(1))
+                if val:
+                    info["fundCompany"] = val
+                    break
+        if "开放申购" in text:
+            info["applyStatus"] = "开放申购"
+        elif "暂停申购" in text:
+            info["applyStatus"] = "暂停申购"
+        if "开放赎回" in text:
+            info["redeemStatus"] = "开放赎回"
+        elif "暂停赎回" in text:
+            info["redeemStatus"] = "暂停赎回"
     except Exception:
         pass
     return info
 
 
+def _fetch_purchase_status():
+    """批量获取基金申购状态（东方财富批量API）"""
+    result = {}
+    try:
+        url = "https://fund.eastmoney.com/Data/Fund_JJJZ_Data.aspx?t=8"
+        text = SESSION.get(url, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
+        m = re.search(r"var r = (\[.*?\]);", text, re.DOTALL)
+        if not m:
+            return result
+        arr = _json.loads(m.group(1))
+        for item in arr:
+            code = str(item.get("code", ""))
+            if not code:
+                continue
+            status = item.get("applyStatus", "")
+            limit = item.get("applyLimit")
+            result[code] = {
+                "applyStatus": status,
+                "dailyLimit": _to_float(limit),
+            }
+    except Exception:
+        pass
+    return result
+
+
 def _build_tc_code(ticker, market):
+    """构建腾讯行情代码"""
     if market == "hk":
         return "hk" + ticker.zfill(5)
     elif market == "us":
@@ -316,30 +254,24 @@ def build_lof_snapshot():
     funds = _load_fund_list()
     purchase_status_data = _fetch_purchase_status()
 
-    etf_codes = list({f.get("etf") for f in funds if f.get("etf") and f.get("estimation") == "A"})
-    etf_changes, etf_current_prices = _fetch_etf_changes(etf_codes)
-
     all_rows = []
-    etf_nav_date_prices = {}
     for fund in funds:
         code = fund["code"]
         nav_data = _fetch_nav(code)
         nav, nav_date = nav_data["nav"], nav_data["navDate"]
-        holdings = _fetch_holdings(code)
+        # 持仓获取: 指数型用ETF映射, 主动型用API/PDF
+        fund_class = get_fund_class(code)
+        if fund_class == "index":
+            holdings = [{"ticker": h["ticker"], "name": "", "weight": h["weight"], "market": h["market"].lower()} for h in get_holdings_for_service(code)]
+        else:
+            holdings = _fetch_holdings(code)
         fund_info = _fetch_fund_info(code)
-        # A类ETF净值日价格
-        if fund.get("etf") and fund.get("estimation") == "A":
-            etf_nav_date_prices[fund["etf"]] = _get_etf_nav_date_prices([fund["etf"]], nav_date).get(fund["etf"])
 
         market = "sh" if code.startswith(("5", "6")) else "sz"
-        try:
-            q = get_quotes([f"{market}{code}"])
-            price = _to_float(q.get(f"{market}{code}", {}).get("price"))
-        except Exception:
-            price = None
-
         current_prices = {}
+        price = None
         if holdings:
+            # 港股实时行情
             try:
                 hk_codes = [_build_tc_code(h["ticker"], h["market"]) for h in holdings if h["market"] == "hk"]
                 if hk_codes:
@@ -355,6 +287,7 @@ def build_lof_snapshot():
                                 current_prices.setdefault("_prev_close", {})[h["ticker"]] = hk_q[tc]["prev_close"]
             except Exception:
                 pass
+            # 美股实时行情
             try:
                 us_tickers = [h["ticker"] for h in holdings if h["market"] == "us"]
                 if us_tickers:
@@ -369,6 +302,7 @@ def build_lof_snapshot():
                                 current_prices.setdefault("_prev_close", {})[h["ticker"]] = us_q[tc]["prev_close"]
             except Exception:
                 pass
+            # DB fallback
             missing = [h for h in holdings if not current_prices.get(h["ticker"])]
             if missing:
                 try:
@@ -384,6 +318,7 @@ def build_lof_snapshot():
 
         stock_position = _fetch_stock_position(code) or sum(h.get("weight", 0) or 0 for h in holdings)
 
+        # 净值披露日股价（用于IOPV计算的基准价格）
         nav_date_prices = {}
         if holdings and nav_date:
             try:
@@ -400,6 +335,15 @@ def build_lof_snapshot():
             except Exception:
                 pass
 
+        # LOF场内价格
+        try:
+            tc_code = _build_tc_code(code, market)
+            q = get_quotes([tc_code])
+            if q and tc_code in q:
+                price = q[tc_code].get("price")
+        except Exception:
+            pass
+
         all_rows.append({
             "code": code,
             "name": fund["name"],
@@ -408,8 +352,6 @@ def build_lof_snapshot():
             "shareIncrease": nav_data.get("shareIncrease"),
             "shareTotal": nav_data.get("shareTotal"),
             "price": price,
-            "estimation": fund["estimation"],
-            "etf": fund.get("etf"),
             "holdings": holdings,
             "currentPrices": current_prices,
             "stockPosition": stock_position,
@@ -424,9 +366,6 @@ def build_lof_snapshot():
             "redeemStatus": fund_info.get("redeemStatus"),
             "custodianFee": fund_info.get("custodianFee"),
             "fundCompany": fund_info.get("fundCompany"),
-            "etfChange": etf_changes.get(fund.get("etf")),
-            "etfNavDatePrice": etf_nav_date_prices.get(fund.get("etf")) if fund.get("estimation") == "A" else None,
-            "etfCurrentPrice": etf_current_prices.get(fund.get("etf")) if fund.get("estimation") == "A" else None,
         })
 
     return {

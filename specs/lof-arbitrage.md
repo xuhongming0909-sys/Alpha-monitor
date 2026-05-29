@@ -8,9 +8,15 @@ type: spec
 
 ## 1. 范围
 
-24只QDII LOF基金，两类估值：
-- **A类-指数跟踪法（19只）**：美股/商品/黄金/原油ETF映射，IOPV = NAV * (1 + etf_ret) * fx_ratio
-- **B类-T10持仓加权法（5只）**：前十大持仓股票加权，IOPV = NAV * [1 + stock_ratio * sum(w_i * ret_i)] * fx_ratio
+24只QDII LOF基金，三类估值：
+- **指数型（14只）**：ETF映射追踪业绩基准，回测MAE<0.5%，IOPV = NAV * (1 + etf_ret) * fx_ratio
+- **持仓型（4只）**：天天基金API实时持仓（合计>30%），自动适应季度变更
+- **报表型（6只）**：PDF季报解析持仓，每季度手动更新
+
+分类规则：
+1. 回测MAE<0.5% → 指数型（ETF映射）
+2. 不通过→ API持仓合计>30% → 持仓型（天天基金API）
+3. 其他 → 报表型（PDF季报）
 
 已移除：161815抗通胀、160216国泰商品、165513中信商品（FOF持仓不透明，无法拟合）
 
@@ -19,20 +25,20 @@ type: spec
 | 数据 | API | 刷新间隔 |
 |---|---|---|
 | 净值NAV | 东财 lsjz API | 每日 |
-| 持仓Top10 | akshare fund_portfolio_hold_em | 每日 |
+| 持仓Top10 | 天天基金API（持仓型）/ PDF季报（报表型）/ ETF映射（指数型） | 实时/季度/静态 |
 | LOF场内价 | shared.market_service（腾讯行情） | 实时 |
 | ETF价格 | 新浪 stock_us_daily（etf_updater） | 每日 |
 | 个股价格 | 新浪 stock_us_daily / stock_hk_daily（etf_updater） | 每日 |
 | 汇率 | akshare currency_boc_sina | 每日 |
 | 申购限额 | 东财 fund数据页 | 每日 |
 
-## 3. A类估值公式
+## 3. 指数型估值公式
 
 ```
 IOPV = NAV_T-2 * (1 + ETF_ret) * (FX_today / FX_T-2)
 ```
 
-## 4. B类估值公式
+## 4. 持仓型/报表型估值公式
 
 ```
 IOPV = NAV_T-2 * (1 + stock_ratio * sum(w_i * ret_i)) * fx_ratio
@@ -46,7 +52,7 @@ Schema定义：`data_fetch/lof_db/schema.py`
 |---|---|---|
 | `fund_nav` | 基金净值历史 | 90天过期清理 |
 | `etf_prices` | ETF价格历史 | 90天过期清理 |
-| `stock_prices` | 持仓股票价格历史（B类回测用） | 90天过期清理 |
+| `stock_prices` | 持仓股票价格历史（持仓型/报表型回测用） | 90天过期清理 |
 | `fx_rates` | 汇率历史 | 90天过期清理 |
 | `holdings` | 持仓数据（不清理） | 保留全部 |
 
@@ -54,8 +60,8 @@ Schema定义：`data_fetch/lof_db/schema.py`
 
 - 脚本v1：`strategy/lof_iopv/backtest.py`（日收益率回归，共同日期对齐）
 - 脚本v2：`strategy/lof_iopv/backtest_v2.py`（NAV绝对值对比，3个月窗口，复用calc公式）
-- A类：基金净值日收益 vs ETF日收益+汇率日收益
-- B类：基金净值日收益 vs T10持仓加权日收益+汇率日收益
+- 指数型：基金净值日收益 vs ETF日收益+汇率日收益
+- 持仓型/报表型：基金净值日收益 vs T10持仓加权日收益+汇率日收益
 - 日期对齐：共同价格日期集合
 - 评级：R²>=0.8且MaxErr<1%=OK, R²>=0.6=WARN, 否则BAD
 

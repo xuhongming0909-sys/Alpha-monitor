@@ -298,99 +298,114 @@ data_fetch:
       - code: '161128'
         name: 标普信息科技LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: XLK
       - code: '501225'
         name: 全球芯片LOF
         currency: USD
-        estimation: B
+        fund_class: active_pdf
       - code: '161130'
         name: 纳指LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: QQQ
       - code: '161125'
         name: 标普500LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: SPY
       - code: '161126'
         name: 标普医疗保健LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: RYH
       - code: '161127'
         name: 标普生物科技LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: XBI
       - code: '162415'
         name: 美国消费LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: XLY
       - code: '160140'
         name: 美国REIT精选LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: IYR
       - code: '501300'
         name: 美元债LOF
         currency: USD
-        estimation: B
+        fund_class: active_pdf
       - code: '164824'
         name: 印度基金LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: INDA
       - code: '160416'
         name: 石油基金LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: IXC
       - code: '162719'
         name: 石油LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: IEO
       - code: '162411'
         name: 华宝油气LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: XOP
       - code: '160723'
         name: 嘉实原油LOF
         currency: USD
-        estimation: B
+        fund_class: active_pdf
+        etf_ticker: USO
       - code: '161129'
         name: 原油LOF
         currency: USD
-        estimation: B
+        fund_class: active_pdf
+        etf_ticker: USO
       - code: '501018'
         name: 南方原油LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: USO
       - code: '163208'
         name: 全球油气能源LOF
         currency: USD
-        estimation: B
+        fund_class: active_api
       - code: '160719'
         name: 嘉实黄金LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: GLD
       - code: '164701'
         name: 黄金LOF
         currency: USD
-        estimation: B
+        fund_class: index
+        etf_ticker: GLD
       - code: '161116'
         name: 黄金主题LOF
         currency: USD
-        estimation: B
+        fund_class: active_pdf
       - code: '160125'
         name: 南方香港LOF
         currency: HKD
-        estimation: B
+        fund_class: active_api
       - code: '160644'
         name: 港美互联网LOF
         currency: HKD
-        estimation: B
+        fund_class: active_api
       - code: '164906'
         name: 中概互联网LOF
         currency: USD
-        estimation: B
+        fund_class: active_api
       - code: '501312'
         name: 海外科技LOF
         currency: USD
-        estimation: B
 strategy:
   ah_premium:
     ranking_metric: premium_rate
@@ -659,3 +674,4 @@ notification:
     webhook_url: ${WECOM_WEBHOOK_URL}
     push_html_url: ${PUSH_HTML_URL}
     max_markdown_length: 3900
+    fund_class: active_pdf

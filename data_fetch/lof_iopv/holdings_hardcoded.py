@@ -1,103 +1,96 @@
-﻿# -*- coding: utf-8 -*-
-"""已知基金持仓数据（从2026Q1季报提取，已合并重复ticker）。
-用于PDF解析失败时的fallback。
+# -*- coding: utf-8 -*-
+# AI-SUMMARY: 基金持仓 - A类ETF映射(100%权重,基于业绩基准) + B类实际持仓(2026Q1季报)
+# 对应 INDEX.md 9.3 文件摘要索引
+"""已知基金持仓数据。
+
+A类(指数跟踪): 单ETF映射, weight固定100%, 总仓位由API抓取。
+B类(主动/混合): 实际持仓从季报, 总仓位由API抓取。
 """
 from __future__ import annotations
 from typing import Dict, List, Tuple
 
-# 每只基金的前20大持仓: [(ticker, weight%, market), ...]
-# 重复ticker已合并权重
-KNOWN_HOLDINGS: Dict[str, List[Tuple[str, float, str]]] = {
-    # ========== 海外科技 ==========
-    "501312": [
-        ("ARKK", 18.74, "US"),   # ARK Innovation ETF
-        ("ARKG", 15.35, "US"),   # ARK Genomic Revolution ETF
-        ("ARKQ", 11.59, "US"),   # ARK Autonomous Technology & Robotics ETF
-        ("SOXX",  9.51, "US"),   # iShares Semiconductor ETF
-        ("AIQ",   7.85, "US"),   # Global X AI & Technology ETF
-        ("QQQ",   7.45, "US"),   # Invesco QQQ Trust
-        ("BOTZ",  7.44, "US"),   # Global X Robotics & AI ETF
-        ("XLK",   6.44, "US"),   # State Street Technology Select Sector
-        ("SMH",   4.29, "US"),   # VanEck Semiconductor ETF
-        ("FINX",  1.20, "US"),   # Global X FinTech ETF
-    ],
-    # ========== 南方原油 (合并重复ticker) ==========
-    "501018": [
-        ("USO",  38.86, "US"),   # WisdomTree WTI(19.80) + USO(19.06)
-        ("BNO",  35.08, "US"),   # WisdomTree Brent(19.20) + BNO(15.88)
-        # Simplex WTI ETF (日本) - 剔除
-        # Nomura Crude Oil ETF (日本) - 剔除
-        # UBS CMCI Oil SF ETF (瑞士) - 剔除
-    ],
-    # ========== 嘉实原油 (合并重复ticker) ==========
-    "160723": [
-        ("USO",  28.91, "US"),   # WisdomTree WTI(19.35) + USO(9.56)
-        ("BNO",  24.45, "US"),   # WisdomTree Brent(16.28) + BNO(8.17)
-        ("OILK", 14.48, "US"),   # ProShares K-1 Free Crude Oil ETF
-    ],
-    # ========== 原油LOF (合并重复ticker) ==========
-    "161129": [
-        ("USO",  32.56, "US"),   # WisdomTree WTI(19.70) + USO(12.86)
-        ("BNO",  32.77, "US"),   # WisdomTree Brent(19.53) + BNO(13.24)
-        ("DBO",  16.72, "US"),   # Invesco DB Oil Fund
-    ],
-    # ========== 全球油气 ==========
-    "163208": [
-        ("XOP",  16.04, "US"),   # SPDR S&P Oil & Gas Exploration & Production
-        ("VDE",  16.02, "US"),   # Vanguard Energy ETF
-        ("IYE",  15.82, "US"),   # iShares US Energy ETF
-        ("IXC",  15.81, "US"),   # iShares Global Energy ETF
-        ("XLE",  15.60, "US"),   # SPDR Energy Select Sector
-        ("USO",   7.60, "US"),   # United States Oil Fund LP
-        ("BNO",   7.31, "US"),   # United States Brent Oil Fund LP
-    ],
-    # ========== 全球芯片 ==========
-    "501225": [
-        ("PSI",  18.32, "US"),   # Invesco Dynamic Semiconductors ETF
-        ("SOXQ", 18.25, "US"),   # Invesco PHLX Semiconductor ETF
-        ("SOXX", 18.23, "US"),   # iShares Semiconductor ETF
-        ("SMH",  18.17, "US"),   # VanEck Semiconductor ETF
-        # A股芯片ETF (~20%) - 暂无数据
-        # Global X Semiconductor Japan (日本) - 剔除
-    ],
-    # ========== 标普信息科技 ==========
-    "161128": [("XLK", 100, "US")],
-    # ========== 纳指 ==========
-    "161130": [("QQQ", 100, "US")],
-    # ========== 标普500 ==========
-    "161125": [("SPY", 100, "US")],
-    # ========== 标普医疗保健 ==========
-    "161126": [("XLV", 100, "US")],
-    # ========== 标普生物科技 ==========
-    "161127": [("XBI", 100, "US")],
-    # ========== 美国消费 ==========
-    "162415": [("XLY", 100, "US")],
-    # ========== 美国REIT ==========
-    "160140": [("VNQ", 100, "US")],
-    # ========== 美元债 ==========
-    "501300": [("AGG", 100, "US")],
-    # ========== 印度基金 ==========
-    "164824": [("INDA", 100, "US")],
-    # ========== 华宝油气 ==========
-    "162411": [("XOP", 100, "US")],
-    # ========== 嘉实黄金 ==========
-    "160719": [("GLD", 100, "US")],
-    # ========== 黄金LOF ==========
-    "164701": [("GLD", 100, "US")],
-    # ========== 黄金主题 ==========
-    "161116": [("GLD", 100, "US")],
-    # ========== 石油基金(已B类) ==========
-    "160416": [],  # 从DB获取
-    # ========== 石油LOF(已B类) ==========
-    "162719": [],  # 从DB获取
-    # ========== 南方香港(已B类) ==========
-    "160125": [],  # 从DB获取
-    # ========== 港美互联网(已B类) ==========
-    "160644": [],  # 从DB获取
-    # ========== 中概互联网(已B类) ==========
-    "164906": [],  # 从DB获取
+
+# A类: 基金代码 -> (etf_ticker, etf_name)
+ETF_MAPPING: Dict[str, Tuple[str, str]] = {
+    "161128": ("XLK", "标普500信息科技 -> XLK"),
+    "161130": ("QQQ", "纳斯达克100 -> QQQ"),
+    "161125": ("SPY", "标普500 -> SPY"),
+    "161126": ("RYH", "标普500医疗保健等权重 -> RYH"),
+    "161127": ("XBI", "标普生物科技精选行业 -> XBI"),
+    "162415": ("XLY", "标普美国品质消费 -> XLY"),
+    "160416": ("IXC", "标普全球石油 -> IXC"),
+    "162719": ("IEO", "道琼斯美国石油开发生产 -> IEO"),
+    "162411": ("XOP", "标普石油天然气上游 -> XOP"),
+    "160719": ("GLD", "伦敦金价格 -> GLD"),
+    "164824": ("INDA", "中信证券印度ETP(MSCI India) -> INDA"),
+    "160723": ("USO", "WTI原油价格 -> USO"),
+    "161129": ("USO", "S&P GSCI原油指数 -> USO"),
+    "501018": ("USO", "60%WTI+40%Brent -> USO+BNO"),
+    "160140": ("IYR", "道琼斯美国精选REIT -> IYR"),
+    "164701": ("GLD", "伦敦金价格 -> GLD(ETF联接)"),
+    "161116": ("GLD", "50%伦敦金+50%MSCI金矿股 -> GLD+GDX"),
+    "501300": ("AGG", "巴克莱美国综合债券 -> AGG"),
 }
 
 
-def get_hardcoded_holdings(code: str) -> List[Tuple[str, float, str]]:
-    return KNOWN_HOLDINGS.get(code, [])
+def is_class_a(code: str) -> bool:
+    return code in ETF_MAPPING
+
+
+def get_etf_ticker(code: str) -> str:
+    entry = ETF_MAPPING.get(code)
+    return entry[0] if entry else ""
+
+
+def get_a_holdings(code: str) -> List[Dict]:
+    entry = ETF_MAPPING.get(code)
+    if not entry:
+        return []
+    if code == "501018":
+        return [
+            {"ticker": "USO", "weight": 60.0, "market": "US"},
+            {"ticker": "BNO", "weight": 40.0, "market": "US"},
+        ]
+    if code == "161116":
+        return [
+            {"ticker": "GLD", "weight": 50.0, "market": "US"},
+            {"ticker": "GDX", "weight": 50.0, "market": "US"},
+        ]
+    return [{"ticker": entry[0], "weight": 100.0, "market": "US"}]
+
+
+# B类: 基金代码 -> 实际持仓 [(ticker, weight, market), ...]
+B_HOLDINGS: Dict[str, List[Tuple[str, float, str]]] = {
+    "501312": [
+        ("ARKK", 18.74, "US"), ("ARKG", 15.35, "US"),
+        ("ARKQ", 11.59, "US"), ("SOXX", 9.51, "US"),
+        ("AIQ", 7.85, "US"),   ("QQQ", 7.45, "US"),
+        ("BOTZ", 7.44, "US"),  ("XLK", 6.44, "US"),
+        ("SMH", 4.29, "US"),   ("FINX", 1.20, "US"),
+    ],
+    "501225": [("PSI", 18.32, "US"), ("SOXQ", 18.25, "US"), ("SOXX", 18.23, "US"), ("SMH", 18.17, "US")],
+    "163208": [
+        ("XOP", 16.04, "US"), ("VDE", 16.02, "US"), ("IYE", 15.82, "US"),
+        ("IXC", 15.81, "US"), ("XLE", 15.60, "US"), ("USO", 7.60, "US"),
+        ("BNO", 7.31, "US"),
+    ],
+    "160644": [
+        ("TSM", 9.09, "US"), ("NVDA", 9.05, "US"), ("SNDK", 8.57, "US"),
+        ("MU", 7.49, "US"), ("00700", 6.58, "HK"), ("GOOGL", 5.69, "US"),
+        ("09988", 4.69, "HK"), ("00883", 3.96, "HK"), ("AVGO", 3.49, "US"),
+        ("ASML", 2.85, "US"),
+    ],
+    "160125": [],
+    "164906": [("KWEB", 100.0, "US")],
+}
+
+
+def get_b_holdings(code: str) -> List[Dict]:
+    raw = B_HOLDINGS.get(code, [])
+    return [{"ticker": t, "weight": w, "market": m} for t, w, m in raw]
+
+
+def get_holdings_for_backtest(code: str) -> List[Dict]:
+    if is_class_a(code):
+        return get_a_holdings(code)
+    return get_b_holdings(code)

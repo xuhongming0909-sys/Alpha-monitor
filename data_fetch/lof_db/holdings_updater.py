@@ -16,7 +16,7 @@ def _load_b_funds():
         plugins = cfg.get("data_fetch", {}).get("plugins", {})
         lof_cfg = plugins.get("lof_arbitrage", plugins.get("lof_iopv", {}))
         funds = lof_cfg.get("funds", [])
-        return [f for f in funds if f.get("estimation") == "B" and f.get("code")]
+        return [f for f in funds if f.get("code")]
     except Exception:
         return []
 

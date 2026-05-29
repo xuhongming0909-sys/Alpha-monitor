@@ -12,6 +12,7 @@ from shared.market_service import get_fx_rates
 from shared.models.service_result import build_success
 from shared.time.shanghai_time import now_iso
 from strategy.lof_iopv.calc import to_float, get_base_fx, calc_iopv
+from data_fetch.lof_iopv.fund_classifier import get_fund_class, get_index_etf_ticker, is_index_fund
 
 _BACKTEST_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', 'runtime_data', 'backtest', 'results_v2.json')
 _BACKTEST_RESULTS = {}
@@ -135,8 +136,15 @@ def build_lof_response(fetch_payload):
         else:
             premium_status = None
 
-        effective_holdings = row.get("holdings") or _get_holdings_from_db(row.get("code", ""))
-        benchmark = "Top10(%d)" % len(effective_holdings)
+        code = row.get("code", "")
+        effective_holdings = row.get("holdings") or _get_holdings_from_db(code)
+        cls = get_fund_class(code)
+        if cls == "index":
+            benchmark = "ETF:%s" % get_index_etf_ticker(code)
+        elif cls == "active_api":
+            benchmark = "API持仓(%d只)" % len(effective_holdings)
+        else:
+            benchmark = "季报持仓"
 
         apply_status = row.get("applyStatus") or ""
         daily_limit = row.get("dailyLimit")
@@ -169,7 +177,8 @@ def build_lof_response(fetch_payload):
             "custodianFee": row.get("custodianFee"),
             "fundCompany": row.get("fundCompany"),
             "navDate": row.get("navDate"),
-            "r2": _BACKTEST_RESULTS.get(row.get("code"), {}).get("r2"),
+            "fundClass": get_fund_class(row.get("code", "")),
+            "backtestMae": _BACKTEST_RESULTS.get(row.get("code"), {}).get("mae"),
             "maxErr": _BACKTEST_RESULTS.get(row.get("code"), {}).get("maxErr"),
             "samplePeriod": _BACKTEST_RESULTS.get(row.get("code"), {}).get("samplePeriod"),
         })
