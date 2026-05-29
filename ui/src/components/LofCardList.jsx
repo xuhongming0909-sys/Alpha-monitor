@@ -1,5 +1,5 @@
-// AI-SUMMARY: LOF IOPV 估值表格，按 R² 精度分页展示
-// 对应 INDEX.md §9.3 文件摘要索引
+// AI-SUMMARY: LOF IOPV 估值表格，统一展示
+// 对应 INDEX.md 9.3 文件摘要索引
 import React from 'react';
 import SimpleDataTable from './SimpleDataTable.jsx';
 import { formatDate, formatNumber, formatPercent, pickText, rowMatchesQuery, signedClass, toNumber } from './cardHelpers.jsx';
@@ -45,36 +45,20 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
     { key: 'custodianFee', label: '托管费', numeric: true, render: (row) => formatFee(row.custodianFee) },
     { key: 'fundCompany', label: '基金公司', render: (row) => pickText(row.fundCompany) },
     { key: 'calcTarget', label: '估值标的', render: (row) => <span className="muted" style={{fontSize: '0.85em'}}>{pickText(row.calcTarget)}</span> },
-    { key: 'stockPosition', label: '动态仓位', numeric: true, render: (row) => formatStockPosition(row) },
-    { key: 'r2', label: 'R²', numeric: true, render: (row) => row.r2 != null ? row.r2.toFixed(3) : '--' },
+    { key: 'stockPosition', label: '总仓位', numeric: true, render: (row) => formatStockPosition(row) },
     { key: 'mae', label: '平均误差', numeric: true, render: (row) => row.mae != null ? `${row.mae.toFixed(2)}%` : '--' },
     { key: 'maxErr', label: 'MAX误差', numeric: true, render: (row) => row.maxErr != null ? `${row.maxErr.toFixed(2)}%` : '--' },
     { key: 'samplePeriod', label: '样本区间', render: (row) => pickText(row.samplePeriod) || '--' },
   ];
 
-  const accurate = sorted.filter((r) => toNumber(r.r2) >= 0.8);
-  const inaccurate = sorted.filter((r) => toNumber(r.r2) < 0.8);
-
-  return <LofSubTabs accurate={accurate} inaccurate={inaccurate} columns={columns} />;
-}
-
-function LofSubTabs({ accurate, inaccurate, columns }) {
-  const [subTab, setSubTab] = React.useState('accurate');
-  const activeRows = subTab === 'accurate' ? accurate : inaccurate;
   return (
-    <>
-      <div className="subtab-row">
-        <button className={`tab-button${subTab === 'accurate' ? ' active' : ''}`} onClick={() => setSubTab('accurate')}>准确 ({accurate.length})</button>
-        <button className={`tab-button${subTab === 'inaccurate' ? ' active' : ''}`} onClick={() => setSubTab('inaccurate')}>不准确 ({inaccurate.length})</button>
-      </div>
-      <SimpleDataTable
-        eyebrow="LOF IOPV"
-        title="QDII LOF 估值"
-        count={`${activeRows.length} 条`}
-        columns={columns}
-        rows={activeRows}
-        emptyText="LOF 接口暂无数据"
-      />
-    </>
+    <SimpleDataTable
+      eyebrow="LOF IOPV"
+      title="QDII LOF 估值"
+      count={`${sorted.length} 条`}
+      columns={columns}
+      rows={sorted}
+      emptyText="LOF 接口暂无数据"
+    />
   );
 }

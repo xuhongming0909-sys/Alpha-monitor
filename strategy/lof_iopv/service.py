@@ -37,8 +37,8 @@ def _get_fx_base_from_db(currency, nav_date):
         from data_fetch.lof_db.schema import get_db
         conn = get_db()
         row = conn.execute(
-            "SELECT rate FROM fx_rates WHERE currency=? AND date<=? AND rate IS NOT NULL ORDER BY date DESC LIMIT 1",
-            (currency, nav_date[:10])
+            "SELECT rate FROM fx_rates WHERE currency=? AND date<=? AND date>=date(?, '-10 days') AND rate IS NOT NULL ORDER BY date DESC LIMIT 1",
+            (currency, nav_date[:10], nav_date[:10])
         ).fetchone()
         conn.close()
         if row and row[0]:
@@ -63,46 +63,48 @@ def _get_holdings_from_db(code):
     except Exception:
         return []
 
-def _monitor_pools(row):
-    """根据溢价率决定监控池资格"""
+def _monitor_pools(row, limited_threshold=0.5, unlimited_threshold=1.0):
+    """根据溢价率决定监控池资格。阈值可从 config 覆盖。"""
     premium = row.get("premiumRate")
     if premium is None:
         return False, False
-    limited = abs(premium) >= 0.5
-    unlimited = abs(premium) >= 1.0
+    limited = abs(premium) >= limited_threshold
+    unlimited = abs(premium) >= unlimited_threshold
     return limited, unlimited
 
+
+
+def _resolve_fx_rates(currencies):
+    """统一汇率获取：先 tencent API，fallback 到 DB。"""
+    fx = {}
+    try:
+        api_rates = get_fx_rates(currencies)
+        if api_rates:
+            fx.update(api_rates)
+    except Exception:
+        pass
+    missing = [c for c in currencies if c not in fx]
+    if missing:
+        try:
+            from data_fetch.lof_db.schema import get_db
+            conn = get_db()
+            for cur in missing:
+                row = conn.execute(
+                    "SELECT rate FROM fx_rates WHERE currency=? AND rate IS NOT NULL ORDER BY date DESC LIMIT 1",
+                    (cur,)
+                ).fetchone()
+                if row and row[0]:
+                    fx[cur] = row[0]
+            conn.close()
+        except Exception:
+            pass
+    return fx
 
 def build_lof_response(fetch_payload):
     """从 source 层 fetch 结果构建 UI 展示数据"""
     _load_backtest_results()
 
-    fx_rates = {}
-    for cur in ["USD", "HKD"]:
-        try:
-            rates = get_fx_rates([cur])
-            if rates and cur in rates:
-                fx_rates[cur] = rates[cur]
-        except Exception:
-            pass
-        if cur not in fx_rates:
-            try:
-                from data_fetch.lof_db.schema import get_db
-                conn = get_db()
-                row = conn.execute(
-                    "SELECT rate FROM fx_rates WHERE currency=? AND rate IS NOT NULL ORDER BY date DESC LIMIT 1",
-                    (cur,)
-                ).fetchone()
-                conn.close()
-                if row and row[0]:
-                    fx_rates[cur] = row[0]
-            except Exception:
-                pass
-    if not fx_rates:
-        try:
-            fx_rates = get_fx_rates(["USD", "HKD"])
-        except Exception:
-            fx_rates = {}
+    fx_rates = _resolve_fx_rates(["USD", "HKD"])
 
     rows = fetch_payload.get("data") or []
     result = []
@@ -176,9 +178,12 @@ def build_lof_response(fetch_payload):
             "redeemStatus": row.get("redeemStatus"),
             "custodianFee": row.get("custodianFee"),
             "fundCompany": row.get("fundCompany"),
+            "shareIncrease": row.get("shareIncrease"),
+            "shareTotal": row.get("shareTotal"),
+            "applyFee": row.get("applyFee"),
             "navDate": row.get("navDate"),
             "fundClass": get_fund_class(row.get("code", "")),
-            "backtestMae": _BACKTEST_RESULTS.get(row.get("code"), {}).get("mae"),
+            "mae": _BACKTEST_RESULTS.get(row.get("code"), {}).get("mae"),
             "maxErr": _BACKTEST_RESULTS.get(row.get("code"), {}).get("maxErr"),
             "samplePeriod": _BACKTEST_RESULTS.get(row.get("code"), {}).get("samplePeriod"),
         })

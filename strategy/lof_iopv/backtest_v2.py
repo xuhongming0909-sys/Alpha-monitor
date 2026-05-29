@@ -63,12 +63,12 @@ def _get_stock_prices_batch(tickers, start_date, end_date):
     return result
 
 
-def _get_fx_rates(start_date, end_date):
-    """获取USD汇率 {date: rate}"""
+def _get_fx_rates(start_date, end_date, currency='USD'):
+    """获取指定币种汇率 {date: rate}，支持 USD/HKD"""
     conn = get_db()
     rows = conn.execute(
         'SELECT date, rate FROM fx_rates WHERE currency = ? AND date >= ? AND date <= ? ORDER BY date',
-        ('USD', start_date, end_date)
+        (currency.upper(), start_date, end_date)
     ).fetchall()
     conn.close()
     return {r[0]: r[1] for r in rows}
@@ -108,7 +108,20 @@ def backtest_fund(code, end_date_str):
     """回测单只基金: A类ETF追踪或B类持仓加权, 统一calc_iopv。"""
     start_date = (datetime.strptime(end_date_str, '%Y-%m-%d') - timedelta(days=LOOKBACK_DAYS)).strftime('%Y-%m-%d')
     nav_dict = _get_nav_dates(code, start_date, end_date_str)
-    fx_rates = _get_fx_rates(start_date, end_date_str)
+    # Determine fund currency for FX lookup
+    fund_currency = 'USD'
+    try:
+        from shared.config.script_config import load_config
+        cfg = load_config()
+        plugins = cfg.get('data_fetch', {}).get('plugins', {})
+        lof_cfg = plugins.get('lof_arbitrage', plugins.get('lof_iopv', {}))
+        for f in lof_cfg.get('funds', []):
+            if f.get('code') == code:
+                fund_currency = f.get('currency', 'USD')
+                break
+    except Exception:
+        pass
+    fx_rates = _get_fx_rates(start_date, end_date_str, fund_currency)
     holdings = _get_holdings(code)
     if not holdings:
         return None

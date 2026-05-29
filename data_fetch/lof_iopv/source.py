@@ -261,11 +261,12 @@ def build_lof_snapshot():
         nav, nav_date = nav_data["nav"], nav_data["navDate"]
         # 持仓获取: 指数型用ETF映射, 主动型用API/PDF
         fund_class = get_fund_class(code)
-        if fund_class == "index":
-            holdings = [{"ticker": h["ticker"], "name": "", "weight": h["weight"], "market": h["market"].lower()} for h in get_holdings_for_service(code)]
+        # 统一使用 get_holdings_for_service（含 hardcoded fallback），不再仅限 index
+        holdings_raw = get_holdings_for_service(code)
+        if holdings_raw:
+            holdings = [{"ticker": h["ticker"], "name": h.get("name", ""), "weight": h["weight"], "market": h["market"].lower()} for h in holdings_raw]
         else:
             holdings = _fetch_holdings(code)
-        fund_info = _fetch_fund_info(code)
 
         market = "sh" if code.startswith(("5", "6")) else "sz"
         current_prices = {}
@@ -355,7 +356,7 @@ def build_lof_snapshot():
             "holdings": holdings,
             "currentPrices": current_prices,
             "stockPosition": stock_position,
-            "holdingsPrevClose": current_prices.pop("_prev_close", None),
+            "holdingsPrevClose": current_prices.get("_prev_close"),
             "navDatePrices": nav_date_prices,
             "navDate": nav_date,
             "currentFxRate": fx_rates.get(fund["currency"]),

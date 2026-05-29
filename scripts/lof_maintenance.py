@@ -1,11 +1,5 @@
 # -*- coding: utf-8 -*-
-# AI-SUMMARY: LOF数据库每日维护脚本，独立入口供cron/systemd调用
-# 对应 INDEX.md §9.3 文件摘要索引
-"""LOF数据库每日维护
-
-用法：python scripts/lof_maintenance.py [--dry-run]
-"""
-
+"""LOF数据库每日维护脚本，独立入口供cron/systemd调用。"""
 import sys
 import os
 import traceback
@@ -21,18 +15,47 @@ def run_maintenance(dry_run=False):
         print("[dry-run] Would update and cleanup. Exiting.")
         return True
 
+    results = {}
+    errors = []
+
+    # 逐步执行，记录失败但不中断
+    steps = [
+        ("nav", "data_fetch.lof_db.nav_updater", "update_nav"),
+        ("etf", "data_fetch.lof_db.etf_updater", "update_etf"),
+        ("fx", "data_fetch.lof_db.fx_updater", "update_fx"),
+        ("holdings", "data_fetch.lof_db.holdings_updater", "update_holdings"),
+    ]
+
+    for key, module_name, func_name in steps:
+        try:
+            print(f"\nUpdating {key}...")
+            import importlib
+            mod = importlib.import_module(module_name)
+            fn = getattr(mod, func_name)
+            results[key] = fn()
+        except Exception as e:
+            errors.append(f"{key}: {e}")
+            traceback.print_exc()
+
+    # Cleanup
     try:
-        from data_fetch.lof_db.updater import update_all
-        results = update_all()
-
-        print("\n=== Summary ===")
-        for k, v in results.items():
-            print(f"  {k}: {v}")
-
-        return True
+        print("\nCleaning up old data (>90 days)...")
+        from data_fetch.lof_db.schema import cleanup_old_data
+        results['cleanup'] = cleanup_old_data()
     except Exception as e:
+        errors.append(f"cleanup: {e}")
         traceback.print_exc()
+
+    # Summary
+    print("\n=== Summary ===")
+    for k, v in results.items():
+        print(f"  {k}: {v}")
+    if errors:
+        print(f"\n=== Errors ({len(errors)}) ===")
+        for e in errors:
+            print(f"  FAIL: {e}")
         return False
+    return True
 
 
 if __name__ == '__main__':

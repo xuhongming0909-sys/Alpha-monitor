@@ -6,6 +6,7 @@
 from datetime import datetime, timedelta
 import sqlite3
 import os
+from contextlib import contextmanager
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'runtime_data', 'lof_db', 'lof.db')
 
@@ -16,6 +17,20 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
+
+
+@contextmanager
+def db_conn():
+    """Context manager for DB connections. Auto-commit on success, rollback on error."""
+    conn = get_db()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def init_db():

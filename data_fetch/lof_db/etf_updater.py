@@ -1,36 +1,22 @@
 # -*- coding: utf-8 -*-
-# AI-SUMMARY: ETF和个股价格增量更新，统一使用新浪akshare替代东财secid反查
-# 对应 INDEX.md §9.3 文件摘要索引
-"""ETF/个股价格增量更新 - 新浪akshare stock_us_daily + stock_hk_daily"""
-
+"""ETF和个股价格增量更新，统一使用新浪akshare stock_us_daily + stock_hk_daily"""
 import time
-
 from data_fetch.lof_db.schema import get_db
 
 
 def _load_etf_list() -> list[str]:
+    """从 fund_classifier 动态提取所有需要跟踪的 ETF ticker。"""
     try:
-        from shared.config.script_config import load_config
-        cfg = load_config()
-        plugins = cfg.get("data_fetch", {}).get("plugins", {})
-        lof_cfg = plugins.get("lof_arbitrage", plugins.get("lof_iopv", {}))
-        funds = lof_cfg.get("funds", [])
+        from data_fetch.lof_iopv.fund_classifier import INDEX_ETF
         etfs = set()
-        for f in funds:
-            if f.get("estimation") != "A":
-                continue
-            if f.get("etf"):
-                etfs.add(f["etf"])
-            for b in (f.get("etf_blend") or []):
-                if b.get("ticker"):
-                    etfs.add(b["ticker"])
-        extra = {'SOXX', 'DBC', 'TIP', 'OIH'}  # GSG已移除(新浪数据有误)
-        etfs |= extra
+        for mappings in INDEX_ETF.values():
+            for item in mappings:
+                etfs.add(item[0])  # ticker is first element
         return sorted(etfs)
-
     except Exception:
-        pass
-    return ['QQQ', 'SPY', 'GLD', 'XLK']
+        # Fallback to hardcoded if import fails
+        return sorted({'SOXX', 'DBC', 'TIP', 'OIH', 'SPY', 'QQQ', 'XLK', 'RYH',
+                        'XBI', 'XLY', 'IXC', 'IEO', 'XOP', 'GLD', 'INDA', 'IYR', 'USO', 'BNO'})
 
 
 def _load_stock_list() -> list[str]:
@@ -41,7 +27,7 @@ def _load_stock_list() -> list[str]:
 
 
 def _is_hk(ticker: str) -> bool:
-    """判断是否港股：5位数字开头或HK前缀"""
+    """判断是否港股：5位数字开头"""
     return ticker.isdigit() and len(ticker) == 5
 
 
@@ -65,23 +51,31 @@ def _fetch_sina(ticker: str) -> dict[str, float]:
         return {}
 
 
+def _update_prices(conn, table, ticker, prices):
+    """通用价格写入，返回新增条数。"""
+    count = 0
+    for date_str, close in prices.items():
+        conn.execute(
+            f'INSERT OR REPLACE INTO {table} (ticker, date, close) VALUES (?, ?, ?)',
+            (ticker, date_str, close)
+        )
+        count += 1
+    return count
+
+
 def update_etf():
     conn = get_db()
     total_inserted = 0
     etf_list = _load_etf_list()
-    print(f'ETF列表 ({len(etf_list)}): {", ".join(etf_list)}')
+    print(f'ETF列表 ({len(etf_list)}): {", ".join(etf_list[:10])}{"..." if len(etf_list) > 10 else ""}')
     for ticker in etf_list:
         prices = _fetch_sina(ticker)
         if not prices:
             continue
-        for date_str, close in prices.items():
-            conn.execute(
-                'INSERT OR REPLACE INTO etf_prices (ticker, date, close) VALUES (?, ?, ?)',
-                (ticker, date_str, close)
-            )
+        inserted = _update_prices(conn, 'etf_prices', ticker, prices)
         conn.commit()
-        total_inserted += len(prices)
-        print(f'  {ticker}: {len(prices)}天')
+        total_inserted += inserted
+        print(f'  {ticker}: {inserted}条')
         time.sleep(0.3)
     conn.close()
     return total_inserted
@@ -97,14 +91,10 @@ def update_stocks(tickers: list[str] = None):
         prices = _fetch_sina(ticker)
         if not prices:
             continue
-        for date_str, close in prices.items():
-            conn.execute(
-                'INSERT OR REPLACE INTO stock_prices (ticker, date, close) VALUES (?, ?, ?)',
-                (ticker, date_str, close)
-            )
+        inserted = _update_prices(conn, 'stock_prices', ticker, prices)
         conn.commit()
-        total_inserted += len(prices)
-        print(f'  {ticker}: {len(prices)}天')
+        total_inserted += inserted
+        print(f'  {ticker}: {inserted}条')
         time.sleep(0.3)
     conn.close()
     return total_inserted
@@ -115,7 +105,7 @@ def update_all():
     etf_count = update_etf()
     print(f'\n=== 更新持仓股票价格 ===')
     stock_count = update_stocks()
-    print(f'\n完成: ETF {etf_count}条, 股票 {stock_count}条')
+    print(f'\n完成: ETF {etf_count}条 股票 {stock_count}条')
     return etf_count + stock_count
 
 

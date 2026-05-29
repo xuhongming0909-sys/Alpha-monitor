@@ -62,20 +62,20 @@ def update_nav():
         if not nav:
             continue
 
-        inserted = 0
+        actual = 0
         for date, nav_val in nav.items():
             try:
-                conn.execute(
+                cur = conn.execute(
                     'INSERT OR IGNORE INTO fund_nav (code, date, nav) VALUES (?, ?, ?)',
                     (code, date, nav_val)
                 )
-                pass  # count via len(nav)
+                actual += cur.rowcount if cur.rowcount > 0 else 0
             except Exception:
                 pass
 
         conn.commit()
-        total_inserted += len(nav)
-        print(f'  {code}: {len(nav)} days')
+        total_inserted += actual
+        print(f'  {code}: {actual}/{len(nav)} new days')
 
     conn.close()
     return total_inserted
