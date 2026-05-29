@@ -31,7 +31,7 @@ def _load_config():
         secrets_path = os.path.join(_PROJECT_ROOT, 'config', 'secrets.yaml')
         with open(secrets_path, 'r', encoding='utf-8') as f:
             secrets = yaml.safe_load(f) or {}
-        mimo = secrets.get("mimo", {})
+        mimo = secrets.get("vision", {})
         return {
             "api_key": mimo.get("api_key", ""),
             "base_url": mimo.get("base_url", "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"),
