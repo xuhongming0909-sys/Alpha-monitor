@@ -19,7 +19,7 @@ _BACKTEST_RESULTS = {}
 
 
 def _load_backtest_results():
-    """加载回测结果缓存"""
+    """鍔犺浇鍥炴祴缁撴灉缂撳瓨"""
     global _BACKTEST_RESULTS
     try:
         if _os.path.exists(_BACKTEST_PATH):
@@ -30,7 +30,7 @@ def _load_backtest_results():
 
 
 def _get_fx_base_from_db(currency, nav_date):
-    """从 DB 获取 NAV 基准日汇率，fallback 到 get_base_fx"""
+    """浠?DB 鑾峰彇 NAV 鍩哄噯鏃ユ眹鐜囷紝fallback 鍒?get_base_fx"""
     if not nav_date or currency == "CNY":
         return 1.0 if currency == "CNY" else None
     try:
@@ -50,7 +50,7 @@ def _get_fx_base_from_db(currency, nav_date):
 
 
 def _get_holdings_from_db(code):
-    """从 DB 兜底获取最新持仓数据"""
+    """浠?DB 鍏滃簳鑾峰彇鏈€鏂版寔浠撴暟鎹?""
     try:
         from data_fetch.lof_db.schema import get_db
         conn = get_db()
@@ -64,7 +64,7 @@ def _get_holdings_from_db(code):
         return []
 
 def _monitor_pools(row, limited_threshold=0.5, unlimited_threshold=1.0):
-    """根据溢价率决定监控池资格。阈值可从 config 覆盖。"""
+    """鏍规嵁婧环鐜囧喅瀹氱洃鎺ф睜璧勬牸銆傞槇鍊煎彲浠?config 瑕嗙洊銆?""
     premium = row.get("premiumRate")
     if premium is None:
         return False, False
@@ -75,7 +75,7 @@ def _monitor_pools(row, limited_threshold=0.5, unlimited_threshold=1.0):
 
 
 def _resolve_fx_rates(currencies):
-    """统一汇率获取：先 tencent API，fallback 到 DB。"""
+    """缁熶竴姹囩巼鑾峰彇锛氬厛 tencent API锛宖allback 鍒?DB銆?""
     fx = {}
     try:
         api_rates = get_fx_rates(currencies)
@@ -101,7 +101,7 @@ def _resolve_fx_rates(currencies):
     return fx
 
 def build_lof_response(fetch_payload):
-    """从 source 层 fetch 结果构建 UI 展示数据"""
+    """浠?source 灞?fetch 缁撴灉鏋勫缓 UI 灞曠ず鏁版嵁"""
     _load_backtest_results()
 
     fx_rates = _resolve_fx_rates(["USD", "HKD"])
@@ -134,7 +134,7 @@ def build_lof_response(fetch_payload):
         stock_pos = row.get("stockPosition")
 
         if premium is not None:
-            premium_status = "溢价" if premium > 0.5 else ("折价" if premium < -0.5 else "平价")
+            premium_status = "婧环" if premium > 0.5 else ("鎶樹环" if premium < -0.5 else "骞充环")
         else:
             premium_status = None
 
@@ -144,17 +144,21 @@ def build_lof_response(fetch_payload):
         if cls == "index":
             benchmark = "ETF:%s" % get_index_etf_ticker(code)
         elif cls == "active_api":
-            benchmark = "API持仓(%d只)" % len(effective_holdings)
+            benchmark = "API鎸佷粨(%d鍙?" % len(effective_holdings)
         else:
-            benchmark = "季报持仓"
+            benchmark = "瀛ｆ姤鎸佷粨"
 
         apply_status = row.get("applyStatus") or ""
         daily_limit = row.get("dailyLimit")
-        if apply_status == "限大额" and daily_limit is not None and daily_limit < 1e10:
-            apply_status = "限额%d" % int(daily_limit)
+        if apply_status == "闄愬ぇ棰? and daily_limit is not None and daily_limit < 1e10:
+            apply_status = "闄愰%d" % int(daily_limit)
         elif not apply_status:
-            apply_status = "未知"
+            apply_status = "鏈煡"
 
+        # 交易所判断：1开头=深市（支持1拖六），5开头=沪市（不支持）
+        fund_code = row.get("code", "")
+        exchange = "深市" if fund_code.startswith("1") else "沪市"
+        supports_1to6 = fund_code.startswith("1")
         result.append({
             "code": row.get("code"),
             "name": row.get("name"),
@@ -182,6 +186,8 @@ def build_lof_response(fetch_payload):
             "shareTotal": row.get("shareTotal"),
             "applyFee": row.get("applyFee"),
             "navDate": row.get("navDate"),
+            "exchange": exchange,
+            "supports1to6": supports_1to6,
             "fundClass": get_fund_class(row.get("code", "")),
             "mae": _BACKTEST_RESULTS.get(row.get("code"), {}).get("mae"),
             "maxErr": _BACKTEST_RESULTS.get(row.get("code"), {}).get("maxErr"),

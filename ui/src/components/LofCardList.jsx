@@ -1,4 +1,4 @@
-// AI-SUMMARY: LOF IOPV 估值表格，统一展示
+// AI-SUMMARY: LOF IOPV 估值表格，统一展示，支持置顶筛选和1拖六字段
 // 对应 INDEX.md 9.3 文件摘要索引
 import React from 'react';
 import SimpleDataTable from './SimpleDataTable.jsx';
@@ -21,16 +21,39 @@ function formatStockPosition(row) {
   return `${v.toFixed(1)}%`;
 }
 
+/** 置顶条件：有限额 + 限额<5万 + IOPV溢价率>1% */
+function isPinned(row) {
+  const status = (row.applyStatus || '').toString();
+  const limit = toNumber(row.dailyLimit);
+  const premium = toNumber(row.premiumRate);
+  const hasLimit = status.includes('限');
+  const limitUnder5w = limit !== null && limit < 50000;
+  const premiumOver1 = premium !== null && premium > 1;
+  return hasLimit && limitUnder5w && premiumOver1;
+}
+
 export default function LofCardList({ rows = [], searchQuery = '' }) {
   const filtered = rows.filter((row) =>
     rowMatchesQuery(row, searchQuery, ['name', 'code', 'fundCompany', 'calcTarget'])
   );
-  const sorted = [...filtered].sort(
-    (a, b) => Math.abs(toNumber(b.premiumRate) ?? 0) - Math.abs(toNumber(a.premiumRate) ?? 0)
-  );
+  // 置顶排前面，其余按溢价率绝对值降序
+  const sorted = [...filtered].sort((a, b) => {
+    const pa = isPinned(a) ? 1 : 0;
+    const pb = isPinned(b) ? 1 : 0;
+    if (pa !== pb) return pb - pa;
+    return Math.abs(toNumber(b.premiumRate) ?? 0) - Math.abs(toNumber(a.premiumRate) ?? 0);
+  });
 
   const columns = [
-    { key: 'code', label: '代码', render: (row) => <span className="mono">{pickText(row.code)}</span> },
+    {
+      key: 'code', label: '代码',
+      render: (row) => (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          {isPinned(row) && <span title="置顶：限额<5万且溢价>1%" style={{ color: '#e74c3c', fontSize: '0.75em' }}>📌</span>}
+          <span className="mono">{pickText(row.code)}</span>
+        </span>
+      ),
+    },
     { key: 'name', label: '名称', render: (row) => pickText(row.name) },
     { key: 'nav', label: 'T-2净值', numeric: true, render: (row) => formatNumber(row.nav) },
     { key: 'navDate', label: '净值日期', render: (row) => formatDate(row.navDate) },
@@ -38,6 +61,7 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
     { key: 'iopv', label: '实时估值', numeric: true, render: (row) => formatNumber(row.iopv) },
     { key: 'premiumRate', label: '溢价率', numeric: true, className: (row) => signedClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate) },
     { key: 'applyStatus', label: '申购状态', render: (row) => pickText(row.applyStatus) },
+    { key: 'supports1to6', label: '1拖六', render: (row) => row.supports1to6 ? <span style={{ color: '#27ae60', fontWeight: 600 }}>✓</span> : <span style={{ color: '#bdc3c7' }}>✗</span> },
     { key: 'shareIncrease', label: '新增份额', numeric: true, render: (row) => formatShare(row.shareIncrease) },
     { key: 'shareTotal', label: '原有份额', numeric: true, render: (row) => formatShare(row.shareTotal) },
     { key: 'applyFee', label: '申购费', numeric: true, render: (row) => formatFee(row.applyFee) },
@@ -51,10 +75,12 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
     { key: 'samplePeriod', label: '样本区间', render: (row) => pickText(row.samplePeriod) || '--' },
   ];
 
+  const pinnedCount = sorted.filter(isPinned).length;
+
   return (
     <SimpleDataTable
       eyebrow="LOF IOPV"
-      title="QDII LOF 估值"
+      title={`QDII LOF 估值${pinnedCount > 0 ? ` · 📌${pinnedCount}` : ''}`}
       count={`${sorted.length} 条`}
       columns={columns}
       rows={sorted}
