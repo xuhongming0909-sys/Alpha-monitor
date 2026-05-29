@@ -245,7 +245,7 @@ def _fetch_purchase_status():
         url = "https://fund.eastmoney.com/Data/Fund_JJJZ_Data.aspx?t=8"
         text = SESSION.get(url, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
         # API返回 var db={datas:[[code,name,type,nav,date,applyStatus,...,limit,...],...]}
-        m = re.search(r"var db=\{datas:(\[.*?\])\}", text, re.DOTALL)
+        m = re.search(r"var db=\{datas:(\[.*\]),record:", text, re.DOTALL)
         if not m:
             return result
         arr = _json.loads(m.group(1))
@@ -399,7 +399,7 @@ def build_lof_snapshot():
             "currentFxRate": fx_rates.get(fund["currency"]),
             "applyFee": fund_info.get("applyFee"),
             "applyStatus": purchase_status_data.get(code, {}).get("applyStatus") or fund_info.get("applyStatus"),
-            "dailyLimit": purchase_status_data.get(code, {}).get("dailyLimit"),
+            "dailyLimit": purchase_status_data.get(code, {}).get("dailyLimit") or fund_info.get("dailyLimit"),
             "redeemFee": fund_info.get("redeemFee"),
             "redeemStatus": fund_info.get("redeemStatus"),
             "custodianFee": fund_info.get("custodianFee"),
