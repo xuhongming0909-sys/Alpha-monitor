@@ -1,4 +1,4 @@
-﻿# Alpha Monitor 生效规格说明
+# Alpha Monitor 生效规格说明
 
 状态：当前生效版本  
 日期：2026-04-24

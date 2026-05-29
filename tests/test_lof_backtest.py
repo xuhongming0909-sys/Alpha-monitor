@@ -1,4 +1,4 @@
-﻿"""Tests for backtest_v2.py - multi-currency and DB holdings."""
+"""Tests for backtest_v2.py - multi-currency and DB holdings."""
 import json
 import os
 import sys

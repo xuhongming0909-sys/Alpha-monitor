@@ -1,4 +1,4 @@
-﻿# Memory
+# Memory
 
 **Retention**: max 50 entries. Oldest auto-deleted when exceeded.
 
@@ -7,6 +7,20 @@
 
 ## Entries
 ### 2026-05-28 | LOF文档同步
+
+### 2026-05-28 | LOF A/B类统一清理
+
+- **Decision**: 所有14只基金都是B类(T10持仓法)，A类代码全是死代码，统一清理
+- **Action**: calc.py: calc_b_iopv→calc_iopv，删除calc_a_iopv
+- **Action**: backtest_v2.py: backtest_b→backtest_fund，删除backtest_a
+- **Action**: service.py: 删除A类分支，统一calc_iopv
+- **Action**: source.py: 删除ETF相关函数和estimation字段
+- **Action**: 删除backtest.py/backtest_t10.py/classifier.py
+- **Action**: config.yaml: 删除全部estimation字段
+- **Action**: holdings_updater.py: 修复estimation=="B"过滤bug
+- **Formula**: IOPV = NAV * (1 + stock_ratio/100 * weighted_ret) * fx_ratio
+- **Result**: 删除3文件，5文件重写，代码精简~200行
+
 
 - **Decision**: 代码领先于文档，全面同步specs/INDEX/calc与实际代码
 - **Action**: 修复specs/lof-arbitrage.md（维护脚本路径、文件结构、数据源表）

@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """LOF IOPV 数据标准化器。"""
 
 from __future__ import annotations

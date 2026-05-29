@@ -1,4 +1,4 @@
-﻿# Alpha Monitor UI Design System
+# Alpha Monitor UI Design System
 
 ## 1. 定位
 

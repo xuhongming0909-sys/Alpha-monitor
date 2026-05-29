@@ -1,4 +1,4 @@
-﻿import urllib.request, json
+import urllib.request, json
 
 proxy = urllib.request.ProxyHandler({"https":"http://127.0.0.1:7890","http":"http://127.0.0.1:7890"})
 opener = urllib.request.build_opener(proxy)

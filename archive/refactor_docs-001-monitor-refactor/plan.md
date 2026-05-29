@@ -1,4 +1,4 @@
-﻿# Plan: React 金融终端 UI 并行重做
+# Plan: React 金融终端 UI 并行重做
 
 ## 假设
 

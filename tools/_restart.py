@@ -1,4 +1,4 @@
-﻿import paramiko, time
+import paramiko, time
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 ssh.connect("43.139.35.190", port=22, username="ubuntu", password="DellG77588")

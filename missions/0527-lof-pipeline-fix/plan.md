@@ -1,4 +1,4 @@
-﻿# LOF 全链修复 Plan
+# LOF 全链修复 Plan
 
 ## 步骤
 

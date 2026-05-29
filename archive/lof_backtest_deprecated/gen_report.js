@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const base = 'C:\\Users\\93724\\Desktop\\Alpha monitor\\';
 const aR = JSON.parse(fs.readFileSync(base + 'runtime_data\\backtest\\a_results.json', 'utf-8'));
 const bR = JSON.parse(fs.readFileSync(base + 'runtime_data\\backtest\\b_results.json', 'utf-8'));

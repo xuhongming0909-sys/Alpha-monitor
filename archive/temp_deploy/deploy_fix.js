@@ -1,4 +1,4 @@
-﻿const { execSync } = require('child_process');
+const { execSync } = require('child_process');
 const host = '43.139.35.190', user = 'ubuntu', pass = 'DellG77588';
 const proj = '/home/ubuntu/Alpha monitor';
 function ssh(cmd) {

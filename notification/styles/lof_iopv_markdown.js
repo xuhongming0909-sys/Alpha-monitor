@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 // LOF IOPV 推送 Markdown 格式化
 
 function formatPercent(value, digits = 2) {

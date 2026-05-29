@@ -1,4 +1,4 @@
-﻿import paramiko, time, json
+import paramiko, time, json
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())

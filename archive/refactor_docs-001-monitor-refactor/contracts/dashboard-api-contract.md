@@ -1,4 +1,4 @@
-﻿# Dashboard API Contract
+# Dashboard API Contract
 
 ## Scope
 

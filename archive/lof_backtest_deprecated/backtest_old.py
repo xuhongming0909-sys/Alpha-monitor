@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # AI-SUMMARY: LOF回测脚本，从数据库读取数据计算R²/MAE
 # 对应 INDEX.md §9.3 文件摘要索引
 """LOF回测脚本 - 从数据库读取"""

@@ -1,4 +1,4 @@
-﻿// AI-SUMMARY: Express 主入口：启动服务、挂载路由、注册调度器、管理运行时状态
+// AI-SUMMARY: Express 主入口：启动服务、挂载路由、注册调度器、管理运行时状态
 // 对应 INDEX.md §9 文件摘要索引
 
 ﻿const fs = require('fs');

@@ -1,4 +1,4 @@
-﻿"""Tests for strategy/lof_iopv/calc.py - IOPV calculation formula."""
+"""Tests for strategy/lof_iopv/calc.py - IOPV calculation formula."""
 import math
 import sys
 import unittest
@@ -113,17 +113,16 @@ class TestCalcIopv(unittest.TestCase):
         self.assertAlmostEqual(est, 1.02, places=4)
         self.assertAlmostEqual(details["weightedRet"], 2.0, places=4)
 
-    def test_no_price_returns_nav_fx(self):
-        """No price data -> fallback to nav * fx_ratio."""
+    def test_no_price_returns_none(self):
+        """No price data -> returns None (cannot estimate IOPV)."""
         holdings = self._make_holdings([("AAPL", 100)])
         est, status, _ = calc_iopv(
             nav=2.0, holdings=holdings, stock_ratio=90,
             current_prices={}, nav_date_prices={}, prev_closes={},
             fx_now=7.0, fx_base=7.0,
         )
-        self.assertAlmostEqual(est, 2.0, places=4)
+        self.assertIsNone(est)
         self.assertIn("无股价", status)
-
     def test_prev_close_fallback(self):
         """When nav_date_prices missing, use prev_closes as fallback."""
         holdings = self._make_holdings([("AAPL", 100)])

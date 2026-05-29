@@ -1,4 +1,4 @@
-﻿import os
+import os
 path = os.path.join(r'C:\Users\93724\Desktop\Alpha monitor', 'data_fetch', 'lof_iopv', 'fetcher.py')
 with open(path, 'r', encoding='utf-8') as f:
     content = f.read()

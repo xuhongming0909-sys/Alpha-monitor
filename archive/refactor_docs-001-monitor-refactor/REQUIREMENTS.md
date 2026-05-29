@@ -1,4 +1,4 @@
-﻿# Alpha Monitor 需求手册
+# Alpha Monitor 需求手册
 
 状态：当前生效版本  
 日期：2026-04-24

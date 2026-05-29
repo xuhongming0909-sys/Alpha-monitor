@@ -1,0 +1,58 @@
+{
+  "date": "2026-05-28",
+  "lookback_days": 90,
+  "total_funds": 24,
+  "results": {
+    "excellent_mae_lt_0_2": {
+      "count": 11,
+      "funds": [
+        {"code": "164701", "name": "黄金LOF", "mae": 0.032, "err_gt_05": 0.0},
+        {"code": "161125", "name": "标普500LOF", "mae": 0.047, "err_gt_05": 0.0},
+        {"code": "161130", "name": "纳指LOF", "mae": 0.054, "err_gt_05": 0.0},
+        {"code": "162415", "name": "美国消费LOF", "mae": 0.061, "err_gt_05": 0.0},
+        {"code": "161127", "name": "标普生物科技LOF", "mae": 0.100, "err_gt_05": 0.0},
+        {"code": "162411", "name": "华宝油气LOF", "mae": 0.100, "err_gt_05": 0.0},
+        {"code": "501300", "name": "美元债LOF", "mae": 0.123, "err_gt_05": 0.0},
+        {"code": "501312", "name": "海外科技LOF", "mae": 0.151, "err_gt_05": 1.8},
+        {"code": "162719", "name": "石油LOF", "mae": 0.154, "err_gt_05": 1.8},
+        {"code": "160140", "name": "美国REIT精选LOF", "mae": 0.176, "err_gt_05": 1.8},
+        {"code": "163208", "name": "全球油气能源LOF", "mae": 0.198, "err_gt_05": 3.6}
+      ]
+    },
+    "good_mae_0_2_to_0_5": {
+      "count": 7,
+      "funds": [
+        {"code": "161116", "name": "黄金主题LOF", "mae": 0.184, "err_gt_05": 3.6},
+        {"code": "164906", "name": "中概互联网LOF", "mae": 0.266, "err_gt_05": 14.3},
+        {"code": "164824", "name": "印度基金LOF", "mae": 0.320, "err_gt_05": 19.6},
+        {"code": "161128", "name": "标普信息科技LOF", "mae": 0.326, "err_gt_05": 19.6},
+        {"code": "160719", "name": "嘉实黄金LOF", "mae": 0.360, "err_gt_05": 24.6},
+        {"code": "160644", "name": "港美互联网LOF", "mae": 0.413, "err_gt_05": 33.9},
+        {"code": "161126", "name": "标普医疗保健LOF", "mae": 0.416, "err_gt_05": 37.5}
+      ]
+    },
+    "moderate_mae_0_5_to_1": {
+      "count": 3,
+      "funds": [
+        {"code": "160416", "name": "石油基金LOF", "mae": 0.543, "err_gt_05": 46.4},
+        {"code": "501225", "name": "全球芯片LOF", "mae": 0.669, "err_gt_05": 57.1},
+        {"code": "160125", "name": "南方香港LOF", "mae": 0.809, "err_gt_05": 56.4}
+      ]
+    },
+    "poor_mae_gt_1": {
+      "count": 3,
+      "funds": [
+        {"code": "160723", "name": "嘉实原油LOF", "mae": 1.493, "err_gt_05": 76.8},
+        {"code": "161129", "name": "原油LOF", "mae": 1.523, "err_gt_05": 78.6},
+        {"code": "501018", "name": "南方原油LOF", "mae": 1.713, "err_gt_05": 85.7}
+      ]
+    }
+  },
+  "notes": [
+    "原油基金持仓中有日本/瑞士ETF无法获取价格，被剔除",
+    "全球芯片持仓中有A股ETF无法获取价格",
+    "单ETF基金(标普500/纳指/黄金等)表现极好",
+    "FOF基金(海外科技/全球油气)表现优秀",
+    "PDF解析器尚未完善，当前使用硬编码持仓数据"
+  ]
+}

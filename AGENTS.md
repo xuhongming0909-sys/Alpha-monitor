@@ -15,6 +15,21 @@ It contains only two top-level sections:
 
 # Workflow
 
+## Sync Workflow（最高优先级）
+
+**本地是唯一真实源。所有变更必须经过 git 同步到服务器。**
+
+1. **本地优先**：所有代码修改、配置变更在本地完成并验证。
+2. **任务完成后同步**：每个任务验证通过后，执行 git commit + push。
+3. **服务器自动拉取**：服务器通过 deploy/sync_server.sh 从 git 拉取最新代码并重启服务。
+4. **禁止直接在服务器上改代码**：服务器上的任何手动修改都会被下次同步覆盖。
+5. **同步验证**：push 后检查服务器是否成功拉取（git log --oneline -3 对比本地）。
+
+流程：
+```
+本地修改 → 验证通过 → git add/commit → git push → 服务器 pull + restart
+```
+
 ## Read Order
 
 At the beginning of every new session, AI must read in this order:

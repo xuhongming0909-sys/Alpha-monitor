@@ -1,4 +1,4 @@
-﻿"""Tests for service.py - FX fallback, monitor pools, DB context."""
+"""Tests for service.py - FX fallback, monitor pools, DB context."""
 import sys
 import unittest
 from pathlib import Path

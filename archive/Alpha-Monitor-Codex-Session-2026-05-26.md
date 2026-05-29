@@ -1,4 +1,4 @@
-﻿# Alpha Monitor — Codex Session Export
+# Alpha Monitor — Codex Session Export
 
 > Session ID: `019e641f-df2a-7f63-8aef-9a93b4a8550a`
 > Export Date: 2026-05-26 23:26:04

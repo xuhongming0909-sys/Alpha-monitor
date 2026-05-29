@@ -1,4 +1,4 @@
-﻿# Plan: LOF 文档同步
+# Plan: LOF 文档同步
 
 ## Steps
 

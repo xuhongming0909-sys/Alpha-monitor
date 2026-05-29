@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = 'C:\\Users\\93724\\Desktop\\Alpha monitor\\data_fetch\\lof_iopv\\fetcher.py';
 let content = fs.readFileSync(path, 'utf-8');
 

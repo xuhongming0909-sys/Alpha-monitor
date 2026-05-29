@@ -1,4 +1,4 @@
-﻿---
+---
 name: lof-backtest-cleanup
 type: implementation
 ---
