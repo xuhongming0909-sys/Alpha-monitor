@@ -168,16 +168,29 @@ def _fetch_holdings(code):
 
 
 def _fetch_stock_position(code):
-    """Fetch actual stock position % from xueqiu."""
+    """Fetch stock position % from akshare (雪球持仓资产比例)."""
     try:
-        url = f"https://stock.xueqiu.com/v5/fund/portfolio/stock.json?symbol={code}&size=10"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(url, headers=headers, timeout=10)
-        data = r.json()
-        items = data.get("data", {}).get("list", [])
-        if items:
-            total = sum(i.get("percent", 0) or 0 for i in items)
-            return round(total, 2)
+        import akshare as ak
+        from datetime import datetime
+        now = datetime.now()
+        q = (now.month - 1) // 3
+        q_month = q * 3
+        if q_month == 0:
+            q_month = 12
+            q_year = now.year - 1
+        else:
+            q_year = now.year
+        date_str = f"{q_year}{q_month:02d}31"
+        df = ak.fund_individual_detail_hold_xq(symbol=code, date=date_str)
+        if df is not None and not df.empty:
+            for _, row in df.iterrows():
+                asset_type = str(row.iloc[0])
+                if "股票" in asset_type:
+                    return round(float(row.iloc[1]), 2)
+            for _, row in df.iterrows():
+                asset_type = str(row.iloc[0])
+                if "其他" in asset_type:
+                    return round(float(row.iloc[1]), 2)
     except Exception:
         pass
     return None
@@ -198,14 +211,12 @@ def _fetch_fund_info(code):
         m = re.search(r"赎回费率.*?(\d+\.\d+%)", text)
         if m:
             info["redeemFee"] = m.group(1)
-        # 基金公司
-        for key in ["基金公司", "基金管理人"]:
-            m = re.search(key + r".*?<a[^>]*>(.*?)</a>", text, re.DOTALL)
-            if m:
-                val = _clean(m.group(1))
-                if val:
-                    info["fundCompany"] = val
-                    break
+        # 基金公司 - 从基金管理人字段提取
+        m_company = re.search(r"基金管理人.{0,50}?<a[^>]*>([^<]+)</a>", text)
+        if m_company:
+            val = _clean(m_company.group(1))
+            if val and val != "基金代码":
+                info["fundCompany"] = val
         if "开放申购" in text:
             info["applyStatus"] = "开放申购"
         elif "暂停申购" in text:
