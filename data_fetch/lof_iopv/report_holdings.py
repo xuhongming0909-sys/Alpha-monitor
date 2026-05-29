@@ -227,7 +227,7 @@ def _guess_ticker(name: str) -> str:
     return ""
 def _call_vision_llm(b64_image: str, fund_code: str) -> List[Dict]:
     """Vision LLM（mimo-v2.5）提取持仓。"""
-    cfg = _vision_config()
+    cfg = _text_config()
     if not cfg.get('api_key'):
         return []
     url = cfg.get('base_url', '')
@@ -260,7 +260,7 @@ def _call_text_llm(text: str, fund_code: str) -> List[Dict]:
         url,
         headers={"Authorization": f"Bearer {cfg['api_key']}"},
         json={
-            "model": cfg.get("model", "mimo-v2.5"),
+            "model": cfg.get("model", "deepseek-chat"),
             "messages": [{"role": "user",
                           "content": f"{_LLM_PROMPT}\n\n基金代码: {fund_code}\n\n季报文本:\n{text}"}],
             "max_tokens": 20000,
