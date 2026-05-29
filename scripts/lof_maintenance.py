@@ -15,6 +15,28 @@ def run_maintenance(dry_run=False):
         print("[dry-run] Would update and cleanup. Exiting.")
         return True
 
+    # Normalize existing tickers in holdings table
+    try:
+        from data_fetch.lof_db.schema import get_db
+        conn = get_db()
+        rows = conn.execute("SELECT code, ticker, market FROM holdings").fetchall()
+        fixed = 0
+        for code, ticker, market in rows:
+            if market == "HK" and ticker.isdigit() and len(ticker) < 5:
+                new_t = ticker.zfill(5)
+                conn.execute("UPDATE holdings SET ticker=? WHERE code=? AND ticker=?", (new_t, code, ticker))
+                fixed += 1
+            elif market == "A" and ticker.isdigit() and len(ticker) < 6:
+                new_t = ticker.zfill(6)
+                conn.execute("UPDATE holdings SET ticker=? WHERE code=? AND ticker=?", (new_t, code, ticker))
+                fixed += 1
+        conn.commit()
+        conn.close()
+        if fixed:
+            print(f"Normalized {fixed} tickers")
+    except Exception as e:
+        print(f"Ticker normalization: {e}")
+
     results = {}
     errors = []
 
@@ -24,6 +46,8 @@ def run_maintenance(dry_run=False):
         ("etf", "data_fetch.lof_db.etf_updater", "update_etf"),
         ("fx", "data_fetch.lof_db.fx_updater", "update_fx"),
         ("holdings", "data_fetch.lof_db.holdings_updater", "update_holdings"),
+        ("stock_prices", "data_fetch.lof_db.etf_updater", "update_stocks"),
+        ("backtest", "strategy.lof_iopv.backtest_v2", "run_all"),
     ]
 
     for key, module_name, func_name in steps:

@@ -18,7 +18,7 @@ INDEX_ETF: Dict[str, List[Tuple[str, float]]] = {
     "161125": [("SPY", 100.0)],   # 标普500
     "161130": [("QQQ", 100.0)],   # 纳指100
     "161128": [("XLK", 100.0)],   # 标普信息科技
-    "161126": [("RYH", 100.0)],   # 标普医疗保健
+    "161126": [("XHE", 100.0)],   # 标普医疗保健
     "161127": [("XBI", 100.0)],   # 标普生物科技
     "162415": [("XLY", 100.0)],   # 美国消费
     "160416": [("IXC", 100.0)],   # 石油基金
@@ -127,7 +127,10 @@ def get_holdings_for_service(code: str) -> List[Dict]:
 
 
 def get_holdings_for_backtest(code: str) -> List[Dict]:
-    """回测用: 指数型用ETF映射, 主动型用hardcoded"""
+    """回测用: 指数型用ETF映射, 主动型用DB优先+hardcoded兜底"""
     if is_index_fund(code):
         return get_index_holdings(code)
+    holdings = get_active_holdings(code)
+    if holdings:
+        return holdings
     return get_active_holdings_hardcoded(code)
