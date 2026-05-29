@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # AI-SUMMARY: 服务器 git 同步脚本，处理协议修复/stash/冲突/重启全流程
