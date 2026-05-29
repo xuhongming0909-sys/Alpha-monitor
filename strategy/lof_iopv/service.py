@@ -143,10 +143,8 @@ def build_lof_response(fetch_payload):
         cls = get_fund_class(code)
         if cls == "index":
             benchmark = "ETF:%s" % get_index_etf_ticker(code)
-        elif cls == "active_api":
-            benchmark = "api_holdings(%d)" % len(effective_holdings)
         else:
-            benchmark = "quarterly_holdings"
+            benchmark = "active_holdings(%d)" % len(effective_holdings)
 
         apply_status = row.get("applyStatus") or ""
         daily_limit = row.get("dailyLimit")

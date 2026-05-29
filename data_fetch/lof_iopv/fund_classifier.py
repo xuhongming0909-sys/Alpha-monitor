@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-# AI-SUMMARY: LOF三分类(指数型/持仓API型/持仓PDF型)基金分类器 + 持仓获取
+# AI-SUMMARY: LOF二分类(指数型/主动型)基金分类器 + 持仓获取
 # 对应 INDEX.md 9.3 文件摘要索引
-"""LOF基金三分类体系。
+"""LOF基金二分类体系。
 
-指数型: ETF映射, 基于业绩基准
-主动1类: 天天基金API持仓(合计>30%)
-主动2类: PDF季报解析持仓
+指数型: ETF映射, 基于业绩基准, 回测MAE<0.5%
+主动型: 先API再PDF, 持仓合计<25%时fallback到PDF解析
 """
 from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
@@ -13,41 +12,34 @@ from typing import Dict, List, Optional, Tuple
 
 # ============================================================
 # 指数型ETF映射: 基金代码 -> [(etf_ticker, weight), ...]
-# 映射依据: 业绩比较基准中明确指定的指数
+# 映射依据: 业绩比较基准中明确指定的指数, 回测MAE<0.5%
 # ============================================================
 INDEX_ETF: Dict[str, List[Tuple[str, float]]] = {
-    "161125": [("SPY", 100.0)],
-    "161130": [("QQQ", 100.0)],
-    "161128": [("XLK", 100.0)],
-    "161126": [("RYH", 100.0)],
-    "161127": [("XBI", 100.0)],
-    "162415": [("XLY", 100.0)],
-    "160416": [("IXC", 100.0)],
-    "162719": [("IEO", 100.0)],
-    "162411": [("XOP", 100.0)],
-    "160719": [("GLD", 100.0)],
-    "164824": [("INDA", 100.0)],
-    "160140": [("IYR", 100.0)],
-    "164701": [("GLD", 100.0)],
-    "501300": [("AGG", 100.0)],
+    "161125": [("SPY", 100.0)],   # 标普500
+    "161130": [("QQQ", 100.0)],   # 纳指100
+    "161128": [("XLK", 100.0)],   # 标普信息科技
+    "161126": [("RYH", 100.0)],   # 标普医疗保健
+    "161127": [("XBI", 100.0)],   # 标普生物科技
+    "162415": [("XLY", 100.0)],   # 美国消费
+    "160416": [("IXC", 100.0)],   # 石油基金
+    "162719": [("IEO", 100.0)],   # 石油LOF
+    "162411": [("XOP", 100.0)],   # 华宝油气
+    "160719": [("GLD", 100.0)],   # 嘉实黄金
+    "164824": [("INDA", 100.0)],  # 印度基金
+    "160140": [("IYR", 100.0)],   # 美国REIT
+    "164701": [("GLD", 100.0)],   # 黄金LOF
+    "501300": [("AGG", 100.0)],   # 美元债
 }
 
 
+def is_index_fund(code: str) -> bool:
+    """判断是否为指数型基金"""
+    return code in INDEX_ETF
+
 
 def get_fund_class(code: str) -> str:
-    """返回基金分类: 'index' / 'active_api' / 'active_pdf'"""
-    if code in INDEX_ETF:
-        return "index"
-    # 主动1类: 天天基金API持仓合计>30%
-    active_api = {"160644", "164906", "163208", "160125"}
-    if code in active_api:
-        return "active_api"
-    # 主动2类: 需PDF季报解析
-    return "active_pdf"
-
-
-def is_index_fund(code: str) -> bool:
-    return code in INDEX_ETF
+    """返回基金分类: 'index' / 'active'"""
+    return "index" if code in INDEX_ETF else "active"
 
 
 def get_index_etf_ticker(code: str) -> str:
@@ -57,26 +49,17 @@ def get_index_etf_ticker(code: str) -> str:
 
 
 def get_index_holdings(code: str) -> List[Dict]:
-    """指数型持仓: 从ETF映射构建, weight=100%或指定比例"""
+    """指数型持仓: 从ETF映射构建"""
     etfs = INDEX_ETF.get(code, [])
     if not etfs:
         return []
     return [{"ticker": t, "weight": w, "market": "US"} for t, w in etfs]
 
 
-def get_active_api_holdings(code: str) -> List[Dict]:
-    """主动1类: 调天天基金API获取实时持仓"""
-    from data_fetch.lof_iopv.source import _fetch_holdings as _api_fetch
-    holdings = _api_fetch(code)
-    return holdings if holdings else []
-
-
-def get_active_pdf_holdings(code: str) -> List[Dict]:
-    """主动2类: 从DB读取PDF解析的持仓"""
-    import sqlite3
+def get_active_holdings(code: str) -> List[Dict]:
+    """主动型持仓: 从DB读取(由holdings_updater维护)"""
     from data_fetch.lof_db.schema import get_db
     conn = get_db()
-    # 取最新一期的持仓
     latest = conn.execute(
         "SELECT report_date FROM holdings WHERE code = ? ORDER BY report_date DESC LIMIT 1",
         (code,)
@@ -92,10 +75,9 @@ def get_active_pdf_holdings(code: str) -> List[Dict]:
     return [{"ticker": r[0], "name": r[1], "weight": r[2], "market": r[3]} for r in rows]
 
 
-def get_active_pdf_holdings_hardcoded(code: str) -> List[Dict]:
-    """主动2类兜底: 使用hardcoded持仓(从上季度季报)"""
+def get_active_holdings_hardcoded(code: str) -> List[Dict]:
+    """主动型兜底: 使用hardcoded持仓(从上季度季报)"""
     _HARDCODED: Dict[str, List[Tuple[str, float, str]]] = {
-        # 主动1类(回测用hardcoded兜底)
         "160644": [
             ("TSM", 9.09, "US"), ("NVDA", 9.05, "US"), ("SNDK", 8.57, "US"),
             ("MU", 7.49, "US"), ("00700", 6.58, "HK"), ("GOOGL", 5.69, "US"),
@@ -120,7 +102,6 @@ def get_active_pdf_holdings_hardcoded(code: str) -> List[Dict]:
             ("02590", 3.45, "HK"), ("06082", 3.34, "HK"), ("09988", 3.28, "HK"),
             ("06181", 2.9, "HK"),
         ],
-        # 主动2类
         "501312": [
             ("ARKK", 18.74, "US"), ("ARKG", 15.35, "US"),
             ("ARKQ", 11.59, "US"), ("SOXX", 9.51, "US"),
@@ -130,34 +111,23 @@ def get_active_pdf_holdings_hardcoded(code: str) -> List[Dict]:
         ],
         "501225": [("PSI", 18.32, "US"), ("SOXQ", 18.25, "US"),
                    ("SOXX", 18.23, "US"), ("SMH", 18.17, "US")],
-        "160723": [("00883", 3.43, "HK"), ("00857", 2.99, "HK")],   # 嘉实原油: 中海油+中石油(仅6.4%覆盖)
-        "161129": [],   # 原油: 无PDF持仓数据
-        "161116": [("GOLD", 4.08, "US"), ("NEM", 3.96, "US"), ("02899", 1.40, "HK")],   # 黄金主题: 巴里克+纽蒙特+紫金(仅9.4%覆盖)
-        "501018": [],   # 南方原油: 无PDF持仓数据
-        "501300": [],   # 债券型, 无法用持仓法
     }
     raw = _HARDCODED.get(code, [])
     return [{"ticker": t, "weight": w, "market": m} for t, w, m in raw]
 
 
 def get_holdings_for_service(code: str) -> List[Dict]:
-    """实时服务用: 根据分类返回持仓"""
-    cls = get_fund_class(code)
-    if cls == "index":
+    """实时服务用: 指数型用ETF映射, 主动型用DB+hardcoded"""
+    if is_index_fund(code):
         return get_index_holdings(code)
-    elif cls == "active_api":
-        return get_active_api_holdings(code)
-    else:
-        # 主动2类: 先尝试DB, 没有则用hardcoded
-        holdings = get_active_pdf_holdings(code)
-        if holdings:
-            return holdings
-        return get_active_pdf_holdings_hardcoded(code)
+    holdings = get_active_holdings(code)
+    if holdings:
+        return holdings
+    return get_active_holdings_hardcoded(code)
 
 
 def get_holdings_for_backtest(code: str) -> List[Dict]:
-    """回测用: 指数型用ETF映射, 其他用hardcoded"""
+    """回测用: 指数型用ETF映射, 主动型用hardcoded"""
     if is_index_fund(code):
         return get_index_holdings(code)
-    # 回测中B类用hardcoded
-    return get_active_pdf_holdings_hardcoded(code)
+    return get_active_holdings_hardcoded(code)

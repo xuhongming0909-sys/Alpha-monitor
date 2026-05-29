@@ -303,7 +303,7 @@ data_fetch:
       - code: '501225'
         name: 全球芯片LOF
         currency: USD
-        fund_class: active_pdf
+        fund_class: active
       - code: '161130'
         name: 纳指LOF
         currency: USD
@@ -337,7 +337,7 @@ data_fetch:
       - code: '501300'
         name: 美元债LOF
         currency: USD
-        fund_class: active_pdf
+        fund_class: active
       - code: '164824'
         name: 印度基金LOF
         currency: USD
@@ -361,21 +361,21 @@ data_fetch:
       - code: '160723'
         name: 嘉实原油LOF
         currency: USD
-        fund_class: active_pdf
+        fund_class: active
         etf_ticker: USO
       - code: '161129'
         name: 原油LOF
         currency: USD
-        fund_class: active_pdf
+        fund_class: active
         etf_ticker: USO
       - code: '501018'
         name: 南方原油LOF
         currency: USD
-        fund_class: active_pdf
+        fund_class: active
       - code: '163208'
         name: 全球油气能源LOF
         currency: USD
-        fund_class: active_api
+        fund_class: active
       - code: '160719'
         name: 嘉实黄金LOF
         currency: USD
@@ -389,19 +389,19 @@ data_fetch:
       - code: '161116'
         name: 黄金主题LOF
         currency: USD
-        fund_class: active_pdf
+        fund_class: active
       - code: '160125'
         name: 南方香港LOF
         currency: HKD
-        fund_class: active_api
+        fund_class: active
       - code: '160644'
         name: 港美互联网LOF
         currency: HKD
-        fund_class: active_api
+        fund_class: active
       - code: '164906'
         name: 中概互联网LOF
         currency: USD
-        fund_class: active_api
+        fund_class: active
       - code: '501312'
         name: 海外科技LOF
         currency: USD
@@ -674,6 +674,6 @@ notification:
     webhook_url: ${WECOM_WEBHOOK_URL}
     push_html_url: ${PUSH_HTML_URL}
     max_markdown_length: 3900
-    fund_class: active_pdf
+    fund_class: active
 
 
