@@ -13,7 +13,6 @@ from typing import Optional
 from urllib.parse import quote_plus
 
 import requests
-from bs4 import BeautifulSoup
 
 _DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'runtime_data', 'lof_db', 'lof.db')
 
@@ -134,8 +133,11 @@ _HEADERS = {
 }
 
 
+_SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://localhost:8888")
+
+
 def web_search(query: str, max_results: int = 5) -> str:
-    """Bing搜索，返回摘要结果列表。
+    """通过本地SearXNG搜索引擎搜索，返回摘要结果列表。
 
     返回 JSON 字符串: {"status":"success","results":[{"title":"...","url":"...","snippet":"..."},...]}
     """
@@ -144,45 +146,31 @@ def web_search(query: str, max_results: int = 5) -> str:
         return json.dumps({"status": "error", "message": "query 不能为空"}, ensure_ascii=False)
 
     try:
-        # 判断是否包含中文，决定搜索策略
-        has_chinese = any('\u4e00' <= c <= '\u9fff' for c in query)
-        if has_chinese:
-            url = f"https://cn.bing.com/search?q={quote_plus(query)}&mkt=zh-CN"
-            lang = "zh-CN,zh;q=0.9"
-        else:
-            url = f"https://cn.bing.com/search?q={quote_plus(query)}&ensearch=1&mkt=en-US"
-            lang = "en-US,en;q=0.9"
-
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept-Language": lang,
-        }
-        resp = requests.get(url, headers=headers, timeout=10)
-        resp.encoding = "utf-8"
-        soup = BeautifulSoup(resp.text, "lxml")
+        resp = requests.get(
+            f"{_SEARXNG_URL}/search",
+            params={"q": query, "format": "json", "pageno": 1},
+            timeout=12,
+        )
+        resp.raise_for_status()
+        data = resp.json()
 
         results = []
-        for item in soup.select("li.b_algo"):
-            title_tag = item.select_one("h2 a")
-            snippet_tag = item.select_one(".b_caption p, .b_algoSlug")
-            if not title_tag:
-                continue
-            title = title_tag.get_text(strip=True)
-            href = title_tag.get("href", "")
-            snippet = snippet_tag.get_text(strip=True) if snippet_tag else ""
-            if title:
-                results.append({
-                    "title": title[:200],
-                    "url": href,
-                    "snippet": snippet[:500],
-                })
+        for item in data.get("results", []):
+            results.append({
+                "title": (item.get("title") or "")[:200],
+                "url": item.get("url") or "",
+                "snippet": (item.get("content") or "")[:500],
+            })
             if len(results) >= max_results:
                 break
+
+        unresponsive = [e[0] for e in data.get("unresponsive_engines", [])]
 
         return json.dumps({
             "status": "success",
             "query": query,
             "results": results,
+            "unresponsive_engines": unresponsive,
         }, ensure_ascii=False)
 
     except Exception as e:
