@@ -13,6 +13,7 @@ from shared.models.service_result import build_success
 from shared.time.shanghai_time import now_iso
 from strategy.lof_iopv.calc import to_float, get_base_fx, calc_iopv
 from data_fetch.lof_iopv.fund_classifier import get_fund_class, get_index_etf_ticker, is_index_fund
+from data_fetch.lof_db.holdings_updater import get_holdings_source
 
 _BACKTEST_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', 'runtime_data', 'backtest', 'results_v2.json')
 _BACKTEST_RESULTS = {}
@@ -144,7 +145,13 @@ def build_lof_response(fetch_payload):
         if cls == "index":
             benchmark = "ETF:%s" % get_index_etf_ticker(code)
         else:
-            benchmark = "active_holdings(%d)" % len(effective_holdings)
+            source = get_holdings_source(code)
+            if source == "api":
+                benchmark = "API(%d)" % len(effective_holdings)
+            elif source == "pdf":
+                benchmark = "PDF(%d)" % len(effective_holdings)
+            else:
+                benchmark = "active(%d)" % len(effective_holdings)
 
         apply_status = row.get("applyStatus") or ""
         daily_limit = row.get("dailyLimit")

@@ -81,11 +81,21 @@ def _get_cached_report_id(code: str) -> Optional[str]:
     return None
 
 
-def _set_cached_report_id(code: str, report_id: str):
-    """更新单只基金的 report_id 缓存"""
+def get_holdings_source(code: str) -> str:
+    """获取持仓数据来源: 'api' 或 'pdf'。无缓存返回 'unknown'。"""
+    cache = _load_report_id_cache()
+    entry = cache.get(code)
+    if entry:
+        return entry.get('source', 'unknown')
+    return 'unknown'
+
+
+def _set_cached_report_id(code: str, report_id: str, source: str = 'pdf'):
+    """更新单只基金的 report_id 缓存。source: 'api' 或 'pdf'"""
     cache = _load_report_id_cache()
     cache[code] = {
         'report_id': report_id,
+        'source': source,
         'updated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
     }
     _save_report_id_cache(cache)
@@ -224,6 +234,15 @@ def _fetch_holdings_pdf(code: str, report_info: tuple = None) -> list:
     return _parse_pdf_holdings(code, pdf_path)
 
 
+def _normalize_ticker(ticker: str, market: str) -> str:
+    """规范化ticker: HK补前导零到5位, A股补到6位"""
+    if market == 'HK' and ticker.isdigit() and len(ticker) < 5:
+        return ticker.zfill(5)
+    if market == 'A' and ticker.isdigit() and len(ticker) < 6:
+        return ticker.zfill(6)
+    return ticker
+
+
 def _determine_market(ticker: str) -> str:
     """根据ticker判断市场"""
     if ticker.isdigit() and len(ticker) == 5:
@@ -239,6 +258,7 @@ def _store_holdings(conn, code: str, holdings: list, quarter: str):
     for h in holdings:
         t = h['ticker']
         market = _determine_market(t)
+        t = _normalize_ticker(t, market)
         conn.execute(
             'INSERT OR REPLACE INTO holdings (code, report_date, ticker, name, weight, market) VALUES (?,?,?,?,?,?)',
             (code, quarter, t, h.get('name', ''), h['weight'], market)
@@ -293,6 +313,8 @@ def update_holdings():
 
             if total_weight >= _API_COVERAGE_THRESHOLD:
                 _store_holdings(conn, code, holdings, quarter)
+                # API数据足够，标记来源为api(无需查report_id)
+                _set_cached_report_id(code, '__api__', source='api')
                 print(f'  -> API数据OK, 已写入DB')
                 stats['api_ok'] += 1
                 time.sleep(0.5)
