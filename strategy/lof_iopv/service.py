@@ -19,7 +19,7 @@ _BACKTEST_RESULTS = {}
 
 
 def _load_backtest_results():
-    """鍔犺浇鍥炴祴缁撴灉缂撳瓨"""
+    """Load backtest results cache."""
     global _BACKTEST_RESULTS
     try:
         if _os.path.exists(_BACKTEST_PATH):
@@ -75,7 +75,7 @@ def _monitor_pools(row, limited_threshold=0.5, unlimited_threshold=1.0):
 
 
 def _resolve_fx_rates(currencies):
-    """缁熶竴姹囩巼鑾峰彇锛氬厛 tencent API锛宖allback 鍒?DB銆?""
+    """Unified FX fetch: tencent API first, fallback to DB."""
     fx = {}
     try:
         api_rates = get_fx_rates(currencies)
@@ -134,7 +134,7 @@ def build_lof_response(fetch_payload):
         stock_pos = row.get("stockPosition")
 
         if premium is not None:
-            premium_status = "婧环" if premium > 0.5 else ("鎶樹环" if premium < -0.5 else "骞充环")
+            premium_status = "premium" if premium > 0.5 else ("discount" if premium < -0.5 else "flat")
         else:
             premium_status = None
 
@@ -144,20 +144,20 @@ def build_lof_response(fetch_payload):
         if cls == "index":
             benchmark = "ETF:%s" % get_index_etf_ticker(code)
         elif cls == "active_api":
-            benchmark = "API鎸佷粨(%d鍙?" % len(effective_holdings)
+            benchmark = "api_holdings(%d)" % len(effective_holdings)
         else:
-            benchmark = "瀛ｆ姤鎸佷粨"
+            benchmark = "quarterly_holdings"
 
         apply_status = row.get("applyStatus") or ""
         daily_limit = row.get("dailyLimit")
         if apply_status == "limit_big" and daily_limit is not None and daily_limit < 1e10:
-            apply_status = "闄愰%d" % int(daily_limit)
+            apply_status = "limit_%d" % int(daily_limit)
         elif not apply_status:
-            apply_status = "鏈煡"
+            apply_status = "unknown"
 
-        # 交易所判断：1开头=深市（支持1拖六），5开头=沪市（不支持）
+        # Exchange: 1xx=SZ (supports 1-to-6), 5xx=SH (no 1-to-6)
         fund_code = row.get("code", "")
-        exchange = "深市" if fund_code.startswith("1") else "沪市"
+        exchange = "SZ" if fund_code.startswith("1") else "SH"
         supports_1to6 = fund_code.startswith("1")
         result.append({
             "code": row.get("code"),
