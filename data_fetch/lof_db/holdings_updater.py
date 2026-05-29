@@ -122,7 +122,7 @@ def _store_holdings(conn, code: str, holdings: list, quarter: str):
         t = h["ticker"]
         market = _determine_market(t)
         conn.execute(
-            "INSERT INTO holdings (code, report_date, ticker, name, weight, market) VALUES (?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO holdings (code, report_date, ticker, name, weight, market) VALUES (?,?,?,?,?,?)",
             (code, quarter, t, h.get("name", ""), h["weight"], market)
         )
     conn.commit()
