@@ -217,10 +217,18 @@ def _fetch_fund_info(code):
             val = _clean(m_company.group(1))
             if val and val != "基金代码":
                 info["fundCompany"] = val
-        if "开放申购" in text:
-            info["applyStatus"] = "开放申购"
+        # 申购状态：限大额 > 暂停申购 > 开放申购
+        m_limit = re.search(r"单日累计购买上限([\d,.]+)\s*(万元?|元)", text)
+        if "限大额" in text:
+            info["applyStatus"] = "限大额"
+            if m_limit:
+                raw = float(m_limit.group(1).replace(",", ""))
+                unit = m_limit.group(2)
+                info["dailyLimit"] = raw * 10000 if unit in ("万", "万元") else raw
         elif "暂停申购" in text:
             info["applyStatus"] = "暂停申购"
+        elif "开放申购" in text:
+            info["applyStatus"] = "开放申购"
         if "开放赎回" in text:
             info["redeemStatus"] = "开放赎回"
         elif "暂停赎回" in text:
@@ -236,16 +244,17 @@ def _fetch_purchase_status():
     try:
         url = "https://fund.eastmoney.com/Data/Fund_JJJZ_Data.aspx?t=8"
         text = SESSION.get(url, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
-        m = re.search(r"var r = (\[.*?\]);", text, re.DOTALL)
+        # API返回 var db={datas:[[code,name,type,nav,date,applyStatus,...,limit,...],...]}
+        m = re.search(r"var db=\{datas:(\[.*?\])\}", text, re.DOTALL)
         if not m:
             return result
         arr = _json.loads(m.group(1))
         for item in arr:
-            code = str(item.get("code", ""))
+            code = str(item[0]) if len(item) > 0 else ""
             if not code:
                 continue
-            status = item.get("applyStatus", "")
-            limit = item.get("applyLimit")
+            status = str(item[5]) if len(item) > 5 else ""
+            limit = item[9] if len(item) > 9 else None
             result[code] = {
                 "applyStatus": status,
                 "dailyLimit": _to_float(limit),
@@ -253,6 +262,7 @@ def _fetch_purchase_status():
     except Exception:
         pass
     return result
+
 
 
 def _build_tc_code(ticker, market):

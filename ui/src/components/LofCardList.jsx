@@ -55,12 +55,24 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
       ),
     },
     { key: 'name', label: '名称', render: (row) => pickText(row.name) },
+    { key: 'exchange', label: '市场', render: (row) => {
+      const ex = row.exchange;
+      if (ex === 'SZ') return <span style={{ color: '#e74c3c', fontWeight: 600 }}>深</span>;
+      if (ex === 'SH') return <span style={{ color: '#3498db', fontWeight: 600 }}>沪</span>;
+      return <span className="muted">--</span>;
+    } },
     { key: 'nav', label: 'T-2净值', numeric: true, render: (row) => formatNumber(row.nav) },
     { key: 'navDate', label: '净值日期', render: (row) => formatDate(row.navDate) },
     { key: 'price', label: '现价', numeric: true, render: (row) => formatNumber(row.price) },
     { key: 'iopv', label: '实时估值', numeric: true, render: (row) => formatNumber(row.iopv) },
     { key: 'premiumRate', label: '溢价率', numeric: true, className: (row) => signedClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate) },
-    { key: 'applyStatus', label: '申购状态', render: (row) => pickText(row.applyStatus) },
+    { key: 'applyStatus', label: '申购状态', render: (row) => {
+      const s = (row.applyStatus || '').toString();
+      if (s.startsWith('限额')) return <span style={{ color: '#e67e22', fontWeight: 600 }}>{s}</span>;
+      if (s === '暂停申购') return <span style={{ color: '#e74c3c' }}>{s}</span>;
+      if (s === '开放申购') return <span style={{ color: '#27ae60' }}>{s}</span>;
+      return <span className="muted">{s || '--'}</span>;
+    } },
     { key: 'supports1to6', label: '1拖六', render: (row) => row.supports1to6 ? <span style={{ color: '#27ae60', fontWeight: 600 }}>✓</span> : <span style={{ color: '#bdc3c7' }}>✗</span> },
     { key: 'shareIncrease', label: '新增份额', numeric: true, render: (row) => formatShare(row.shareIncrease) },
     { key: 'shareTotal', label: '原有份额', numeric: true, render: (row) => formatShare(row.shareTotal) },

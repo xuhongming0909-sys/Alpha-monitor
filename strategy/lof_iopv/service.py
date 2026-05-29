@@ -150,10 +150,11 @@ def build_lof_response(fetch_payload):
 
         apply_status = row.get("applyStatus") or ""
         daily_limit = row.get("dailyLimit")
-        if apply_status == "limit_big" and daily_limit is not None and daily_limit < 1e10:
-            apply_status = "limit_%d" % int(daily_limit)
+        # 东方财富API返回: "开放申购"/"暂停申购"/"限大额"
+        if apply_status == "限大额" and daily_limit is not None and daily_limit < 1e10:
+            apply_status = "限额%d" % int(daily_limit)
         elif not apply_status:
-            apply_status = "unknown"
+            apply_status = "未知"
 
         # Exchange: 1xx=SZ (supports 1-to-6), 5xx=SH (no 1-to-6)
         fund_code = row.get("code", "")
