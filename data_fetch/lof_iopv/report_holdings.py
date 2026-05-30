@@ -68,9 +68,6 @@ def _vision_config() -> dict:
     return _load_secrets().get('vision', {})
 
 
-def _text_config() -> dict:
-    return _load_secrets().get('deepseek', {})
-
 
 # ============================================================
 # PDF处理
@@ -87,19 +84,6 @@ def _find_holdings_pages(pdf_path: str) -> List[int]:
                 pages.add(i + 1)
     doc.close()
     return sorted(pages)[:6]
-
-
-def _extract_text(pdf_path: str) -> str:
-    """提取持仓相关页的文本。"""
-    doc = fitz.open(pdf_path)
-    pages = _find_holdings_pages(pdf_path)
-    texts = []
-    for pi in pages:
-        t = doc[pi].get_text().strip()
-        if t:
-            texts.append(t)
-    doc.close()
-    return "\n\n".join(texts)
 
 
 def _render_pages(pdf_path: str) -> Optional[str]:
@@ -250,30 +234,6 @@ def _call_vision_llm(b64_image: str, fund_code: str) -> List[Dict]:
     return _parse_json(content)
 
 
-def _call_text_llm(text: str, fund_code: str) -> List[Dict]:
-    """文本LLM（deepseek-chat）提取持仓。"""
-    cfg = _text_config()
-    if not cfg.get('api_key'):
-        return []
-    base = cfg.get('base_url', '')
-    url = base.rstrip('/') + '/chat/completions'
-    r = httpx.post(
-        url,
-        headers={"Authorization": f"Bearer {cfg['api_key']}"},
-        json={
-            "model": cfg.get("model", "deepseek-chat"),
-            "messages": [{"role": "user",
-                          "content": f"{_LLM_PROMPT}\n\n基金代码: {fund_code}\n\n季报文本:\n{text}"}],
-            "max_tokens": 20000,
-            "temperature": 0.0,
-        },
-        timeout=90,
-    )
-    r.raise_for_status()
-    content = r.json()['choices'][0]['message']['content']
-    return _parse_json(content)
-
-
 # ============================================================
 # 去重
 # ============================================================
@@ -355,21 +315,10 @@ def get_fund_holdings(code: str) -> Tuple[List[Dict], Optional[str]]:
         except Exception as e:
             print(f"  {code}: vision失败: {e}")
 
-    # 2. 文本LLM（兜底）
-    if not items:
-        text = _extract_text(pdf_path)
-        if text and len(text) > 100:
-            try:
-                items = _call_text_llm(text, code)
-                if items:
-                    items = _dedup(items)
-            except Exception as e:
-                print(f"  {code}: text失败: {e}")
-
     if not items:
         return [], f"提取失败: {code}"
 
-    # 3. Yahoo resolve: 为无ticker的持仓补全ticker+market
+    # Yahoo resolve: 为无ticker的持仓补全ticker+market
     items = _resolve_tickers(items, code)
 
     total = sum(h["weight"] for h in items)
