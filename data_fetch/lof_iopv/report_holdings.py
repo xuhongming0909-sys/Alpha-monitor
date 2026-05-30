@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-# AI-SUMMARY: 持仓提取 - PDF渲染→Vision LLM提取→文本LLM兜底→直接覆盖DB
+# AI-SUMMARY: 持仓提取 - PDF渲染→Vision LLM提取→ticker解析→直接覆盖DB
 # 对应 INDEX.md §9.3 文件摘要索引
-"""持仓提取器：PDF渲染→Vision LLM→文本LLM兜底→直接覆盖DB。"""
+"""持仓提取器：PDF渲染→Vision LLM→ticker解析→直接覆盖DB。"""
 from __future__ import annotations
 
 import base64

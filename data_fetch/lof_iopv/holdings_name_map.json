@@ -263,5 +263,20 @@
     "ticker": "BNQA",
     "market": "DE",
     "source": "verified"
+  },
+  "Apple Inc": {
+    "ticker": "AAPL",
+    "market": "US",
+    "source": "yahoo"
+  },
+  "Tesla Inc": {
+    "ticker": "TSLA",
+    "market": "US",
+    "source": "yahoo"
+  },
+  "Samsung Electronics": {
+    "ticker": "005930.KS",
+    "market": null,
+    "source": "yahoo"
   }
 }
