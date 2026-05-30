@@ -224,7 +224,7 @@ def _call_vision_llm(b64_image: str, fund_code: str) -> List[Dict]:
                 {"type": "text", "text": _LLM_PROMPT + f"\n\n基金代码: {fund_code}"},
                 {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}},
             ]}],
-            "max_tokens": 20000,
+            "max_tokens": 50000,
             "temperature": 0.0,
         },
         timeout=120,
