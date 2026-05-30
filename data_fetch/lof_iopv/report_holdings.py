@@ -170,7 +170,8 @@ def _guess_ticker(name: str) -> str:
         ("OILK", "OILK", "US"),
         # 大宗商品
         ("SAMSUNG S&P GSCI", "GSCI", "UK"),
-        ("COLLATERIZED ETC", "BRNT", "UK"),
+        ("COLLATERALIZED ETC", "BRNT", "UK"),
+        ("COLLATERISED ETC", "BRNT", "UK"),
         # 板块ETF
         ("STATE STREET ENERGY", "XLE", "US"),
         ("SPDR S&P OIL", "XOP", "US"),
