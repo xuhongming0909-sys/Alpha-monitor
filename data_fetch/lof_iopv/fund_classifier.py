@@ -3,7 +3,7 @@
 # 对应 INDEX.md 9.3 文件摘要索引
 """LOF基金二分类体系。
 
-指数型: ETF映射, 基于业绩基准, 回测MAE<0.5%
+指数型: ETF/指数/期货映射, 基于业绩基准, 回测MAE<0.5%
 主动型: 先API再PDF, 持仓合计<25%时fallback到PDF解析
 """
 from __future__ import annotations
@@ -11,24 +11,40 @@ from typing import Dict, List, Optional, Tuple
 
 
 # ============================================================
-# 指数型ETF映射: 基金代码 -> [(etf_ticker, weight), ...]
-# 映射依据: 业绩比较基准中明确指定的指数, 回测MAE<0.5%
+# 指数型标的映射: 基金代码 -> [(ticker, weight), ...]
+# 三种ticker类型:
+#   - 指数: ^NDX, ^GSPC, ^SP500-45, ^SP500-30, ^HSI (^开头)
+#   - 期货: CL=F, BZ=F, GC=F 等 (=F结尾)
+#   - ETF:  KWEB, AGG, GLD, RYH, XBI, IYR, XOP 等 (纯字母)
+# Yahoo Deno代理限制: ^SP500EW-35/^SPBIO/^DJUSRE/^SPSIOP 只返回1天
+#   → 用ETF替代: RYH/XBI/IYR/XOP
+# 映射依据: 业绩比较基准, 回测验证
 # ============================================================
 INDEX_ETF: Dict[str, List[Tuple[str, float]]] = {
-    "161125": [("SPY", 100.0)],   # 标普500
-    "161130": [("QQQ", 100.0)],   # 纳指100
-    "161128": [("XLK", 100.0)],   # 标普信息科技
-    "161126": [("XHE", 100.0)],   # 标普医疗保健
-    "161127": [("XBI", 100.0)],   # 标普生物科技
-    "162415": [("XLY", 100.0)],   # 美国消费
-    "160416": [("IXC", 100.0)],   # 石油基金
-    "162719": [("IEO", 100.0)],   # 石油LOF
-    "162411": [("XOP", 100.0)],   # 华宝油气
-    "160719": [("GLD", 100.0)],   # 嘉实黄金
-    "164824": [("INDA", 100.0)],  # 印度基金
-    "160140": [("IYR", 100.0)],   # 美国REIT
-    "164701": [("GLD", 100.0)],   # 黄金LOF
-    "501300": [("AGG", 100.0)],   # 美元债
+    # --- 美股指数 (^ticker, Yahoo有完整历史) ---
+    "161125": [("^GSPC", 100.0)],          # 标普500
+    "161130": [("^NDX", 100.0)],           # 纳斯达克100
+    "161128": [("^SP500-45", 100.0)],      # 标普500信息科技
+    "162415": [("XLY", 100.0)],            # 标普美国品质消费(=Consumer Discretionary)
+    # --- 港股指数 ---
+    "160125": [("^HSI", 100.0)],           # 恒生指数
+    # --- 期货 (=F) ---
+    "160719": [("GC=F", 100.0)],           # 黄金期货 → 伦敦金
+    "160723": [("CL=F", 50.0), ("BZ=F", 50.0)],  # 嘉实原油: 50%WTI+50%Brent
+    "501018": [("CL=F", 60.0), ("BZ=F", 40.0)],  # 南方原油: 60%WTI+40%Brent
+    "161129": [("CL=F", 50.0), ("BZ=F", 50.0)],  # 原油LOF: 50%WTI+50%Brent
+    # --- ETF (指数ticker代理不可用时的替代) ---
+    "161126": [("RYH", 100.0)],            # 标普500医疗保健等权重 (^SP500EW-35无历史)
+    "161127": [("XBI", 100.0)],            # 标普生物科技 (^SPBIO无历史)
+    "160140": [("IYR", 100.0)],            # 道琼斯美国REIT (^DJUSRE无历史)
+    "162719": [("XOP", 100.0)],            # 标普石油天然气上游 (^SPSIOP无历史)
+    "162411": [("XOP", 100.0)],            # 标普石油天然气上游 (^SPSIOP无历史)
+    # --- ETF (本身无对应指数ticker) ---
+    "160416": [("IXC", 100.0)],            # 石油基金: iShares Global Energy
+    "164824": [("INDA", 100.0)],           # 印度基金: iShares MSCI India
+    "164701": [("GLD", 100.0)],            # 黄金LOF: SPDR Gold Shares
+    "164906": [("KWEB", 100.0)],           # 中概互联网: KraneShares CSI China Internet
+    "501300": [("AGG", 100.0)],            # 美元债: iShares Core US Aggregate Bond
 }
 
 
@@ -43,17 +59,36 @@ def get_fund_class(code: str) -> str:
 
 
 def get_index_etf_ticker(code: str) -> str:
-    """返回指数型基金的主ETF ticker(第一个)"""
+    """返回指数型基金的主标的ticker(第一个)"""
     etfs = INDEX_ETF.get(code, [])
     return etfs[0][0] if etfs else ""
 
 
+def is_futures_ticker(ticker: str) -> bool:
+    """判断是否为期货ticker (如 CL=F, BZ=F, GC=F)"""
+    return "=F" in ticker
+
+
+def is_index_ticker(ticker: str) -> bool:
+    """判断是否为指数ticker (如 ^NDX, ^GSPC)"""
+    return ticker.startswith("^")
+
+
 def get_index_holdings(code: str) -> List[Dict]:
-    """指数型持仓: 从ETF映射构建"""
+    """指数型持仓: 从标的映射构建, market根据ticker类型判断"""
     etfs = INDEX_ETF.get(code, [])
     if not etfs:
         return []
-    return [{"ticker": t, "weight": w, "market": "US"} for t, w in etfs]
+    result = []
+    for t, w in etfs:
+        if is_index_ticker(t):
+            market = "INDEX"
+        elif is_futures_ticker(t):
+            market = "FUTURES"
+        else:
+            market = "US"
+        result.append({"ticker": t, "weight": w, "market": market})
+    return result
 
 
 def get_active_holdings(code: str) -> List[Dict]:
@@ -78,29 +113,12 @@ def get_active_holdings(code: str) -> List[Dict]:
 def get_active_holdings_hardcoded(code: str) -> List[Dict]:
     """主动型兜底: 使用hardcoded持仓(从上季度季报)"""
     _HARDCODED: Dict[str, List[Tuple[str, float, str]]] = {
-        "160644": [
-            ("TSM", 9.09, "US"), ("NVDA", 9.05, "US"), ("SNDK", 8.57, "US"),
-            ("MU", 7.49, "US"), ("00700", 6.58, "HK"), ("GOOGL", 5.69, "US"),
-            ("09988", 4.69, "HK"), ("00883", 3.96, "HK"), ("AVGO", 3.49, "US"),
-            ("ASML", 2.85, "US"),
-        ],
-        "164906": [
-            ("00700", 9.54, "HK"), ("PDD", 8.04, "US"), ("09988", 8.0, "HK"),
-            ("03690", 6.62, "HK"), ("09999", 5.37, "HK"), ("09618", 4.25, "HK"),
-            ("09888", 3.92, "HK"), ("02423", 3.88, "HK"), ("06618", 3.55, "HK"),
-            ("YMM", 3.41, "US"),
-        ],
         "163208": [
-            ("00916", 3.21, "HK"), ("00836", 2.46, "HK"), ("00135", 1.97, "HK"),
-            ("01798", 1.87, "HK"), ("06865", 1.43, "HK"), ("00968", 1.16, "HK"),
-            ("01811", 1.14, "HK"), ("01171", 1.13, "HK"), ("00857", 0.90, "HK"),
-            ("00386", 0.72, "HK"),
-        ],
-        "160125": [
-            ("00288", 4.78, "HK"), ("09911", 4.27, "HK"), ("00700", 4.12, "HK"),
-            ("00883", 4.11, "HK"), ("06869", 4.0, "HK"), ("01519", 3.87, "HK"),
-            ("02590", 3.45, "HK"), ("06082", 3.34, "HK"), ("09988", 3.28, "HK"),
-            ("06181", 2.9, "HK"),
+            ("02015", 9.8, "HK"), ("09888", 9.5, "HK"),
+            ("00981", 7.6, "HK"), ("01810", 6.8, "HK"),
+            ("03690", 5.7, "HK"), ("09999", 5.2, "HK"),
+            ("00285", 4.8, "HK"), ("01024", 3.9, "HK"),
+            ("02518", 3.5, "HK"), ("06181", 2.9, "HK"),
         ],
         "501312": [
             ("ARKK", 18.74, "US"), ("ARKG", 15.35, "US"),
@@ -117,7 +135,7 @@ def get_active_holdings_hardcoded(code: str) -> List[Dict]:
 
 
 def get_holdings_for_service(code: str) -> List[Dict]:
-    """实时服务用: 指数型用ETF映射, 主动型用DB+hardcoded"""
+    """实时服务用: 指数型用标的映射, 主动型用DB+hardcoded"""
     if is_index_fund(code):
         return get_index_holdings(code)
     holdings = get_active_holdings(code)
@@ -127,7 +145,7 @@ def get_holdings_for_service(code: str) -> List[Dict]:
 
 
 def get_holdings_for_backtest(code: str) -> List[Dict]:
-    """回测用: 指数型用ETF映射, 主动型用DB优先+hardcoded兜底"""
+    """回测用: 指数型用标的映射, 主动型用DB优先+hardcoded兜底"""
     if is_index_fund(code):
         return get_index_holdings(code)
     holdings = get_active_holdings(code)
