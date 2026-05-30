@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from shared.market_service import get_fx_rates, get_quotes
+from data_fetch.lof_iopv.yahoo_finance import fetch_history as _yahoo_fetch_history
 from data_fetch.lof_iopv.fund_classifier import (
     get_fund_class, get_holdings_for_service, get_index_etf_ticker, is_index_fund,
 )
@@ -336,6 +337,19 @@ def build_lof_snapshot():
                             current_prices[h["ticker"]] = us_q[tc].get("price")
                             if us_q[tc].get("prev_close"):
                                 current_prices.setdefault("_prev_close", {})[h["ticker"]] = us_q[tc]["prev_close"]
+            except Exception:
+                pass
+            # Yahoo复权价覆盖Tencent不复权价（与nav_date_prices基准一致）
+            try:
+                for h in holdings:
+                    if h["market"] != "us":
+                        continue
+                    if not current_prices.get(h["ticker"]):
+                        continue
+                    _hist = _yahoo_fetch_history(h["ticker"], period="5d")
+                    if _hist:
+                        _latest_date = max(_hist.keys())
+                        current_prices[h["ticker"]] = _hist[_latest_date]
             except Exception:
                 pass
             # DB fallback
