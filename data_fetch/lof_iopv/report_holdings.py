@@ -34,20 +34,22 @@ _SECTION_KW = [
     "股票及存托凭证投资明细", "债券投资明细", "占基金资产净值比例",
 ]
 
-_LLM_PROMPT = """你是基金持仓数据提取专家。从基金季报PDF中提取所有持仓的名称和净值占比。
-
-你的唯一任务：从PDF中抄写持仓名称和对应比例。不要猜测任何代码。
+_LLM_PROMPT = """你是基金持仓数据提取专家。从基金季报PDF中提取所有持仓，并联网搜索每只资产的准确Yahoo Finance ticker和市场。
 
 输出格式（纯JSON数组，不要任何其他文字）：
-[{"name":"PDF原文中的完整名称","weight":数字}]
+[{"name":"PDF原文中的完整名称","ticker":"Yahoo Finance代码","market":"US/HK/UK/JP/A","weight":数字}]
 
 规则：
 1. name必须是PDF中显示的原始名称（合并跨行），一字不改
 2. weight是占基金资产净值比例%，纯数字
-3. 必须提取每一条持仓，不能遗漏
-4. 股票、ETF、ETC、基金、债券都算持仓
-5. 排除：银行存款、结算备付金、货币基金、应收类、其他资产
-6. 不要输出任何代码字段，代码会在后续步骤中查找
+3. ticker必须是Yahoo Finance上可查的真实交易代码，联网搜索确认
+4. market是主要上市市场：US(美股)、HK(港股)、UK(伦交所)、JP(日股)、A(A股)
+5. LSE上市的ETC，ticker带.L后缀（如CRUD.L），market填UK
+6. 港股ticker带.HK后缀，日股带.T后缀
+7. 必须提取每一条持仓，不能遗漏
+8. 股票、ETF、ETC、基金、债券都算持仓
+9. 排除：银行存款、结算备付金、货币基金、应收类、其他资产
+10. 不要猜测ticker，必须搜索确认。如果搜索不到，ticker留空字符串""
 """
 
 
@@ -136,6 +138,11 @@ def _parse_json(content: str) -> List[Dict]:
     except json.JSONDecodeError:
         print(f"  [debug] JSON解析失败: {jm.group()[:200]}")
         return []
+    return _validate_items(items)
+
+
+def _validate_items(items: list) -> List[Dict]:
+    """MiMo ticker优先，guess_ticker兜底。"""
     valid = []
     for item in items:
         name = str(item.get("name", "")).strip()
@@ -145,12 +152,14 @@ def _parse_json(content: str) -> List[Dict]:
             continue
         if not name or weight <= 0:
             continue
-        # ticker/market 由 _guess_ticker 兜底（返回 "TICKER|MARKET" 或空）
-        guessed = _guess_ticker(name)
-        if "|" in guessed:
-            ticker, market = guessed.split("|", 1)
-        else:
-            ticker, market = guessed, ""
+        ticker = str(item.get("ticker", "")).strip().upper()
+        market = str(item.get("market", "")).strip().upper()
+        if not ticker:
+            guessed = _guess_ticker(name)
+            if "|" in guessed:
+                ticker, market = guessed.split("|", 1)
+        if market not in ("US", "HK", "UK", "JP", "A", ""):
+            market = ""
         valid.append({"ticker": ticker, "name": name, "weight": weight, "market": market})
     return valid
 
@@ -234,8 +243,9 @@ def _call_vision_llm(b64_image: str, fund_code: str) -> List[Dict]:
             ]}],
             "max_tokens": 50000,
             "temperature": 0.0,
+            "webSearchEnabled": True,
         },
-        timeout=120,
+        timeout=180,
     )
     r.raise_for_status()
     content = r.json()['choices'][0]['message']['content']
