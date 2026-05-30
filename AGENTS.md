@@ -114,6 +114,7 @@ At the beginning of every new session, AI must read in this order:
 ## Completion Rules
 
 - Verify the actual change.
+- **UI 数据验证（自动）**：如果改动影响 UI 显示数据，自动跑 `python scripts/verify_data_field.py` 确认字段非空。三层验证全部 PASS 才算完成。详见 Constitution Rule 12。
 - Update the current mission files.
 - If the task has handoff value, update `MEMORY.md`.
 - If requirements changed, sync the formal specs first.
@@ -282,3 +283,47 @@ When multiple subagents run in parallel, they must not own the same write area o
 
 Non-code documentation in this repository is written in Chinese.
 Code comments for core logic must be in Chinese.
+
+## 12. UI Data Verification (自动触发)
+
+**任何影响 UI 显示数据的改动，完成后必须自动跑验证器确认字段非空。不等人提醒。**
+
+### 触发条件（满足任一即自动执行）
+
+- 用户提到"UI"、"页面"、"显示"、"空白"、"空值"、"数据缺失"、"字段为空"
+- 修改 `data_fetch/` 下任何数据源文件
+- 修改 `strategy/` 下任何计算/服务文件
+- 修改 `ui/routes/` 下任何 API 路由
+- 修改 `ui/view_models/` 下任何数据整形文件
+- 修复任何 "null"、"None"、"空"、"缺失" 相关 bug
+- 修改 IOPV 计算公式、持仓获取、汇率获取等数据链路
+- 新增或修改任何 API 响应字段
+
+### 验证协议（三层，缺一不可）
+
+```
+Layer 1: 代码能导入（语法正确）
+  python -c "import data_fetch.lof_iopv.source"
+
+Layer 2: 调 API / 直连函数，拿到完整 JSON
+  python scripts/verify_data_field.py --direct lof rows[0].目标字段
+
+Layer 3: 目标字段必须有值（非 null、非空字符串、非 0 如果不该是 0）
+  返回码 0 = PASS，返回码 1 = FAIL（继续修，不说"修好了"）
+```
+
+### 执行规则
+
+1. 改完代码后，自动识别受影响的 API 字段
+2. 自动选择验证脚本的正确端点和字段路径
+3. 自动执行三层验证
+4. 如果字段仍为 null：分析根因，继续修复，循环直到 PASS
+5. 只有全部相关字段都 PASS 后，才能说"修好了"
+6. 验证结果附在回复中：字段名 = 实际值
+
+### 禁止行为
+
+- 改完代码就说"修好了"而没跑验证器
+- 只检查 Layer 1（语法）就认为完成
+- 假设"代码逻辑对了数据就一定有"
+- 跳过 Layer 3 的非空检查
