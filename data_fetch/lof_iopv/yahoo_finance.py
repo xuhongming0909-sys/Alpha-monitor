@@ -247,6 +247,12 @@ def normalize_ticker_for_yahoo(ticker: str, market: str) -> str:
         "CH": ".SW", "IT": ".MI", "CA": ".TO", "AU": ".AX",
         "DE": ".DE",
     }
+    suffix = suffix_map.get(market, "")
     if suffix and not ticker.endswith(suffix):
-    if suffix and not ticker.endswith(suffix):
-        # HK: 补前导零到4位
+        # HK: 补前导零到4位 (883 -> 0883)
+        if market == "HK" and ticker.isdigit() and len(ticker) < 4:
+            ticker = ticker.zfill(4)
+        return ticker + suffix
+    return ticker
+
+

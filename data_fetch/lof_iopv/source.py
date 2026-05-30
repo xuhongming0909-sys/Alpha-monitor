@@ -341,7 +341,7 @@ def build_lof_snapshot():
                                 current_prices.setdefault("_prev_close", {})[h["ticker"]] = us_q[tc]["prev_close"]
             except Exception:
                 pass
-            # DB fallback
+            # DB fallback: 查 stock_prices + etf_prices
             missing = [h for h in holdings if not current_prices.get(h["ticker"])]
             if missing:
                 try:
@@ -349,6 +349,8 @@ def build_lof_snapshot():
                     _conn = _get_db()
                     for h in missing:
                         row = _conn.execute("SELECT close FROM stock_prices WHERE ticker=? ORDER BY date DESC LIMIT 1", (h["ticker"],)).fetchone()
+                        if not row:
+                            row = _conn.execute("SELECT close FROM etf_prices WHERE ticker=? ORDER BY date DESC LIMIT 1", (h["ticker"],)).fetchone()
                         if row:
                             current_prices[h["ticker"]] = row[0]
                     _conn.close()
@@ -368,6 +370,11 @@ def build_lof_snapshot():
                         "SELECT close FROM stock_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
                         (h["ticker"], nav_date),
                     ).fetchone()
+                    if not row:
+                        row = _conn.execute(
+                            "SELECT close FROM etf_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
+                            (h["ticker"], nav_date),
+                        ).fetchone()
                     if row:
                         nav_date_prices[h["ticker"]] = row[0]
                 _conn.close()

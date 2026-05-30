@@ -12,7 +12,7 @@ from shared.market_service import get_fx_rates
 from shared.models.service_result import build_success
 from shared.time.shanghai_time import now_iso
 from strategy.lof_iopv.calc import to_float, get_base_fx, calc_iopv
-from data_fetch.lof_iopv.fund_classifier import get_fund_class, get_index_etf_ticker, is_index_fund
+from data_fetch.lof_iopv.fund_classifier import get_fund_class, get_index_etf_ticker, is_index_fund, is_index_ticker, is_futures_ticker, INDEX_ETF
 from data_fetch.lof_db.holdings_updater import get_holdings_source
 
 _BACKTEST_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', 'runtime_data', 'backtest', 'results_v2.json')
@@ -143,16 +143,23 @@ def build_lof_response(fetch_payload):
         effective_holdings = row.get("holdings") or _get_holdings_from_db(code)
         cls = get_fund_class(code)
         if cls == "index":
-            benchmark = "ETF:%s" % get_index_etf_ticker(code)
-        else:
-            source = get_holdings_source(code)
-            total_w = sum(h.get("weight", 0) for h in effective_holdings)
-            if source == "api":
-                benchmark = "API(%.0f%%)" % total_w
-            elif source == "pdf":
-                benchmark = "PDF(%.0f%%)" % total_w
+            # 按标的类型显示: 指数/期货/ETF
+            etfs = INDEX_ETF.get(code, [])
+            if etfs:
+                main_ticker = etfs[0][0]
+                if is_futures_ticker(main_ticker):
+                    names = [t for t, _ in etfs]
+                    benchmark = "期货:" + "+".join(names)
+                elif is_index_ticker(main_ticker):
+                    names = [t for t, _ in etfs]
+                    benchmark = "指数:" + "+".join(names)
+                else:
+                    names = [t for t, _ in etfs]
+                    benchmark = "ETF:" + "+".join(names)
             else:
-                benchmark = "active(%.0f%%)" % total_w
+                benchmark = get_index_etf_ticker(code)
+        else:
+            benchmark = "持仓"
 
         apply_status = row.get("applyStatus") or ""
         daily_limit = row.get("dailyLimit")

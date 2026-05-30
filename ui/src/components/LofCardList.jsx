@@ -37,13 +37,15 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
   const filtered = rows.filter((row) =>
     rowMatchesQuery(row, searchQuery, ['name', 'code', 'fundCompany', 'calcTarget'])
   );
-  // 置顶排前面，其余按溢价率绝对值降序
-  const sorted = [...filtered].sort((a, b) => {
-    const pa = isPinned(a) ? 1 : 0;
-    const pb = isPinned(b) ? 1 : 0;
-    if (pa !== pb) return pb - pa;
-    return Math.abs(toNumber(b.premiumRate) ?? 0) - Math.abs(toNumber(a.premiumRate) ?? 0);
+  // 置顶不受排序影响，始终在顶部；其余按溢价率降序
+  const pinned = filtered.filter(isPinned);
+  const unpinned = filtered.filter((r) => !isPinned(r));
+  const sortedUnpinned = [...unpinned].sort((a, b) => {
+    const pa = toNumber(a.premiumRate) ?? -Infinity;
+    const pb = toNumber(b.premiumRate) ?? -Infinity;
+    return pb - pa;
   });
+  const sorted = [...pinned, ...sortedUnpinned];
 
   const columns = [
     {
