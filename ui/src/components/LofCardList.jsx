@@ -30,7 +30,9 @@ function isPinned(row) {
   const hasLimit = status.includes('限');
   const limitUnder10w = limit !== null && limit < 100000;
   const premiumOver1 = premium !== null && premium > 1;
-  return hasLimit && limitUnder10w && premiumOver1;
+  const deepDiscount = premium !== null && premium < -2;
+  // 溢价>1%需限额条件，深度折价<-2%无需限额
+  return (hasLimit && limitUnder10w && premiumOver1) || deepDiscount;
 }
 
 export default function LofCardList({ rows = [], searchQuery = '' }) {
@@ -52,7 +54,7 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
       key: 'code', label: '代码',
       render: (row) => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          {isPinned(row) && <span title="置顶：限额<10万且溢价>1%" style={{ color: '#e74c3c', fontSize: '0.75em' }}>📌</span>}
+          {isPinned(row) && <span title="置顶：限额<10万且溢价>1%，或折价<-2%" style={{ color: '#e74c3c', fontSize: '0.75em' }}>📌</span>}
           <span className="mono">{pickText(row.code)}</span>
         </span>
       ),
