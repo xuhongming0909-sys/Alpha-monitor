@@ -39,15 +39,12 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
   const filtered = rows.filter((row) =>
     rowMatchesQuery(row, searchQuery, ['name', 'code', 'fundCompany', 'calcTarget'])
   );
-  // 置顶不受排序影响，始终在顶部；其余按溢价率降序
-  const pinned = filtered.filter(isPinned);
-  const unpinned = filtered.filter((r) => !isPinned(r));
-  const sortedUnpinned = [...unpinned].sort((a, b) => {
+// 默认按溢价率降序；列头点击排序时置顶始终隔离在顶部
+  const sorted = [...filtered].sort((a, b) => {
     const pa = toNumber(a.premiumRate) ?? -Infinity;
     const pb = toNumber(b.premiumRate) ?? -Infinity;
     return pb - pa;
   });
-  const sorted = [...pinned, ...sortedUnpinned];
 
   const columns = [
     {
@@ -92,7 +89,7 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
     { key: 'samplePeriod', label: '样本区间', render: (row) => pickText(row.samplePeriod) || '--' },
   ];
 
-  const pinnedCount = sorted.filter(isPinned).length;
+  const pinnedCount = filtered.filter(isPinned).length;
 
   return (
     <SimpleDataTable
@@ -101,6 +98,7 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
       count={`${sorted.length} 条`}
       columns={columns}
       rows={sorted}
+      isPinned={isPinned}
       emptyText="LOF 接口暂无数据"
     />
   );

@@ -22,22 +22,28 @@ function useSort() {
       direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
     }));
   }, []);
-  const sorted = React.useCallback((rows, columns) => {
-    if (!sortConfig.key || !rows.length) return rows;
-    const { key, direction } = sortConfig;
-    const column = columns.find((c) => (c.sortKey || c.key) === key);
-    const getValue = column?.sortValue ? column.sortValue : (row) => toNumber(row[key]) ?? row[key];
-    return [...rows].sort((a, b) => {
-      const av = getValue(a);
-      const bv = getValue(b);
-      if (av == null && bv == null) return 0;
-      if (av == null) return 1;
-      if (bv == null) return -1;
-      if (typeof av === 'number' && typeof bv === 'number') {
-        return direction === 'asc' ? av - bv : bv - av;
-      }
-      return direction === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
-    });
+  const sorted = React.useCallback((rows, columns, isPinned) => {
+    const doSort = (list) => {
+      if (!sortConfig.key || !list.length) return list;
+      const { key, direction } = sortConfig;
+      const column = columns.find((c) => (c.sortKey || c.key) === key);
+      const getValue = column?.sortValue ? column.sortValue : (row) => toNumber(row[key]) ?? row[key];
+      return [...list].sort((a, b) => {
+        const av = getValue(a);
+        const bv = getValue(b);
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (typeof av === 'number' && typeof bv === 'number') {
+          return direction === 'asc' ? av - bv : bv - av;
+        }
+        return direction === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+      });
+    };
+    if (!isPinned) return doSort(rows);
+    const pinned = rows.filter(isPinned);
+    const rest = rows.filter((r) => !isPinned(r));
+    return [...doSort(pinned), ...doSort(rest)];
   }, [sortConfig]);
   return { sortConfig, handleSort, sorted };
 }
@@ -52,7 +58,7 @@ export default function SimpleDataTable({
   tableClassName = '',
 }) {
   const { sortConfig, handleSort, sorted } = useSort();
-  const sortedRows = sorted(rows, columns);
+  const sortedRows = sorted(rows, columns, isPinned);
 
   return (
     <section className="terminal-panel main-table-panel">
