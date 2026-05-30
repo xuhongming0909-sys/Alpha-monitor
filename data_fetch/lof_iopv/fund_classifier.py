@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-# AI-SUMMARY: LOF浜屽垎绫?鎸囨暟鍨?涓诲姩鍨?鍩洪噾鍒嗙被鍣?+ 鎸佷粨鑾峰彇
-# 瀵瑰簲 INDEX.md 9.3 鏂囦欢鎽樿绱㈠紩
-"""LOF鍩洪噾浜屽垎绫讳綋绯汇€?
-鎸囨暟鍨? ETF/鎸囨暟/鏈熻揣鏄犲皠, 鍩轰簬涓氱哗鍩哄噯, 鍥炴祴MAE<0.5%
-涓诲姩鍨? 鍏圓PI鍐峆DF, 鎸佷粨鍚堣<25%鏃秄allback鍒癙DF瑙ｆ瀽
+# AI-SUMMARY: LOF二分类(指数型/主动型)基金分类器 + 持仓获取
+# 对应 INDEX.md 9.3 文件摘要索引
+"""LOF基金二分类体系。
+
+指数型: ETF/指数/期货映射, 基于业绩基准, 回测MAE<0.5%
+主动型: 全API再PDF, 持仓合计<25%时fallback到PDF解析
 """
 from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
@@ -13,62 +14,62 @@ from typing import Dict, List, Optional, Tuple
 # 鎸囨暟鍨嬫爣鐨勬槧灏? 鍩洪噾浠ｇ爜 -> [(ticker, weight), ...]
 # 涓夌ticker绫诲瀷:
 #   - 鎸囨暟: ^NDX, ^GSPC, ^SP500-45, ^SP500-30, ^HSI (^寮€澶?
-#   - 鏈熻揣: CL=F, BZ=F, GC=F 绛?(=F缁撳熬)
+#   - 
 #   - ETF:  KWEB, AGG, GLD, RYH, XBI, IYR, XOP 绛?(绾瓧姣?
 # Yahoo Deno浠ｇ悊闄愬埗: ^SP500EW-35/^SPBIO/^DJUSRE/^SPSIOP 鍙繑鍥?澶?#   鈫?鐢‥TF鏇夸唬: RYH/XBI/IYR/XOP
 # 鏄犲皠渚濇嵁: 涓氱哗姣旇緝鍩哄噯, 鍥炴祴楠岃瘉
 # ============================================================
 INDEX_ETF: Dict[str, List[Tuple[str, float]]] = {
-    # --- 缇庤偂鎸囨暟 (^ticker, Yahoo鏈夊畬鏁村巻鍙? ---
-    "161125": [("^GSPC", 100.0)],          # 鏍囨櫘500
-    "161130": [("^NDX", 100.0)],           # 绾虫柉杈惧厠100
-    "161128": [("^SP500-45", 100.0)],      # 鏍囨櫘500淇℃伅绉戞妧
-    "162415": [("XLY", 100.0)],            # 鏍囨櫘缇庡浗鍝佽川娑堣垂(=Consumer Discretionary)
-    # --- 鏈熻揣 (=F) ---
-    # --- ETF (鎸囨暟ticker浠ｇ悊涓嶅彲鐢ㄦ椂鐨勬浛浠? ---
-    "161126": [("RYH", 100.0)],            # 鏍囨櫘500鍖荤枟淇濆仴绛夋潈閲?(^SP500EW-35鏃犲巻鍙?
-    "161127": [("XBI", 100.0)],            # 鏍囨櫘鐢熺墿绉戞妧 (^SPBIO鏃犲巻鍙?
-    "160140": [("IYR", 100.0)],            # 閬撶惣鏂編鍥絉EIT (^DJUSRE鏃犲巻鍙?
-    "162719": [("IEO", 100.0)],            # 鐭虫补LOF: iShares US Oil & Gas E&P
+    # --- 美股指数 (^ticker, Yahoo有完整历史) ---
+    "161125": [("^GSPC", 100.0)],          # 标普500
+    "161130": [("^NDX", 100.0)],           # 纳斯达克100
+    "161128": [("^SP500-45", 100.0)],      # 标普500淇℃伅绉戞妧
+    "162415": [("XLY", 100.0)],            # 标普美国品质消费(=Consumer Discretionary)
+    # --- 
+    # --- ? ---
+    "161126": [("RYH", 100.0)],            # 标普500鍖荤枟淇濆仴绛夋潈閲?(^SP500EW-35鏃犲巻鍙?
+    "161127": [("XBI", 100.0)],            # 标普生物科技 (^SPBIO无历史)
+    "160140": [("IYR", 100.0)],            # 道琼斯美国REIT (^DJUSRE无历史)
+    "162719": [("IEO", 100.0)],            # 石油LOF: iShares US Oil & Gas E&P
     "162411": [("XOP", 100.0)],            # 鏍囨櫘鐭虫补澶╃劧姘斾笂娓?(^SPSIOP鏃犲巻鍙?
-    # --- ETF (鏈韩鏃犲搴旀寚鏁皌icker) ---
+    # --- 
     "160719": [("GC=F", 100.0)],           # 嘉实黄金: 黄金期货→伦敦金
-    "160416": [("IXC", 100.0)],            # 鐭虫补鍩洪噾: iShares Global Energy
-    "164824": [("INDA", 100.0)],           # 鍗板害鍩洪噾: iShares MSCI India
-    "164701": [("GLD", 100.0)],            # 榛勯噾LOF: SPDR Gold Shares
-    "164906": [("KWEB", 100.0)],           # 涓浜掕仈缃? KraneShares CSI China Internet
-    "501300": [("AGG", 100.0)],            # 缇庡厓鍊? iShares Core US Aggregate Bond
+    "160416": [("IXC", 100.0)],            # 石油基金: iShares Global Energy
+    "164824": [("INDA", 100.0)],           # 印度基金: iShares MSCI India
+    "164701": [("GLD", 100.0)],            # 黄金LOF: SPDR Gold Shares
+    "164906": [("KWEB", 100.0)],           # 中概互联网: KraneShares CSI China Internet
+    "501300": [("AGG", 100.0)],            # 美元债: iShares Core US Aggregate Bond
 }
 
 
 def is_index_fund(code: str) -> bool:
-    """鍒ゆ柇鏄惁涓烘寚鏁板瀷鍩洪噾"""
+    """判断是否为指数型基金"""
     return code in INDEX_ETF
 
 
 def get_fund_class(code: str) -> str:
-    """杩斿洖鍩洪噾鍒嗙被: 'index' / 'active'"""
+    """返回基金分类: index / active"""
     return "index" if code in INDEX_ETF else "active"
 
 
 def get_index_etf_ticker(code: str) -> str:
-    """杩斿洖鎸囨暟鍨嬪熀閲戠殑涓绘爣鐨則icker(绗竴涓?"""
+    """返回指数型基金的主标的ticker(第一个)"""
     etfs = INDEX_ETF.get(code, [])
     return etfs[0][0] if etfs else ""
 
 
 def is_futures_ticker(ticker: str) -> bool:
-    """鍒ゆ柇鏄惁涓烘湡璐icker (濡?CL=F, BZ=F, GC=F)"""
+    """判断是否为期货ticker (如 CL=F)"""
     return "=F" in ticker
 
 
 def is_index_ticker(ticker: str) -> bool:
-    """鍒ゆ柇鏄惁涓烘寚鏁皌icker (濡?^NDX, ^GSPC)"""
+    """判断是否为指数ticker (如 ^NDX)"""
     return ticker.startswith("^")
 
 
 def get_index_holdings(code: str) -> List[Dict]:
-    """鎸囨暟鍨嬫寔浠? 浠庢爣鐨勬槧灏勬瀯寤? market鏍规嵁ticker绫诲瀷鍒ゆ柇"""
+    """指数型持仓: 从标的映射构建, market根据ticker类型判断"""
     etfs = INDEX_ETF.get(code, [])
     if not etfs:
         return []
@@ -85,7 +86,7 @@ def get_index_holdings(code: str) -> List[Dict]:
 
 
 def get_active_holdings(code: str) -> List[Dict]:
-    """涓诲姩鍨嬫寔浠? 浠嶥B璇诲彇(鐢県oldings_updater缁存姢)"""
+    """主动型持仓: 从DB读取(由holdings_updater维护)"""
     from data_fetch.lof_db.schema import get_db
     conn = get_db()
     latest = conn.execute(
@@ -104,7 +105,7 @@ def get_active_holdings(code: str) -> List[Dict]:
 
 
 def get_active_holdings_hardcoded(code: str) -> List[Dict]:
-    """涓诲姩鍨嬪厹搴? 浣跨敤hardcoded鎸佷粨(浠庝笂瀛ｅ害瀛ｆ姤)"""
+    """主动型兜底: 使用hardcoded持仓(从上季度季报)"""
     _HARDCODED: Dict[str, List[Tuple[str, float, str]]] = {
         "163208": [
             ("02015", 9.8, "HK"), ("09888", 9.5, "HK"),
@@ -128,7 +129,7 @@ def get_active_holdings_hardcoded(code: str) -> List[Dict]:
 
 
 def get_holdings_for_service(code: str) -> List[Dict]:
-    """瀹炴椂鏈嶅姟鐢? 鎸囨暟鍨嬬敤鏍囩殑鏄犲皠, 涓诲姩鍨嬬敤DB+hardcoded"""
+    """实时服务用: 指数型用标的映射, 主动型用DB+hardcoded"""
     if is_index_fund(code):
         return get_index_holdings(code)
     holdings = get_active_holdings(code)
@@ -138,7 +139,7 @@ def get_holdings_for_service(code: str) -> List[Dict]:
 
 
 def get_holdings_for_backtest(code: str) -> List[Dict]:
-    """鍥炴祴鐢? 鎸囨暟鍨嬬敤鏍囩殑鏄犲皠, 涓诲姩鍨嬬敤DB浼樺厛+hardcoded鍏滃簳"""
+    """回测用: 指数型用标的映射, 主动型用DB优先+hardcoded兜底"""
     if is_index_fund(code):
         return get_index_holdings(code)
     holdings = get_active_holdings(code)

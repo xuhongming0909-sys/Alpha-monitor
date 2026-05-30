@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # AI-SUMMARY: LOF IOPV data source - fetch NAV, holdings, prices, purchase status from eastmoney/tencent/xueqiu
 # INDEX section 9.3 file summary index
 """LOF IOPV data source layer.
@@ -290,9 +290,6 @@ def build_lof_snapshot():
 
     all_rows = []
     for fund in funds:
-        # 跳过已删除的基金
-        if fund.get('code') == '160125':
-            continue
         code = fund["code"]
         nav_data = _fetch_nav(code)
         nav, nav_date = nav_data["nav"], nav_data["navDate"]
@@ -421,4 +418,3 @@ def build_lof_snapshot():
         "source": "eastmoney+tencent",
         "sourceSummary": {"totalRows": len(all_rows), "fxRates": fx_rates},
     }
-

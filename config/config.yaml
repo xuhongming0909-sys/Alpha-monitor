@@ -388,10 +388,6 @@ data_fetch:
         name: 黄金主题LOF
         currency: USD
         fund_class: active
-      - code: '160125'
-        name: 南方香港LOF
-        currency: HKD
-        fund_class: index
       - code: '160644'
         name: 港美互联网LOF
         currency: HKD
