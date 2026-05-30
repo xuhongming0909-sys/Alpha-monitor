@@ -324,27 +324,10 @@ def build_lof_snapshot():
                                 current_prices.setdefault("_prev_close", {})[h["ticker"]] = hk_q[tc]["prev_close"]
             except Exception:
                 pass
-            # 美股实时行情
-            try:
-                us_tickers = [h["ticker"] for h in holdings if h["market"] == "us"]
-                if us_tickers:
-                    us_q = _fetch_us_realtime(us_tickers)
-                    for h in holdings:
-                        if h["market"] != "us":
-                            continue
-                        tc = h["ticker"].upper()
-                        if tc in us_q:
-                            current_prices[h["ticker"]] = us_q[tc].get("price")
-                            if us_q[tc].get("prev_close"):
-                                current_prices.setdefault("_prev_close", {})[h["ticker"]] = us_q[tc]["prev_close"]
-            except Exception:
-                pass
-            # Yahoo复权价覆盖Tencent不复权价（与nav_date_prices基准一致）
+            # 美股行情：直接用Yahoo复权价（与nav_date_prices同源同口径）
             try:
                 for h in holdings:
                     if h["market"] != "us":
-                        continue
-                    if not current_prices.get(h["ticker"]):
                         continue
                     _hist = _yahoo_fetch_history(h["ticker"], period="5d")
                     if _hist:
