@@ -162,3 +162,38 @@
 - **Action**: 拆分 dashboard_page.js → constants.js（提取 UI 常量 ~200 行）
 - **Action**: 拆分 source.py → cb_metrics.py（提取计算密集型函数 ~570 行）
 - **Action**: 新建 server_config_loader.js（配置读取逻辑 ~300 行）
+
+### 2026-05-30 | 道琼斯美国石油开发与生产指数可交易标的检查
+
+- **任务**: 检查道琼斯美国石油开发与生产指数对应的指数行情、LOF、期货等
+- **结果**:
+  - 指数: ^DJUSEN (Dow Jones U.S. Oil & Gas Index) 可访问，但非完全匹配的石油开发与生产指数
+  - ETF: XOP (SPDR S&P Oil & Gas Exploration & Production ETF) 是最接近的可交易标的，流动性高
+  - LOF: Yahoo Finance 无中国 LOF 数据，需使用国内数据源补充
+  - 期货: 原油期货 CL=F, QM=F, MCL=F 可访问，但非指数期货
+- **数据源**: Yahoo Finance (代理端口 7897)
+- **任务类型**: 研究/分析
+- **Mission**: missions/0530-oil-index-check/
+
+### 2026-05-30 | 移除南方香港LOF (160125)
+
+- **任务**: 从基金列表中彻底移除南方香港LOF，包括UI页面等
+- **Action**: 从 config/config.yaml 的 lof_arbitrage.funds 中删除该基金条目
+- **Action**: 从 data_fetch/lof_iopv/fund_classifier.py 的 INDEX_ETF 中删除映射
+- **Action**: 从 data_fetch/lof_iopv/holdings_hardcoded.py 中删除条目
+- **Action**: 从 specs/lof-arbitrage.md 和 specs/lof-holdings.md 中删除相关行
+- **Action**: 从调试脚本 (tools/debug_scripts/) 中删除引用
+- **Verification**: 在活动代码中搜索 "160125" 无结果
+- **Note**: 运行时数据和存档文件中的引用已忽略
+
+### 2026-05-30 | 修复回测持仓数据缺失逻辑
+
+- **问题**: 回测中只要有一只持仓股票价格缺失，就跳过整个日期
+- **修复**: 修改 strategy/lof_iopv/backtest_v2.py，允许部分持仓缺失数据
+- **逻辑**: 
+  - 构建价格字典时只包含有效价格
+  - 计算有数据的持仓权重总和 (valid_weight_sum)
+  - 调整 stock_ratio 为 stock_ratio * valid_weight_sum / 100
+  - 使用调整后的 stock_ratio 调用 calc_iopv
+- **效果**: 持仓总和60%，其中10%没数据时，按54%持仓比例计算
+- **验证**: 代码逻辑正确，calc_iopv 函数已支持部分持仓缺失

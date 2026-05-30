@@ -1,10 +1,10 @@
-# -*- coding: utf-8 -*-
-# AI-SUMMARY: LOF回测 - 指数型ETF + 主动型持仓，统一calc_iopv公式
-# 对应 INDEX.md §9.3 文件摘要索引
-"""LOF回测: 指数型用ETF映射, 主动型用持仓, 统一calc_iopv公式。
+﻿# -*- coding: utf-8 -*-
+# AI-SUMMARY: LOF鍥炴祴 - 鎸囨暟鍨婨TF + 涓诲姩鍨嬫寔浠擄紝缁熶竴calc_iopv鍏紡
+# 瀵瑰簲 INDEX.md 搂9.3 鏂囦欢鎽樿绱㈠紩
+"""LOF鍥炴祴: 鎸囨暟鍨嬬敤ETF鏄犲皠, 涓诲姩鍨嬬敤鎸佷粨, 缁熶竴calc_iopv鍏紡銆?
 
-日期对齐规则：每个NAV披露日d，用d日的持仓和d日股价作为基准，
-用d+1日股价推算IOPV，与d+1日实际NAV对比。
+鏃ユ湡瀵归綈瑙勫垯锛氭瘡涓狽AV鎶湶鏃锛岀敤d鏃ョ殑鎸佷粨鍜宒鏃ヨ偂浠蜂綔涓哄熀鍑嗭紝
+鐢╠+1鏃ヨ偂浠锋帹绠桰OPV锛屼笌d+1鏃ュ疄闄匩AV瀵规瘮銆?
 """
 
 import json
@@ -50,7 +50,7 @@ def _get_nav_dates(code, start_date, end_date):
 
 
 def _get_stock_prices_batch(tickers, start_date, end_date):
-    """批量获取股价 {ticker: {date: price}}"""
+    """鎵归噺鑾峰彇鑲′环 {ticker: {date: price}}"""
     result = {}
     conn = get_db()
     for ticker in tickers:
@@ -69,7 +69,7 @@ def _get_stock_prices_batch(tickers, start_date, end_date):
 
 
 def _get_fx_rates(start_date, end_date, currency='USD'):
-    """获取指定币种汇率 {date: rate}，支持 USD/HKD"""
+    """鑾峰彇鎸囧畾甯佺姹囩巼 {date: rate}锛屾敮鎸?USD/HKD"""
     conn = get_db()
     rows = conn.execute(
         'SELECT date, rate FROM fx_rates WHERE currency = ? AND date >= ? AND date <= ? ORDER BY date',
@@ -80,12 +80,12 @@ def _get_fx_rates(start_date, end_date, currency='USD'):
 
 
 def _get_holdings(code):
-    """获取持仓: A类=ETF(weight=100), B类=hardcoded实际持仓"""
+    """鑾峰彇鎸佷粨: A绫?ETF(weight=100), B绫?hardcoded瀹為檯鎸佷粨"""
     return get_holdings_for_backtest(code)
 
 
 def _calc_metrics(actual_series, predicted_series):
-    """计算回测指标: Bias / MAE / MaxErr / ErrRate05"""
+    """璁＄畻鍥炴祴鎸囨爣: Bias / MAE / MaxErr / ErrRate05"""
     y = np.array(actual_series)
     x = np.array(predicted_series)
     n = len(y)
@@ -110,7 +110,7 @@ def _calc_metrics(actual_series, predicted_series):
 
 
 def backtest_fund(code, end_date_str):
-    """回测单只基金: A类ETF追踪或B类持仓加权, 统一calc_iopv。"""
+    """鍥炴祴鍗曞彧鍩洪噾: A绫籈TF杩借釜鎴朆绫绘寔浠撳姞鏉? 缁熶竴calc_iopv銆?""
     start_date = (datetime.strptime(end_date_str, '%Y-%m-%d') - timedelta(days=LOOKBACK_DAYS)).strftime('%Y-%m-%d')
     nav_dict = _get_nav_dates(code, start_date, end_date_str)
     # Determine fund currency for FX lookup
@@ -131,7 +131,7 @@ def backtest_fund(code, end_date_str):
     if not holdings:
         return None
 
-    # 总仓位: 从API获取(1-现金比例)
+    # 鎬讳粨浣? 浠嶢PI鑾峰彇(1-鐜伴噾姣斾緥)
     stock_ratio = _fetch_stock_position(code)
     if not stock_ratio or stock_ratio <= 0:
         stock_ratio = sum(h.get("weight", 0) for h in holdings)
@@ -158,10 +158,10 @@ def backtest_fund(code, end_date_str):
         if nav_prev <= 0:
             continue
 
-        # 构建价格字典
+        # 构建价格字典，只包含有效价格
         nav_date_prices = {}
         current_prices = {}
-        all_ok = True
+        valid_weight_sum = 0.0
         for h in holdings:
             t = h["ticker"]
             p_prev = stock_prices.get(t, {}).get(d_prev)
@@ -169,20 +169,20 @@ def backtest_fund(code, end_date_str):
             if p_prev and p_prev > 0:
                 nav_date_prices[t] = p_prev
             else:
-                all_ok = False
-                break
+                continue
             if p_curr and p_curr > 0:
                 current_prices[t] = p_curr
             else:
-                all_ok = False
-                break
-        if not all_ok:
+                continue
+            valid_weight_sum += h.get("weight", 0)
+        if valid_weight_sum <= 0:
             continue
+        adjusted_stock_ratio = stock_ratio * valid_weight_sum / 100.0
 
         predicted, _, _ = calc_iopv(
             nav=nav_prev,
             holdings=holdings,
-            stock_ratio=stock_ratio,
+            stock_ratio=adjusted_stock_ratio,
             current_prices=current_prices,
             nav_date_prices=nav_date_prices,
             prev_closes={},
@@ -206,7 +206,7 @@ def backtest_fund(code, end_date_str):
 
 
 def run_all():
-    """回测所有配置的LOF基金"""
+    """鍥炴祴鎵€鏈夐厤缃殑LOF鍩洪噾"""
     end_date_str = datetime.now().strftime('%Y-%m-%d')
     funds = _load_funds()
     results = {}
@@ -224,9 +224,9 @@ def run_all():
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     with open(OUTPUT_PATH, "w", encoding="utf-8") as fp:
         json.dump(results, fp, ensure_ascii=False, indent=2)
-    print(f"回测完成: {len(results)}只 -> {OUTPUT_PATH}")
+    print(f"鍥炴祴瀹屾垚: {len(results)}鍙?-> {OUTPUT_PATH}")
     if skipped:
-        print(f"跳过(无数据): {', '.join(skipped)}")
+        print(f"璺宠繃(鏃犳暟鎹?: {', '.join(skipped)}")
     return results
 
 
@@ -240,3 +240,5 @@ if __name__ == "__main__":
         cls = r.get('class', '?')
         tag = f"[{cls}]" + (f"<{r.get('etf','')}>" if r.get('etf') else "")
         print(f"{code} {tag}: bias={bias:+.3f}% mae={mae:.3f}% maxErr={maxe:.3f}% err>0.5%={err_rate}% ({r.get('errDays',0)}/{r.get('totalDays',0)})")
+
+
