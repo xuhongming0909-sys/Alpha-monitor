@@ -1,6 +1,6 @@
 "use strict";
 // LOF IOPV 推送服务
-// 推送条件：有限额 AND 限额<5万 AND IOPV溢价率>1%
+// 推送条件：有限额 AND 限额<10万 AND IOPV溢价率>1%
 
 function createLofIopvPushService(options = {}) {
   const getConfig = typeof options.getConfig === "function" ? options.getConfig : () => ({ enabled: false, times: [] });
@@ -15,7 +15,7 @@ function createLofIopvPushService(options = {}) {
   const logInfo = options.logInfo || ((msg) => console.info(msg));
   const logError = options.logError || ((scope, err) => console.error(scope, err));
 
-  // 推送筛选：有限额 + 限额<5万 + 溢价>1%
+  // 推送筛选：有限额 + 限额<10万 + 溢价>1%
   function filterPushRows(rows) {
     if (!rows || !Array.isArray(rows)) return [];
     return rows.filter(r => {
@@ -23,7 +23,7 @@ function createLofIopvPushService(options = {}) {
       if (premium === null || premium === undefined || premium <= 1.0) return false;
       const limit = r.dailyLimit;
       if (limit === null || limit === undefined || limit === "" || limit === 0) return false;
-      if (limit >= 50000) return false;
+      if (limit >= 100000) return false;
       return true;
     });
   }

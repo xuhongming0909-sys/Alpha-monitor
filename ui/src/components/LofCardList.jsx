@@ -22,15 +22,15 @@ function formatStockPosition(row) {
   return `${v.toFixed(1)}%`;
 }
 
-/** 置顶条件：有限额 + 限额<5万 + IOPV溢价率>1% */
+/** 置顶条件：有限额 + 限额<10万 + IOPV溢价率>1% */
 function isPinned(row) {
   const status = (row.applyStatus || '').toString();
   const limit = toNumber(row.dailyLimit);
   const premium = toNumber(row.premiumRate);
   const hasLimit = status.includes('限');
-  const limitUnder5w = limit !== null && limit < 50000;
+  const limitUnder10w = limit !== null && limit < 100000;
   const premiumOver1 = premium !== null && premium > 1;
-  return hasLimit && limitUnder5w && premiumOver1;
+  return hasLimit && limitUnder10w && premiumOver1;
 }
 
 export default function LofCardList({ rows = [], searchQuery = '' }) {
@@ -52,7 +52,7 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
       key: 'code', label: '代码',
       render: (row) => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          {isPinned(row) && <span title="置顶：限额<5万且溢价>1%" style={{ color: '#e74c3c', fontSize: '0.75em' }}>📌</span>}
+          {isPinned(row) && <span title="置顶：限额<10万且溢价>1%" style={{ color: '#e74c3c', fontSize: '0.75em' }}>📌</span>}
           <span className="mono">{pickText(row.code)}</span>
         </span>
       ),

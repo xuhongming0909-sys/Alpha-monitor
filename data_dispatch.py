@@ -23,7 +23,7 @@ from data_fetch.event_arbitrage.fetcher import fetch_event_arbitrage_snapshot
 from data_fetch.event_arbitrage.normalizer import normalize_event_arbitrage_snapshot
 from data_fetch.exchange_rate.fetcher import fetch_exchange_rate_snapshot
 from data_fetch.exchange_rate.normalizer import normalize_exchange_rate_snapshot
-from data_fetch.lof_iopv.fetcher import fetch_lof_iopv_snapshot
+from data_fetch.lof_iopv.source import build_lof_snapshot as fetch_lof_iopv_snapshot
 
 from data_fetch.merger.fetcher import fetch_merger_snapshot
 from data_fetch.merger.normalizer import normalize_merger_snapshot
