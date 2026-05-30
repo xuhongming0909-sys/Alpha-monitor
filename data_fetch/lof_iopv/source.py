@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# AI-SUMMARY: LOF IOPV data source - fetch NAV, holdings, prices, purchase status from eastmoney/tencent/xueqiu
+# AI-SUMMARY: LOF IOPV data source - NAV/持仓/价格/申购状态，美股持仓用Yahoo复权价覆盖腾讯不复权价
 # INDEX section 9.3 file summary index
 """LOF IOPV data source layer.
 

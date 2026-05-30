@@ -73,7 +73,7 @@
 | `exchange_rate/` | 腾讯 | `fetcher.py`, `normalizer.py` | 港币/美元人民币汇率 |
 | `convertible_bond/` | 集思录 + 东财 | `fetcher.py`, `source.py`, `normalizer.py`, `history_sync.py`, `history_source.py` | 转债套利数据（含理论定价） |
 | `cb_rights_issue/` | 集思录 | `fetcher.py`, `source.py`, `normalizer.py`, `history_source.py` | 转债抢权配售数据 |
-| `lof_iopv/` | 东财+腾讯+雪球 | `fetcher.py`, `source.py`, `fund_classifier.py`, `normalizer.py` | QDII LOF IOPV二分类(指数/主动)数据 |
+| `lof_iopv/` | 东财+腾讯→Yahoo复权+雪球 | `fetcher.py`, `source.py`, `fund_classifier.py`, `normalizer.py` | QDII LOF IOPV二分类(指数/主动)数据 |
 | `merger/` | 公告 API | `fetcher.py`, `source.py`, `normalizer.py` | 并购重组公告 |
 | `event_arbitrage/` | 集思录 | `fetcher.py`, `normalizer.py` | 事件驱动套利 |
 | `subscription/` | 多源 | `fetcher.py`, `ipo_source.py`, `bond_source.py`, `normalizer.py` | 新股/转债申购日历 |
@@ -236,7 +236,7 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | 抢权配售数据抓取 | `data_fetch/cb_rights_issue/fetcher.py` |
 | 抢权配售推送 | `notification/cb_rights_issue/service.js` |
 | QDII LOF IOPV 数据抓取 | `data_fetch/lof_iopv/fetcher.py` | LOF IOPV fetcher（薄包装，调用source.py） |
-| data_fetch/lof_iopv/source.py | LOF IOPV数据获取层（东财净值+腾讯行情+雪球仓位） |
+| data_fetch/lof_iopv/source.py | LOF IOPV数据获取层（东财净值+腾讯行情→Yahoo复权覆盖+雪球仓位） |
 | QDII LOF IOPV 推送 | `notification/lof_iopv/service.js` |
 | AH 溢价计算 | `strategy/ah_premium/service.py` |
 | AB 溢价计算 | `strategy/ab_premium/service.py` |
@@ -339,7 +339,7 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `data_fetch/convertible_bond/source.py` | 转债套利上游 API：集思录实时行情 + 东方财富财务数据 |
 | `data_fetch/convertible_bond/normalizer.py` | 转债套利数据标准化：含理论定价的 Bus 记录生成 |
 | `data_fetch/lof_iopv/fetcher.py` | LOF IOPV fetcher（薄包装，调用source.py） |
-| `data_fetch/lof_iopv/source.py` | LOF IOPV上游API：东财净值+腾讯行情+雪球仓位+集思录申购状态 |
+| `data_fetch/lof_iopv/source.py` | LOF IOPV上游API：东财净值+腾讯行情→Yahoo复权覆盖+雪球仓位+集思录申购状态 |
 | `data_fetch/lof_iopv/normalizer.py` | LOF IOPV数据标准化：快照转Bus记录 |
 | `data_fetch/merger/fetcher.py` | 并购数据抓取调度：调用巨潮公告 API |
 | `data_fetch/merger/source.py` | 并购公告 API：巨潮资讯公告搜索与解析 |
