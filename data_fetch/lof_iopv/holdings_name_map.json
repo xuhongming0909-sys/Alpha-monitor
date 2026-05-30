@@ -1,0 +1,267 @@
+{
+  "NVIDIA Corporation": {
+    "ticker": "NVDA",
+    "market": "US",
+    "source": "db"
+  },
+  "Broadcom Inc": {
+    "ticker": "AVGO",
+    "market": "US",
+    "source": "db"
+  },
+  "Micron Technology": {
+    "ticker": "MU",
+    "market": "US",
+    "source": "db"
+  },
+  "iShares Gold Trust": {
+    "ticker": "IAU",
+    "market": "US",
+    "source": "db"
+  },
+  "SPDR Gold Shares": {
+    "ticker": "GLD",
+    "market": "US",
+    "source": "db"
+  },
+  "SPDR Gold MiniShares Trust": {
+    "ticker": "GLDM",
+    "market": "US",
+    "source": "db"
+  },
+  "abrdn Physical Gold Shares ETF": {
+    "ticker": "SGOL",
+    "market": "US",
+    "source": "db"
+  },
+  "Taiwan Semiconductor (ADR)": {
+    "ticker": "TSM",
+    "market": "US",
+    "source": "db"
+  },
+  "SanDisk Corporation": {
+    "ticker": "SNDK",
+    "market": "US",
+    "source": "db"
+  },
+  "腾讯控股": {
+    "ticker": "700",
+    "market": "HK",
+    "source": "db"
+  },
+  "Alphabet Inc": {
+    "ticker": "GOOGL",
+    "market": "US",
+    "source": "db"
+  },
+  "阿里巴巴": {
+    "ticker": "9988",
+    "market": "HK",
+    "source": "db"
+  },
+  "中国海洋石油": {
+    "ticker": "883",
+    "market": "HK",
+    "source": "db"
+  },
+  "ASML Holding NV": {
+    "ticker": "ASML",
+    "market": "US",
+    "source": "db"
+  },
+  "UBS Gold ETF": {
+    "ticker": "AUUSI",
+    "market": "CH",
+    "source": "db"
+  },
+  "Invesco Dynamic Semiconductor ETF": {
+    "ticker": "PSI",
+    "market": "US",
+    "source": "db"
+  },
+  "Invesco PHLX Semiconductor ETF": {
+    "ticker": "SOXQ",
+    "market": "US",
+    "source": "db"
+  },
+  "iShares Semiconductor ETF": {
+    "ticker": "SOXX",
+    "market": "US",
+    "source": "db"
+  },
+  "VanEck Semiconductor ETF": {
+    "ticker": "SMH",
+    "market": "US",
+    "source": "db"
+  },
+  "景顺长城中证芯片产业ETF": {
+    "ticker": "159560",
+    "market": "A",
+    "source": "db"
+  },
+  "国泰CES半导体芯片行业ETF": {
+    "ticker": "512760",
+    "market": "A",
+    "source": "db"
+  },
+  "Global X Japan Semiconductor ETF": {
+    "ticker": "2644",
+    "market": "JP",
+    "source": "db"
+  },
+  "中国石油": {
+    "ticker": "857",
+    "market": "HK",
+    "source": "db"
+  },
+  "WisdomTree WTI Crude Oil": {
+    "ticker": "CRUD",
+    "market": "UK",
+    "source": "db"
+  },
+  "WisdomTree Brent Crude Oil USD": {
+    "ticker": "BRNT",
+    "market": "UK",
+    "source": "db"
+  },
+  "ProShares K-1 Free Crude Oil ETF": {
+    "ticker": "OILK",
+    "market": "US",
+    "source": "fix"
+  },
+  "United States Brent Oil Fund LP": {
+    "ticker": "BNO",
+    "market": "US",
+    "source": "db"
+  },
+  "Simplex WTI ETF": {
+    "ticker": "1671.T",
+    "market": "JP",
+    "source": "db"
+  },
+  "State Street Energy Select Sector SPDR ETF": {
+    "ticker": "XLE",
+    "market": "US",
+    "source": "db"
+  },
+  "BNP Paribas Collateralized ETC on Brent Crude": {
+    "ticker": "BNQA",
+    "market": "DE",
+    "source": "db"
+  },
+  "Samsung S&P GSCI Crude Oil ER": {
+    "ticker": "3175",
+    "market": "HK",
+    "source": "db"
+  },
+  "WisdomTree Brent Crude Oil": {
+    "ticker": "BRNT",
+    "market": "UK",
+    "source": "db"
+  },
+  "Invesco DB Oil Fund": {
+    "ticker": "DBO",
+    "market": "US",
+    "source": "db"
+  },
+  "United States Oil Fund LP": {
+    "ticker": "USO",
+    "market": "US",
+    "source": "db"
+  },
+  "WisdomTree WTI Crude Oil ETF": {
+    "ticker": "CRUD",
+    "market": "UK",
+    "source": "db"
+  },
+  "WisdomTree Brent Crude Oil ETF": {
+    "ticker": "BRNT",
+    "market": "UK",
+    "source": "db"
+  },
+  "NEXT FUNDS NOMURA Crude Oil Long": {
+    "ticker": "1699",
+    "market": "JP",
+    "source": "db"
+  },
+  "UBS CMCI Oil SF ETF": {
+    "ticker": "OILUSA",
+    "market": "CH",
+    "source": "db"
+  },
+  "SPDR S&P OIL & GAS EXPLORATION & PRODUCTION ETF": {
+    "ticker": "XOP",
+    "market": "US",
+    "source": "db"
+  },
+  "ISHARES US ENERGY ETF": {
+    "ticker": "IYE",
+    "market": "US",
+    "source": "db"
+  },
+  "ISHARES GLOBAL ENERGY ETF": {
+    "ticker": "IXC",
+    "market": "US",
+    "source": "db"
+  },
+  "ARK Innovation ETF": {
+    "ticker": "ARKK",
+    "market": "US",
+    "source": "db"
+  },
+  "ARK Genomic Revolution ETF": {
+    "ticker": "ARKG",
+    "market": "US",
+    "source": "db"
+  },
+  "ARK Autonomous Technology & Robotics ETF": {
+    "ticker": "ARKQ",
+    "market": "US",
+    "source": "db"
+  },
+  "Global X Artificial Intelligence & Technology ETF": {
+    "ticker": "AIQ",
+    "market": "US",
+    "source": "db"
+  },
+  "Invesco QQQ Trust Series 1": {
+    "ticker": "QQQ",
+    "market": "US",
+    "source": "db"
+  },
+  "Global X Robotics & Artificial Intelligence ETF": {
+    "ticker": "BOTZ",
+    "market": "US",
+    "source": "db"
+  },
+  "State Street Technology Select Sector SPDR ETF": {
+    "ticker": "XLK",
+    "market": "US",
+    "source": "db"
+  },
+  "Global X FinTech ETF": {
+    "ticker": "FINX",
+    "market": "US",
+    "source": "db"
+  },
+  "Vanguard Energy ETF": {
+    "ticker": "VDE",
+    "market": "US",
+    "source": "db"
+  },
+  "Samsung S&P GSCI Crude Oil ER Futures ETF": {
+    "ticker": "3175",
+    "market": "HK",
+    "source": "verified"
+  },
+  "WisdomTree Brent Crude Oil GBP": {
+    "ticker": "BRNT",
+    "market": "UK",
+    "source": "verified"
+  },
+  "Collateralized ETC on Brent": {
+    "ticker": "BNQA",
+    "market": "DE",
+    "source": "verified"
+  }
+}

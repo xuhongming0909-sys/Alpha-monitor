@@ -350,32 +350,32 @@ def get_fund_holdings(code: str) -> Tuple[List[Dict], Optional[str]]:
 
 
 def _resolve_tickers(items: List[Dict], code: str) -> List[Dict]:
-    """用Yahoo搜索为无ticker的持仓补全。已有ticker的保留。"""
-    try:
-        from data_fetch.lof_iopv.yahoo_finance import search_ticker, determine_market_from_ticker
-    except ImportError:
-        return items
+    """持仓名称→ticker解析: 映射表→Yahoo搜索→mimo验证→回写映射表。"""
+    from data_fetch.lof_iopv.ticker_resolver import resolve_ticker, add_mapping
 
     resolved = 0
     for h in items:
         if h.get("ticker"):
+            # 已有ticker，也记录到映射表供后续复用
+            name = h.get("name", "")
+            if name and h.get("ticker"):
+                add_mapping(name, h["ticker"], h.get("market", "US"), source="llm")
             continue
         name = h.get("name", "")
         if not name:
             continue
-        result = search_ticker(name)
+        result = resolve_ticker(name, skip_validation=False)
         if result:
             h["ticker"] = result["ticker"]
             h["market"] = result["market"]
-            h["yahoo_symbol"] = result["yahoo_symbol"]
             resolved += 1
-            print(f"    {code}: Yahoo resolve '{name}' -> {result['ticker']} ({result['market']})")
-        time.sleep(0.5)
+            print(f"    {code}: {result['source']} '{name}' -> {result['ticker']} ({result['market']})")
+        else:
+            print(f"    {code}: ❌ 未解析 '{name}'")
 
     if resolved:
-        print(f"  {code}: Yahoo resolve 补全 {resolved}/{len(items)} 条")
+        print(f"  {code}: ticker解析 补全 {resolved}/{len(items)} 条")
     return items
-
 
 def _process_one(code: str) -> Tuple[str, Dict]:
     """处理单只基金：提取+覆盖写入DB。"""
