@@ -21,7 +21,7 @@ type: spec
 | 净值NAV | 东方财富 lsjz API | 实时抓取 + DB(fund_nav) |
 | LOF场内价 | 腾讯行情(qt.gtimg.cn) | 实时 |
 | ETF价格 | Yahoo Deno代理 | DB(etf_prices) |
-| 个股价格 | 腾讯行情(实时) → Yahoo复权价覆盖 | Yahoo复权价优先，确保与nav_date_prices基准一致 |
+| 美股个股价格 | Yahoo Deno代理(复权日频) | 与etf_prices/nav_date_prices同源同口径 |
 | 汇率 | akshare currency_boc_sina | DB(fx_rates) + 实时 |
 | 持仓Top10 | 东方财富API / Vision LLM PDF | DB(holdings) |
 | 申购限额 | 东方财富基金数据页 | 实时 |
