@@ -140,16 +140,16 @@
     "name": "石油基金LOF"
   },
   "162719": {
-    "bias": 0.0237,
-    "mae": 0.3701,
-    "maxErr": 1.4929,
-    "errRate05": 17.0,
-    "errDays": 9,
+    "bias": -0.0024,
+    "mae": 0.1379,
+    "maxErr": 0.4875,
+    "errRate05": 0.0,
+    "errDays": 0,
     "totalDays": 53,
     "samplePeriod": "2026-03-03~2026-05-26",
     "alignedDays": 53,
     "class": "A",
-    "etf": "XOP",
+    "etf": "IEO",
     "code": "162719",
     "name": "石油LOF"
   },
@@ -168,11 +168,11 @@
     "name": "华宝油气LOF"
   },
   "160723": {
-    "bias": 0.0046,
-    "mae": 1.9264,
-    "maxErr": 6.6172,
-    "errRate05": 77.4,
-    "errDays": 41,
+    "bias": 0.0173,
+    "mae": 2.2245,
+    "maxErr": 8.1002,
+    "errRate05": 79.2,
+    "errDays": 42,
     "totalDays": 53,
     "samplePeriod": "2026-03-03~2026-05-26",
     "alignedDays": 53,
@@ -236,6 +236,20 @@
     "etf": "GLD",
     "code": "164701",
     "name": "黄金LOF"
+  },
+  "160125": {
+    "bias": 0.0979,
+    "mae": 1.1613,
+    "maxErr": 3.4433,
+    "errRate05": 80.5,
+    "errDays": 33,
+    "totalDays": 41,
+    "samplePeriod": "2026-03-03~2026-05-26",
+    "alignedDays": 41,
+    "class": "A",
+    "etf": "^HSI",
+    "code": "160125",
+    "name": "南方香港LOF"
   },
   "164906": {
     "bias": -0.0214,

@@ -337,7 +337,7 @@ data_fetch:
       - code: '501300'
         name: 美元债LOF
         currency: USD
-        fund_class: active
+        fund_class: index
       - code: '164824'
         name: 印度基金LOF
         currency: USD
@@ -361,17 +361,15 @@ data_fetch:
       - code: '160723'
         name: 嘉实原油LOF
         currency: USD
-        fund_class: active
-        etf_ticker: USO
+        fund_class: index
       - code: '161129'
         name: 原油LOF
         currency: USD
-        fund_class: active
-        etf_ticker: USO
+        fund_class: index
       - code: '501018'
         name: 南方原油LOF
         currency: USD
-        fund_class: active
+        fund_class: index
       - code: '163208'
         name: 全球油气能源LOF
         currency: USD
@@ -393,7 +391,7 @@ data_fetch:
       - code: '160125'
         name: 南方香港LOF
         currency: HKD
-        fund_class: active
+        fund_class: index
       - code: '160644'
         name: 港美互联网LOF
         currency: HKD
@@ -401,7 +399,7 @@ data_fetch:
       - code: '164906'
         name: 中概互联网LOF
         currency: USD
-        fund_class: active
+        fund_class: index
       - code: '501312'
         name: 海外科技LOF
         currency: USD
@@ -675,5 +673,3 @@ notification:
     push_html_url: ${PUSH_HTML_URL}
     max_markdown_length: 3900
     fund_class: active
-
-
