@@ -232,7 +232,7 @@ def _infer_market(symbol: str, exchange: str) -> str:
     if ".MI" in symbol: return "IT"
     if ".TO" in symbol: return "CA"
     if ".AX" in symbol: return "AU"
-    return "US"
+    if ".DE" in symbol: return "DE"
 
 
 def determine_market_from_ticker(ticker: str) -> str:
@@ -245,8 +245,8 @@ def normalize_ticker_for_yahoo(ticker: str, market: str) -> str:
     suffix_map = {
         "HK": ".HK", "UK": ".L", "JP": ".T",
         "CH": ".SW", "IT": ".MI", "CA": ".TO", "AU": ".AX",
+        "DE": ".DE",
     }
-    suffix = suffix_map.get(market, "")
     if suffix and not ticker.endswith(suffix):
-        return ticker + suffix
-    return ticker
+    if suffix and not ticker.endswith(suffix):
+        # HK: 补前导零到4位

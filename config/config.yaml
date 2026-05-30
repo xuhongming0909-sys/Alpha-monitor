@@ -361,15 +361,15 @@ data_fetch:
       - code: '160723'
         name: 嘉实原油LOF
         currency: USD
-        fund_class: index
+        fund_class: active
       - code: '161129'
         name: 原油LOF
         currency: USD
-        fund_class: index
+        fund_class: active
       - code: '501018'
         name: 南方原油LOF
         currency: USD
-        fund_class: index
+        fund_class: active
       - code: '163208'
         name: 全球油气能源LOF
         currency: USD
