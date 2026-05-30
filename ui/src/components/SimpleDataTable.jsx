@@ -57,7 +57,7 @@ export default function SimpleDataTable({
   emptyText = '暂无数据',
   tableClassName = '',
   isPinned,
-) {
+}) {
   const { sortConfig, handleSort, sorted } = useSort();
   const sortedRows = sorted(rows, columns, isPinned);
 
