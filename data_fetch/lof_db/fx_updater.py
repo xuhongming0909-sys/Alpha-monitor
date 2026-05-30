@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """汇率增量更新，只拉取DB中缺失的日期范围。"""
 from datetime import datetime, timedelta
 from data_fetch.lof_db.schema import get_db
@@ -26,6 +26,10 @@ def fetch_fx_incremental(currency, start_date, end_date):
         fx = {}
         for _, row in df.iterrows():
             d = str(row.iloc[0])
+            # 归一化日期格式为 YYYY-MM-DD
+            d = d.replace("/", "-").strip()
+            if len(d) == 8 and d.isdigit():
+                d = f"{d[:4]}-{d[4:6]}-{d[6:]}"
             rate = float(row.iloc[4]) / 100
             if rate > 0:
                 fx[d] = rate
