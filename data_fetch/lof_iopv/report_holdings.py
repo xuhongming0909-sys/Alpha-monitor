@@ -152,6 +152,8 @@ def _parse_json(content: str) -> List[Dict]:
         else:
             ticker, market = guessed, ""
         valid.append({"ticker": ticker, "name": name, "weight": weight, "market": market})
+    return valid
+
 
 def _guess_ticker(name: str) -> str:
     """从名称推断ticker+market。本地映射表覆盖已知ETF/ETC，其余返回空。"""
