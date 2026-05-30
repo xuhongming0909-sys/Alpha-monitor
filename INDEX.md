@@ -474,3 +474,16 @@ React 导航与概览已排除：分红提醒、事件套利、推送设置。
 | `config/config.yaml` | 业务配置合同：所有参数、阈值、URL、开关的单一来源 |
 | `config/secrets.yaml` | 敏感配置：API Key、Webhook、密码（gitignored） |
 | `config/server_profile.local.yaml` | 服务器连接配置：SSH host/user/port/password（gitignored） |
+
+### 9.10 skills/ — AI Skill 定义
+
+| 文件 | 职责摘要 |
+|------|----------|
+| `skills/lof-fund-analysis/SKILL.md` | LOF 基金全流程分析：输入基金代码→分类→数据抓取→DB→IOPV计算→报告 |
+| `skills/pdf-holdings-extraction/SKILL.md` | PDF 季报持仓提取：下载PDF→PyMuPDF渲染→Vision LLM→ticker解析→DB写入 |
+
+### 9.11 docs/ — 文档
+
+| 文件 | 职责摘要 |
+|------|----------|
+| `docs/api-reference.md` | 完整 API 文档：HTTP端点 + Python CLI + 内部模块函数级API |

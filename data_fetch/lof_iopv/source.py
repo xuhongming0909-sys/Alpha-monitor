@@ -116,14 +116,14 @@ def _fetch_nav(code):
                 result["shareTotal"] = _to_float(arr2[-1])
     except Exception:
         pass
-    # fallback: 浠庡熀閲戞鍐甸〉鑾峰彇浠介
+    # fallback: 从基金概况页获取份额
     if result["shareTotal"] is None:
         try:
             url3 = f"https://fundf10.eastmoney.com/jbgk_{code}.html"
             text3 = SESSION.get(url3, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
-            # 鍖归厤 "浠介瑙勬ā: xxx浜夸唤" 鎴?"xxx涓囦唤"
-            for unit, mult in [("浜夸唤", 10000), ("涓囦唤", 1)]:
-                m3 = re.search(r"浠介瑙勬ā.*?(\d+[\d,.]*)\s*" + unit, text3)
+            # 匹配 "份额规模: xxx亿份" 或 "xxx万份"
+            for unit, mult in [("亿份", 10000), ("万份", 1)]:
+                m3 = re.search(r"份额规模.*?(\d+[\d,.]*)\s*" + unit, text3)
                 if m3:
                     val = _to_float(m3.group(1).replace(",", ""))
                     if val:
@@ -145,9 +145,9 @@ def _fetch_holdings(code):
             return []
         html = m.group(1)
         rows = re.findall(r'<td class=\'tor\'>.*?</td>', html, re.DOTALL)
-        # 瑙ｆ瀽鎸佷粨琛ㄦ牸
+        # 解析持仓表格
         holdings = []
-        # 姣忚鏁版嵁锛氬簭鍙枫€佽偂绁ㄤ唬鐮併€佽偂绁ㄥ悕绉般€佸崰鍑€鍊兼瘮渚嬨€佹寔浠撹偂鏁般€佹寔浠撳競鍊?
+        # 每行数据：序号、股票代码、股票名称、占净值比例、持仓股数、持仓市值
         stock_blocks = re.findall(
             r'<td[^>]*>.*?</td>.*?<td[^>]*>.*?</td>.*?<td[^>]*>(.*?)</td>.*?<td[^>]*>(.*?)</td>.*?<td[^>]*>(.*?)</td>',
             html, re.DOTALL
@@ -157,7 +157,7 @@ def _fetch_holdings(code):
             name = _clean(name_td)
             weight = _to_float(weight_td.replace("%", ""))
             if ticker and weight is not None:
-                # 娓偂:5浣嶆暟瀛?00700) 缇庤偂:绾瓧姣?NVDA) A鑲?6浣嶆暟瀛?
+                # 港股:5位数字(00700) 美股:纯字母(NVDA) A股:6位数字
                 market = "hk" if ticker.isdigit() and len(ticker) >= 4 else \
                          "us" if ticker.isalpha() and len(ticker) <= 5 else \
                          "sz" if ticker.startswith(("0", "3")) and ticker.isdigit() else "sh"
@@ -186,7 +186,7 @@ def _fetch_stock_position(code):
             cash_pct = 0.0
             for _, row in df.iterrows():
                 asset_type = str(row.iloc[0])
-                if "鐜伴噾" in asset_type:
+                if "现金" in asset_type:
                     cash_pct += float(row.iloc[1])
             return round(100.0 - cash_pct, 2)
     except Exception:
@@ -200,49 +200,49 @@ def _fetch_fund_info(code):
     try:
         url = f"https://fundf10.eastmoney.com/jbgk_{code}.html"
         text = SESSION.get(url, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
-        m = re.search(r"鎵樼璐圭巼.*?(\d+\.\d+%)", text)
+        m = re.search(r"托管费率.*?(\d+\.\d+%)", text)
         if m:
             info["custodianFee"] = m.group(1)
-        m = re.search(r"鐢宠喘璐圭巼.*?(\d+\.\d+%)", text)
+        m = re.search(r"申购费率.*?(\d+\.\d+%)", text)
         if m:
             info["applyFee"] = m.group(1)
-        m = re.search(r"璧庡洖璐圭巼.*?(\d+\.\d+%)", text)
+        m = re.search(r"赎回费率.*?(\d+\.\d+%)", text)
         if m:
             info["redeemFee"] = m.group(1)
-        # 鍩洪噾鍏徃 - 浠庡熀閲戠鐞嗕汉瀛楁鎻愬彇
-        m_company = re.search(r"鍩洪噾绠＄悊浜?{0,50}?<a[^>]*>([^<]+)</a>", text)
+        # 基金公司 - 从基金管理人字段提取
+        m_company = re.search(r"基金管理人.{0,50}?<a[^>]*>([^<]+)</a>", text)
         if m_company:
             val = _clean(m_company.group(1))
-            if val and val != "鍩洪噾浠ｇ爜":
+            if val and val != "基金代码":
                 info["fundCompany"] = val
-        # 鐢宠喘鐘舵€侊細闄愬ぇ棰?> 鏆傚仠鐢宠喘 > 寮€鏀剧敵璐?
-        m_limit = re.search(r"鍗曟棩绱璐拱涓婇檺([\d,.]+)\s*(涓囧厓?|鍏?", text)
-        if "闄愬ぇ棰? in text:
-            info["applyStatus"] = "闄愬ぇ棰?
+        # 申购状态：限大额 > 暂停申购 > 开放申购
+        m_limit = re.search(r"单日累计购买上限([\d,.]+)\s*(万元?|元)", text)
+        if "限大额" in text:
+            info["applyStatus"] = "限大额"
             if m_limit:
                 raw = float(m_limit.group(1).replace(",", ""))
                 unit = m_limit.group(2)
-                info["dailyLimit"] = raw * 10000 if unit in ("涓?, "涓囧厓") else raw
-        elif "鏆傚仠鐢宠喘" in text:
-            info["applyStatus"] = "鏆傚仠鐢宠喘"
-        elif "寮€鏀剧敵璐? in text:
-            info["applyStatus"] = "寮€鏀剧敵璐?
-        if "寮€鏀捐祹鍥? in text:
-            info["redeemStatus"] = "寮€鏀捐祹鍥?
-        elif "鏆傚仠璧庡洖" in text:
-            info["redeemStatus"] = "鏆傚仠璧庡洖"
+                info["dailyLimit"] = raw * 10000 if unit in ("万", "万元") else raw
+        elif "暂停申购" in text:
+            info["applyStatus"] = "暂停申购"
+        elif "开放申购" in text:
+            info["applyStatus"] = "开放申购"
+        if "开放赎回" in text:
+            info["redeemStatus"] = "开放赎回"
+        elif "暂停赎回" in text:
+            info["redeemStatus"] = "暂停赎回"
     except Exception:
         pass
     return info
 
 
 def _fetch_purchase_status():
-    """鎵归噺鑾峰彇鍩洪噾鐢宠喘鐘舵€侊紙涓滄柟璐㈠瘜鎵归噺API锛?""
+    """批量获取基金申购状态（东方财富批量API）"""
     result = {}
     try:
         url = "https://fund.eastmoney.com/Data/Fund_JJJZ_Data.aspx?t=8"
         text = SESSION.get(url, timeout=_REQUEST_TIMEOUT).content.decode("utf-8", errors="ignore")
-        # API杩斿洖 var db={datas:[[code,name,type,nav,date,applyStatus,...,limit,...],...]}
+        # API返回 var db={datas:[[code,name,type,nav,date,applyStatus,...,limit,...],...]}
         m = re.search(r"var db=\{datas:(\[.*\]),record:", text, re.DOTALL)
         if not m:
             return result
@@ -264,7 +264,7 @@ def _fetch_purchase_status():
 
 
 def _build_tc_code(ticker, market):
-    """鏋勫缓鑵捐琛屾儏浠ｇ爜"""
+    """构建腾讯行情代码"""
     if market == "hk":
         return "hk" + ticker.zfill(5)
     elif market == "us":
@@ -293,9 +293,9 @@ def build_lof_snapshot():
         code = fund["code"]
         nav_data = _fetch_nav(code)
         nav, nav_date = nav_data["nav"], nav_data["navDate"]
-        # 鎸佷粨鑾峰彇: 鎸囨暟鍨嬬敤ETF鏄犲皠, 涓诲姩鍨嬬敤API/PDF
+        # 持仓获取: 指数型用ETF映射, 主动型用API/PDF
         fund_class = get_fund_class(code)
-        # 缁熶竴浣跨敤 get_holdings_for_service锛堝惈 hardcoded fallback锛夛紝涓嶅啀浠呴檺 index
+        # 统一使用 get_holdings_for_service（含 hardcoded fallback），不再仅限 index
         holdings_raw = get_holdings_for_service(code)
         if holdings_raw:
             holdings = [{"ticker": h["ticker"], "name": h.get("name", ""), "weight": h["weight"], "market": h["market"].lower()} for h in holdings_raw]
@@ -307,7 +307,7 @@ def build_lof_snapshot():
         current_prices = {}
         price = None
         if holdings:
-            # 娓偂瀹炴椂琛屾儏
+            # 港股实时行情
             try:
                 hk_codes = [_build_tc_code(h["ticker"], h["market"]) for h in holdings if h["market"] == "hk"]
                 if hk_codes:
@@ -323,7 +323,7 @@ def build_lof_snapshot():
                                 current_prices.setdefault("_prev_close", {})[h["ticker"]] = hk_q[tc]["prev_close"]
             except Exception:
                 pass
-            # 缇庤偂瀹炴椂琛屾儏
+            # 美股实时行情
             try:
                 us_tickers = [h["ticker"] for h in holdings if h["market"] == "us"]
                 if us_tickers:
@@ -338,7 +338,7 @@ def build_lof_snapshot():
                                 current_prices.setdefault("_prev_close", {})[h["ticker"]] = us_q[tc]["prev_close"]
             except Exception:
                 pass
-            # DB fallback: 查 stock_prices + etf_prices
+            # DB fallback
             missing = [h for h in holdings if not current_prices.get(h["ticker"])]
             if missing:
                 try:
@@ -356,7 +356,7 @@ def build_lof_snapshot():
 
         stock_position = _fetch_stock_position(code) or sum(h.get("weight", 0) or 0 for h in holdings)
 
-        # 鍑€鍊兼姭闇叉棩鑲′环锛堢敤浜嶪OPV璁＄畻鐨勫熀鍑嗕环鏍硷級
+        # 净值披露日股价（用于IOPV计算的基准价格）
         nav_date_prices = {}
         if holdings and nav_date:
             try:
@@ -367,18 +367,13 @@ def build_lof_snapshot():
                         "SELECT close FROM stock_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
                         (h["ticker"], nav_date),
                     ).fetchone()
-                    if not row:
-                        row = _conn.execute(
-                            "SELECT close FROM etf_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
-                            (h["ticker"], nav_date),
-                        ).fetchone()
                     if row:
                         nav_date_prices[h["ticker"]] = row[0]
                 _conn.close()
             except Exception:
                 pass
 
-        # LOF鍦哄唴浠锋牸
+        # LOF场内价格
         try:
             tc_code = _build_tc_code(code, market)
             q = get_quotes([tc_code])
