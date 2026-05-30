@@ -13,6 +13,19 @@
     "code": "161128",
     "name": "标普信息科技LOF"
   },
+  "501225": {
+    "bias": 0.0169,
+    "mae": 0.2265,
+    "maxErr": 0.5906,
+    "errRate05": 6.4,
+    "errDays": 3,
+    "totalDays": 47,
+    "samplePeriod": "2026-03-03~2026-05-26",
+    "alignedDays": 47,
+    "class": "B",
+    "code": "501225",
+    "name": "全球芯片LOF"
+  },
   "161130": {
     "bias": 0.0016,
     "mae": 0.1369,
@@ -205,6 +218,19 @@
     "class": "B",
     "code": "501018",
     "name": "南方原油LOF"
+  },
+  "163208": {
+    "bias": 0.0146,
+    "mae": 0.2125,
+    "maxErr": 0.8073,
+    "errRate05": 5.7,
+    "errDays": 3,
+    "totalDays": 53,
+    "samplePeriod": "2026-03-03~2026-05-26",
+    "alignedDays": 53,
+    "class": "B",
+    "code": "163208",
+    "name": "全球油气能源LOF"
   },
   "160719": {
     "bias": 0.0261,
