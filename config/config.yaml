@@ -399,6 +399,11 @@ data_fetch:
       - code: '501312'
         name: 海外科技LOF
         currency: USD
+      - code: '161226'
+        name: 白银LOF
+        currency: CNY
+        fund_class: index
+        etf_ticker: SI=F
 strategy:
   ah_premium:
     ranking_metric: premium_rate

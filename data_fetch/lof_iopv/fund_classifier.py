@@ -34,6 +34,7 @@ INDEX_ETF: Dict[str, List[Tuple[str, float]]] = {
     "162411": [("XOP", 100.0)],            # 鏍囨櫘鐭虫补澶╃劧姘斾笂娓?(^SPSIOP鏃犲巻鍙?
     # --- 
     "160719": [("GC=F", 100.0)],           # 嘉实黄金: 黄金期货→伦敦金
+    "161226": [("AG0", 100.0)],            # 白银LOF: 上海白银期货主力合约(akshare)
     "160416": [("IXC", 100.0)],            # 石油基金: iShares Global Energy
     "164824": [("INDA", 100.0)],           # 印度基金: iShares MSCI India
     "164701": [("GLD", 100.0)],            # 黄金LOF: SPDR Gold Shares
@@ -58,9 +59,16 @@ def get_index_etf_ticker(code: str) -> str:
     return etfs[0][0] if etfs else ""
 
 
+# 国内期货主力合约符号集合 (2-3字母 + "0")
+_DOMESTIC_FUTURES = {"AG0", "AU0", "CU0", "AL0", "ZN0", "PB0", "NI0", "SN0",
+                     "RB0", "HC0", "SS0", "BU0", "RU0", "FU0", "LU0", "NR0",
+                     "SC0", "SP0", "EB0", "EG0", "PG0", "LH0", "AP0", "CJ0",
+                     "CF0", "SR0", "TA0", "MA0", "OI0", "RM0", "FG0", "SA0"}
+
+
 def is_futures_ticker(ticker: str) -> bool:
-    """判断是否为期货ticker (如 CL=F)"""
-    return "=F" in ticker
+    """判断是否为期货ticker: Yahoo格式(=F结尾) 或 国内主力合约(如AG0)"""
+    return "=F" in ticker or ticker in _DOMESTIC_FUTURES
 
 
 def is_index_ticker(ticker: str) -> bool:

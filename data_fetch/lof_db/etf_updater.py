@@ -3,10 +3,11 @@
 """ETF、指数、期货价格增量更新。
 
 所有Yahoo请求走Deno Deploy代理，服务器不再直连Yahoo。
-支持三种ticker类型:
-  - 指数: ^NDX, ^GSPC 等
-  - 期货: CL=F, BZ=F, GC=F 等
-  - ETF:  KWEB, AGG, GLD 等 (使用后复权价格)
+支持四种ticker类型:
+  - 指数: ^NDX, ^GSPC 等 (Yahoo)
+  - 期货: CL=F, BZ=F, GC=F 等 (Yahoo)
+  - ETF:  KWEB, AGG, GLD 等 (Yahoo, 后复权)
+  - 国内期货: AG0, CU0 等 (akshare, 上海/大连/郑州)
 """
 import time
 import logging
@@ -39,6 +40,36 @@ def _load_stock_list() -> List[str]:
     rows = conn.execute('SELECT DISTINCT ticker, market FROM holdings').fetchall()
     conn.close()
     return [(r[0], r[1]) for r in rows if r[0]]
+
+
+# --- 国内期货支持 (akshare) ---
+# 已知的国内期货主力合约符号 (可在INDEX_ETF中直接使用)
+_DOMESTIC_FUTURES = {"AG0", "AU0", "CU0", "AL0", "ZN0", "PB0", "NI0", "SN0",
+                     "RB0", "HC0", "SS0", "BU0", "RU0", "FU0", "LU0", "NR0",
+                     "SC0", "SP0", "EB0", "EG0", "PG0", "LH0", "AP0", "CJ0",
+                     "CF0", "SR0", "TA0", "MA0", "OI0", "RM0", "FG0", "SA0"}
+
+
+def _is_domestic_futures(ticker: str) -> bool:
+    """判断是否为国内期货主力合约符号 (如 AG0, CU0)"""
+    return ticker in _DOMESTIC_FUTURES
+
+
+def _fetch_domestic_futures_history(symbol: str) -> Dict:
+    """通过 akshare 获取国内期货历史日K数据。返回 {date: close} dict。"""
+    try:
+        import akshare as ak
+        df = ak.futures_zh_daily_sina(symbol=symbol)
+        if df is None or df.empty:
+            return {}
+        prices = {}
+        for _, row in df.iterrows():
+            d = str(row["date"])[:10]
+            prices[d] = float(row["close"])
+        return prices
+    except Exception as e:
+        logger.warning(f"国内期货 {symbol} 数据获取失败: {e}")
+        return {}
 
 
 def _fetch_yahoo_history(ticker: str, market: str = "", period: str = "3mo") -> Dict[str, float]:
@@ -77,14 +108,19 @@ def update_etf():
         else:
             from data_fetch.lof_iopv.yahoo_finance import determine_market_from_ticker
             market = determine_market_from_ticker(ticker)
-        prices = _fetch_yahoo_history(ticker, market)
+        # 国内期货用 akshare，其余走 Yahoo Deno
+        if _is_domestic_futures(ticker):
+            prices = _fetch_domestic_futures_history(ticker)
+            kind = "国内期货"
+        else:
+            prices = _fetch_yahoo_history(ticker, market)
+            kind = "指数" if ticker.startswith("^") else ("期货" if "=F" in ticker else "ETF")
         if not prices:
             print(f'  {ticker}: 无数据')
             continue
         inserted = _update_prices(conn, 'etf_prices', ticker, prices)
         conn.commit()
         total_inserted += inserted
-        kind = "指数" if ticker.startswith("^") else ("期货" if "=F" in ticker else "ETF")
         print(f'  {ticker}: {inserted}条 ({kind})')
         time.sleep(0.3)
     conn.close()

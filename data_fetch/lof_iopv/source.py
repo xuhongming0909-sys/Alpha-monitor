@@ -335,6 +335,26 @@ def build_lof_snapshot():
                         current_prices[h["ticker"]] = _hist[_latest_date]
             except Exception:
                 pass
+            # 国内期货实时行情（Sina）
+            try:
+                _futures_tickers = [h["ticker"] for h in holdings if h["market"] == "futures"]
+                if _futures_tickers:
+                    _symbols = ",".join(f"nf_{t}" for t in _futures_tickers)
+                    _r = SESSION.get(f"https://hq.sinajs.cn/list={_symbols}",
+                                     headers={"Referer": "https://finance.sina.com.cn"},
+                                     timeout=_REQUEST_TIMEOUT)
+                    _text = _r.content.decode("gbk", errors="ignore")
+                    for line in _text.strip().split("\n"):
+                        m = re.search(r'hq_str_nf_(\w+)="(.*?)"', line)
+                        if not m:
+                            continue
+                        _ticker, _data = m.group(1), m.group(2).split(",")
+                        if len(_data) > 8 and _data[8]:
+                            _price = float(_data[8])
+                            if _price > 0:
+                                current_prices[_ticker] = _price
+            except Exception:
+                pass
             # DB fallback
             missing = [h for h in holdings if not current_prices.get(h["ticker"])]
             if missing:

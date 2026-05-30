@@ -38,7 +38,8 @@
 | 转债套利 | 转债折价/小额刚兑数据、计算、展示 | `specs/convertible-bond-arbitrage.md` | `data_fetch/convertible_bond/`, `strategy/convertible_bond/`, `ui/routes/dashboard_routes.js` |
 | AH 溢价 | A/H 股溢价监控 | `specs/ah-premium.md` | `data_fetch/ah_premium/`, `ui/routes/dashboard_routes.js` |
 | AB 溢价 | A/B 股溢价监控 | `specs/ab-premium.md` | `data_fetch/ab_premium/`, `ui/routes/dashboard_routes.js` |
-| LOF 套利 | LOF 折溢价监控 | `specs/lof-arbitrage.md` | `data_fetch/lof_arbitrage/`, `ui/routes/dashboard_routes.js` |
+| LOF 套利 | LOF 折溢价监控 | `specs/lof-arbitrage.md` |
+| LOF IOPV 24h优化 | 盘前盘后价格方案 | `specs/iopv-24h-price-optimization.md` | `data_fetch/lof_arbitrage/`, `ui/routes/dashboard_routes.js` |
 | 合并套利 | 并购重组公告监控 | `specs/merger-arbitrage.md` | `data_fetch/merger/`, `ui/routes/dashboard_routes.js` |
 | 事件套利 | 事件驱动套利监控 | `specs/event-arbitrage.md` | `data_fetch/event_arbitrage/`, `ui/routes/dashboard_routes.js` |
 | 股息提醒 | 股息机会跟踪 | `specs/dividend.md` | `data_fetch/dividend/`, `ui/routes/dashboard_routes.js` |
@@ -68,6 +69,7 @@
 - `specs/ah-premium.md`: AH 溢价模块规格、配对规则、溢价率计算、历史分位
 - `specs/ab-premium.md`: AB 溢价模块规格、双汇率支持、溢价率计算
 - `specs/lof-arbitrage.md`: LOF 套利模块规格、IOPV 计算、监控池规则、推送规则
+- `specs/iopv-24h-price-optimization.md`: IOPV 24h价格优化方案（盘前盘后数据，方案阶段）
 - `specs/merger-arbitrage.md`: 合并套利模块规格、公告筛选规则、AI 简报推送
 - `specs/event-arbitrage.md`: 事件套利模块规格、集思录数据源、分类展示
 - `specs/dividend.md`: 股息提醒模块规格、分红数据查询、股息率计算
