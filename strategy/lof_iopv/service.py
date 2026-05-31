@@ -12,7 +12,7 @@ from shared.market_service import get_fx_rates
 from shared.models.service_result import build_success
 from shared.time.shanghai_time import now_iso
 from strategy.lof_iopv.calc import to_float, get_base_fx, calc_iopv
-from data_fetch.lof_iopv.fund_classifier import get_fund_class, get_index_etf_ticker, is_index_fund, is_index_ticker, is_futures_ticker, INDEX_ETF
+from data_fetch.lof_iopv.fund_classifier import get_fund_class, get_index_etf_ticker, is_index_fund, is_index_ticker, is_futures_ticker, INDEX_ETF, IOPV_INDEX_FUTURES
 from data_fetch.lof_db.holdings_updater import get_holdings_source
 
 _BACKTEST_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', 'runtime_data', 'backtest', 'results_v2.json')
