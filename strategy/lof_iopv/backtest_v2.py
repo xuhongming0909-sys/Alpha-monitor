@@ -58,11 +58,6 @@ def _get_stock_prices_batch(tickers, start_date, end_date):
             'SELECT date, close FROM stock_prices WHERE ticker = ? AND date >= ? AND date <= ? ORDER BY date',
             (ticker, start_date, end_date)
         ).fetchall()
-        if not rows:
-            rows = conn.execute(
-                'SELECT date, close FROM etf_prices WHERE ticker = ? AND date >= ? AND date <= ? ORDER BY date',
-                (ticker, start_date, end_date)
-            ).fetchall()
         result[ticker] = {r[0]: r[1] for r in rows}
     conn.close()
     return result
@@ -163,22 +158,24 @@ def backtest_fund(code, end_date_str):
         current_prices = {}
         all_ok = True
         for h in holdings:
+        valid_weight_sum = 0.0
+        for h in holdings:
             t = h["ticker"]
             p_prev = stock_prices.get(t, {}).get(d_prev)
             p_curr = stock_prices.get(t, {}).get(d_curr)
             if p_prev and p_prev > 0:
                 nav_date_prices[t] = p_prev
             else:
-                all_ok = False
-                break
+                continue
             if p_curr and p_curr > 0:
                 current_prices[t] = p_curr
             else:
-                all_ok = False
-                break
-        if not all_ok:
+                continue
+            valid_weight_sum += h.get("weight", 0)
+        if valid_weight_sum <= 0:
             continue
 
+        adjusted_stock_ratio = stock_ratio * valid_weight_sum / 100.0
         predicted, _, _ = calc_iopv(
             nav=nav_prev,
             holdings=holdings,
