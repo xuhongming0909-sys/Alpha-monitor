@@ -20,8 +20,13 @@ type: spec
 |------|-----|------|
 | 净值NAV | 东方财富 lsjz API | 实时抓取 + DB(fund_nav) |
 | LOF场内价 | 腾讯行情(qt.gtimg.cn) | 实时 |
-| ETF价格 | Yahoo Deno代理 | DB(etf_prices) |
-| 美股个股价格 | Yahoo Deno代理(复权日频) | 与etf_prices/nav_date_prices同源同口径 |
+| 美股/期货价格 | Yahoo Deno代理 5m | 美股+includePrePost(~16h)，期货不加(~23h) |
+| 港股价格 | 腾讯行情优先 → Yahoo .HK 5m兜底 | 港股交易时段 |
+| 伦敦上市 | Yahoo .L 5m | 伦敦交易时段(~8h) |
+| 日股 | Yahoo .T 5m | 东京交易时段(~6h) |
+| A股价格 | 腾讯API → Yahoo .SS/.SZ → DB兜底 | 非交易时段用DB/Yahoo最近价 |
+| 国内期货 | Sina hq.sinajs.cn | 实时 |
+| NAV日基准价 | DB(etf_prices/stock_prices) → Yahoo历史兜底 | 期货/海外标的不在DB时用Yahoo |
 | 汇率 | akshare currency_boc_sina | DB(fx_rates) + 实时 |
 | 持仓Top10 | 东方财富API / Vision LLM PDF | DB(holdings) |
 | 申购限额 | 东方财富基金数据页 | 实时 |
@@ -42,10 +47,10 @@ IOPV = NAV × (1 + stock_ratio/100 × weighted_ret) × fx_ratio
 指数型：holdings为ETF映射（100%权重），用ETF价格变化
 主动型：holdings为实际持仓Top10，用个股价格加权
 
-> **价格基准一致性**：current_prices（实时）和 nav_date_prices（DB）必须使用同一价格基准。
-> 腾讯行情返回不复权价，Yahoo/etf_prices存储后复权价。对美股持仓，source.py先取腾讯实时价，
-> 再用Yahoo复权价覆盖，确保IOPV计算的收益率（weighted_ret）准确。
-> 若某标的发生拆股/合股，不复权价与复权价差异巨大，会导致IOPV严重失真。
+> **价格基准一致性**：current_prices 和 nav_date_prices 必须使用同一价格基准（Yahoo后复权价）。
+> 美股持仓直接用Yahoo 5m复权价，期货不加includePrePost（会返回空数据）。
+> A股用腾讯API，非交易时段用DB或Yahoo .SS/.SZ兜底。
+> 指数(^NDX/^GSPC)通过IOPV_INDEX_FUTURES映射为期货(NQ=F/ES=F)获得24h报价。
 
 
 ## 4. 监控池规则
