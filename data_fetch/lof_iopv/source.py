@@ -347,7 +347,21 @@ def build_lof_snapshot():
                             current_prices[_t] = _p
             except Exception:
                 pass
-            # 港股：Yahoo .HK 5m
+            # 港股：腾讯优先，Yahoo .HK兜底
+            try:
+                hk_codes = [_build_tc_code(h["ticker"], h["market"]) for h in holdings if h["market"].lower() == "hk"]
+                if hk_codes:
+                    hk_q = get_quotes(hk_codes)
+                    for h in holdings:
+                        if h["market"].lower() != "hk":
+                            continue
+                        tc = _build_tc_code(h["ticker"], h["market"])
+                        if tc in hk_q:
+                            cur = hk_q[tc].get("price") or hk_q[tc].get("prev_close")
+                            if cur:
+                                current_prices[h["ticker"]] = cur
+            except Exception:
+                pass
             try:
                 for h in holdings:
                     if h["market"].lower() != "hk":
