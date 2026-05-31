@@ -1,308 +1,224 @@
-# IOPV 24只基金完整映射方案
+# IOPV 24只基金完整映射方案（v2）
 
-> 基于 Yahoo Finance 5m 数据实测（2026-05-31）
-> 原则：期货 > ETF 24h > 股票 24h > DB收盘价
+> 2026-05-31 修订
+> 原则：期货仅用于已有的（GC=F等），其余用ETF/股票24h数据
 
-## 数据源能力总览
+## 数据源能力实测
 
-| 市场 | Yahoo 5m 可用 | 盘前盘后 | 24h覆盖 |
-|------|:---:|:---:|:---:|
-| 美股ETF | ✅ | ✅ (includePrePost) | ~16h |
-| 美股个股 | ✅ | ✅ (includePrePost) | ~16h |
-| 美股期货 | ✅ | 天然24h | ~23h |
-| 美股指数(^) | ✅ (仅盘中) | ❌ | 仅6.5h |
-| 港股 | ✅ | ❌ | 仅港股交易时段 |
-| A股ETF | ✅ | ❌ | 仅A股交易时段 |
-| A股债券ETF | ❌ | — | — |
-| 日股 | ✅ | ❌ | 仅日股交易时段 |
+| 市场 | Yahoo代码后缀 | 5m可用 | 盘前盘后 | 实际覆盖 | 备注 |
+|------|:---:|:---:|:---:|------|------|
+| 美股ETF | 无后缀 | ✅ | ✅ | ~16h (08:00-23:59 UTC) | 最佳覆盖 |
+| 美股个股 | 无后缀 | ✅ | ✅ | ~16h | 同上 |
+| 美股期货(F) | =F | ✅ | 天然24h | ~23h | 已有的继续用 |
+| 美股指数(^) | ^ | ✅(仅盘中) | ❌ | 6.5h | 用期货替代 |
+| 港股 | .HK | ✅ | ❌ | 港股时段 | |
+| A股ETF | .SS/.SZ | ✅ | ❌ | A股时段 | 用腾讯API |
+| A股债券 | — | ❌ | — | — | DB兜底 |
+| 伦敦上市 | .L | ✅ | ❌ | 伦敦时段(07-15 UTC) | 仅8h |
+| 日股 | .T | ✅ | ❌ | 东京时段(00-06 UTC) | 仅6h |
 
-**不可用标的**：BRNT(伦敦上市)、CRUD(已退市)、GSCI(无数据)、RYH(5m无数据)
+**结论**：美股ETF/个股的24h数据（含盘前盘后）是最佳通用数据源。
 
 ---
 
 ## 一、指数型基金（16只）
 
 ### 1. 161130 纳指LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | ^NDX (指数,仅盘中) | **NQ=E** (E-mini纳指期货,24h) |
-| 数据源 | Yahoo 1d | Yahoo 5m |
-| 覆盖时间 | 6.5h | ~23h |
-| 变更类型 | 指数→期货 | |
+- **当前**：^NDX（指数，仅盘中6.5h）
+- **优化**：`NQ=F`（E-mini纳指期货，24h）
+- **原因**：^NDX无盘后，NQ=F天然24h
 
 ### 2. 161125 标普500LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | ^GSPC (指数,仅盘中) | **ES=F** (E-mini标普期货,24h) |
-| 数据源 | Yahoo 1d | Yahoo 5m |
-| 覆盖时间 | 6.5h | ~23h |
-| 变更类型 | 指数→期货 | |
+- **当前**：^GSPC（指数，仅盘中6.5h）
+- **优化**：`ES=F`（E-mini标普期货，24h）
 
 ### 3. 161128 标普信息科技LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | ^SP500-45 (指数,仅盘中) | **ES=F** (E-mini标普期货,24h,近似) |
-| 数据源 | Yahoo 1d | Yahoo 5m |
-| 说明 | 无信息科技期货，用标普期货近似 | |
-| 变更类型 | 指数→期货(近似) | |
+- **当前**：^SP500-45（指数，仅盘中）
+- **优化**：`XLK`（美股ETF，24h盘前盘后）
+- **说明**：不换期货，用ETF 24h数据
 
 ### 4. 160719 嘉实黄金LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | GC=F (期货) | **GC=F** (不变) |
-| 数据源 | Yahoo 1d | **Yahoo 5m** |
-| 覆盖时间 | 6.5h | ~23h |
-| 变更类型 | 仅升级数据频率 | |
+- **当前**：GC=F（期货）
+- **优化**：`GC=F`（不变，升级为5m频率）
 
 ### 5. 164701 黄金LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | GLD (ETF) | **GC=F** (黄金期货,24h) |
-| 数据源 | Yahoo 1d | Yahoo 5m |
-| 覆盖时间 | ~16h | ~23h |
-| 变更类型 | ETF→期货 | |
+- **当前**：GLD（ETF，1d）
+- **优化**：`GLD`（ETF，5m + includePrePost，~16h）
+- **说明**：不换期货，用ETF 24h
 
 ### 6. 160140 美国REIT精选LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | IYR (ETF) | **IYR** (不变,无REIT期货) |
-| 数据源 | Yahoo 1d | **Yahoo 5m + includePrePost** |
-| 覆盖时间 | ~16h | ~16h(盘前盘后) |
-| 变更类型 | 仅升级数据频率 | |
+- **当前**：IYR（ETF，1d）
+- **优化**：`IYR`（ETF，5m + includePrePost，~16h）
 
 ### 7. 161127 标普生物科技LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | XBI (ETF) | **XBI** (不变,无生物科技期货) |
-| 数据源 | Yahoo 1d | **Yahoo 5m + includePrePost** |
-| 覆盖时间 | ~16h | ~16h |
-| 变更类型 | 仅升级数据频率 | |
+- **当前**：XBI（ETF，1d）
+- **优化**：`XBI`（ETF，5m + includePrePost，~16h）
 
 ### 8. 162411 华宝油气LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | XOP (ETF) | **CL=F** (WTI原油期货,24h) |
-| 数据源 | Yahoo 1d | Yahoo 5m |
-| 覆盖时间 | ~16h | ~23h |
-| 变更类型 | ETF→期货 | |
+- **当前**：XOP（ETF，1d）
+- **优化**：`XOP`（ETF，5m + includePrePost，~16h）
+- **说明**：不换期货
 
 ### 9. 162719 石油LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | IEO (ETF) | **CL=F** (WTI原油期货,24h) |
-| 数据源 | Yahoo 1d | Yahoo 5m |
-| 覆盖时间 | ~16h | ~23h |
-| 变更类型 | ETF→期货 | |
+- **当前**：IEO（ETF，1d）
+- **优化**：`IEO`（ETF，5m + includePrePost，~16h）
+- **说明**：不换期货
 
 ### 10. 160416 石油基金LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | IXC (ETF) | **CL=F** (WTI原油期货,24h,近似) |
-| 数据源 | Yahoo 1d | Yahoo 5m |
-| 说明 | 全球能源ETF，原油是主要驱动因素 | |
-| 变更类型 | ETF→期货(近似) | |
+- **当前**：IXC（ETF，1d）
+- **优化**：`IXC`（ETF，5m + includePrePost，~16h）
+- **说明**：不换期货
 
 ### 11. 162415 美国消费LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | XLY (ETF) | **XLY** (不变,无消费期货) |
-| 数据源 | Yahoo 1d | **Yahoo 5m + includePrePost** |
-| 覆盖时间 | ~16h | ~16h |
-| 变更类型 | 仅升级数据频率 | |
+- **当前**：XLY（ETF，1d）
+- **优化**：`XLY`（ETF，5m + includePrePost，~16h）
 
 ### 12. 161126 标普医疗保健LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | RYH (ETF) | **RYH** (不变,5m无数据) |
-| 数据源 | Yahoo 1d | **Yahoo 1d** (无变化) |
-| 说明 | RYH 5m数据不可用，只能用日频。后续可尝试其他ticker | |
-| 变更类型 | 无变化 | |
+- **当前**：RYH（ETF，1d）
+- **优化**：`RYH`（保持日频，5m数据不可用）
 
 ### 13. 164824 印度基金LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | INDA (ETF) | **INDA** (不变,无印度期货) |
-| 数据源 | Yahoo 1d | **Yahoo 5m + includePrePost** |
-| 覆盖时间 | ~16h | ~16h |
-| 变更类型 | 仅升级数据频率 | |
+- **当前**：INDA（ETF，1d）
+- **优化**：`INDA`（ETF，5m + includePrePost，~16h）
 
 ### 14. 501300 美元债LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | AGG (ETF) | **AGG** (不变,ZB=F关系复杂) |
-| 数据源 | Yahoo 1d | **Yahoo 5m + includePrePost** |
-| 说明 | 债券ETF与期货基差复杂，暂不替代 | |
-| 变更类型 | 仅升级数据频率 | |
+- **当前**：AGG（ETF，1d）
+- **优化**：`AGG`（ETF，5m + includePrePost，~16h）
 
 ### 15. 164906 中概互联网LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | KWEB (ETF) | **KWEB** (不变,无恒生科技期货) |
-| 数据源 | Yahoo 1d | **Yahoo 5m + includePrePost** |
-| 说明 | HSTECH=F 在Yahoo不可用 | |
-| 覆盖时间 | ~16h | ~16h |
-| 变更类型 | 仅升级数据频率 | |
+- **当前**：KWEB（ETF，1d）
+- **优化**：`KWEB`（ETF，5m + includePrePost，~16h）
 
 ### 16. 161226 白银LOF
-| 项目 | 当前 | 优化后 |
-|------|------|--------|
-| 标的 | AG0 (上海期货) | **SI=F** (COMEX白银期货,24h) |
-| 数据源 | akshare | Yahoo 5m |
-| 说明 | 上海期货仅国内交易时段，SI=F覆盖23h | |
-| 变更类型 | 国内期货→COMEX期货 | |
+- **当前**：AG0（上海期货）
+- **优化**：**不优化**，保持现状
 
 ---
 
 ## 二、主动型基金（8只）
 
 ### 17. 501225 全球芯片LOF
-| 持仓 | 市场 | 当前数据源 | 优化后数据源 | 说明 |
+| 持仓 | 市场 | Yahoo代码 | 优化后数据源 | 说明 |
 |------|------|-----------|------------|------|
-| PSI | us | Yahoo 1d | **Yahoo 5m pre/post** | 半导体ETF |
-| SOXX | us | Yahoo 1d | **Yahoo 5m pre/post** | 半导体ETF |
-| SMH | us | Yahoo 1d | **Yahoo 5m pre/post** | 半导体ETF |
-| 159995 | a | 腾讯 | **Yahoo 5m** (.SZ) | A股半导体ETF |
-| 512800 | a | 腾讯 | **Yahoo 5m** (.SS) | A股芯片ETF |
-| 512760 | a | 腾讯 | **Yahoo 5m** (.SS) | A股半导体ETF |
+| PSI | us | PSI | Yahoo 5m pre/post | |
+| SOXX | us | SOXX | Yahoo 5m pre/post | |
+| SMH | us | SMH | Yahoo 5m pre/post | |
+| 159995 | a | 159995.SZ | **腾讯API** | A股无24h |
+| 512800 | a | 512800.SS | **腾讯API** | |
+| 512760 | a | 512760.SS | **腾讯API** | |
 
 ### 18. 501018 南方原油LOF
-| 持仓 | 市场 | 当前数据源 | 优化后数据源 | 说明 |
-|------|------|-----------|------------|------|
-| USL | us | Yahoo 1d | **CL=F** (WTI期货替代) | 原油ETF→期货 |
-| BRNT | us | Yahoo 1d | **BZ=F** (布伦特期货替代) | 伦敦上市,无Yahoo数据 |
-| USO | us | Yahoo 1d | **CL=F** (WTI期货替代) | 原油ETF→期货 |
-| BNO | us | Yahoo 1d | **BZ=F** (布伦特期货替代) | 布伦特原油ETF |
-| SimpleXWTI | us | Yahoo 1d | **CL=F** (WTI期货替代) | WTI相关 |
-
-**简化**：5个原油标的 → 2个期货（CL=F + BZ=F），权重按原始持仓比例分配。
+| 持仓 | 市场 | Yahoo代码 | 优化后数据源 | 覆盖 | 说明 |
+|------|------|-----------|------------|------|------|
+| USL | us | USL | Yahoo 5m pre/post | ~16h | 美股ETF |
+| BRNT | uk | **BRNT.L** | Yahoo 5m | ~8h | 伦敦上市，加.L后缀 |
+| USO | us | USO | Yahoo 5m pre/post | ~16h | |
+| BNO | us | BNO | Yahoo 5m pre/post | ~16h | |
+| SimpleXWTI | us | — | DB兜底 | — | 无Yahoo数据 |
 
 ### 19. 161129 原油LOF
-| 持仓 | 市场 | 当前数据源 | 优化后数据源 | 说明 |
-|------|------|-----------|------------|------|
-| CRUD | us | Yahoo 1d | **CL=F** (退市,用期货替代) | |
-| BRNT | us | Yahoo 1d | **BZ=F** (伦敦上市) | |
-| DBO | us | Yahoo 1d | **CL=F** (WTI期货替代) | |
-| BNO | us | Yahoo 1d | **BZ=F** | |
-| USO | us | Yahoo 1d | **CL=F** | |
-| GSCI | us | — | **CL=F** (无Yahoo数据) | |
-| 210305 | a | — | **DB收盘价** | A股债券,Yahoo无数据 |
-| 250431 | a | — | **DB收盘价** | A股债券,Yahoo无数据 |
-
-**简化**：原油持仓 → CL=F + BZ=F，A股债券保留DB。
+| 持仓 | 市场 | Yahoo代码 | 优化后数据源 | 覆盖 | 说明 |
+|------|------|-----------|------------|------|------|
+| CRUD | uk | **CRUD.L** | Yahoo 5m | ~8h | 伦敦上市，加.L后缀 |
+| BRNT | uk | **BRNT.L** | Yahoo 5m | ~8h | 伦敦上市 |
+| DBO | us | DBO | Yahoo 5m pre/post | ~16h | |
+| BNO | us | BNO | Yahoo 5m pre/post | ~16h | |
+| USO | us | USO | Yahoo 5m pre/post | ~16h | |
+| GSCI | us | — | DB兜底 | — | 无Yahoo数据 |
+| 210305 | a | — | **腾讯API** / DB | A股时段 | A股债券 |
+| 250431 | a | — | **腾讯API** / DB | A股时段 | A股债券 |
 
 ### 20. 160723 嘉实原油LOF
-| 持仓 | 市场 | 当前数据源 | 优化后数据源 | 说明 |
-|------|------|-----------|------------|------|
-| CRUD | us | Yahoo 1d | **CL=F** | |
-| BRNT | us | Yahoo 1d | **BZ=F** | |
-| OILK | us | Yahoo 1d | **CL=F** | |
-| USO | us | Yahoo 1d | **CL=F** | |
-| BNO | us | Yahoo 1d | **BZ=F** | |
-| 1671 | jp | Yahoo 1d | **Yahoo 5m** (.T) | 日股,有24h数据 |
-| 00883 | hk | 腾讯 | **Yahoo 5m** (.HK) | 中海油 |
-| 00857 | hk | 腾讯 | **Yahoo 5m** (.HK) | 中石油 |
-| XLE | us | Yahoo 1d | **CL=F** (能源ETF→期货) | |
-| 03175 | hk | 腾讯 | **Yahoo 5m** (.HK) | |
+| 持仓 | 市场 | Yahoo代码 | 优化后数据源 | 覆盖 | 说明 |
+|------|------|-----------|------------|------|------|
+| CRUD | uk | **CRUD.L** | Yahoo 5m | ~8h | 伦敦上市 |
+| BRNT | uk | **BRNT.L** | Yahoo 5m | ~8h | 伦敦上市 |
+| OILK | us | OILK | Yahoo 5m pre/post | ~16h | |
+| USO | us | USO | Yahoo 5m pre/post | ~16h | |
+| BNO | us | BNO | Yahoo 5m pre/post | ~16h | |
+| 1671 | jp | 1671.T | Yahoo 5m | ~6h | 日股 |
+| 00883 | hk | 0883.HK | Yahoo 5m | 港股时段 | |
+| 00857 | hk | 0857.HK | Yahoo 5m | 港股时段 | |
+| XLE | us | XLE | Yahoo 5m pre/post | ~16h | |
+| 03175 | hk | 3175.HK | Yahoo 5m | 港股时段 | |
 
 ### 21. 160644 港美互联网LOF
-| 持仓 | 市场 | 当前数据源 | 优化后数据源 | 说明 |
+| 持仓 | 市场 | Yahoo代码 | 优化后数据源 | 说明 |
 |------|------|-----------|------------|------|
-| TSM | us | Yahoo 1d | **Yahoo 5m pre/post** | 台积电 |
-| NVDA | us | Yahoo 1d | **Yahoo 5m pre/post** | 英伟达 |
-| SNDK | us | Yahoo 1d | **Yahoo 5m pre/post** | |
-| MU | us | Yahoo 1d | **Yahoo 5m pre/post** | 美光 |
-| 00700 | hk | 腾讯 | **Yahoo 5m** (.HK) | 腾讯 |
-| GOOGL | us | Yahoo 1d | **Yahoo 5m pre/post** | 谷歌 |
-| 09988 | hk | 腾讯 | **Yahoo 5m** (.HK) | 阿里 |
-| 00883 | hk | 腾讯 | **Yahoo 5m** (.HK) | 中海油 |
-| AVGO | us | Yahoo 1d | **Yahoo 5m pre/post** | 博通 |
-| ASML | us | Yahoo 1d | **Yahoo 5m pre/post** | ASML |
+| TSM | us | TSM | Yahoo 5m pre/post | |
+| NVDA | us | NVDA | Yahoo 5m pre/post | |
+| SNDK | us | SNDK | Yahoo 5m pre/post | |
+| MU | us | MU | Yahoo 5m pre/post | |
+| 00700 | hk | 0700.HK | Yahoo 5m | |
+| GOOGL | us | GOOGL | Yahoo 5m pre/post | |
+| 09988 | hk | 9988.HK | Yahoo 5m | |
+| 00883 | hk | 0883.HK | Yahoo 5m | |
+| AVGO | us | AVGO | Yahoo 5m pre/post | |
+| ASML | us | ASML | Yahoo 5m pre/post | |
 
 ### 22. 163208 全球油气能源LOF
-| 持仓 | 市场 | 当前数据源 | 优化后数据源 | 说明 |
+| 持仓 | 市场 | Yahoo代码 | 优化后数据源 | 说明 |
 |------|------|-----------|------------|------|
-| 00916等16只 | hk | 腾讯 | **Yahoo 5m** (.HK) | 全部港股 |
-
-**说明**：纯港股持仓，无期货替代，用Yahoo 5m覆盖港股交易时段。
+| 00916等16只 | hk | *.HK | Yahoo 5m | 全部港股 |
 
 ### 23. 501312 海外科技LOF
-| 持仓 | 市场 | 当前数据源 | 优化后数据源 | 说明 |
+| 持仓 | 市场 | Yahoo代码 | 优化后数据源 | 说明 |
 |------|------|-----------|------------|------|
-| ARKK | us | Yahoo 1d | **Yahoo 5m pre/post** | |
-| ARKG | us | Yahoo 1d | **Yahoo 5m pre/post** | |
-| ARKQ | us | Yahoo 1d | **Yahoo 5m pre/post** | |
-| SOXX | us | Yahoo 1d | **Yahoo 5m pre/post** | |
-| AIQ | us | Yahoo 1d | **Yahoo 5m pre/post** | |
-| QQQ | us | Yahoo 1d | **Yahoo 5m pre/post** | |
-| BOTZ | us | Yahoo 1d | **Yahoo 5m pre/post** | |
-| XLK | us | Yahoo 1d | **Yahoo 5m pre/post** | |
-| SMH | us | Yahoo 1d | **Yahoo 5m pre/post** | |
-| FINX | us | Yahoo 1d | **Yahoo 5m pre/post** | |
+| ARKK等10只 | us | 各自代码 | Yahoo 5m pre/post | 全部美股ETF |
 
 ### 24. 161116 黄金主题LOF
-| 持仓 | 市场 | 当前数据源 | 优化后数据源 | 说明 |
+| 持仓 | 市场 | Yahoo代码 | 优化后数据源 | 说明 |
 |------|------|-----------|------------|------|
-| SGOL | us | Yahoo 1d | **GC=F** (黄金ETF→期货) | |
-| GLDM | us | Yahoo 1d | **GC=F** | |
-| IAU | us | Yahoo 1d | **GC=F** | |
-| GLD | us | Yahoo 1d | **GC=F** | |
-| 250431 | a | — | **DB收盘价** | A股债券,Yahoo无数据 |
+| SGOL | us | SGOL | Yahoo 5m pre/post | |
+| GLDM | us | GLDM | Yahoo 5m pre/post | |
+| IAU | us | IAU | Yahoo 5m pre/post | |
+| GLD | us | GLD | Yahoo 5m pre/post | |
+| 250431 | a | — | **腾讯API** / DB | A股债券 |
 
-**简化**：4个黄金ETF → 1个GC=F，权重合并为100%。
+**说明**：不换期货，4个黄金ETF各自用24h数据。
 
 ---
 
-## 三、汇总统计
-
-| 类型 | 数量 | 标的数变化 | 说明 |
-|------|------|-----------|------|
-| ETF→期货 | 9只基金 | 大幅减少 | 多个ETF合并为1个期货 |
-| 指数→期货 | 3只基金 | 不变 | ^NDX→NQ=F, ^GSPC→ES=F |
-| 仅升级频率 | 9只基金 | 不变 | 5m替代1d |
-| 无变化 | 1只基金 | 不变 | RYH 5m不可用 |
-| 主动型升级 | 8只基金 | 略减 | 原油ETF→期货,黄金ETF→期货 |
-
-## 四、期货替代映射表
-
-```python
-# fund_classifier.py 新增
-IOPV_FUTURES替代 = {
-    # 原油类 → CL=F / BZ=F
-    "160723": [("CL=F", 60.0), ("BZ=F", 40.0)],  # 嘉实原油
-    "161129": [("CL=F", 60.0), ("BZ=F", 40.0)],  # 原油LOF
-    "501018": [("CL=F", 50.0), ("BZ=F", 50.0)],  # 南方原油
-    "162411": [("CL=F", 100.0)],                  # 华宝油气→WTI
-    "162719": [("CL=F", 100.0)],                  # 石油LOF→WTI
-    "160416": [("CL=F", 100.0)],                  # 石油基金→WTI
-    # 黄金类 → GC=F
-    "164701": [("GC=F", 100.0)],                  # 黄金LOF
-    "161116": [("GC=F", 100.0)],                  # 黄金主题(4个黄金ETF合并)
-    # 白银 → SI=F
-    "161226": [("SI=F", 100.0)],                  # 白银LOF
-    # 指数→期货
-    "161125": [("ES=F", 100.0)],                  # 标普500
-    "161130": [("NQ=F", 100.0)],                  # 纳指
-    "161128": [("ES=F", 100.0)],                  # 标普信息科技(近似)
-}
-```
-
-## 五、数据源分层
+## 三、数据源优先级
 
 ```
-获取 current_price 优先级：
-  1. IOPV_FUTURES替代 中有映射 → Yahoo 5m 期货价
-  2. 美股持仓 → Yahoo 5m + includePrePost
-  3. 港股持仓 → Yahoo 5m (.HK)
-  4. A股持仓 → Yahoo 5m (.SS/.SZ) → 腾讯行情 fallback
-  5. 日股持仓 → Yahoo 5m (.T)
-  6. 以上均失败 → DB 收盘价 (etf_prices / stock_prices)
+获取 current_price：
+  1. 期货类（已有）：GC=F → Yahoo 5m
+  2. 指数→期货替代：^NDX→NQ=F, ^GSPC→ES=F → Yahoo 5m
+  3. 美股ETF/个股 → Yahoo 5m + includePrePost（~16h）
+  4. 港股 → Yahoo 5m .HK
+  5. 伦敦上市 → Yahoo 5m .L（~8h）
+  6. 日股 → Yahoo 5m .T（~6h）
+  7. A股 → 腾讯API（实时，无24h）
+  8. 以上均失败 → DB 收盘价
 ```
 
-## 六、预期效果
+## 四、Yahoo 代码后缀映射
 
-| 场景 | 当前 | 优化后 |
-|------|------|--------|
-| A股开盘时(9:30 CST) | 美股上一交易日收盘 | 美股盘后最新价 |
-| 美股盘后(16:00-20:00 ET) | 同上 | 盘后实时价 |
-| 期货类(GC=F/CL=F) | 仅日频 | 23h连续报价 |
-| 港股持仓 | 腾讯实时 | Yahoo 5m(更稳定) |
+| 市场 | 后缀 | 示例 |
+|------|------|------|
+| 美股/ETF | 无 | GLD, USO, NVDA |
+| 美股期货 | =F | GC=F, CL=F, NQ=F |
+| 美股指数 | ^ | ^NDX, ^GSPC |
+| 港股 | .HK | 0700.HK, 9988.HK |
+| 伦敦上市 | .L | CRUD.L, BRNT.L |
+| 日股 | .T | 1671.T |
+| A股(上海) | .SS | 512800.SS |
+| A股(深圳) | .SZ | 159995.SZ |
+
+## 五、需要修改的代码
+
+### fund_classifier.py
+- 新增 `IOPV_YAHOO替代` 映射表（仅指数→期货：^NDX→NQ=F, ^GSPC→ES=F）
+
+### source.py
+- 港股：腾讯 → Yahoo .HK（5m）
+- 美股：Yahoo 1d → Yahoo 5m + includePrePost
+- 伦敦：识别 `.L` 后缀，用 Yahoo 5m
+- 日股：识别 `.T` 后缀，用 Yahoo 5m
+- A股：保持腾讯API不变
+- 期货：已有 GC=F，升级为 5m 频率
+
+### yahoo_finance.py
+- `normalize_ticker_for_yahoo()` 确保伦敦后缀 `.L`、日股 `.T` 正确映射
+- `fetch_history()` 支持 `include_pre_post` 参数
