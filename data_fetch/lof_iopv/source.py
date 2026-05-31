@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from shared.market_service import get_fx_rates, get_quotes
-from data_fetch.lof_iopv.yahoo_finance import fetch_history as _yahoo_fetch_history
+from data_fetch.lof_iopv.yahoo_finance import fetch_history as _yahoo_fetch_history, fetch_latest_realtime_price as _yahoo_realtime_price, fetch_latest_realtime_price as _yahoo_realtime_price
 from data_fetch.lof_iopv.fund_classifier import (
     get_fund_class, get_holdings_for_service, get_index_etf_ticker, is_index_fund,
 )
@@ -277,6 +277,21 @@ def _build_tc_code(ticker, market):
     return ticker
 
 
+
+def _normalize_yahoo_ticker(ticker: str, market: str) -> str:
+    """根据market为ticker添加Yahoo后缀。"""
+    suffix_map = {
+        "hk": ".HK", "uk": ".L", "jp": ".T",
+        "de": ".DE", "it": ".MI", "ch": ".SW",
+        "fr": ".PA", "es": ".MC", "se": ".ST", "nl": ".AS",
+    }
+    suffix = suffix_map.get(market.lower(), "")
+    if suffix and not ticker.endswith(suffix):
+        if market.lower() == "hk" and ticker.isdigit() and len(ticker) < 4:
+            ticker = ticker.zfill(4)
+        return ticker + suffix
+    return ticker
+
 def build_lof_snapshot():
     """Fetch all QDII LOF data. Main entry point."""
     now = now_iso()
@@ -308,38 +323,89 @@ def build_lof_snapshot():
         current_prices = {}
         price = None
         if holdings:
-            # 港股实时行情
+                        # 指数→期货替代（^NDX→NQ=F等，获得24h报价）
             try:
-                hk_codes = [_build_tc_code(h["ticker"], h["market"]) for h in holdings if h["market"] == "hk"]
-                if hk_codes:
-                    hk_q = get_quotes(hk_codes)
-                    for h in holdings:
-                        if h["market"] != "hk":
-                            continue
-                        tc = _build_tc_code(h["ticker"], h["market"])
-                        if tc in hk_q:
-                            cur = hk_q[tc].get("price") or hk_q[tc].get("prev_close")
-                            current_prices[h["ticker"]] = cur
-                            if hk_q[tc].get("prev_close"):
-                                current_prices.setdefault("_prev_close", {})[h["ticker"]] = hk_q[tc]["prev_close"]
+                from data_fetch.lof_iopv.fund_classifier import IOPV_INDEX_FUTURES
+                for h in holdings:
+                    _futures_ticker = IOPV_INDEX_FUTURES.get(code)
+                    if _futures_ticker and h["ticker"].startswith("^"):
+                        _p = _yahoo_realtime_price(_futures_ticker)
+                        if _p:
+                            current_prices[h["ticker"]] = _p
             except Exception:
                 pass
-            # 美股行情：直接用Yahoo复权价（与nav_date_prices同源同口径）
+            # 美股/期货(F)/海外ETF：Yahoo 5m + includePrePost
             try:
                 for h in holdings:
-                    if h["market"] != "us":
+                    _m = h["market"].lower()
+                    _t = h["ticker"]
+                    if current_prices.get(_t):
                         continue
-                    _hist = _yahoo_fetch_history(h["ticker"], period="5d")
-                    if _hist:
-                        _latest_date = max(_hist.keys())
-                        current_prices[h["ticker"]] = _hist[_latest_date]
+                    if _m in ("us", "futures") or "=F" in _t:
+                        _p = _yahoo_realtime_price(_t)
+                        if _p:
+                            current_prices[_t] = _p
             except Exception:
                 pass
-            # 国内期货实时行情（Sina）
+            # 港股：Yahoo .HK 5m
             try:
-                _futures_tickers = [h["ticker"] for h in holdings if h["market"] == "futures"]
-                if _futures_tickers:
-                    _symbols = ",".join(f"nf_{t}" for t in _futures_tickers)
+                for h in holdings:
+                    if h["market"].lower() != "hk":
+                        continue
+                    if current_prices.get(h["ticker"]):
+                        continue
+                    _yahoo_t = _normalize_yahoo_ticker(h["ticker"], "hk")
+                    _p = _yahoo_realtime_price(_yahoo_t)
+                    if _p:
+                        current_prices[h["ticker"]] = _p
+            except Exception:
+                pass
+            # 伦敦上市：Yahoo .L 5m
+            try:
+                for h in holdings:
+                    if h["market"].lower() not in ("uk", "london"):
+                        continue
+                    if current_prices.get(h["ticker"]):
+                        continue
+                    _yahoo_t = _normalize_yahoo_ticker(h["ticker"], "uk")
+                    _p = _yahoo_realtime_price(_yahoo_t)
+                    if _p:
+                        current_prices[h["ticker"]] = _p
+            except Exception:
+                pass
+            # 日股：Yahoo .T 5m
+            try:
+                for h in holdings:
+                    if h["market"].lower() != "jp":
+                        continue
+                    if current_prices.get(h["ticker"]):
+                        continue
+                    _yahoo_t = _normalize_yahoo_ticker(h["ticker"], "jp")
+                    _p = _yahoo_realtime_price(_yahoo_t)
+                    if _p:
+                        current_prices[h["ticker"]] = _p
+            except Exception:
+                pass
+            # A股：腾讯API（无24h数据）
+            try:
+                _a_codes = [_build_tc_code(h["ticker"], h["market"]) for h in holdings if h["market"].lower() in ("a", "cn", "sh", "sz")]
+                if _a_codes:
+                    _a_q = get_quotes(_a_codes)
+                    for h in holdings:
+                        if h["market"].lower() not in ("a", "cn", "sh", "sz"):
+                            continue
+                        if current_prices.get(h["ticker"]):
+                            continue
+                        tc = _build_tc_code(h["ticker"], h["market"])
+                        if tc in _a_q:
+                            current_prices[h["ticker"]] = _a_q[tc].get("price") or _a_q[tc].get("prev_close")
+            except Exception:
+                pass
+            # 国内期货：Sina
+            try:
+                _cn_futures = [h["ticker"] for h in holdings if h["market"] == "futures" and "=F" not in h["ticker"]]
+                if _cn_futures:
+                    _symbols = ",".join(f"nf_{t}" for t in _cn_futures)
                     _r = SESSION.get(f"https://hq.sinajs.cn/list={_symbols}",
                                      headers={"Referer": "https://finance.sina.com.cn"},
                                      timeout=_REQUEST_TIMEOUT)
