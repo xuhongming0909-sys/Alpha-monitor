@@ -124,7 +124,7 @@ def batch_search_tickers(names: List[str], delay: float = 0.5) -> Dict[str, Opti
 # 历史价格（Yahoo chart API via Deno proxy）
 # ============================================================
 
-def fetch_history(yahoo_symbol: str, period: str = "3mo", interval: str = "1d") -> Dict[str, float]:
+def fetch_history(yahoo_symbol: str, period: str = "3mo", interval: str = "1d", include_pre_post: bool = False) -> Dict[str, float]:
     """拉取Yahoo历史收盘价。
 
     Returns:
@@ -136,9 +136,11 @@ def fetch_history(yahoo_symbol: str, period: str = "3mo", interval: str = "1d") 
 
     url = f"{base}/v8/finance/chart/{yahoo_symbol}"
     try:
-        r = _SESSION.get(url, params={
-            "range": period, "interval": interval,
-        }, timeout=20)
+        params = {"range": period, "interval": interval}
+        # 期货(=F)不支持includePrePost，会返回空数据
+        if include_pre_post and interval != "1d" and "=F" not in yahoo_symbol:
+            params["includePrePost"] = "true"
+        r = _SESSION.get(url, params=params, timeout=20)
         if r.status_code != 200:
             logger.warning(f"Yahoo chart {r.status_code} for {yahoo_symbol}")
             return {}
@@ -170,6 +172,20 @@ def fetch_latest_price(yahoo_symbol: str) -> Optional[float]:
     if not prices:
         return None
     return list(prices.values())[-1]
+
+
+def fetch_latest_realtime_price(yahoo_symbol: str) -> Optional[float]:
+    """获取最新实时价（含盘前盘后），用于IOPV实时计算。
+
+    美股ETF/个股：5m + includePrePost，覆盖~16h
+    期货：5m，天然覆盖~23h（不加includePrePost）
+    港股/伦敦/日股：5m，覆盖各市场交易时段
+    """
+    prices = fetch_history(yahoo_symbol, "5d", "5m", include_pre_post=True)
+    if not prices:
+        return None
+    return list(prices.values())[-1]
+
 
 
 def batch_fetch_prices(yahoo_symbols: List[str], period: str = "3mo",
