@@ -58,6 +58,11 @@ def _get_stock_prices_batch(tickers, start_date, end_date):
             'SELECT date, close FROM stock_prices WHERE ticker = ? AND date >= ? AND date <= ? ORDER BY date',
             (ticker, start_date, end_date)
         ).fetchall()
+        if not rows:
+            rows = conn.execute(
+                'SELECT date, close FROM etf_prices WHERE ticker = ? AND date >= ? AND date <= ? ORDER BY date',
+                (ticker, start_date, end_date)
+            ).fetchall()
         result[ticker] = {r[0]: r[1] for r in rows}
     conn.close()
     return result
@@ -146,8 +151,9 @@ def backtest_fund(code, end_date_str):
     actual_series, predicted_series = [], []
     for i in range(1, len(nav_dates)):
         d_prev, d_curr = nav_dates[i - 1], nav_dates[i]
-        if d_prev not in fx_rates or d_curr not in fx_rates:
-            continue
+        # CNY基金无汇率数据时默认1.0
+        fx_prev = fx_rates.get(d_prev, 1.0)
+        fx_curr = fx_rates.get(d_curr, 1.0)
         nav_prev = nav_dict[d_prev]
         nav_curr = nav_dict[d_curr]
         if nav_prev <= 0:
@@ -156,8 +162,6 @@ def backtest_fund(code, end_date_str):
         # 构建价格字典
         nav_date_prices = {}
         current_prices = {}
-        all_ok = True
-        for h in holdings:
         valid_weight_sum = 0.0
         for h in holdings:
             t = h["ticker"]
@@ -183,8 +187,8 @@ def backtest_fund(code, end_date_str):
             current_prices=current_prices,
             nav_date_prices=nav_date_prices,
             prev_closes={},
-            fx_now=fx_rates[d_curr],
-            fx_base=fx_rates[d_prev],
+            fx_now=fx_curr,
+            fx_base=fx_prev,
         )
         if predicted is None or predicted <= 0:
             continue
