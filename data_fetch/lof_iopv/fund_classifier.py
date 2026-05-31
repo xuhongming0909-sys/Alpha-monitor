@@ -48,6 +48,16 @@ INDEX_ETF: Dict[str, List[Tuple[str, float]]] = {
     "501300": [("AGG", 100.0)],            # 美元债: iShares Core US Aggregate Bond
 }
 
+}
+
+# 指数→期货替代映射（仅用于IOPV实时计算，不影响回测和DB）
+# 指数(^NDX等)无盘后数据，用期货获得24h报价
+IOPV_INDEX_FUTURES: Dict[str, str] = {
+    "161130": "NQ=F",   # 纳指 → E-mini纳斯达克100期货
+    "161125": "ES=F",   # 标普500 → E-mini标普500期货
+}
+
+
 
 def is_index_fund(code: str) -> bool:
     """判断是否为指数型基金"""
