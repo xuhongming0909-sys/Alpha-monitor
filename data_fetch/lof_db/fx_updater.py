@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """汇率增量更新，只拉取DB中缺失的日期范围。"""
 from datetime import datetime, timedelta
 from data_fetch.lof_db.schema import get_db

@@ -1,4 +1,4 @@
-﻿# LOF基金基础信息
+# LOF基金基础信息
 
 生成时间: 2026-05-29
 数据来源: 同花顺(fund_info_ths) + 雪球(fund_individual_basic_info_xq)

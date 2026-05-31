@@ -251,7 +251,7 @@ def _get_fx_rates() -> Dict[str, float]:
     hkd = quotes.get("whHKDCNY", {}).get("price")
     usd = quotes.get("whUSDCNY", {}).get("price")
     if not (isinstance(hkd, (float, int)) and hkd > 0 and isinstance(usd, (float, int)) and usd > 0):
-        raise RuntimeError("无法获取腾讯exchange_rate")
+        raise RuntimeError("鏃犳硶鑾峰彇鑵捐exchange_rate")
     return {"HKD": float(hkd), "USD": float(usd)}
 
 

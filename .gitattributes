@@ -1,0 +1,9 @@
+# Force UTF-8 for all text files
+* text=auto working-tree-encoding=utf-8
+*.md text diff
+*.py text diff
+*.js text diff
+*.jsx text diff
+*.json text diff
+*.yaml text diff
+*.yml text diff

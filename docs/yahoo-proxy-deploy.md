@@ -1,4 +1,4 @@
-﻿# Yahoo Finance 代理 - Cloudflare Worker 部署指南
+# Yahoo Finance 代理 - Cloudflare Worker 部署指南
 
 ## 为什么需要
 

@@ -197,3 +197,18 @@
   - 使用调整后的 stock_ratio 调用 calc_iopv
 - **效果**: 持仓总和60%，其中10%没数据时，按54%持仓比例计算
 - **验证**: 代码逻辑正确，calc_iopv 函数已支持部分持仓缺失
+
+### 2026-05-31 | 底层修复 UTF-8 乱码问题
+
+- **问题**: Windows 系统代码页 936(GBK) + PowerShell 默认 GB2312 编码 → 所有中文文件读写乱码
+- **根因**: ACP=936, Console InputEncoding=GB2312, $OutputEncoding=US-ASCII, 1个文件是UTF-16 LE
+- **修复**:
+  1. PowerShell profile 添加 UTF-8 全局编码设置 ($OutputEncoding, [Console]::OutputEncoding/InputEncoding)
+  2. 系统环境变量 PYTHONUTF8=1, PYTHONIOENCODING=utf-8 (User级)
+  3. Windows 注册表 ACP/OEMCP/MACCP 改为 65001 (需重启生效)
+  4. 项目 .env 添加 PYTHONUTF8=1 + PYTHONIOENCODING=utf-8
+  5. 创建 .editorconfig (charset=utf-8) + .gitattributes (text=auto working-tree-encoding=utf-8)
+  6. shared/db/market_pairs.py 从 UTF-16 LE 转换为 UTF-8
+  7. 清理 20 个 BOM 文件
+- **验证**: PowerShell/Python/Node.js 三层读 INDEX.md 中文均正确
+- **待办**: 重启 Windows 使系统代码页 65001 生效

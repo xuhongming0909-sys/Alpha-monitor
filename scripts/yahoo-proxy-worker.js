@@ -1,4 +1,4 @@
-﻿// Cloudflare Worker - Yahoo Finance Proxy
+// Cloudflare Worker - Yahoo Finance Proxy
 // 部署到 Cloudflare Workers（免费10万次/天）
 // 然后服务器用 https://your-worker.workers.dev 替代 query1.finance.yahoo.com
 
