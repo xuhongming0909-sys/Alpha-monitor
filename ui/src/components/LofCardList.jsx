@@ -28,7 +28,7 @@ function isPinned(row) {
   const status = (row.applyStatus || '').toString();
   const isPaused = status.includes('暂停');
   // 溢价>2% + 未暂停申购（有明确限额或开放申购），或折价<-3%
-  if (premium !== null && premium > 2 && !isPaused) return true;
+  if (premium !== null && premium > 1.5 && !isPaused) return true;
   if (premium !== null && premium < -3) return true;
   return false;
 }
