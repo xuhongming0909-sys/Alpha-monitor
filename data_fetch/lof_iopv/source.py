@@ -417,7 +417,19 @@ def build_lof_snapshot():
                                 current_prices[h["ticker"]] = _p
             except Exception:
                 pass
-            # A股DB兜底（腾讯没拿到的，用DB最近价格）
+            # A股Yahoo .SS/.SZ兜底（DB也没有的，用Yahoo历史）
+            try:
+                _a_yahoo_missing = [h for h in holdings if h["market"].lower() in ("a", "cn", "sh", "sz") and not current_prices.get(h["ticker"])]
+                for h in _a_yahoo_missing:
+                    _suffix = ".SS" if h["ticker"].startswith(("5", "6")) else ".SZ"
+                    _yahoo_t = h["ticker"] + _suffix
+                    _p = _yahoo_realtime_price(_yahoo_t)
+                    if _p:
+                        current_prices[h["ticker"]] = _p
+            except Exception:
+                pass
+            # A股DB兜底（腾讯和Yahoo都没拿到的，用DB最近价格）
+            
             try:
                 _a_missing = [h for h in holdings if h["market"].lower() in ("a", "cn", "sh", "sz") and not current_prices.get(h["ticker"])]
                 if _a_missing:

@@ -25,8 +25,12 @@ function formatStockPosition(row) {
 /** 置顶条件：有限额 + 限额<10万 + IOPV溢价率>1% */
 function isPinned(row) {
   const premium = toNumber(row.premiumRate);
-  // 溢价>2% 或 折价<-3%，无需限额条件
-  return premium !== null && (premium > 2 || premium < -3);
+  const status = (row.applyStatus || '').toString();
+  const isPaused = status.includes('暂停');
+  // 溢价>2% + 未暂停申购（有明确限额或开放申购），或折价<-3%
+  if (premium !== null && premium > 2 && !isPaused) return true;
+  if (premium !== null && premium < -3) return true;
+  return false;
 }
 
 export default function LofCardList({ rows = [], searchQuery = '' }) {
@@ -57,9 +61,8 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
       if (ex === 'SH') return <span style={{ color: '#3498db', fontWeight: 600 }}>沪</span>;
       return <span className="muted">--</span>;
     } },
-    { key: 'premiumRate', label: '溢价率', numeric: true, className: (row) => signedClass(row.premiumRate), render: (row) => (
-      <span>{formatPercent(row.premiumRate)}{row.iopvStatus ? <span className="muted" style={{fontSize:'0.7em',marginLeft:'4px'}}>{row.iopvStatus}</span> : null}</span>
-    ) },
+    { key: 'premiumRate', label: '溢价率', numeric: true, className: (row) => signedClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate) },
+    { key: 'iopvStatus', label: '持仓覆盖', render: (row) => row.iopvStatus ? <span className="muted" style={{fontSize:'0.8em'}}>{row.iopvStatus}</span> : '--' },
     { key: 'applyStatus', label: '申购状态', render: (row) => {
       const s = (row.applyStatus || '').toString();
       if (s.startsWith('限额')) return <span style={{ color: '#e67e22', fontWeight: 600 }}>{s}</span>;
@@ -67,7 +70,10 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
       if (s === '开放申购') return <span style={{ color: '#27ae60' }}>{s}</span>;
       return <span className="muted">{s || '--'}</span>;
     } },
-    { key: 'supports1to6', label: '1拖六', render: (row) => row.supports1to6 ? <span style={{ color: '#27ae60', fontWeight: 600 }}>✓</span> : <span style={{ color: '#bdc3c7' }}>✗</span> },
+    { key: 'supports1to6', label: '1拖六', render: (row) => {
+    if (row.code === '161226') return <span style={{ color: '#f39c12', fontSize: '0.85em' }}>身份证</span>;
+    return row.supports1to6 ? <span style={{ color: '#27ae60', fontWeight: 600 }}>✓</span> : <span style={{ color: '#bdc3c7' }}>✗</span>;
+  } },
     { key: 'nav', label: 'T-2净值', numeric: true, render: (row) => formatNumber(row.nav) },
     { key: 'navDate', label: '净值日期', render: (row) => formatDate(row.navDate) },
     { key: 'price', label: '现价', numeric: true, render: (row) => formatNumber(row.price) },
