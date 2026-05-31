@@ -475,6 +475,30 @@ def build_lof_snapshot():
             except Exception:
                 pass
 
+            # Yahoo历史兜底（期货/海外标的不在DB里）
+            _missing_nav = [h for h in holdings if h["ticker"] not in nav_date_prices]
+            if _missing_nav:
+                try:
+                    for h in _missing_nav:
+                        _yahoo_t = h["ticker"]
+                        _m = h["market"].lower()
+                        if _m == "hk":
+                            _yahoo_t = _normalize_yahoo_ticker(h["ticker"], "hk")
+                        elif _m == "uk":
+                            _yahoo_t = _normalize_yahoo_ticker(h["ticker"], "uk")
+                        elif _m == "jp":
+                            _yahoo_t = _normalize_yahoo_ticker(h["ticker"], "jp")
+                        _hist = _yahoo_fetch_history(_yahoo_t, period="1mo", interval="1d")
+                        if _hist:
+                            _nav_key = nav_date[:10] if len(nav_date) > 10 else nav_date
+                            # 找<=nav_date的最近日期
+                            _valid = {k: v for k, v in _hist.items() if k <= _nav_key}
+                            if _valid:
+                                _best_date = max(_valid.keys())
+                                nav_date_prices[h["ticker"]] = _valid[_best_date]
+                except Exception:
+                    pass
+
         # LOF场内价格
         try:
             tc_code = _build_tc_code(code, market)
