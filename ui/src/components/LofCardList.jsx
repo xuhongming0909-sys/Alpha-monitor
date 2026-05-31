@@ -24,15 +24,9 @@ function formatStockPosition(row) {
 
 /** 置顶条件：有限额 + 限额<10万 + IOPV溢价率>1% */
 function isPinned(row) {
-  const status = (row.applyStatus || '').toString();
-  const limit = toNumber(row.dailyLimit);
   const premium = toNumber(row.premiumRate);
-  const hasLimit = status.includes('限');
-  const limitUnder10w = limit !== null && limit < 100000;
-  const premiumOver1 = premium !== null && premium > 1;
-  const deepDiscount = premium !== null && premium < -2;
-  // 溢价>1%需限额条件，深度折价<-2%无需限额
-  return (hasLimit && limitUnder10w && premiumOver1) || deepDiscount;
+  // 溢价>2% 或 折价<-3%，无需限额条件
+  return premium !== null && (premium > 2 || premium < -3);
 }
 
 export default function LofCardList({ rows = [], searchQuery = '' }) {
@@ -51,7 +45,7 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
       key: 'code', label: '代码',
       render: (row) => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          {isPinned(row) && <span title="置顶：限额<10万且溢价>1%，或折价<-2%" style={{ color: '#e74c3c', fontSize: '0.75em' }}>📌</span>}
+          {isPinned(row) && <span title="置顶：溢价>2% 或 折价<-3%" style={{ color: '#e74c3c', fontSize: '0.75em' }}>📌</span>}
           <span className="mono">{pickText(row.code)}</span>
         </span>
       ),
@@ -63,7 +57,9 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
       if (ex === 'SH') return <span style={{ color: '#3498db', fontWeight: 600 }}>沪</span>;
       return <span className="muted">--</span>;
     } },
-    { key: 'premiumRate', label: '溢价率', numeric: true, className: (row) => signedClass(row.premiumRate), render: (row) => formatPercent(row.premiumRate) },
+    { key: 'premiumRate', label: '溢价率', numeric: true, className: (row) => signedClass(row.premiumRate), render: (row) => (
+      <span>{formatPercent(row.premiumRate)}{row.iopvStatus ? <span className="muted" style={{fontSize:'0.7em',marginLeft:'4px'}}>{row.iopvStatus}</span> : null}</span>
+    ) },
     { key: 'applyStatus', label: '申购状态', render: (row) => {
       const s = (row.applyStatus || '').toString();
       if (s.startsWith('限额')) return <span style={{ color: '#e67e22', fontWeight: 600 }}>{s}</span>;

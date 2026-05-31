@@ -400,7 +400,7 @@ def build_lof_snapshot():
                         current_prices[h["ticker"]] = _p
             except Exception:
                 pass
-            # A股：腾讯API（无24h数据）
+            # A股：腾讯API + DB兜底（非交易时段也能拿到最近价格）
             try:
                 _a_codes = [_build_tc_code(h["ticker"], h["market"]) for h in holdings if h["market"].lower() in ("a", "cn", "sh", "sz")]
                 if _a_codes:
@@ -412,7 +412,22 @@ def build_lof_snapshot():
                             continue
                         tc = _build_tc_code(h["ticker"], h["market"])
                         if tc in _a_q:
-                            current_prices[h["ticker"]] = _a_q[tc].get("price") or _a_q[tc].get("prev_close")
+                            _p = _a_q[tc].get("price") or _a_q[tc].get("prev_close")
+                            if _p:
+                                current_prices[h["ticker"]] = _p
+            except Exception:
+                pass
+            # A股DB兜底（腾讯没拿到的，用DB最近价格）
+            try:
+                _a_missing = [h for h in holdings if h["market"].lower() in ("a", "cn", "sh", "sz") and not current_prices.get(h["ticker"])]
+                if _a_missing:
+                    from data_fetch.lof_db.schema import get_db as _get_db2
+                    _conn2 = _get_db2()
+                    for h in _a_missing:
+                        row = _conn2.execute("SELECT close FROM stock_prices WHERE ticker=? ORDER BY date DESC LIMIT 1", (h["ticker"],)).fetchone()
+                        if row:
+                            current_prices[h["ticker"]] = row[0]
+                    _conn2.close()
             except Exception:
                 pass
             # 国内期货：Sina
