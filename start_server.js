@@ -2075,8 +2075,8 @@ async function runDataJobsCycle(context = 'tick', options = {}) {
     }
 
     if (details.tradingSession) await runIntradayRefreshCycle();
-    // LOF IOPV需要美股数据，即使中国非交易时段也要刷新（美股盘前盘后）
-    if (!details.tradingSession && shouldRunIntradayDataset('lofArb', Number(DATASETS.lofArb?.refreshIntervalMs) || 60000)) {
+    // LOF IOPV全天候刷新（依赖美股/港股/期货等全球市场数据）
+    if (shouldRunIntradayDataset('lofArb', Number(DATASETS.lofArb?.refreshIntervalMs) || 60000)) {
       await refreshDataset('lofArb');
     }
     await runDailySync();
