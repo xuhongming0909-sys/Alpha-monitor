@@ -113,20 +113,7 @@ function useDashboardData() {
     }
   }, []);
 
-  // 30分钟自动刷新LOF数据
-  React.useEffect(() => {
-    const timer = setInterval(() => {
-      fetchJson(API_ENDPOINTS.lofArb).then((data) => {
-        setState((current) => {
-          if (current.resources) {
-            return { ...current, resources: { ...current.resources, lofArb: data } };
-          }
-          return current;
-        });
-      }).catch(() => {});
-    }, 30 * 60 * 1000);
-    return () => clearInterval(timer);
-  }, []);
+  ;
 
   const load = React.useCallback(async (isBackground = false) => {
     if (!isBackground) {
@@ -203,11 +190,11 @@ function useDashboardData() {
 
   React.useEffect(() => {
     load(false);
-    const timer = window.setInterval(() => load(true), 60000);
+    const timer = window.setInterval(() => load(true), 30 * 60 * 1000);
     return () => window.clearInterval(timer);
   }, [load]);
 
-  return { ...state, reload: () => load(false) };
+  return { ...state, reload: () => load(false), refreshLof };
 }
 
 function sortByNumber(rows, getter, direction = 'desc') {
@@ -687,7 +674,7 @@ function App() {
             {activeTab === 'convertible' && <ConvertiblePage rows={cbRows} smallRows={smallRedemptionRows} rightsIssueData={cbRightsIssueData} searchQuery={searchQuery} />}
             {activeTab === 'ah' && <AhCardList rows={ahRows} searchQuery={searchQuery} />}
             {activeTab === 'ab' && <AbCardList rows={abRows} searchQuery={searchQuery} />}
-            {activeTab === 'lof' && <LofCardList rows={lofRows} searchQuery={searchQuery} onRefresh={refreshLof} />}
+            {activeTab === 'lof' && <LofCardList rows={lofRows} searchQuery={searchQuery} onRefresh={state.refreshLof} />}
             {activeTab === 'subscription' && <SubscriptionCardList rows={subscriptionRows} searchQuery={searchQuery} />}
             {activeTab === 'monitor' && <MonitorPage rows={monitorRows} searchQuery={searchQuery} onRefresh={state.reload} />}
           </>
