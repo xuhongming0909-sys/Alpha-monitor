@@ -27,7 +27,7 @@ function isPinned(row) {
   const premium = toNumber(row.premiumRate);
   const status = (row.applyStatus || '').toString();
   const isPaused = status.includes('暂停');
-  // 溢价>2% + 未暂停申购（有明确限额或开放申购），或折价<-3%
+  // 溢价>1% + 未暂停申购，或折价<-3%
   if (premium !== null && premium > 1 && !isPaused) return true;
   if (premium !== null && premium < -3) return true;
   return false;
@@ -37,12 +37,8 @@ export default function LofCardList({ rows = [], searchQuery = '', onRefresh }) 
   const filtered = rows.filter((row) =>
     rowMatchesQuery(row, searchQuery, ['name', 'code', 'fundCompany', 'calcTarget'])
   );
-// 默认按溢价率降序；列头点击排序时置顶始终隔离在顶部
-  const sorted = [...filtered].sort((a, b) => {
-    const pa = toNumber(a.premiumRate) ?? -Infinity;
-    const pb = toNumber(b.premiumRate) ?? -Infinity;
-    return pb - pa;
-  });
+// 不预排序，由SimpleDataTable统一处理（置顶隔离+列头排序）
+  const sorted = filtered;
 
   const columns = [
     {

@@ -41,6 +41,7 @@ function useSort() {
       });
     };
     if (!isPinned) return doSort(rows);
+    // 始终分离置顶和非置顶，各自独立排序
     const pinned = rows.filter(isPinned);
     const rest = rows.filter((r) => !isPinned(r));
     return [...doSort(pinned), ...doSort(rest)];
