@@ -2075,6 +2075,10 @@ async function runDataJobsCycle(context = 'tick', options = {}) {
     }
 
     if (details.tradingSession) await runIntradayRefreshCycle();
+    // LOF IOPV需要美股数据，即使中国非交易时段也要刷新（美股盘前盘后）
+    if (!details.tradingSession && shouldRunIntradayDataset('lofArb', Number(DATASETS.lofArb?.refreshIntervalMs) || 60000)) {
+      await refreshDataset('lofArb');
+    }
     await runDailySync();
     updateHealthSection('data_jobs', 'ok', 'Background data jobs are healthy', details);
   } catch (error) {
