@@ -272,6 +272,10 @@ data_fetch:
       source_api_url: https://www.jisilu.cn/webapi/cb/pre/
       source_title: 闆嗘€濆綍鍙浆鍊洪妗?
       source_referer: https://www.jisilu.cn/web/data/cb/pre
+    lof_iopv:
+      intraday: true
+      refresh_interval_ms: 60000
+      daily_incremental_sync: true
     lof_arbitrage:
       intraday: true
       refresh_interval_ms: 60000
