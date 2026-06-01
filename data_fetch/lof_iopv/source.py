@@ -488,12 +488,12 @@ def build_lof_snapshot():
                 _conn = _get_db()
                 for h in holdings:
                     row = _conn.execute(
-                        "SELECT close FROM stock_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
+                        "SELECT close FROM etf_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
                         (h["ticker"], nav_date),
                     ).fetchone()
                     if not row:
                         row = _conn.execute(
-                            "SELECT close FROM etf_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
+                            "SELECT close FROM stock_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
                             (h["ticker"], nav_date),
                         ).fetchone()
                     if row:
