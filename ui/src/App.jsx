@@ -125,7 +125,7 @@ function useDashboardData() {
       { key: 'cbArb', url: API_ENDPOINTS.cbArb, fallback: {} },
       { key: 'ah', url: API_ENDPOINTS.ah, fallback: [] },
       { key: 'ab', url: API_ENDPOINTS.ab, fallback: [] },
-      { key: 'lofArb', url: `${API_ENDPOINTS.lofArb}?force=1`, fallback: [] },
+      { key: 'lofArb', url: API_ENDPOINTS.lofArb, fallback: [] },
       { key: 'monitor', url: API_ENDPOINTS.monitor, fallback: [] },
       { key: 'cbRightsIssue', url: API_ENDPOINTS.cbRightsIssue, fallback: {} },
     ];
