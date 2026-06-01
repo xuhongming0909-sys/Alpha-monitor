@@ -436,7 +436,7 @@ def build_lof_snapshot():
                     from data_fetch.lof_db.schema import get_db as _get_db2
                     _conn2 = _get_db2()
                     for h in _a_missing:
-                        row = _conn2.execute("SELECT close FROM stock_prices WHERE ticker=? ORDER BY date DESC LIMIT 1", (h["ticker"],)).fetchone()
+                        row = _conn2.execute("SELECT close FROM prices WHERE ticker=? ORDER BY date DESC LIMIT 1", (h["ticker"],)).fetchone()
                         if row:
                             current_prices[h["ticker"]] = row[0]
                     _conn2.close()
@@ -469,9 +469,9 @@ def build_lof_snapshot():
                     from data_fetch.lof_db.schema import get_db as _get_db
                     _conn = _get_db()
                     for h in missing:
-                        row = _conn.execute("SELECT close FROM stock_prices WHERE ticker=? ORDER BY date DESC LIMIT 1", (h["ticker"],)).fetchone()
+                        row = _conn.execute("SELECT close FROM prices WHERE ticker=? ORDER BY date DESC LIMIT 1", (h["ticker"],)).fetchone()
                         if not row:
-                            row = _conn.execute("SELECT close FROM etf_prices WHERE ticker=? ORDER BY date DESC LIMIT 1", (h["ticker"],)).fetchone()
+                            row = _conn.execute("SELECT close FROM prices WHERE ticker=? ORDER BY date DESC LIMIT 1", (h["ticker"],)).fetchone()
                         if row:
                             current_prices[h["ticker"]] = row[0]
                     _conn.close()
@@ -488,12 +488,12 @@ def build_lof_snapshot():
                 _conn = _get_db()
                 for h in holdings:
                     row = _conn.execute(
-                        "SELECT close FROM etf_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
+                        "SELECT close FROM prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
                         (h["ticker"], nav_date),
                     ).fetchone()
                     if not row:
                         row = _conn.execute(
-                            "SELECT close FROM stock_prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
+                            "SELECT close FROM prices WHERE ticker=? AND date<=? ORDER BY date DESC LIMIT 1",
                             (h["ticker"], nav_date),
                         ).fetchone()
                     if row:

@@ -118,7 +118,7 @@ def update_etf():
         if not prices:
             print(f'  {ticker}: 无数据')
             continue
-        inserted = _update_prices(conn, 'etf_prices', ticker, prices)
+        inserted = _update_prices(conn, 'prices', ticker, prices)
         conn.commit()
         total_inserted += inserted
         print(f'  {ticker}: {inserted}条 ({kind})')
@@ -146,7 +146,7 @@ def update_stocks(tickers: Optional[List[tuple]] = None):
         if not prices:
             print(f'  {ticker}: 无数据 ({market})')
             continue
-        inserted = _update_prices(conn, 'stock_prices', ticker, prices)
+        inserted = _update_prices(conn, 'prices', ticker, prices)
         conn.commit()
         total_inserted += inserted
         print(f'  {ticker}: {inserted}条 ({market})')

@@ -95,7 +95,7 @@ def cleanup_old_data(conn=None):
     today = datetime.now()
     stats = {}
     cutoff = (today - timedelta(days=90)).strftime('%Y-%m-%d')
-    for table in ('fund_nav', 'etf_prices', 'stock_prices', 'fx_rates'):
+    for table in ('fund_nav', 'prices', 'etf_prices', 'stock_prices', 'fx_rates'):
         cur = conn.execute(f'DELETE FROM {table} WHERE date < ?', (cutoff,))
         stats[table] = cur.rowcount
     conn.commit()
