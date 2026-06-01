@@ -29,8 +29,7 @@ config/secrets.yaml
 .vs/
 runtime_data/*.json
 runtime_data/*.tsv
-# ui/dist/ 不忽略，因为服务器部署时直接引用静态文件
-# ui/dist/
+ui/dist/
 scripts/debug_scripts/
 scripts/screenshots/
 

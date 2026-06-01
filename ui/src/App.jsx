@@ -96,6 +96,38 @@ function useDashboardData() {
     updatedAt: cached?.updatedAt || '',
   });
 
+  // LOF强制刷新
+  const refreshLof = React.useCallback(async () => {
+    try {
+      const data = await fetchJson(`${API_ENDPOINTS.lofArb}?force=1`);
+      setState((current) => {
+        const updated = { ...current };
+        if (updated.resources) {
+          updated.resources = { ...updated.resources, lofArb: data };
+        }
+        updated.updatedAt = new Date().toISOString();
+        return updated;
+      });
+    } catch (e) {
+      console.error('LOF refresh failed:', e);
+    }
+  }, []);
+
+  // 30分钟自动刷新LOF数据
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      fetchJson(API_ENDPOINTS.lofArb).then((data) => {
+        setState((current) => {
+          if (current.resources) {
+            return { ...current, resources: { ...current.resources, lofArb: data } };
+          }
+          return current;
+        });
+      }).catch(() => {});
+    }, 30 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const load = React.useCallback(async (isBackground = false) => {
     if (!isBackground) {
       setState((current) => ({ ...current, loading: true, error: '' }));
@@ -106,7 +138,7 @@ function useDashboardData() {
       { key: 'cbArb', url: API_ENDPOINTS.cbArb, fallback: {} },
       { key: 'ah', url: API_ENDPOINTS.ah, fallback: [] },
       { key: 'ab', url: API_ENDPOINTS.ab, fallback: [] },
-      { key: 'lofArb', url: API_ENDPOINTS.lofArb, fallback: [] },
+      { key: 'lofArb', url: `${API_ENDPOINTS.lofArb}?force=1`, fallback: [] },
       { key: 'monitor', url: API_ENDPOINTS.monitor, fallback: [] },
       { key: 'cbRightsIssue', url: API_ENDPOINTS.cbRightsIssue, fallback: {} },
     ];
@@ -655,7 +687,7 @@ function App() {
             {activeTab === 'convertible' && <ConvertiblePage rows={cbRows} smallRows={smallRedemptionRows} rightsIssueData={cbRightsIssueData} searchQuery={searchQuery} />}
             {activeTab === 'ah' && <AhCardList rows={ahRows} searchQuery={searchQuery} />}
             {activeTab === 'ab' && <AbCardList rows={abRows} searchQuery={searchQuery} />}
-            {activeTab === 'lof' && <LofCardList rows={lofRows} searchQuery={searchQuery} />}
+            {activeTab === 'lof' && <LofCardList rows={lofRows} searchQuery={searchQuery} onRefresh={refreshLof} />}
             {activeTab === 'subscription' && <SubscriptionCardList rows={subscriptionRows} searchQuery={searchQuery} />}
             {activeTab === 'monitor' && <MonitorPage rows={monitorRows} searchQuery={searchQuery} onRefresh={state.reload} />}
           </>

@@ -33,7 +33,7 @@ function isPinned(row) {
   return false;
 }
 
-export default function LofCardList({ rows = [], searchQuery = '' }) {
+export default function LofCardList({ rows = [], searchQuery = '', onRefresh }) {
   const filtered = rows.filter((row) =>
     rowMatchesQuery(row, searchQuery, ['name', 'code', 'fundCompany', 'calcTarget'])
   );
@@ -96,7 +96,7 @@ export default function LofCardList({ rows = [], searchQuery = '' }) {
   return (
     <SimpleDataTable
       eyebrow="LOF IOPV"
-      title={`QDII LOF 估值${pinnedCount > 0 ? ` · 📌${pinnedCount}` : ''}`}
+      title={`QDII LOF 估值${pinnedCount > 0 ? ` · 📌${pinnedCount}` : ''}`}{onRefresh && <button onClick={onRefresh} style={{marginLeft:'8px',fontSize:'0.75em',padding:'2px 8px',cursor:'pointer',background:'#2d3436',color:'#dfe6e9',border:'1px solid #636e72',borderRadius:'4px'}} title="强制刷新数据">🔄</button>}
       count={`${sorted.length} 条`}
       columns={columns}
       rows={sorted}

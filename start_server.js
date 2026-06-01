@@ -350,7 +350,7 @@ const DEFAULT_LOF_IOPV_PUSH_CONFIG = {
   times: normalizeTimeListConfig(
     LOF_IOPV_NOTIFICATION_CONFIG?.default_times,
     '14:00'
-  ).slice(0, 1),
+  ),
   tradingDaysOnly: LOF_IOPV_NOTIFICATION_CONFIG?.trading_days_only !== false,
 };
 
